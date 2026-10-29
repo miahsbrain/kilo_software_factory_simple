@@ -7,4 +7,4 @@ Active architectural and project risks. Short bullets only.
 - **Bootstrapping the repo:** the first commit lands on `main` and must exist before any worktree
   can branch from it. After that, every change happens on a worktree branch (ADR-015).
 - **Uncommitted board on `main`:** after each merge the orchestrator edits `docs/BOARD.md` to mark
-  the row `Merged`, leaving one uncommitted change for the user to commit (§B3).
+  the row `Merged`. That edit is committed alongside the merge (§B3).

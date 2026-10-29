@@ -14,14 +14,16 @@ Read `docs/BOARD.md` and report:
 
 Then, if asked to start it:
 
-- Create the Agent Manager worktree named after the feature
-  (`.kilo/worktrees/<feature-slug>/`, branch `feat|fix|chore|docs/<feature-slug>`).
+- Create the worktree with git, named after the feature:
+  `git worktree add .kilo/worktrees/<feature-slug> -b <type>/<feature-slug> <base-branch>`
+  (see the `git-worktree` skill for the full procedure).
 - Record the worktree path and branch in the board row and set it to `In Progress`.
-- Delegate the work to a builder session in that worktree. The builder does **not** edit this
-  board — it updates the scope docs and reports back.
+- Delegate the work to a builder agent working inside that worktree. The builder does **not**
+  edit this board — it updates the scope docs and reports back.
 - For frontend work, the builder builds the component factory and gallery first and waits for
   the user's approval of the visual language (`/components`). No screens before that.
 - On the builder's report: set `In Review`, then `Pending Merge` when the merge gate (§B4) is
-  green — including the QA and UI/UX review lanes for frontend work (`/ui`) — then ask the user
-  to inspect and merge. Never merge into `main` yourself.
+  green — including the QA and UI/UX review lanes for frontend work (`/ui`). `Pending Merge`
+  means the work is waiting for human approval to merge.
+- Print the review and merge commands for the user. Never merge, push, or open a PR yourself.
 - After the user merges, set `Merged` and clean up the worktree.

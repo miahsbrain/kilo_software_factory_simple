@@ -757,9 +757,9 @@ effects, integrations, failure/retry behaviour.
 **The board is live and lives in the main checkout.** It is the single place to see everything
 going on, including work that has not been merged yet.
 
-**Mirror it in the Agent Manager UI.** When sections exist, name them after the board lanes
-(`In Progress`, `In Review`, `Pending Merge`) and move each worktree into the section matching its
-board row, so the extension and the board never disagree.
+**The board is the CLI's view of the worktrees.** `git worktree list` shows the worktrees;
+`docs/BOARD.md` shows what each one is doing and who owns it. The board row's
+`Branch/Worktree` column is the link between them.
 
 - **Single writer: the orchestrator, in the main checkout.** Only the orchestrator session
   (working in the repo root) edits `docs/BOARD.md`.
@@ -804,11 +804,26 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Branch/Work
 
 ## B4. Worktree workflow (every change, every session)
 
-**Every change happens inside a worktree. There is no exception.** The worktree *is* the unit of
-work and it carries the code **and** every documentation update for that change. `main` stays
+**Every change happens inside a git worktree. There is no exception.** The worktree *is* the unit
+of work and it carries the code **and** every documentation update for that change. `main` stays
 clean and untouched by agents.
 
-Kilo Agent Manager worktrees live under `.kilo/worktrees/<worktree-name>/`.
+This is **CLI only**: plain `git`, no extension, no `gh`, no browser. The executable procedure is
+the `git-worktree` skill at `.kilo/skills/git-worktree/SKILL.md`. Read it before creating a
+worktree.
+
+### The enforced rules
+
+| Rule | Consequence if broken |
+|---|---|
+| Every change happens in a worktree | The change is unsanctioned work and does not exist for review |
+| The worktree is named after the feature | Unfindable; the board row cannot point at it |
+| Work only inside the worktree | Edits in the main checkout are invisible to the merge |
+| **Never commit to `main`/`master`/`base`** | The human loses control of the base branch |
+| **Never commit to an existing branch from a worktree** | Two worktrees on one branch corrupt each other |
+| **Never merge, push, or open a PR** | The human's approval step is skipped |
+| Local commits on the worktree branch are required | There is nothing for the human to merge |
+| Never delete a worktree holding unmerged work | Work is destroyed |
 
 ### Rules
 
@@ -824,11 +839,15 @@ Kilo Agent Manager worktrees live under `.kilo/worktrees/<worktree-name>/`.
    - `<feature-slug>` is short, kebab-case, and matches the board task name:
      `feat/user-login`, `fix/session-timeout`, `docs/handover-template`.
    - Record the exact worktree path and branch in the board row.
-4. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
+4. **Create it with git, from the base branch:**
+
+       git worktree add .kilo/worktrees/<feature-slug> -b <type>/<feature-slug> <base-branch>
+
+5. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
    happens there. The worktree must contain the code change **and** the matching scope-doc
    updates (§B1) so it can be reviewed as one self-contained unit.
    **Never edit `docs/BOARD.md` from a worktree** — the orchestrator owns the live board (§B3).
-5. **Three lanes, in order.** For meaningful work the board drives lanes:
+6. **Three lanes, in order.** For meaningful work the board drives lanes:
    - **Build** — implement the change in the worktree, smallest safe diff, run the verification
      command, update the docs.
    - **QA** — verify the behavior with evidence (test run, manual steps, or screenshots for UI).
@@ -836,13 +855,14 @@ Kilo Agent Manager worktrees live under `.kilo/worktrees/<worktree-name>/`.
    - **Review** — review the diff against the acceptance criteria and the production/modularity
      standards in §A8.
    Trivial changes (copy, styling, comments, docs-only) may skip QA and go straight to Review.
-6. **Merge gate.** A worktree is only offered for merge when: the verification command passed,
+7. **Merge gate.** A worktree is only offered for merge when: the verification command passed,
    QA produced evidence, the review found no blocking issue, and the documentation is updated.
-7. **Pending merge is a real state.** When the work is ready, the orchestrator sets the board row
-   to `Pending Merge` and **asks the user to inspect and merge into `main`**. Never merge into
-   `main` on your own initiative, never push, never open a PR (§B11).
-8. **After the merge**, the orchestrator marks the row `Merged` in the main checkout and cleans
-   up the worktree.
+8. **Pending merge means human approval is required.** When the work is ready, the orchestrator
+   sets the board row to `Pending Merge` and **asks the user to review and merge**. The merge
+   target is the human's choice — `main` or a feature branch. Never merge into any branch on your
+   own initiative, never push, never open a PR (§B11).
+9. **After the merge**, the orchestrator marks the row `Merged` in the main checkout, and the
+   worktree is cleaned up by the human (or by the agent once the branch is confirmed merged).
 
 ### Board lanes
 
@@ -855,7 +875,7 @@ Kilo Agent Manager worktrees live under `.kilo/worktrees/<worktree-name>/`.
 | `Ready` | Scoped, has acceptance criteria, can be picked up |
 | `In Progress` | Worktree exists, Build lane running |
 | `In Review` | Build done, QA/Review lanes running |
-| `Pending Merge` | Green. Waiting for the user to inspect and merge |
+| `Pending Merge` | Green and **waiting for human approval to merge** |
 | `Merged` | The user merged it; worktree can be removed |
 | `Blocked` | Parked for a human: needs a decision, unclear scope, or duplicate. Record what unblocks it |
 | `Dropped` | Abandoned; record why |
@@ -904,6 +924,7 @@ reason on one line.
   shape on the base branch **before** fanning out.
 - Never delete a worktree that holds unmerged or dirty work. Preserve it and report it.
 - Clean up a worktree only after its row reaches `Merged`.
+- Never create, move, or use a worktree outside `.kilo/worktrees/`.
 
 ### Guard rules (enforced by discipline, not by scripts)
 
@@ -911,6 +932,10 @@ Kilo has no hook runner here, so these are agent responsibilities. Violate none 
 
 - **Worktree confinement.** Never create, move, or use a git worktree outside
   `<project>/.kilo/worktrees/`.
+- **Never touch the base branch.** No commit, no checkout, no reset, no merge, no push on
+  `main`/`master`/`base` — not even a "small fix".
+- **Never commit to an existing branch from a worktree.** A branch belongs to exactly one
+  worktree and one task.
 - **Secrets.** Never read, grep, cat, or print `.env`, SSH keys, `.npmrc`, `credentials*`, or
   `*.pem`. Check key *presence* by name only, never by value. `.env.example` stays readable.
 - **Key literals.** Never write a live-looking API key, token, or secret into any file. Reference
@@ -932,8 +957,10 @@ stays in `In Review` or bounces to `In Progress` — it does not become `Pending
 3. QA produced evidence (command + result + `file:line`), not an assertion.
 4. The review in §A8 found no blocking issue.
 5. The documentation set is updated for the change (§B1).
+6. The worktree is clean — nothing uncommitted.
 
-The user performs the merge. The agent never merges, pushes, or opens a PR.
+The user performs the merge, into `main` or a feature branch. The agent never merges, pushes, or
+opens a PR.
 
 ## B4.1 Writing standard
 
@@ -1118,12 +1145,18 @@ the port values.
 
 ## B11. Git and commit policy
 
+**CLI only: plain `git`. No `gh`, no extension, no browser, no pull requests.**
+
 **A worktree branch must contain commits, or there is nothing for the user to merge.** So:
 
 - **Local commits on the worktree branch are allowed and expected.** The builder commits its own
   work in its worktree, on its own branch, with the message format in §B4.1.
+- **Never commit on `main`/`master`/`base`.** Not for a fix, not for a typo, not for a doc. The
+  human owns the base branch.
+- **Never commit to a branch that already has a worktree.** One branch, one worktree, one task.
+- **Never merge.** Not into `main`, not into a feature branch, not with `--no-ff`, not at all.
 - **Never push.** No `git push`, no force push, no `--all`/`--mirror`, to any branch.
-- **Never merge into `main`/`master`/`base`, and never create a pull request.** The user merges.
+- **Never create a pull request.** There is no remote workflow in this factory.
 - **Never amend or rewrite someone else's commit.** Only add new commits on top.
 - **Never force-push, even on a feature branch.**
 - **Never write a live-looking API key, token, `.env` content, SSH key, or credential file into
@@ -1142,6 +1175,24 @@ the port values.
 Types: `feat fix chore refactor test perf docs ci ui security revert wip`.
 Subject ≤ 72 characters, imperative voice, plain words. One logical change per commit.
 
+### The human approval gate
+
+Work lands on a branch. A human reviews it and decides where it goes:
+
+- The agent finishes the work, commits it on the worktree branch, and sets the board row to
+  `Pending Merge`. That state means **waiting for human approval to merge**.
+- The agent reports the worktree path, the branch, the commits, and the diff command.
+- The human reviews, then merges into `main` or into a feature branch:
+
+      git merge --no-ff <type>/<feature-slug> -m "merge: <feature-slug>"
+
+- Then the human (or the agent, once the branch is confirmed merged) cleans up:
+
+      git worktree remove .kilo/worktrees/<feature-slug>
+      git branch -d <type>/<feature-slug>
+
+The agent stops at `Pending Merge`. It does not merge, does not push, and does not open a PR.
+
 ### How the user checks the worktree
 
 | Question | Answer |
@@ -1149,11 +1200,12 @@ Subject ≤ 72 characters, imperative voice, plain words. One logical change per
 | What worktrees exist? | `git worktree list` |
 | What changed in mine? | `git -C .kilo/worktrees/<slug> status` and `git -C .kilo/worktrees/<slug> diff main` |
 | What is on my branch? | `git -C .kilo/worktrees/<slug> log --oneline main..HEAD` |
-| Is it mergeable? | `git merge-base --is-ancestor main HEAD && echo "no conflicts expected"` |
+| Is it mergeable? | `git -C .kilo/worktrees/<slug> merge-base --is-ancestor main HEAD && echo "no conflicts expected"` |
 | Clean it up after merge | `git worktree remove .kilo/worktrees/<slug>` and `git branch -d <branch>` |
-| In the UI | Agent Manager lists every worktree and its session; the board row records the path |
+| Which row owns it? | The board row's `Branch/Worktree` column |
 
-Worktrees live under `.kilo/worktrees/<feature-slug>/` and are git-ignored.
+Worktrees live under `.kilo/worktrees/<feature-slug>/` and are git-ignored. The full procedure is
+the `git-worktree` skill at `.kilo/skills/git-worktree/SKILL.md`.
 
 ## B12. Definition of Done
 
