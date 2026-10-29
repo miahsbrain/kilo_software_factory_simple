@@ -15,7 +15,10 @@ Lanes: `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merg
 
 | ID | Task | Type | Status | Priority | Risk | Blocked by | Branch/Worktree | Notes |
 |---|---|---|---|---|---|---|---|---|
-| BOARD-001 | Establish factory documentation and orchestration rules | Chore | In Review | P1 | 🟢 low — docs only | - None. | main checkout (pre-dates the worktree rule) | Root `AGENTS.md`, `docs/` set, builder `AGENTS.md` files, `/board` `/run` commands |
+| BOARD-001 | Establish factory documentation and orchestration rules | Chore | Merged | P1 | 🟢 low — docs only | - None. | `main` | Root `AGENTS.md`, `docs/` set, builder `AGENTS.md` files, agent team. Merged in `13b8953` |
+| BOARD-002 | Describe the factory in `docs/HANDOVER.md` | Docs | Merged | P2 | 🟢 low — docs only | - None. | `docs/factory-handover` | Replace the generic template with the real factory: entry points, agent/command units marked pure or effectful, the board lane state machine, and the real risks. Merged in `3a4ca25` |
+| BOARD-003 | Build the first application | Feature | Backlog | P1 | 🟡 medium — new code, unknown blast radius | - None. | - | Which application this factory builds first is still an open question. Run the discovery interview (`/decide`) before any scaffolding |
+| BOARD-004 | CLI-only git worktree skill and branch protection | Chore | Merged | P1 | 🟢 low — rules and docs only | - None. | `feat/cli-worktree-skill` | Adds `.kilo/skills/git-worktree`, removes the extension dependency, forbids commits on `main`/`master`/`base` and on branches that already have a worktree, and makes `Pending Merge` the human approval gate. Merged in `83b4b2c` |
 
 ## Rules
 
