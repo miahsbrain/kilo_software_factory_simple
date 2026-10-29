@@ -539,7 +539,7 @@ For any frontend work, the visual language is settled **before** screens are bui
 5. **A screen that deviates from the approved gallery is a review finding**, not a new decision.
 
 No screen is built before the gallery is approved. The gallery imports the same component
-modules the screens use — never a forked copy. See `docs/UI-UX.md` §3.
+modules the screens use — never a forked copy. See `docs/UI-UX.md` §4.
 
 ### Orchestration protocol
 
@@ -927,6 +927,62 @@ worktree.
   result + `file:line`), what is not done and why, and the next action.
 - **Never two orchestrators on one board.** One agent owns the board at a time.
 
+### The loop: it runs until the spec is met
+
+A row is not finished when the builder is finished. It is finished when the **human's spec is
+met**, proven by evidence. The lanes repeat until then.
+
+```
+        ┌──────────────────────────────────────────────┐
+        │                                              │
+   decision sheet  →  build  →  QA  →  critique  →  review
+   (human approves)  (worktree)  (Playwright) (UI/UX)   │
+        │                              │                 │
+        │                        findings                │
+        │                              ▼                 │
+        │                    fix rows (Type: Fix)       │
+        │                              │                 │
+        └──────────────────────────────┴─── re-verify ───┘
+```
+
+**The rules that make it a loop, not a pipeline:**
+
+1. **A row cannot reach `Pending Merge` while any Fix row it spawned is open.** Every finding
+   becomes a Fix row with `Blocked by: BOARD-xxx`. The original row waits.
+2. **Every Fix row runs the same three lanes.** A fix is not trusted because it looks right. It
+   goes through QA with the finding's acceptance criteria, then review. A fix that fixes the
+   symptom but breaks the flow is caught here.
+3. **After the Fix rows merge, the original row is re-verified.** The QA lane re-runs against the
+   merged result — the criterion that failed must now pass, and nothing around it may have
+   regressed. Only then can the original row go to `Pending Merge`.
+4. **A finding that repeats three times is a `Blocked` row, not a fourth attempt.** The same
+   finding failing the same way three times means the approach is wrong, not the implementation.
+   Park it, write down what was tried, and ask the human.
+5. **A red critical path is an immediate `Blocked` row.** Money, data loss, auth, and security
+   flows are never retried silently.
+6. **The loop ends on the spec, not on the diff.** "The builder wrote the code" is not a stopping
+   condition. "Every acceptance criterion on the row passes with recorded proof" is.
+
+### What the review lanes must check
+
+Both the QA lane and the Review lane check the same three things, from different angles. A gap in
+any one of them is a finding.
+
+| Check | Question | Who |
+|---|---|---|
+| **Reuse** | Did the change duplicate an existing function, component, or state instead of expanding one? | review |
+| **User-centred** | Does the result serve a named user doing a named task, with an obvious primary action? | QA + critique |
+| **Spec** | Does every acceptance criterion pass, proven by evidence? | QA |
+
+The reuse check is not a feeling. For a Feature row, the acceptance criteria must contain one of:
+
+    - [ ] Existing `validateRange()` already covers this — extended it instead of adding `checkRange()`
+    - [ ] No existing helper covers this — added `formatWindow()` because the existing formatters
+          return a different unit
+
+A builder that cannot name the existing code it looked at, or the reason there is none, has not
+done the search. That is a review finding.
+
 ### Task grading (routing)
 
 Before delegating, grade the task by scope of change and pick the lightest effort that can
@@ -1047,7 +1103,7 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   expected-vs-actual with the screenshot or `file:line` that proves them.
 - **Verdict:** a frontend row cannot leave `In Review` until both QA and the UI/UX critique are
   green. Any finding returns the row to `In Progress` with the finding restated.
-- The spec is in `docs/UI-UX.md` §4. Keep it lean: one spec file per feature lane, no extra test
+- The spec is in `docs/UI-UX.md` §5. Keep it lean: one spec file per feature lane, no extra test
   framework.
 
 ### The reviewer agents
@@ -1141,6 +1197,23 @@ exist — or can an existing one be tweaked to do it?"**
 - Prefer editing an existing file over creating a new one. New files need a stated reason in the
   changelog.
 - No speculative abstractions, no framework for a single use case, no "just in case" helpers.
+
+### The analysis is reported, not assumed
+
+The search must leave a trace in the builder's report, because a rule nobody can check is a rule
+nobody follows. For every new function, component, endpoint, or state slice, the report says:
+
+| Question | Answer |
+|---|---|
+| What existing code covers this? | `file:line` — or "none, after searching for X, Y, Z" |
+| What did you do about it? | extended it · used it as-is · it did not fit because <reason> |
+| What is new, and why? | the new symbol and the reason there was nothing to extend |
+
+For a **Fix** row, the report additionally says which existing function carried the bug and what
+changed inside it.
+
+The Review lane checks this: a diff that adds a function beside a near-identical existing one is
+a finding, and so is a second source of truth for state that already exists.
 
 ## B7. Functional programming style
 

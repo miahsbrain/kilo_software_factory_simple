@@ -105,7 +105,70 @@ Every rule here is checkable in review. A screen that trips several of them read
 
 ---
 
-## 3. The component factory (required before any screen)
+## 3. User-centred and modern — the standard the critique enforces
+
+Anti-slop rules stop a screen looking generated. These stop it being **useless**. A screen can
+pass every rule in §2 and still be a bad product.
+
+Both the QA lane and the UI/UX critique check these. Every one is answerable by looking at the
+screen and asking a question — no taste, no preference.
+
+### 3.1 User-centred
+
+| # | Question | Failure looks like |
+|---|---|---|
+| U1 | **Who is this for, and what are they doing?** State it in one sentence: "a support agent answering a customer ticket." | The screen serves the org's internal model (a `ticket_state` enum) instead of the user's task ("find the customer's last message"). |
+| U2 | **What is the outcome the user came for?** Name it. | The screen's main content is a list of internal records; the outcome is buried in a modal. |
+| U3 | **Is the primary action obvious?** One dominant action per view, visible without scrolling, labelled with the verb the user would use. | Four equally-weighted buttons, or a primary action that is only labelled "Submit". |
+| U4 | **Does it ask the user to do the organisation's work?** | Internal jargon, raw IDs, "admin" concepts, or fields the user never chose. Names where a name belongs; IDs only when the ID is the point. |
+| U5 | **Does it respect the user's time?** No re-entry of known data, no unnecessary steps, no waiting for something that could be instant. | The user retypes their address on every page. A spinner where the result was already available. |
+| U6 | **Is a destructive action reversible or confirmed?** | "Delete" with no confirmation, or confirmation that does not name what will be deleted. |
+| U7 | **Do the error states tell the user what to do next?** | "Something went wrong." The message names the problem and the next action. |
+| U8 | **Does it work for the user who cannot use the mouse, zoom in, or read at a glance?** Keyboard-only, 200% zoom, 320px wide, and screen-reader names all work. | A drag-only interaction, a hover-only tooltip, 11px body text, an icon-only button with no name. |
+
+### 3.2 Modern
+
+"Modern" means **current platform convention**, not novelty. A 2015 dashboard is not modern; a
+new-fangled layout is not either.
+
+| # | Convention | Why |
+|---|---|---|
+| M1 | **Real input types** — `type="email"`, `type="number"`, `inputmode`, `autocomplete` | The keyboard matches the data. |
+| M2 | **Inline validation** at the field, after the user leaves it — not a wall of errors on submit | Errors land where the mistake was made. |
+| M3 | **Skeletons over spinners** for layout that is known; a spinner only when the wait is unbounded | The page does not jump. |
+| M4 | **Optimistic feedback** where the outcome is predictable and reversible | The interface does not stall the user. |
+| M5 | **System or a single text face**, a real type scale, no five weights of the same family | Readability. |
+| M6 | **Keyboard-first where the user is a power user** — `/` to search, `j`/`k` to move, `Enter` to act, `Esc` to close | Speed for the people who live in the tool. |
+| M7 | **Dark mode when the product needs it**, with both themes designed — not an inverted filter | Night use and low-light environments. |
+| M8 | **Copy that names the job** | "Send the weekly report", not "Submit". |
+| M9 | **No layout shift when data arrives** | Reserved space for content of unknown size. |
+| M10 | **Touch targets ≥ 44×44 CSS px** in touch-primary flows (the review floor is 24×24) | A thumb, not a cursor. |
+
+### 3.3 Density matches the task
+
+| The user is… | Density | Look like |
+|---|---|---|
+| scanning many records | high | table, 32–40px rows, columns aligned, secondary metadata in one line |
+| reading | low | 60–75ch measure, 16–18px, generous leading |
+| entering data | comfortable | 16px fields, label above, hint under, one column unless the data is compared side by side |
+
+Pick one deliberately. A form laid out like a spreadsheet is a finding.
+
+### 3.4 The critique verdict
+
+The UI/UX critique reports on §2 (anti-slop), §3.1 (user-centred), §3.2 (modern), and §3.3
+(density). A screen that passes §2 and fails §3.1 is still a **FAIL** — beautiful and useless is
+not done.
+
+Findings state the question that failed, what the screen does instead, and the fix:
+
+    | # | Rule | Expected | Actual | Evidence | Fix |
+    |---|---|---|---|---|---|
+    | U3 | Primary action obvious | One dominant action, visible | Three equal buttons, the real one is below the fold | settings-390.png | Make "Save filters" the filled primary action |
+
+---
+
+## 4. The component factory (required before any screen)
 
 **A frontend project builds a component factory before it builds screens.**
 
@@ -167,7 +230,7 @@ registry plus one route is cheaper and enforces the same sync rule.
 
 ---
 
-## 4. QA and UI/UX review evidence (Playwright)
+## 5. QA and UI/UX review evidence (Playwright)
 
 The QA lane for frontend work produces **evidence**, not assertions.
 
@@ -280,7 +343,7 @@ Exit 0 → accepted. Exit 66 → the finding is too weak to act on; fix the body
 
 ---
 
-## 5. Open design decisions
+## 6. Open design decisions
 
 | Decision | Status | Notes |
 |---|---|---|

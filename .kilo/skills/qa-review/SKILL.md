@@ -78,6 +78,14 @@ Then look at the screenshots and answer:
 - Do the empty, loading, and error states say something specific and name the next action?
 - Is the primary action obvious? Does the hierarchy read at 320px?
 
+Then judge it for the **user**, not only for the spec. Answer every question in
+`docs/UI-UX.md` §3.1 (user-centred, U1–U8) and §3.2 (modern, M1–M10), and the density rule in
+§3.3. A screen that passes the acceptance criteria and fails §3 is still a FAIL — beautiful and
+useless is not done.
+
+Also check **reuse**: does the diff duplicate an existing function, component, or state instead of
+expanding one? Name the existing code if it does.
+
 ---
 
 ## 5. Write the finding

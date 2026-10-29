@@ -62,6 +62,8 @@ Every row carries:
 
 - **Acceptance criteria** — 2–5 checkable items, each verifiable by a test or an observable step.
   A task with no checkable criteria is not ready to build.
+  A **Feature** row also carries a reuse criterion — which existing code was extended, or the
+  reason there was none to extend.
 - **Risk** — `🟢 low` / `🟡 medium` / `🔴 high` plus one line of reasoning.
 - **Blocked by** — board IDs it depends on, or exactly `- None.`
 - **Notes** — the acceptance criteria and any context, so the next agent can pick it up cold.

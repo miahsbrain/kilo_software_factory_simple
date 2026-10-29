@@ -3,7 +3,7 @@ description: Run the QA and UI/UX review lane with Playwright and produce eviden
 ---
 
 Run the QA lane and the UI/UX critique for a frontend row. Evidence, not assertions.
-Spec: `docs/UI-UX.md` §4.
+Spec: `docs/UI-UX.md` §3 and §5.
 
 1. **Confirm the app runs.** Use the dev command from `docs/STACK.md`. If it does not start,
    report the blocker; do not fake a review.
@@ -26,8 +26,10 @@ Spec: `docs/UI-UX.md` §4.
    - console errors, unexpected 4xx/5xx
    - horizontal overflow at 320px
    - does the screen match the approved component gallery (tokens, states, density)
-5. **UI/UX critique** against the 15 anti-slop rules in `docs/UI-UX.md` §2. Each finding names
-   the rule, the screenshot or `file:line` that proves it, and the fix.
+5. **UI/UX critique** against the 15 anti-slop rules in `docs/UI-UX.md` §2, **and** the
+   user-centred (U1–U8) and modern (M1–M10) criteria in §3. Each finding names the rule, the
+   screenshot or `file:line` that proves it, and the fix. A screen that passes §2 and fails §3
+   is still a FAIL.
 6. **Verdict**: a frontend row cannot leave `In Review` until both QA and the critique are
    green. Any finding returns the row to `In Progress` with the finding restated.
 

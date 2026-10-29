@@ -17,6 +17,8 @@ Run the decision gate from `AGENTS.md` §A6.1 for the described feature or chang
    fast answer. Do not drip one question at a time.
 4. **On approval**, record each decision in `docs/DECISIONS.md` (with the date), and add the
    board row with 2–5 checkable acceptance criteria, a risk level, and `Blocked by`.
+   For a **Feature** row, include the reuse criterion — which existing code will be extended, or
+   the reason there is none to extend. The builder cannot be asked to guess it later.
 5. **Then** produce the implementation plan or delegate. No code before the decisions are settled.
 
 If something remains unclear after the sheet is answered, ask again rather than assume. Silence
