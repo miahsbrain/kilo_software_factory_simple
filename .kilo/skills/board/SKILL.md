@@ -119,7 +119,26 @@ lets it proceed to `Pending Merge`.
 
 ---
 
-## 6. Rules
+## 6. See it live
+
+The markdown table is the source of truth, but it is hard to scan. The **board viewer** renders it
+as a dashboard you can open in a browser:
+
+```bash
+python3 .kilo/skills/board/scripts/board_serve.py --port 15180
+```
+
+- One column per lane, so the shape of the flow is always visible.
+- Every card shows its ID, task, type, priority, risk badge, `Blocked by`, and worktree.
+- A **live worktrees** panel shows each worktree with its branch, path, ahead/behind counts, and a
+  dirty marker.
+- The board is re-read on **every request** and the page auto-refreshes. Nothing is cached.
+- The server is **read-only**. It never writes to the board or the repository.
+- `/api/board` and `/api/worktrees` serve the same data as JSON.
+
+The port is forwarded by the devcontainer as **Factory Board (15180)**.
+
+## 7. Rules
 
 - **The board is the source of truth.** Re-read it at the start of every session and every task.
   A row's status must match reality.

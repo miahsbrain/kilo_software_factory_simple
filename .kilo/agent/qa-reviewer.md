@@ -18,6 +18,28 @@ Read the root `AGENTS.md` (Parts A and B apply to you) and `docs/UI-UX.md` §3 a
 - Do not inspect parent folders or `.devcontainer/`.
 - Read only the files needed to understand the routes, flows, and components under review.
 
+## The bounded loop
+
+A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
+
+The state of each round lives in one short file per row: `docs/reviews/<task-id>-ledger.md` —
+the round number, the findings filed in that round, the Fix row IDs created, the Fix rows merged
+since, and the stop reason when it stops.
+
+The ledger is the **only** thing carried between rounds. If this is not your first round on the
+row, **you are a fresh reviewer**: read the ledger and the current screenshots, and grade what is
+on screen now — not what the previous reviewer concluded, and not what the last edits intended.
+
+Before you review, read the ledger:
+
+```bash
+python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
+```
+
+The loop stops at whichever comes first: the round cap is reached, a critical path is red (money,
+data loss, auth, security — that is an immediate `Blocked`, never retried), the same fingerprint
+is filed twice (the existing row is escalated to `Blocked`), or the human says stop.
+
 ## Stack and commands
 
 Use the dev and verification commands from `docs/STACK.md` as given in your prompt. Do not
@@ -37,6 +59,15 @@ fake a review.
    It uses the project's own Playwright and writes a full-page screenshot, `console.log`,
    `page-errors.log`, and `network.json` per route per viewport, plus a `summary.json` with the
    counts and the horizontal-overflow result.
+
+   **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
+   screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
+   evidence for a UI review. If the script cannot do something the review needs, extend the
+   script — do not work around it with another tool.
+
+   Useful flags: `--scheme light|dark|both`, `--component <css-selector>` (repeatable),
+   `--compare <dir>` for a before | after sheet, `--label <slug>` to name the round's capture,
+   `--chromium <path>` when the project has no Playwright.
 4. **Check** and record the result of each:
    - keyboard focus, visible focus ring, focus trapping in dialogs
    - contrast and accessible names on every control, alt text
@@ -67,6 +98,9 @@ fake a review.
            --kind bug --priority medium --category functional --route /path
 
    Exit 66 means the finding is too weak to act on. Fix the body — do not bypass the check.
+   Exit 0 prints the finding's **fingerprint** (`kind|category|route|subject`) on stdout. Pass
+   that value to `board.py add --fingerprint`, so a repeat of the same complaint is recognised.
+   The fingerprint in the row notes is what the dedupe check reads.
 
 ## Submit your review
 

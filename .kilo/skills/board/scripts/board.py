@@ -4,7 +4,8 @@
     board.py show [ID]
     board.py add --id BOARD-00X --task "..." --type Feature --status Backlog
                  --priority P1 --risk "🟢 low — one line" [--blocked-by "..."]
-                 [--branch-worktree "..."] [--note "..."]
+                 [--branch-worktree "..."] [--note "..."] [--fingerprint "kind|category|route|subject"]
+    board.py note <ID> --value "..." [--escalate]
     board.py set-status <ID> "<new status>"
     board.py set-field <ID> --field risk|priority|blocked-by|branch-worktree|notes --value "..."
     board.py remove <ID>
@@ -15,6 +16,11 @@ The table is located by its header row and separator row. Rows are split on
 refuses to touch the file when the table cannot be parsed. Only the named cell
 changes: every other cell keeps its bytes. The file is written atomically
 (temp file in the same directory, then os.replace).
+
+A Fix row may carry a fingerprint — kind|category|route|subject — so the same
+complaint about the same thing is recognised when it is filed again. A row with
+a fingerprint that is already open is refused; the repeat is appended to the
+existing row with `board.py note`.
 
 Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 """
@@ -33,6 +39,8 @@ PRIORITIES = ["P1", "P2", "P3", "P4"]
 FIELDS = {"risk": 5, "priority": 4, "blocked-by": 6, "branch-worktree": 7, "notes": 8}
 COLUMNS = ["ID", "Task", "Type", "Status", "Priority", "Risk", "Blocked by",
            "Branch/Worktree", "Notes"]
+OPEN_STATUSES = ("Backlog", "Ready", "In Progress", "In Review", "Pending Merge", "Blocked")
+FINGERPRINT_PREFIX = "fp="
 
 OK = 0
 REFUSED = 1
@@ -79,11 +87,11 @@ def read_table(path):
 
 
 def split_row(line):
-    """The cells of a markdown table row. Pipes inside cells are not supported."""
+    """The cells of a markdown table row. A pipe escaped with a backslash stays in its cell."""
     stripped = line.strip()
     if not stripped.startswith("|"):
         return []
-    parts = stripped.split("|")
+    parts = re.split(r"(?<!\\)\|", stripped)
     if parts and parts[0].strip() == "":
         parts = parts[1:]
     if parts and parts[-1].strip() == "":
@@ -92,14 +100,14 @@ def split_row(line):
 
 
 def cell_texts(lines, index):
-    return [c.strip() for c in split_row(lines[index])]
+    return [c.strip().replace("\\|", "|") for c in split_row(lines[index])]
 
 
 def replace_cell(line, index, value):
     """The same row with only cell `index` changed; every other byte stays as it was."""
     stripped = line.strip()
     lead = line[:len(line) - len(line.lstrip())]
-    parts = stripped.split("|")
+    parts = re.split(r"(?<!\\)\|", stripped)
     leading_pipe = bool(parts) and parts[0].strip() == ""
     if leading_pipe:
         parts = parts[1:]
@@ -111,7 +119,7 @@ def replace_cell(line, index, value):
     raw = parts[index]
     left = raw[:len(raw) - len(raw.lstrip())]
     right = raw[len(raw.rstrip()):]
-    parts[index] = left + value + right
+    parts[index] = left + value.replace("|", "\\|") + right
     return lead + ("|" if leading_pipe else "") + "|".join(parts) + ("|" if trailing_pipe else "")
 
 
@@ -146,6 +154,60 @@ def row_by_id(table, board_id):
     return None
 
 
+def reject_unsafe_value(name, value):
+    if any(char in value for char in "\n\r|"):
+        print("invalid %s: the value must be on one line and must not contain a pipe; "
+              "use a middle dot (·), a comma, or a semicolon instead" % name,
+              file=sys.stderr)
+        return True
+    return False
+
+
+def reject_unsafe_fingerprint(value):
+    if any(char in value for char in "\n\r"):
+        print("invalid --fingerprint: the value must be on one line", file=sys.stderr)
+        return True
+    return False
+
+
+def normalize_fingerprint(value):
+    """The canonical fingerprint: kind|category|route|subject, lowercased and trimmed."""
+    parts = [part.strip().lower() for part in (value or "").split("|")]
+    while len(parts) < 4:
+        parts.append("-")
+    return "|".join(parts[:4])
+
+
+def row_fingerprint(cells):
+    """The fingerprint carried by a row's Notes cell, or an empty string."""
+    notes = cells[8] if len(cells) > 8 else ""
+    match = re.search(re.escape(FINGERPRINT_PREFIX) + r"([^\s|·]+\|[^\s|·]+\|[^\s|·]+\|[^\s|·]+)", notes)
+    return normalize_fingerprint(match.group(1)) if match else ""
+
+
+def fingerprint_notes(fingerprint, note):
+    """The Notes cell text for a row that carries a fingerprint."""
+    if not fingerprint:
+        return note or "-"
+    token = FINGERPRINT_PREFIX + fingerprint
+    if not note:
+        return token
+    return token + " · " + note
+
+
+def find_open_fingerprint(table, fingerprint):
+    """(id, status) of the open row carrying this fingerprint, or (None, None)."""
+    for i in table["rows"]:
+        cells = cell_texts(table["lines"], i)
+        if len(cells) < 4:
+            continue
+        if cells[3] not in OPEN_STATUSES:
+            continue
+        if row_fingerprint(cells) == fingerprint:
+            return cells[0], cells[3]
+    return None, None
+
+
 def cmd_show(args, path):
     table, err = read_table(path)
     if table is None:
@@ -168,7 +230,28 @@ def cmd_show(args, path):
     return OK
 
 
+def escalate_repeat(table, existing_id, fingerprint):
+    """A repeat finding: the existing row carries it and is escalated to Blocked."""
+    index = row_by_id(table, existing_id)
+    if index is None:
+        return
+    cells = cell_texts(table["lines"], index)
+    notes = cells[8] if len(cells) > 8 else ""
+    merged = notes + " · repeat finding: fingerprint " + fingerprint
+    table["lines"][index] = replace_cell(table["lines"][index], FIELDS["notes"], merged)
+    table["lines"][index] = replace_cell(table["lines"][index], 3, "Blocked")
+
+
 def cmd_add(args, path):
+    named_values = [("--id", args.id), ("--task", args.task), ("--risk", args.risk),
+                    ("--blocked-by", args.blocked_by), ("--branch-worktree", args.branch_worktree),
+                    ("--note", args.note)]
+    for name, value in named_values:
+        if value is not None and reject_unsafe_value(name, value):
+            return REFUSED
+    if args.fingerprint is not None and reject_unsafe_fingerprint(args.fingerprint):
+        return REFUSED
+    fingerprint = normalize_fingerprint(args.fingerprint) if args.fingerprint else ""
     table, err = read_table(path)
     if table is None:
         print(err, file=sys.stderr)
@@ -176,8 +259,23 @@ def cmd_add(args, path):
     if row_by_id(table, args.id) is not None:
         print("ID %s already exists on the board" % args.id, file=sys.stderr)
         return REFUSED
+    if fingerprint:
+        existing_id, existing_status = find_open_fingerprint(table, fingerprint)
+        if existing_id is not None:
+            escalate_repeat(table, existing_id, fingerprint)
+            note_uncommitted(path)
+            write_atomic(path, table["lines"])
+            print("refused: fingerprint %s is already open on %s (status: %s)" %
+                  (fingerprint, existing_id, existing_status), file=sys.stderr)
+            print("this is a repeat finding: %s now carries it and is Blocked" % existing_id,
+                  file=sys.stderr)
+            print("add the new evidence to it with:", file=sys.stderr)
+            print("  python3 %s note %s --value \"<the new evidence>\"" %
+                  (sys.argv[0], existing_id), file=sys.stderr)
+            return REFUSED
     values = [args.id, args.task, args.type, args.status, args.priority, args.risk,
-              args.blocked_by or "- None.", args.branch_worktree or "-", args.note or "-"]
+              args.blocked_by or "- None.", args.branch_worktree or "-",
+              fingerprint_notes(fingerprint, args.note)]
     new_row = "| " + " | ".join(v.replace("|", "\\|") for v in values) + " |"
     lines = list(table["lines"])
     insert_at = (table["rows"][-1] + 1) if table["rows"] else table["header"] + 2
@@ -185,6 +283,35 @@ def cmd_add(args, path):
     note_uncommitted(path)
     write_atomic(path, lines)
     print("added %s (%s, %s)" % (args.id, args.type, args.status))
+    if fingerprint:
+        print("fingerprint: %s" % fingerprint)
+    return OK
+
+
+def cmd_note(args, path):
+    if reject_unsafe_value("--value", args.value):
+        return REFUSED
+    table, err = read_table(path)
+    if table is None:
+        print(err, file=sys.stderr)
+        return REFUSED
+    index = row_by_id(table, args.id)
+    if index is None:
+        print("no row with ID %s" % args.id, file=sys.stderr)
+        return REFUSED
+    cells = cell_texts(table["lines"], index)
+    notes = cells[8] if len(cells) > 8 else ""
+    if notes in ("", "-"):
+        merged = args.value
+    else:
+        merged = notes + " · " + args.value
+    lines = list(table["lines"])
+    lines[index] = replace_cell(lines[index], FIELDS["notes"], merged)
+    if args.escalate:
+        lines[index] = replace_cell(lines[index], 3, "Blocked")
+    note_uncommitted(path)
+    write_atomic(path, lines)
+    print("%s notes updated%s" % (args.id, " and escalated to Blocked" if args.escalate else ""))
     return OK
 
 
@@ -206,6 +333,8 @@ def cmd_set_status(args, path):
 
 
 def cmd_set_field(args, path):
+    if reject_unsafe_value("--value", args.value):
+        return REFUSED
     table, err = read_table(path)
     if table is None:
         print(err, file=sys.stderr)
@@ -277,6 +406,13 @@ def main(argv):
     p.add_argument("--blocked-by")
     p.add_argument("--branch-worktree")
     p.add_argument("--note")
+    p.add_argument("--fingerprint", help="kind|category|route|subject; a repeat is refused")
+
+    p = sub.add_parser("note", help="append evidence to an existing row")
+    p.add_argument("id")
+    p.add_argument("--value", required=True)
+    p.add_argument("--escalate", action="store_true",
+                   help="also move the row to Blocked")
 
     p = sub.add_parser("set-status", help="change only the status cell")
     p.add_argument("id")
@@ -310,6 +446,8 @@ def main(argv):
                   file=sys.stderr)
             return INVALID
         return cmd_add(args, path)
+    if args.command == "note":
+        return cmd_note(args, path)
     if args.command == "set-status":
         if args.status not in STATUSES:
             print("invalid status %r: use one of %s" % (args.status, ", ".join(STATUSES)),

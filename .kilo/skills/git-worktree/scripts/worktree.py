@@ -98,11 +98,26 @@ def load_board_module(root):
     return module
 
 
+TRAILING_STOPWORDS = {
+    "with", "and", "or", "but", "for", "from", "to", "of", "in", "on", "at", "by", "as",
+    "that", "which", "the", "a", "an", "is", "are", "was", "were", "be", "been", "it", "its",
+    "this", "these", "those", "then", "into", "over", "via", "per",
+}
+
+
+def drop_trailing_stopwords(slug):
+    """The slug without the connective words it ends on, never below one word."""
+    words = slug.split("-")
+    while len(words) > 1 and words[-1] in TRAILING_STOPWORDS:
+        words.pop()
+    return "-".join(words)
+
+
 def slugify(title):
     """The kebab-case slug of a board task title."""
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
     if len(slug) > MAX_SLUG_LEN:
-        slug = "-".join(slug.split("-")[:6])
+        slug = drop_trailing_stopwords("-".join(slug.split("-")[:6]))
     return slug
 
 

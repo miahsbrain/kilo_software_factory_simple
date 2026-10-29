@@ -16,21 +16,46 @@ Spec: `docs/UI-UX.md` §3 and §5.
 
    Viewports: 390×844 (mobile), 834×1112 (tablet), 1440×900 (desktop), 1920×1080 (wide), and
    320×800 as the overflow floor.
-3. **Store artifacts** under `apps/<scope>/artifacts/qa/<YYYY-MM-DD>/<task-id>/` with a
+
+   **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
+   screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
+   evidence for a UI review. If the script cannot do something the review needs, extend the
+   script — do not work around it with another tool.
+
+   Extra flags: `--scheme light|dark|both`, `--component <css-selector>` (repeatable),
+   `--compare <dir>` (before | after sheet), `--label <slug>` (names the round's capture),
+   `--chromium <path>` (fallback binary over CDP when the project has no Playwright).
+3. **Check the round ledger** — a row goes through at most 3 QA↔fix rounds, and each round's
+   review is done by a fresh reviewer who reads the ledger, not the previous reviewer's
+   reasoning:
+
+       python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
+
+   The ledger lives at `docs/reviews/<task-id>-ledger.md`.
+4. **Store artifacts** under `apps/<scope>/artifacts/qa/<YYYY-MM-DD>/<task-id>/` with a
    `notes.md` recording what was checked and expected vs actual. Commit `notes.md` and small
    component shots only.
-4. **Check** and report findings as expected-vs-actual:
+5. **Check** and report findings as expected-vs-actual:
    - keyboard focus, visible focus ring, focus trapping in dialogs
    - contrast, accessible names on controls, alt text
    - tap targets ≥ 24×24 CSS px
    - console errors, unexpected 4xx/5xx
    - horizontal overflow at 320px
    - does the screen match the approved component gallery (tokens, states, density)
-5. **UI/UX critique** against the 15 anti-slop rules in `docs/UI-UX.md` §2, **and** the
+6. **UI/UX critique** against the 15 anti-slop rules in `docs/UI-UX.md` §2, **and** the
    user-centred (U1–U8) and modern (M1–M10) criteria in §3. Each finding names the rule, the
    screenshot or `file:line` that proves it, and the fix. A screen that passes §2 and fails §3
    is still a FAIL.
-6. **Verdict**: a frontend row cannot leave `In Review` until both QA and the critique are
-   green. Any finding returns the row to `In Progress` with the finding restated.
+7. **Validate each finding and take its fingerprint**:
+
+       python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+           --kind bug --priority medium --category functional --route /path
+
+   Exit 0 prints the fingerprint on stdout. Pass it to `board.py add --fingerprint`; a repeat
+   fingerprint is refused and the existing row is escalated to `Blocked` instead.
+8. **Verdict**: a frontend row cannot leave `In Review` until both QA and the critique are
+   green. Any finding returns the row to `In Progress` with the finding restated. The round cap
+   is 3 — when it is reached and the row still fails, the row moves to `Blocked` with a summary
+   of what was tried and the question the human must answer.
 
 Report in this order: what was done, what is proven, what is not done and why, next action.

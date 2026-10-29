@@ -18,9 +18,23 @@ stays in the main checkout and only you write it.
    - Commit locally on the worktree branch. Never push, never merge, never open a PR.
 3. **QA** — produce evidence, not assertion. One observable check per acceptance criterion,
    with the command and result and `file:line`. For UI work, capture screenshots.
+   - The capture script is the only way to capture UI evidence. Ad-hoc `chromium`, `npx playwright
+     screenshot`, `curl`-and-guess, or any other browser command from bash is not acceptable
+     evidence. If the script cannot do something the review needs, extend the script — do not
+     work around it with another tool.
+   - A row goes through at most **3** QA↔fix rounds. Round 3 is the last. Each round's review is
+     done by a fresh reviewer that reads `docs/reviews/<task-id>-ledger.md` and the current
+     screenshots, not the previous reviewer's reasoning. The ledger script opens and closes rounds:
+     `python3 .kilo/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005`.
+   - Findings are deduplicated by fingerprint (`kind|category|route|subject`). `check-finding.py`
+     prints it; `board.py add --fingerprint` refuses a fingerprint that is already open and prints
+     the command that updates the existing row.
    - Pass → continue to Review.
    - Fail → row back to `In Progress` with the expected-vs-actual and the failing repro.
      Never mark an unchecked criterion as done.
+   - Stop conditions: round cap reached, a critical path red (money, data loss, auth, security —
+     immediate `Blocked`), the same fingerprint filed twice (the existing row is escalated to
+     `Blocked`), or the human says stop.
 4. **Review** — read the diff and the acceptance criteria first, form your own hypotheses, then
    compare against the builder's summary (§A8). Re-run the exact verification command the QA
    lane used. Any blocking finding → row back to `In Progress` with the finding restated.
