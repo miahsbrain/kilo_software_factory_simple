@@ -18,10 +18,12 @@ defect, what the severity is, and what the fix should be.
 | Script | Does |
 |---|---|
 | `.kilo/skills/qa-review/scripts/browser-review.mjs` | drives Playwright, captures screenshots, console errors, page errors, network failures, overflow |
-| `.kilo/skills/qa-review/scripts/check-finding.py` | validates a finding body before it becomes a board row |
+| `.kilo/skills/qa-review/scripts/check-finding.py` | validates a finding body before it becomes a board row, and prints its fingerprint |
+| `.kilo/skills/qa-review/scripts/ledger.py` | tracks the bounded QA/fix rounds of one row |
 
-The Playwright runner uses the **project's own** Playwright installation. It never installs
-anything.
+The Playwright runner uses the **project's own** Playwright when it has one, and the global
+install the devcontainer provides otherwise. It never installs anything and never drives a browser
+over a hand-rolled protocol.
 
 ---
 
@@ -37,15 +39,56 @@ node .kilo/skills/qa-review/scripts/browser-review.mjs \
   --project apps/web
 ```
 
-- `--route` repeats; capture every route the change touches.
-- `--viewports` defaults to `390x844,834x1112,1440x900,1920x1080,320x800`.
-- `--project` is where Playwright must resolve from. Default: the current directory.
-
-It writes, per route and viewport: `full.png`, `console.log`, `page-errors.log`, `network.json`,
-plus a top-level `summary.json` with the counts and the horizontal-overflow result at each width.
-
 The script exits 0 when the capture completed, even when errors were found. Findings are your
 job. It exits 2 on a fatal failure (browser launch, bad URL) — report that, do not fake a review.
+
+### The script is the only way to capture UI evidence
+
+The QA reviewer and the UI critic capture screenshots **only** through `browser-review.mjs`.
+Ad-hoc `chromium`, `npx playwright screenshot`, `curl`-and-guess, or any other browser command
+run from bash is **not acceptable evidence** for a UI review.
+
+If the script cannot do something the review needs, **extend the script** — do not work around it
+with another tool.
+
+| Flag | What it adds |
+|---|---|
+| `--scheme light\|dark\|both` | Capture in one colour scheme, or both. |
+| `--component <css-selector>` | A cropped screenshot of each matched element. Repeatable. |
+| `--compare <dir>` | A **before \| after** sheet against a previous capture, per scheme. |
+| `--label <slug>` | Names the capture, so round 0, round 1 and round 2 can be compared. |
+
+### Artifact layout
+
+`<artifact-dir>/<label>/<route-slug>/<viewport>/<scheme>/`:
+
+    1440x900/light/1440x900-light.png   the screenshot
+    1440x900/light/console.log            console errors
+    1440x900/light/page-errors.log        uncaught page errors
+    1440x900/light/network.json           failed responses and requests
+    1440x900/light/compare.png            before | after, when --compare is used
+
+`summary.json` sits next to the label directory, with one entry per route, viewport, and scheme,
+each carrying that scheme's own console, page-error, network, and overflow counts. The two
+schemes never share a file.
+
+### Where Playwright comes from
+
+The script uses the **project's own** Playwright when it has one. Otherwise it resolves the
+global install the devcontainer provides:
+
+    /usr/local/share/npm-global/lib/node_modules/@playwright/mcp/node_modules/playwright
+
+The container sets `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` and installs system chromium, so the
+script launches `/usr/bin/chromium` when Playwright has no downloaded browser. Override the
+binary with `PLAYWRIGHT_CHROMIUM_PATH`.
+
+### The interactive browser tool
+
+`playwright-mcp` is configured in `kilo.jsonc`, so the Playwright MCP tools are available for
+interactive exploration — navigating, snapshotting, clicking, reading the console. Use them to
+*investigate*. Use `browser-review.mjs` to *capture evidence* for a verdict, because it produces
+the artifact set, the per-scheme counts, and the summary the verdict depends on.
 
 ---
 
@@ -139,6 +182,16 @@ python3 .kilo/skills/qa-review/scripts/check-finding.py \
 Exit 0 → accepted. Exit 66 → the finding is too weak to act on; fix the body. A finding that
 names no expected behavior, no repro, and no evidence is not a finding.
 
+On acceptance the script prints the finding's **fingerprint** on stdout:
+
+```
+check-finding: body accepted
+fingerprint: bug|functional|/settings/export-button-stays-enabled
+```
+
+The fingerprint is `kind|category|route|subject` — deterministic, so the same complaint about the
+same thing produces the same value. Pass `--fingerprint <value>` to override the derived one.
+
 ---
 
 ## 6. File the findings on the board
@@ -149,6 +202,7 @@ A validated finding becomes a **board row of type `Fix`**:
 - `Priority` from the severity: `high` → `P1`, `medium` → `P2`, `low` → `P3`
 - `Risk` from the blast radius of the defect
 - `Blocked by: BOARD-xxx` — the row that produced the finding
+- `Fingerprint` — the value `check-finding.py` printed
 - `Notes` — expected, actual, repro, evidence path
 
 ```bash
@@ -157,11 +211,58 @@ python3 .kilo/skills/board/scripts/board.py add \
   --status Ready --priority P2 \
   --risk "🟡 medium — one endpoint is unreachable while the request runs" \
   --blocked-by "BOARD-005" \
+  --fingerprint "bug|functional|/settings/export-button-stays-enabled" \
   --note "Expected: button disabled during request. Actual: stays enabled, user can double-submit. Repro: /settings -> Export. Evidence: apps/web/artifacts/qa/2026-10-29/BOARD-005/settings/full.png"
 ```
 
+**A duplicate fingerprint is refused.** When the fingerprint is already open on another row, the
+script refuses the add, names the existing row and its status, and prints the command that
+updates it. A repeat finding updates the existing row's notes instead of opening a new row:
+
+```bash
+python3 .kilo/skills/board/scripts/board.py note BOARD-006 --value "<the new evidence>"
+```
+
+The same fingerprint filed twice escalates the existing row to `Blocked` rather than a new row
+opening.
+
 **The board is written by the orchestrator in the main checkout.** A reviewer working in a
 worktree reports its findings; the orchestrator creates the rows.
+
+---
+
+## 6a. The bounded loop: rounds and the ledger
+
+A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
+
+Each round's state lives in one short file per row: `docs/reviews/<task-id>-ledger.md`. It holds
+the round number, the findings filed in that round, the Fix row IDs created, the Fix rows merged
+since, and the stop reason when it stops.
+
+The ledger is the **only** thing carried between rounds. **Each round's review must be done by a
+fresh reviewer** that reads the ledger and the current screenshots — not the previous reviewer's
+reasoning.
+
+```bash
+python3 .kilo/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
+python3 .kilo/skills/qa-review/scripts/ledger.py finding  --task-id BOARD-005 \
+    --fingerprint "bug|functional|/settings/export-button-stays-enabled" \
+    --evidence apps/web/artifacts/qa/2026-10-29/BOARD-005/finding-1.md --fix-row BOARD-006
+python3 .kilo/skills/qa-review/scripts/ledger.py merged   --task-id BOARD-005 --fix-row BOARD-006
+python3 .kilo/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-005 --reason "..."
+python3 .kilo/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
+```
+
+`next-round` refuses to open round 4.
+
+**Stop conditions** — the loop stops at whichever comes first:
+
+| Stop condition | What happens |
+|---|---|
+| Round cap reached (3 rounds, row still failing) | Row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round. |
+| A critical path is red (money, data loss, auth, security) | Row is `Blocked` immediately. Never retried silently. |
+| The same fingerprint is filed twice | The existing row is escalated to `Blocked` rather than a new one opening. |
+| The human says stop | Row is `Blocked` with the reason recorded in the ledger's stop reason. |
 
 ---
 

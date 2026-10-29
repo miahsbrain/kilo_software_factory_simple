@@ -17,11 +17,39 @@ reference galleries, §2 the 15 rules, §3 the component factory gate.
   extra screenshots.
 - Do not modify application source code, and do not edit `docs/BOARD.md`.
 
+## The bounded loop
+
+A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
+
+The state of each round lives in one short file per row: `docs/reviews/<task-id>-ledger.md` —
+the round number, the findings filed in that round, the Fix row IDs created, the Fix rows merged
+since, and the stop reason when it stops.
+
+The ledger is the **only** thing carried between rounds. If this is not your first round on the
+row, **you are a fresh reviewer**: read the ledger and the current screenshots, and judge what is
+on screen now — not what the previous reviewer concluded.
+
+```bash
+python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
+```
+
 ## What to do
 
 1. **Get the evidence.** Use the screenshots from the QA lane under
-   `apps/<scope>/artifacts/qa/<date>/<task-id>/`, or capture them yourself with Playwright at
-   1440×900 (desktop) and 390×844 (mobile). No screenshot, no verdict.
+   `apps/<scope>/artifacts/qa/<date>/<task-id>/`, or capture them yourself with the gated
+   capture script at 1440×900 (desktop) and 390×844 (mobile). No screenshot, no verdict.
+
+   **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
+   screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
+   evidence for a UI review. If the script cannot do something the review needs, extend the
+   script — do not work around it with another tool.
+
+       node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
+           --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope> \
+           --label <round-slug> --scheme both
+
+   `--label` names the round's capture so rounds can be compared; `--compare <dir>` writes a
+   before | after sheet; `--component <css-selector>` crops the elements you judge.
 2. **Compare against the approved gallery.** If the component factory was approved, the screen
    must match it: same tokens, radius, type scale, accent, spacing, and states. A deviation is a
    finding, not a new decision.
@@ -98,6 +126,17 @@ Write it to `docs/reviews/<task-id>-ui.md`:
 
 Each finding is a **bug-fix row** for the board: it names the rule broken, what was expected, what
 was actually observed, and the evidence that proves it.
+
+Validate each finding and take its fingerprint:
+
+```bash
+python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+    --kind ux --priority medium --category visual --route /path
+```
+
+Exit 0 prints the fingerprint (`kind|category|route|subject`) on stdout. Pass it to
+`board.py add --fingerprint` so the same complaint about the same thing is recognised the next
+time it is raised.
 
 **A screen that passes §2 and fails §3.1 or §3.2 is still a FAIL.** Beautiful and useless is not
 done.

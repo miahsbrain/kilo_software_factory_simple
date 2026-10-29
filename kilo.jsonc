@@ -1,0 +1,11 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "playwright": {
+      "command": "playwright-mcp",
+      "args": ["--executable-path", "/usr/bin/chromium", "--headless"],
+      "enabled": true,
+      "timeout": 30000
+    }
+  }
+}

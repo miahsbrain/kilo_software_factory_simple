@@ -11,11 +11,15 @@ Usage:
                    [--priority high|medium|low]
                    [--category functional|visual|network|console|a11y|data|testability]
                    [--route <path>]
+                   [--fingerprint <value>]
 
 Exit codes:
   0  body accepted
   2  bad argument
   66 body is weak (missing sections, placeholders, too few acceptance criteria)
+
+On acceptance the computed fingerprint is printed on stdout as
+`kind|category|route|subject`, ready to be pasted into a board row.
 """
 
 import argparse
@@ -64,6 +68,8 @@ def parse_args(argv):
     parser.add_argument("--priority", default=None, choices=list(PRIORITIES), help="Finding priority.")
     parser.add_argument("--category", default=None, choices=list(CATEGORIES), help="Finding category.")
     parser.add_argument("--route", default=None, help="Route the finding applies to.")
+    parser.add_argument("--fingerprint", default=None,
+                        help="Override the computed fingerprint (kind|category|route|subject).")
     args = parser.parse_args(argv)
     return args
 
@@ -96,6 +102,41 @@ def section_body(body, name):
 def strip_code(body):
     text = FENCE_RE.sub("", body)
     return INLINE_CODE_RE.sub("", text)
+
+
+def slugify(text, words=8):
+    """A stable, lowercase, dash-joined slug of the given text."""
+    cleaned = re.sub(r"[`*_\[\]()#]", " ", str(text))
+    parts = [word.lower() for word in re.split(r"[^A-Za-z0-9]+", cleaned) if word]
+    return "-".join(parts[:words]) or "unknown"
+
+
+def normalize_route(route):
+    if not route:
+        return "-"
+    trimmed = route.strip()
+    if not trimmed or trimmed == "/":
+        return "/"
+    if not trimmed.startswith("/"):
+        trimmed = "/" + trimmed
+    return trimmed.rstrip("/") or "/"
+
+
+def compute_fingerprint(kind, category, route, subject):
+    """kind|category|route|subject — the same complaint about the same thing."""
+    return "|".join([
+        (kind or "bug").strip().lower(),
+        (category or "functional").strip().lower(),
+        normalize_route(route),
+        subject.strip().lower(),
+    ])
+
+
+def fingerprint_subject(body):
+    """The subject of a finding: the slug of its Summary line."""
+    summary = section_body(body, "Summary") or ""
+    first_line = next((line for line in summary.splitlines() if line.strip()), "")
+    return slugify(first_line)
 
 
 def check_placeholders(body):
@@ -180,6 +221,18 @@ def validate(body):
     return problems
 
 
+def resolve_fingerprint(args, body):
+    """The fingerprint of the finding: an explicit override wins over the derived one."""
+    override = (args.fingerprint or "").strip()
+    if override:
+        parts = [part.strip() for part in override.split("|")]
+        if len(parts) != 4:
+            raise ValueError(
+                "fingerprint must be kind|category|route|subject (4 parts), got %d" % len(parts))
+        return compute_fingerprint(parts[0], parts[1], parts[2], parts[3])
+    return compute_fingerprint(args.kind, args.category, args.route, fingerprint_subject(body))
+
+
 def main(argv):
     args = parse_args(argv)
     try:
@@ -196,7 +249,15 @@ def main(argv):
             sys.stderr.write("  - " + problem + "\n")
         return 66
 
+    try:
+        fingerprint = resolve_fingerprint(args, body)
+    except ValueError as error:
+        sys.stderr.write("check-finding: " + str(error) + "\n")
+        return 2
+
     sys.stdout.write("check-finding: body accepted\n")
+    sys.stdout.write("fingerprint: " + fingerprint + "\n")
+    sys.stdout.write("board-row: --fingerprint '" + fingerprint + "'\n")
     return 0
 
 

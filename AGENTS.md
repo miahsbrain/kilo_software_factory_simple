@@ -416,6 +416,25 @@ Specify whether verification is required.
 - Never reduce verification on security, auth, contracts, persistence, deployment, or critical
   product behavior.
 
+### Verification discipline (this is what stops an agent looping)
+
+Three rules. They apply to the architect and to every builder.
+
+1. **A verification must yield a binary signal.** If a check cannot return pass or fail in one
+   attempt — because its criterion is ambiguous, because the tool gives an ambiguous result, or
+   because the thing being measured is self-contradictory — it is **not** a check. Report it as a
+   limitation in one attempt and move on. Do not iterate on a measurement.
+2. **Two attempts per check, then report.** If a check fails twice and the fix is not obvious,
+   stop and report the blocker with what you tried. A third attempt at the same failing check is
+   a loop, not diligence.
+3. **Never mutate the subject of a verification.** Test data goes in a copy or a temp directory.
+   Changing the thing you are measuring invalidates the measurement and sends you back to the
+   start.
+
+The same three rules govern the **QA↔fix loop** for a row: the loop is capped at 3 rounds, a
+repeat finding escalates the existing row to `Blocked` instead of opening another, and the ledger
+in `docs/reviews/<task-id>-ledger.md` is the only state carried between rounds.
+
 ### Task chunking rule
 
 Do not run or delegate a broad, complex task as one large task. Break into sequential chunks, each
@@ -955,13 +974,105 @@ met**, proven by evidence. The lanes repeat until then.
 3. **After the Fix rows merge, the original row is re-verified.** The QA lane re-runs against the
    merged result — the criterion that failed must now pass, and nothing around it may have
    regressed. Only then can the original row go to `Pending Merge`.
-4. **A finding that repeats three times is a `Blocked` row, not a fourth attempt.** The same
-   finding failing the same way three times means the approach is wrong, not the implementation.
-   Park it, write down what was tried, and ask the human.
-5. **A red critical path is an immediate `Blocked` row.** Money, data loss, auth, and security
+4. **The loop is bounded at 3 rounds.** A row gets at most three QA↔fix rounds. When the third
+   round still fails, the row moves to `Blocked` with what was tried and the question the human
+   needs to answer. There is no fourth round.
+5. **A repeat finding is not a new finding.** Every finding carries a fingerprint. When a
+   fingerprint is filed twice, the **existing** row is escalated to `Blocked` — a second row is
+   never opened, because that is the loop.
+6. **A red critical path is an immediate `Blocked` row.** Money, data loss, auth, and security
    flows are never retried silently.
-6. **The loop ends on the spec, not on the diff.** "The builder wrote the code" is not a stopping
+7. **The loop ends on the spec, not on the diff.** "The builder wrote the code" is not a stopping
    condition. "Every acceptance criterion on the row passes with recorded proof" is.
+
+### The ledger
+
+The state of a row's rounds lives in one short file, `docs/reviews/<task-id>-ledger.md`: the
+round number, the findings filed, the Fix row IDs, the Fix rows merged since, and the stop reason.
+The ledger is the **only** thing carried between rounds — a reviewer that watched the last edits
+grades intent, not pixels, so **each round's review is done by a fresh reviewer** that reads the
+ledger and the current screenshots.
+
+Use the script to keep it honest:
+
+```bash
+python3 .kilo/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
+python3 .kilo/skills/qa-review/scripts/ledger.py finding --task-id BOARD-005 --fingerprint "..." --evidence <file> --fix-row BOARD-010
+python3 .kilo/skills/qa-review/scripts/ledger.py merged --task-id BOARD-005 --fix-row BOARD-010
+python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
+```
+
+`next-round` refuses past the cap and tells you the row is done.
+
+### B4.4 The bounded loop: rounds, ledger, fingerprints
+
+A QA finding can come back, get fixed, and come back again. The loop is bounded by a **round cap**
+and a **ledger**, and duplicate findings are recognised by a **fingerprint**.
+
+**The round cap.** A row may go through **at most 3** QA↔fix rounds. Round 3 is the last. When the
+cap is reached and the row still fails, the row moves to `Blocked` with a summary of what was
+tried and the question the human needs to answer. A fourth round is never opened.
+
+**The ledger.** Each round's state lives in one short file per row:
+`docs/reviews/<task-id>-ledger.md`. It holds the round number, the findings filed in that round,
+the Fix row IDs created, the Fix rows merged since, and the stop reason when it stops.
+
+The ledger is the **only** thing carried between rounds. A reviewer that watched the last edits
+grades intent, not pixels, so **each round's review must be done by a fresh reviewer** that reads
+the ledger and the current screenshots — not the previous reviewer's reasoning.
+
+The script owns the ledger:
+
+```bash
+python3 .kilo/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
+python3 .kilo/skills/qa-review/scripts/ledger.py finding  --task-id BOARD-005 \
+    --fingerprint "bug|functional|/x|export-button" --evidence <path> --fix-row BOARD-010
+python3 .kilo/skills/qa-review/scripts/ledger.py merged   --task-id BOARD-005 --fix-row BOARD-010
+python3 .kilo/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-005 --reason "..."
+python3 .kilo/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
+```
+
+`next-round` refuses to open round 4. That refusal is the cap.
+
+**The fingerprint.** A finding gets a deterministic fingerprint derived from what it is about —
+`kind|category|route|subject` — so the same complaint about the same thing produces the same
+fingerprint.
+
+```bash
+python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+    --kind bug --priority medium --category functional --route /x
+```
+
+It prints the fingerprint on stdout, in a form that can be pasted into a board row. Pass
+`--fingerprint <value>` to override the derived value.
+
+`board.py add --fingerprint <value>` refuses a `Fix` row whose fingerprint is already open. The
+refusal names the existing row and prints the command that updates it:
+
+```bash
+python3 .kilo/skills/board/scripts/board.py add --id BOARD-010 --task "..." --type Fix \
+    --status Ready --priority P2 --risk "🟡 medium — one line" --blocked-by BOARD-005 \
+    --fingerprint "bug|functional|/x|export-button" --note "..."
+```
+
+A repeat finding updates the existing row's notes instead of creating a new one:
+
+```bash
+python3 .kilo/skills/board/scripts/board.py note BOARD-010 --value "<the new evidence>"
+```
+
+**The stop conditions.** The loop stops when any of these fires — whichever comes first:
+
+| Stop condition | What happens |
+|---|---|
+| **The round cap is reached** (3 rounds done, row still failing) | The row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round is opened. |
+| **A critical path is red** (money, data loss, auth, security) | The row is `Blocked` immediately. It is never retried silently. |
+| **The same fingerprint is filed twice** | The existing row is escalated to `Blocked` rather than a new one opening. |
+| **The human says stop** | The row is `Blocked` with the human's reason recorded in the ledger's stop reason. |
+
+A finding that repeats three times is a `Blocked` row, not a fourth attempt. The same finding
+failing the same way three times means the approach is wrong, not the implementation. Park it,
+write down what was tried, and ask the human.
 
 ### What the review lanes must check
 
@@ -1093,6 +1204,22 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   It writes a full-page screenshot, `console.log`, `page-errors.log`, and `network.json` per route
   per viewport (390×844, 834×1112, 1440×900, 1920×1080, plus 320×800 as the overflow floor), and
   a `summary.json` with the counts and the overflow result.
+- **The script is the only way to capture UI evidence.** The QA reviewer and the UI critic capture
+  screenshots **only** through `browser-review.mjs`. Ad-hoc `chromium`, `npx playwright
+  screenshot`, `curl`-and-guess, or any other browser command run from bash is **not acceptable
+  evidence** for a UI review. If the script cannot do something the review needs, **extend the
+  script** — do not work around it with another tool.
+  - `--scheme light|dark|both` — capture in one colour scheme or both; `both` names the files
+    `<viewport>-light.png` / `<viewport>-dark.png`.
+  - `--component <css-selector>` (repeatable) — capture a cropped screenshot of each matched
+    element, at `<artifact-dir>/<route-slug>/<viewport>/component-<n>.png`.
+  - `--compare <dir>` — write a **before | after** sheet to
+    `<artifact-dir>/<route-slug>/<viewport>/compare.png` when that directory holds a previous
+    capture with the same route-slug and viewport names.
+  - `--label <slug>` — name the capture, so round 0, round 1 and round 2 can be compared.
+  - `--chromium <path>` — a fallback browser binary for pages with no Playwright project of their
+    own; the script drives it over CDP. When neither Playwright nor `--chromium` is available the
+    script fails cleanly and exits 2.
 - **Store artifacts** under `apps/<scope>/artifacts/qa/<date>/<task-id>/` with `notes.md`
   recording what was checked and expected vs actual. Commit `notes.md` and small component shots;
   leave full-page captures out of git.
@@ -1129,18 +1256,23 @@ A review finding is a **bug-fix unit of work**, so it becomes a board row.
            --kind bug --priority medium --category functional --route /path
 
    Exit 66 means the finding is too weak to act on. Fix the body, do not bypass the check.
+   Exit 0 prints the finding's **fingerprint** on stdout, ready to be pasted into the board row.
 2. The **orchestrator** creates one board row per validated finding, with the script:
 
        python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "<one line>" \
            --type Fix --status Ready --priority P2 --risk "🟡 medium — <blast radius>" \
-           --blocked-by "BOARD-xxx" --note "<expected vs actual, repro, evidence path>"
+           --blocked-by "BOARD-xxx" --fingerprint "<kind|category|route|subject>" \
+           --note "<expected vs actual, repro, evidence path>"
 
    - `Type: Fix`
    - `Status: Ready` (or `Blocked` if the finding needs a product decision)
    - `Priority` from the finding severity
    - `Risk` from the blast radius of the defect
    - `Blocked by: BOARD-xxx` — the row that produced the finding
+   - `Fingerprint` — from `check-finding.py`; the row carries it so a repeat is recognisable
    - `Notes` — the finding text: expected, actual, repro, evidence path
+   - A fingerprint that is already open is **refused**. The refusal names the existing row and
+     prints the command that updates it: `board.py note <ID> --value "<the new evidence>"`.
 3. The reviewed row's status depends on the verdict:
    - **FAIL** → the reviewed row returns to `In Progress` with the failing findings restated.
    - **PASS** → the reviewed row may proceed to `Pending Merge`.
