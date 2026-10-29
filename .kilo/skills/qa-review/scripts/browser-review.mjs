@@ -7,18 +7,24 @@
  *
  * Usage:
  *   node browser-review.mjs --base-url <url> --route <path> [--route <path> ...]
- *                            --artifact-dir <dir>
+ *                            [--scope <name>] [--task-id <id>] [--date <YYYY-MM-DD>]
+ *                            [--artifact-dir <dir>]
  *                            [--project <dir with package.json>]
  *                            [--viewports "390x844,834x1112,1440x900,1920x1080,320x800"]
  *                            [--label <slug>] [--scheme light|dark|both]
  *                            [--component <css-selector>] [--compare <dir>]
  *
+ * Without --artifact-dir the capture lands in the canonical artifacts folder of
+ * the main checkout: <repo-root>/artifacts/<scope>/qa/<date>/<task-id>/.
+ *
  * For every route x viewport x scheme it writes a screenshot plus console,
- * page-error and network-failure logs, then a summary.json for the reviewer.
+ * page-error and network-failure logs, then a summary.json and a notes.md for
+ * the reviewer.
  * Exit codes: 0 capture completed, 2 fatal error.
  */
 import {createRequire} from 'node:module';
 import {resolve, join, dirname} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {writeFile, mkdir, readdir, readFile} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
@@ -26,11 +32,13 @@ import {execFileSync} from 'node:child_process';
 const DEFAULT_VIEWPORTS = '390x844,834x1112,1440x900,1920x1080,320x800';
 const SCHEMES = ['light', 'dark'];
 const COMMON_GLOBAL_ROOT = '/usr/local/share/npm-global/lib/node_modules';
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
 function usage() {
   return [
     'Usage: node browser-review.mjs --base-url <url> --route <path> [--route <path> ...]',
-    '                                --artifact-dir <dir>',
+    '                                [--scope <name>] [--task-id <id>] [--date <YYYY-MM-DD>]',
+    '                                [--artifact-dir <dir>]',
     '                                [--project <dir with package.json>]',
     '                                [--viewports "' + DEFAULT_VIEWPORTS + '"]',
     '                                [--label <slug>]',
@@ -41,7 +49,10 @@ function usage() {
     'Options:',
     '  --base-url     Base URL of the running app (required).',
     '  --route        Route path to visit, repeatable (required).',
-    '  --artifact-dir Directory that receives screenshots and logs (required).',
+    '  --scope        Scope folder under artifacts/. Default: factory.',
+    '  --task-id      Task folder under qa/<date>/. Default: adhoc.',
+    '  --date         Capture date folder YYYY-MM-DD. Default: today.',
+    '  --artifact-dir Optional override for the task directory.',
     '  --project      Directory whose package.json provides Playwright. Default: cwd.',
     '  --viewports    Comma-separated WIDTHxHEIGHT list. Default: ' + DEFAULT_VIEWPORTS,
     '  --label        Optional slug mixed into the artifact directory name.',
@@ -57,6 +68,40 @@ function fail(message) {
   process.exit(2);
 }
 
+function today() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return now.getFullYear() + '-' + month + '-' + day;
+}
+
+function mainCheckoutRoot() {
+  try {
+    const output = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    for (const line of output.split('\n')) {
+      if (line.startsWith('worktree ')) return line.slice('worktree '.length).trim();
+    }
+  } catch {
+    /* git is not available here */
+  }
+  let current = SCRIPT_DIR;
+  while (true) {
+    if (existsSync(join(current, '.git'))) return current;
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return SCRIPT_DIR;
+}
+
+function taskDirectory(options) {
+  if (options.artifactDir) return resolve(options.artifactDir);
+  return join(mainCheckoutRoot(), 'artifacts', options.scope, 'qa', options.date, options.taskId);
+}
+
 function parseArgs(argv) {
   const options = {
     routes: [],
@@ -64,6 +109,9 @@ function parseArgs(argv) {
     project: process.cwd(),
     scheme: 'light',
     components: [],
+    scope: 'factory',
+    taskId: 'adhoc',
+    date: today(),
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -87,6 +135,15 @@ function parseArgs(argv) {
         break;
       case '--artifact-dir':
         options.artifactDir = next();
+        break;
+      case '--scope':
+        options.scope = next();
+        break;
+      case '--task-id':
+        options.taskId = next();
+        break;
+      case '--date':
+        options.date = next();
         break;
       case '--project':
         options.project = next();
@@ -112,7 +169,9 @@ function parseArgs(argv) {
   }
   if (!options.baseUrl) fail('--base-url is required');
   if (!options.routes.length) fail('at least one --route is required');
-  if (!options.artifactDir) fail('--artifact-dir is required');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(options.date)) fail('--date must be YYYY-MM-DD');
+  if (!options.scope) fail('--scope is required');
+  if (!options.taskId) fail('--task-id is required');
   if (!['light', 'dark', 'both'].includes(options.scheme)) {
     fail('--scheme must be light, dark, or both');
   }
@@ -412,6 +471,31 @@ async function writeCompareSheet(browser, beforeBuffer, afterBuffer, sheetPath, 
 
 /* ---------- capture ---------- */
 
+function renderNotes(options, summary) {
+  const lines = [];
+  lines.push('# QA capture — ' + options.taskId);
+  lines.push('');
+  lines.push('- Command: `' + process.argv.join(' ') + '`');
+  lines.push('- Scope: ' + options.scope);
+  lines.push('- Task: ' + options.taskId);
+  lines.push('- Date: ' + options.date);
+  lines.push('- Routes: ' + options.routes.join(', '));
+  lines.push('- Viewports: ' + options.viewports.map(viewport => viewport.name).join(', '));
+  lines.push('- Schemes: ' + schemeList(options.scheme).join(', '));
+  lines.push('');
+  lines.push('| Scheme | Console errors | Page errors | Network failures |');
+  lines.push('|---|---|---|---|');
+  for (const scheme of schemeList(options.scheme)) {
+    const rows = summary.results.filter(entry => entry.scheme === scheme);
+    const sum = field => rows.reduce((total, entry) => total + (entry[field] || 0), 0);
+    lines.push('| ' + scheme + ' | ' + sum('console_error_count') + ' | ' +
+      sum('page_error_count') + ' | ' + sum('network_failure_count') + ' |');
+  }
+  lines.push('');
+  lines.push('What was checked and the expected vs actual result are written by the reviewer.');
+  return lines.join('\n') + '\n';
+}
+
 async function captureEntry(session, options, route, viewport, scheme, allSchemes) {
   const url = joinUrl(options.baseUrl, route);
   const dir = join(options.artifactRoot, routeSlug(route), viewport.name, scheme);
@@ -504,9 +588,10 @@ async function main() {
       ' (npm root -g, NODE_PATH, ' + COMMON_GLOBAL_ROOT + ').');
   }
 
+  options.taskDir = taskDirectory(options);
   options.artifactRoot = options.label
-    ? join(resolve(options.artifactDir), options.label)
-    : resolve(options.artifactDir);
+    ? join(options.taskDir, options.label)
+    : options.taskDir;
 
   const launchOptions = {headless: true, args: ['--no-sandbox']};
   const executablePath = downloadedChromiumPath(playwright) || systemChromiumPath();
@@ -516,6 +601,10 @@ async function main() {
     base_url: options.baseUrl,
     project: resolve(options.project),
     artifact_dir: options.artifactRoot,
+    task_dir: options.taskDir,
+    scope: options.scope,
+    task_id: options.taskId,
+    date: options.date,
     scheme: options.scheme,
     viewports: options.viewports.map(viewport => viewport.name),
     routes: options.routes,
@@ -578,8 +667,9 @@ async function main() {
     await browser.handle.close().catch(() => {});
   }
 
-  await mkdir(options.artifactRoot, {recursive: true});
-  await writeFile(join(options.artifactRoot, 'summary.json'), JSON.stringify(summary, null, 2));
+  await mkdir(options.taskDir, {recursive: true});
+  await writeFile(join(options.taskDir, 'summary.json'), JSON.stringify(summary, null, 2));
+  await writeFile(join(options.taskDir, 'notes.md'), renderNotes(options, summary));
   process.stdout.write(JSON.stringify(summary) + '\n');
 }
 

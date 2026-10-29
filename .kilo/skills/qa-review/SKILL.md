@@ -35,7 +35,7 @@ Start the app first, using the dev command from `docs/STACK.md`. Then:
 node .kilo/skills/qa-review/scripts/browser-review.mjs \
   --base-url http://localhost:15173 \
   --route / --route /settings \
-  --artifact-dir apps/web/artifacts/qa/2026-10-29/BOARD-005 \
+  --scope web --task-id BOARD-005 \
   --project apps/web
 ```
 
@@ -53,6 +53,10 @@ with another tool.
 
 | Flag | What it adds |
 |---|---|
+| `--scope <name>` | Scope folder under `artifacts/`. Default: `factory`. |
+| `--task-id <id>` | Task folder under `qa/<date>/`. Default: `adhoc`. |
+| `--date <YYYY-MM-DD>` | Capture date folder. Default: today. |
+| `--artifact-dir <dir>` | Optional override for the task directory. |
 | `--scheme light\|dark\|both` | Capture in one colour scheme, or both. |
 | `--component <css-selector>` | A cropped screenshot of each matched element. Repeatable. |
 | `--compare <dir>` | A **before \| after** sheet against a previous capture, per scheme. |
@@ -60,7 +64,35 @@ with another tool.
 
 ### Artifact layout
 
-`<artifact-dir>/<label>/<route-slug>/<viewport>/<scheme>/`:
+There is **one canonical artifacts folder**, at the repository root:
+
+```
+artifacts/
+  <scope>/                    # web | api | mobile | factory
+    qa/
+      <YYYY-MM-DD>/
+        <task-id>/            # BOARD-005
+          <route-slug>/
+            <viewport>/
+              <scheme>/        # light | dark
+                <screenshot>.png
+                console.log
+                page-errors.log
+                network.json
+                compare.png
+          notes.md              # what was checked, expected vs actual
+          summary.json
+```
+
+The script computes that path itself — `--scope`, `--task-id` and `--date` name the folders — so no
+agent has to remember it. The artifacts folder belongs to the **main checkout**: a capture taken
+from a worktree still lands in the same place.
+
+**Review reports and the ledger are documents, not artifacts.** They stay where documents live:
+`docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
+`docs/reviews/<task-id>-ledger.md`.
+
+Per route, viewport, and scheme:
 
     1440x900/light/1440x900-light.png   the screenshot
     1440x900/light/console.log            console errors
@@ -68,9 +100,12 @@ with another tool.
     1440x900/light/network.json           failed responses and requests
     1440x900/light/compare.png            before | after, when --compare is used
 
-`summary.json` sits next to the label directory, with one entry per route, viewport, and scheme,
-each carrying that scheme's own console, page-error, network, and overflow counts. The two
-schemes never share a file.
+`summary.json` sits in the task directory, with one entry per route, viewport, and scheme, each
+carrying that scheme's own console, page-error, network, and overflow counts. The two schemes
+never share a file. `notes.md` sits beside it and records the routes, viewports, schemes, the
+command used, and the console/page/network counts per scheme. With `--label`, the captures go
+into a label folder inside the task directory; `summary.json` and `notes.md` stay in the task
+directory.
 
 ### Where Playwright comes from
 
@@ -136,7 +171,7 @@ expanding one? Name the existing code if it does.
 One file per finding, in the scope you reviewed:
 
 ```
-apps/<scope>/artifacts/qa/<date>/<task-id>/finding-<n>.md
+artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md
 ```
 
 Required sections — the validator enforces this:
@@ -157,7 +192,7 @@ What should happen, citing the acceptance criterion.
 What happened instead.
 
 ## Evidence
-- Screenshot: apps/web/artifacts/qa/2026-10-29/BOARD-005/settings/full.png
+- Screenshot: artifacts/web/qa/2026-10-29/BOARD-005/settings/1440x900/light/1440x900-light.png
 - Console: 0 errors, see console.log
 - Network: one 500 on /api/export, see network.json
 - Spec: apps/web/e2e/export.spec.ts
@@ -175,7 +210,7 @@ Validate before submitting:
 
 ```bash
 python3 .kilo/skills/qa-review/scripts/check-finding.py \
-  --body-file apps/<scope>/artifacts/qa/<date>/<task-id>/finding-<n>.md \
+  --body-file artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md \
   --kind bug --priority medium --category functional --route /settings
 ```
 
@@ -212,7 +247,7 @@ python3 .kilo/skills/board/scripts/board.py add \
   --risk "🟡 medium — one endpoint is unreachable while the request runs" \
   --blocked-by "BOARD-005" \
   --fingerprint "bug|functional|/settings/export-button-stays-enabled" \
-  --note "Expected: button disabled during request. Actual: stays enabled, user can double-submit. Repro: /settings -> Export. Evidence: apps/web/artifacts/qa/2026-10-29/BOARD-005/settings/full.png"
+  --note "Expected: button disabled during request. Actual: stays enabled, user can double-submit. Repro: /settings -> Export. Evidence: artifacts/web/qa/2026-10-29/BOARD-005/settings/1440x900/light/1440x900-light.png"
 ```
 
 **A duplicate fingerprint is refused.** When the fingerprint is already open on another row, the
@@ -247,7 +282,7 @@ reasoning.
 python3 .kilo/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
 python3 .kilo/skills/qa-review/scripts/ledger.py finding  --task-id BOARD-005 \
     --fingerprint "bug|functional|/settings/export-button-stays-enabled" \
-    --evidence apps/web/artifacts/qa/2026-10-29/BOARD-005/finding-1.md --fix-row BOARD-006
+    --evidence artifacts/web/qa/2026-10-29/BOARD-005/finding-1.md --fix-row BOARD-006
 python3 .kilo/skills/qa-review/scripts/ledger.py merged   --task-id BOARD-005 --fix-row BOARD-006
 python3 .kilo/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-005 --reason "..."
 python3 .kilo/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005

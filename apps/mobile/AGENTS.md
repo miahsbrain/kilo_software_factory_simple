@@ -86,6 +86,14 @@ Passing the anti-slop rules is not enough — the result also has to serve the u
   layout shift, 44×44 touch targets in touch-primary flows.
 - **§3.3 Density** — dense for scanning, spacious for reading, comfortable for data entry.
 
+## QA evidence
+
+The QA lane captures evidence through `.kilo/skills/qa-review/scripts/browser-review.mjs`, which
+computes the canonical path itself: `artifacts/mobile/qa/<date>/<task-id>/` in the **main
+checkout**. The task directory holds `notes.md` with what was checked and the expected vs actual
+result. Review reports stay in `docs/reviews/<task-id>-qa.md` and
+`docs/reviews/<task-id>-ui.md` — those are documents, not artifacts.
+
 ## Production expectations
 
 Production-ready behavior appropriate to the task. No temporary hacks, placeholder architecture,
