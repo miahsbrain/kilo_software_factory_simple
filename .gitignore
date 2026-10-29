@@ -10,5 +10,6 @@ __pycache__/
 !.env.example
 .kilo/worktrees/
 .kilo/agent-manager.json
+.tmp/
 .DS_Store
 *.log
