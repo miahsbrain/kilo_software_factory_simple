@@ -1,14 +1,11 @@
 # HANDOVER — Mini Light Factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** 2026-10-29 — removed CDP from the QA capture path and added the
->   report-first rule (BOARD-012, branch `chore/remove-cdp-and-report-failures`).
-> - **In flight:** branch `chore/remove-cdp-and-report-failures` in worktree
->   `.kilo/worktrees/remove-cdp-and-report-failures` — the capture script resolves the chromium
->   binary itself and reports a missing browser instead of installing or replacing one. No
->   application code exists.
-> - **Next action:** the user inspects and merges this branch into `main`; after that, run the
->   discovery interview (`AGENTS.md` §A4) for the first application.
+> - **Last session:** 2026-10-29 — prepared the factory as a public starter: added the root
+>   `README.md`, dropped the test capture, and cleared the board.
+> - **In flight:** nothing. The board is empty and no application has been built yet.
+> - **Next action:** run the discovery interview (`AGENTS.md` §A4) for the first project in this
+>   checkout, then add the first board row.
 
 ## 1. Overview
 
@@ -31,11 +28,12 @@
 | Path | Contents |
 |---|---|
 | `AGENTS.md` | Root rules for the architect, orchestrator, and every builder (Part A, Part B). |
+| `README.md` | The repo front page: what the factory is, how to plug it into a project, quick start. |
 | `DOMAIN.md` | Product scope and terminology for the first application. Still `TBD`; discovery has not run. |
 | `ROADMAP.md` | Planned work not in progress. |
 | `CHANGELOG.md` | Product-facing changelog. Updated only on the user's instruction. |
 | `.kilo/agent/` | The five agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`. |
-| `.kilo/command/` | The seven slash commands: `decide`, `board`, `run`, `components`, `ui`, `handover`, `closeout`. |
+| `.kilo/command/` | The eight slash commands: `decide`, `board`, `board-view`, `run`, `components`, `ui`, `handover`, `closeout`. |
 | `.kilo/worktrees/` | Agent Manager worktrees, one per task. Git-ignored. Not part of the committed tree. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, `devcontainer-lock.json`. |
 | `apps/web/` | Scope rules for the future web app (`AGENTS.md` only). No code. |
