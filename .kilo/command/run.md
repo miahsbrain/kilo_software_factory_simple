@@ -7,13 +7,15 @@ stays in the main checkout and only you write it.
 
 1. **Pick** the row: highest-priority `Ready`, not blocked by another row. Grade it
    low/medium/high (§B4 "Task grading") to set the rigor of review.
-2. **Build** in the worktree named after the feature
-   (`.kilo/worktrees/<feature-slug>/`, branch `feat|fix|chore|docs/<feature-slug>`):
+2. **Build** in the worktree named after the feature. Create it with git if it does not exist:
+   `git worktree add .kilo/worktrees/<feature-slug> -b <type>/<feature-slug> <base-branch>`
+   (see the `git-worktree` skill for the full procedure).
    - Implement the smallest change that satisfies every acceptance criterion.
    - Update the scope docs (`HANDOVER.md`, `BUSINESS-LOGIC.md`, `ARCHITECTURE.md`,
      `DECISIONS.md`, `changelog/`) in the same change set (§B1).
    - Do **not** edit `docs/BOARD.md` from the worktree.
    - Run the project's verification command from `docs/STACK.md`.
+   - Commit locally on the worktree branch. Never push, never merge, never open a PR.
 3. **QA** — produce evidence, not assertion. One observable check per acceptance criterion,
    with the command and result and `file:line`. For UI work, capture screenshots.
    - Pass → continue to Review.
@@ -24,7 +26,13 @@ stays in the main checkout and only you write it.
    lane used. Any blocking finding → row back to `In Progress` with the finding restated.
    For frontend work, also run the UI/UX critique lane (`/ui`) — both must be green.
 5. **Merge gate** (§B4): all criteria verified, verification passed, QA evidence present, review
-   clean, docs updated → set the row to `Pending Merge` in the main checkout.
-6. **Ask the user** to inspect the worktree and merge into `main`. Never merge, push, or open a PR.
+   clean, docs updated, worktree clean → set the row to `Pending Merge` in the main checkout.
+   That state means the work is waiting for human approval to merge.
+6. **Hand off.** Report the worktree path, the branch, the commits, and the review commands.
+   Print the merge command for the user:
+
+       git merge --no-ff <type>/<feature-slug> -m "merge: <feature-slug>"
+
+   Never merge, push, or open a PR yourself.
 
 Report in this order: what was done, what is proven, what is not done and why, next action.

@@ -13,5 +13,8 @@ Run the documentation rule from `AGENTS.md` §B1 for the work just completed, in
 5. Run the project's lint / typecheck / tests and attach the evidence.
 
 Do **not** edit `docs/BOARD.md` from a worktree — the orchestrator owns the live board (§B3).
+Commit your work locally on the worktree branch using the message format in `AGENTS.md` §B4.1.
+Never push, never merge, never open a PR.
+
 Report your lane status and evidence to the orchestrator, which moves the row to `In Review` and
-then `Pending Merge`, and asks the user to merge into `main`.
+then `Pending Merge` — the state that waits for human approval to merge.

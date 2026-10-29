@@ -12,6 +12,7 @@ moved, or discovered to be different from what is recorded here.
     ├── CHANGELOG.md           # product-facing changelog (user-approved only)
     ├── .kilo/command/         # Kilo slash commands (derived from AGENTS.md)
     ├── .kilo/agent/           # Kilo agent definitions (frontend-dev, backend-dev, qa-reviewer…)
+    ├── .kilo/skills/          # Kilo skills (git-worktree: the worktree procedure)
     ├── docs/
     │   ├── PROJECT_STRUCTURE.md
     │   ├── HANDOVER.md        # living description of the app as it is now
