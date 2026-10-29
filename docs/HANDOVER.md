@@ -1,10 +1,12 @@
 # HANDOVER — Mini Light Factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** 2026-10-29 — replaced the generic handover template with a description of
->   the factory as it exists today (this file, branch `docs/factory-handover`).
-> - **In flight:** branch `docs/factory-handover` in worktree
->   `.kilo/worktrees/factory-handover` — this handover rewrite only. No application code exists.
+> - **Last session:** 2026-10-29 — removed CDP from the QA capture path and added the
+>   report-first rule (BOARD-012, branch `chore/remove-cdp-and-report-failures`).
+> - **In flight:** branch `chore/remove-cdp-and-report-failures` in worktree
+>   `.kilo/worktrees/remove-cdp-and-report-failures` — the capture script resolves the chromium
+>   binary itself and reports a missing browser instead of installing or replacing one. No
+>   application code exists.
 > - **Next action:** the user inspects and merges this branch into `main`; after that, run the
 >   discovery interview (`AGENTS.md` §A4) for the first application.
 
