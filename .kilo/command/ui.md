@@ -7,11 +7,15 @@ Spec: `docs/UI-UX.md` §4.
 
 1. **Confirm the app runs.** Use the dev command from `docs/STACK.md`. If it does not start,
    report the blocker; do not fake a review.
-2. **Capture with Playwright** — full-page screenshot per route per viewport:
-   - 390×844 (mobile), 834×1112 (tablet), 1440×900 (desktop), 1920×1080 (wide), and 320×800
-     as the overflow floor.
-   - Component screenshots for each changed component, at desktop and mobile.
-   - Console errors and failed network requests during each flow.
+2. **Capture with the script** — it drives the project's own Playwright and writes a full-page
+   screenshot, `console.log`, `page-errors.log`, and `network.json` per route per viewport, plus a
+   `summary.json` with the counts and the overflow result:
+
+       node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
+           --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope>
+
+   Viewports: 390×844 (mobile), 834×1112 (tablet), 1440×900 (desktop), 1920×1080 (wide), and
+   320×800 as the overflow floor.
 3. **Store artifacts** under `apps/<scope>/artifacts/qa/<YYYY-MM-DD>/<task-id>/` with a
    `notes.md` recording what was checked and expected vs actual. Commit `notes.md` and small
    component shots only.

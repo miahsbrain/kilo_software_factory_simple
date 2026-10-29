@@ -1,6 +1,6 @@
 ---
 name: git-worktree
-description: Create, work inside, and hand off an isolated git worktree for any change. Use before editing any file in a project that follows the worktree rule — every change happens in its own worktree on its own branch, and the merge is always the human's.
+description: Create, verify, and clean up the isolated git worktree that carries every change in this factory. Use before editing any file in a project that follows the worktree rule. The script does the work — the agent supplies the slug and the judgment.
 ---
 
 # Git Worktree
@@ -8,101 +8,94 @@ description: Create, work inside, and hand off an isolated git worktree for any 
 Every change in this factory happens in an isolated git worktree. The worktree carries the code
 **and** the documentation for that change. `main` is never edited by an agent.
 
-This skill is the CLI procedure. It uses `git` only — no `gh`, no extension, no browser.
+This is **CLI only**: plain `git`, no extension, no `gh`, no browser, no pull requests.
+
+**The script does the mechanics. You supply the intent.** Do not hand-run `git worktree add` when
+the script can do it — the script is where the naming rules and the refusals live.
 
 ---
 
-## 0. The rules this skill enforces
+## 1. The scripts
 
-| Rule | Why |
+| Script | Does |
 |---|---|
-| Every change gets its own worktree | Parallel work never collides; `main` stays clean and reviewable. |
-| The worktree is named after the feature | `feat/user-login`, `fix/session-timeout` — not after the agent or session. |
-| Work only inside the worktree | Edits in the main checkout are invisible to review and to the merge. |
-| Never commit to `main`/`master`/`base` | The human controls the base branch. |
-| Never commit to an existing branch from a worktree | One branch, one worktree, one task. |
-| Never merge, never push, never open a PR | The merge is a human decision. |
-| Local commits on the worktree branch are required | Without commits there is nothing to merge. |
-| Never delete a worktree holding unmerged work | WIP is preserved, not destroyed. |
+| `.kilo/skills/git-worktree/scripts/worktree.py` | create · list · verify · cleanup |
+| `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree |
 
----
-
-## 1. Preconditions
-
-```bash
-git rev-parse --is-inside-work-tree     # must print: true
-git branch --show-current                # the base branch you will branch from
-git log --oneline -1                     # the commit the worktree will start from
-```
-
-If the repository has no commits, a worktree cannot branch from it. The base branch needs one
-commit before any worktree can exist.
+Python 3.9+, standard library only.
 
 ---
 
 ## 2. Create the worktree
 
-The worktree directory is `.kilo/worktrees/<feature-slug>/` inside the repository. The branch is
-`<type>/<feature-slug>` created from the base branch.
-
 ```bash
-# from the repository root
-git worktree add .kilo/worktrees/<feature-slug> -b <type>/<feature-slug> <base-branch>
+python3 .kilo/skills/git-worktree/scripts/worktree.py create <slug> --type <type> --base <base>
 ```
 
+- `<slug>` — short, kebab-case, identical to the board task slug: `user-login`, `session-timeout`.
 - `<type>` — `feat` | `fix` | `chore` | `docs` | `refactor` | `test` | `perf`
-- `<feature-slug>` — short, kebab-case, and identical to the board task slug.
-- `<base-branch>` — `main` by default. Use a feature branch only when the board row's
-  `Blocked by` says the work depends on it.
+- `<base>` — `main` by default. A feature branch only when the board row's `Blocked by` says so.
 
-Example:
+The script creates `.kilo/worktrees/<slug>/` on branch `<type>/<slug>` and prints the absolute
+path. It refuses when the branch or the directory already exists. It never deletes anything.
 
-```bash
-git worktree add .kilo/worktrees/user-login -b feat/user-login main
-```
-
-**Do not** run `git worktree add` outside `.kilo/worktrees/`. **Do not** create a worktree with
-`--detach`. **Do not** reuse a branch that already has a worktree.
-
-Verify:
+Before creating, check for an in-flight worktree on the same task:
 
 ```bash
-git worktree list
-git -C .kilo/worktrees/<feature-slug> branch --show-current
+python3 .kilo/skills/git-worktree/scripts/worktree.py list
 ```
 
 ---
 
 ## 3. Work inside it
 
-Every edit, every command, every verification run happens with the worktree as the working
-directory:
+Every edit, command, and verification run happens with the worktree as the working directory.
 
 ```bash
-git -C .kilo/worktrees/<feature-slug> status
-git -C .kilo/worktrees/<feature-slug> diff
+git -C .kilo/worktrees/<slug> status
+git -C .kilo/worktrees/<slug> diff
 ```
 
-Rules while working:
-
-- Do not edit files in the main checkout. The only exception: the live board
-  (`docs/BOARD.md`), which the orchestrator writes in the main checkout.
+- Do not edit files in the main checkout. The only exception is `docs/BOARD.md`, which the
+  orchestrator writes in the main checkout.
 - Do not `git checkout` another branch inside the worktree.
-- Do not `git merge` the base branch into the worktree unless the task needs it, and then
-  resolve conflicts inside the worktree. Never use `git stash` — stashes are shared across
-  worktrees and cause conflicts.
+- Do not `git merge` the base branch in unless the task needs it; resolve conflicts inside the
+  worktree. Never use `git stash` — stashes are shared across worktrees.
 - Keep the diff minimal: one logical change per commit.
 
 ---
 
-## 4. Commit locally
+## 4. Guarded deletes
+
+**Deletion inside the worktree only.** Before any destructive command, run the guard:
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/guard.py check-delete -- "rm -rf build"
+```
+
+- Exit 0 → allowed. Run the command.
+- Exit 1 → denied. The reason is on stderr. Do not work around it; do not run the command.
+
+The guard blocks `rm`, `rmdir`, `unlink`, `trash`, `find -delete`, `git clean`,
+`git worktree remove`, `git branch -D`, `git reset --hard`, and `git checkout --` when the
+target resolves outside the current worktree or inside the main checkout. `/` and `$HOME` are
+never deletable. Temp dirs under `/tmp` and `$TMPDIR` are allowed.
+
+The same guard has a worktree-path check:
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/guard.py check-worktree -- "git worktree add .kilo/worktrees/x -b feat/x main"
+```
+
+---
+
+## 5. Commit locally
 
 Local commits on the worktree branch are required — they are what the human reviews and merges.
 
 ```bash
-git -C .kilo/worktrees/<feature-slug> add -A
-git -C .kilo/worktrees/<feature-slug> commit -m "<emoji> [<type>] <scope>: <subject>" \
-  -m "- one bullet on what changed and why"
+git -C .kilo/worktrees/<slug> add -A
+git -C .kilo/worktrees/<slug> commit -m "<emoji> [<type>] <scope>: <subject>" -m "- what changed and why"
 ```
 
 Message format (`AGENTS.md` §B4.1):
@@ -118,89 +111,81 @@ Subject ≤ 72 characters, imperative voice. One logical change per commit.
 
 ---
 
-## 5. Verify before handing off
-
-Run the project's verification command from `docs/STACK.md` inside the worktree. Then produce
-the evidence a reviewer needs:
+## 6. Verify before handing off
 
 ```bash
-git -C .kilo/worktrees/<feature-slug> log --oneline <base>..HEAD   # what is on the branch
-git -C .kilo/worktrees/<feature-slug> diff --stat <base>           # what changed
-git -C .kilo/worktrees/<feature-slug> diff <base>                   # the actual diff
-git -C .kilo/worktrees/<feature-slug> status --short                # nothing uncommitted
+python3 .kilo/skills/git-worktree/scripts/worktree.py verify <slug> --base main
 ```
+
+Prints the branch, the commits ahead of base, the changed files, the dirty state, and a
+`READY FOR MERGE` or `NOT READY` line. `READY FOR MERGE` requires a clean tree and at least one
+commit ahead of base.
 
 A worktree is ready for handoff only when:
 
-- [ ] the verification command passed, and the command + result are recorded
+- [ ] the verification command from `docs/STACK.md` passed, and the command + result are recorded
 - [ ] every acceptance criterion on the board row has its proof recorded
 - [ ] the documentation for the change is updated in the same branch
-- [ ] the working tree is clean — nothing uncommitted
+- [ ] `worktree.py verify` prints `READY FOR MERGE`
 
 ---
 
-## 6. Hand off for human approval
+## 7. Hand off for human approval
 
-The agent **never** merges. The handoff marks the work as needing human approval:
+The agent **never** merges.
 
 1. The orchestrator sets the board row to `Pending Merge` in the main checkout, with the
    worktree path and branch in the `Branch/Worktree` column.
-2. The agent reports: what was done, what is proven, what is not done and why, and the next
-   action.
-3. The agent prints the exact commands for the human to review and merge.
+2. The agent reports: what was done, what is proven, what is not done and why, the next action.
+3. The agent prints the review and merge commands for the human.
 
 ```bash
 # review
-git worktree list
-git -C .kilo/worktrees/<feature-slug> log --oneline main..HEAD
-git -C .kilo/worktrees/<feature-slug> diff main
+python3 .kilo/skills/git-worktree/scripts/worktree.py list
+git -C .kilo/worktrees/<slug> log --oneline main..HEAD
+git -C .kilo/worktrees/<slug> diff main
 
 # merge — run by the human, in the main checkout
-git merge --no-ff <type>/<feature-slug> -m "merge: <feature-slug>"
+git merge --no-ff <type>/<slug> -m "merge: <slug>"
 
 # cleanup — run by the human, after the merge
-git worktree remove .kilo/worktrees/<feature-slug>
-git branch -d <type>/<feature-slug>
+python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply
 ```
 
 The merge target is the human's call: `main`, or a feature branch when the work is part of a
-larger feature. Either way the agent only prepares it.
+larger feature.
 
 ---
 
-## 7. Clean up
-
-After the human merges:
+## 8. Clean up
 
 ```bash
-git worktree remove .kilo/worktrees/<feature-slug>   # only if the branch is merged
-git branch -d <type>/<feature-slug>
+python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug>           # dry run
+python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply   # act
 ```
 
-Guardrails:
-
-- **Never** remove a worktree whose branch has unmerged commits. Check first:
-  `git -C .kilo/worktrees/<feature-slug> log --oneline main..HEAD` must be empty.
-- **Never** remove the main checkout or a worktree with a running process.
-- **Never** delete worktrees outside `.kilo/worktrees/`.
+The script refuses when the branch has commits not reachable from the base, or when the worktree
+is dirty. It writes a recovery record to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before
+acting. **Never delete a worktree holding unmerged work.**
 
 ---
 
-## 8. Failure modes
+## 9. Failure modes
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `fatal: invalid reference: HEAD` | The repository has no commits | The base branch needs one commit before any worktree exists |
-| `fatal: '<branch>' is already checked out` | The branch already has a worktree | Use a new branch, or remove the old worktree first |
-| Merge conflict at merge time | The base branch moved since the worktree started | Merge the base into the worktree, resolve there, re-verify, then hand off again |
+| `branch ... is already checked out` | The branch already has a worktree | Use a new branch, or clean up the old worktree first |
+| `worktree.py create` refuses | The slug, branch, or directory already exists | Pick another slug, or clean up first |
+| `guard.py check-delete` denies | The target is outside the worktree | Delete inside the worktree, use a temp dir, or ask the user |
+| Merge conflict at merge time | The base branch moved since the worktree started | Merge the base into the worktree, resolve there, re-verify, hand off again |
 | `git stash` conflicts across worktrees | Stashes are shared | Do not stash. Resolve conflicts inside the worktree |
-| Worktree looks empty | The base branch had no commits | Commit on the base branch first |
 
 ---
 
-## 9. Relationship to the rest of the factory
+## 10. Relationship to the rest of the factory
 
-- The board row is the work item. The worktree is where it happens. The row records the path.
+- The board row is the work item; the worktree is where it happens; the row records the path.
 - The builder agents (`frontend-dev`, `backend-dev`, `mobile-dev`) work inside the worktree.
 - The reviewer agents (`qa-reviewer`, `ui-critic`) run against the worktree state and report
   findings; the orchestrator turns findings into `Type: Fix` board rows.

@@ -293,6 +293,24 @@ workspace path in every builder prompt.
 Builders must read their nearest applicable `AGENTS.md`, stay inside the assigned scope, and
 report changed files, verification, assumptions, blockers, and limitations.
 
+### The division of labour: scripts own the mechanics, agents own the judgment
+
+**A rule that can be a script must be a script.** When a rule involves a mechanical operation —
+creating a worktree, editing a board row, capturing screenshots, validating a finding body, or
+checking whether a destructive command is allowed — the script performs it and the agent supplies
+the intent. Never have an agent hand-run the underlying command when a script covers it.
+
+| Rule | Script that owns it |
+|---|---|
+| Every change gets a worktree with a feature-named path and branch | `.kilo/skills/git-worktree/scripts/worktree.py` |
+| Deletion only inside the worktree; worktree paths confined to `.kilo/worktrees/` | `.kilo/skills/git-worktree/scripts/guard.py` |
+| The board is edited by lane and cell, never hand-written | `.kilo/skills/board/scripts/board.py` |
+| QA evidence capture: screenshots, console, page errors, network, overflow | `.kilo/skills/qa-review/scripts/browser-review.mjs` |
+| A finding is actionable before it becomes a board row | `.kilo/skills/qa-review/scripts/check-finding.py` |
+
+The skills in `.kilo/skills/` are the executable procedures behind these rules. When a rule
+changes, the script and the skill change with it.
+
 ### Universal builder rule
 
 Every delegated prompt must include:
@@ -795,6 +813,14 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Branch/Work
 
 - **The board is the source of truth.** Re-read `docs/BOARD.md` at the start of every session and
   at the start of every task. A row's status must match reality; fix the row before starting work.
+- **The board is edited with the script**, never by hand:
+
+      python3 .kilo/skills/board/scripts/board.py show
+      python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "..." --type Feature \
+          --status Ready --priority P2 --risk "🟡 medium — one line" --blocked-by "None."
+      python3 .kilo/skills/board/scripts/board.py set-status BOARD-00X "In Progress"
+      python3 .kilo/skills/board/scripts/board.py set-field BOARD-00X --field notes --value "..."
+
 - **Never silently drop a row.** A task that cannot proceed moves to `Blocked` with a one-line
   reason and what is needed to unblock it.
 - **`Merged` means the user merged it.** Never means "the agent finished".
@@ -839,9 +865,12 @@ worktree.
    - `<feature-slug>` is short, kebab-case, and matches the board task name:
      `feat/user-login`, `fix/session-timeout`, `docs/handover-template`.
    - Record the exact worktree path and branch in the board row.
-4. **Create it with git, from the base branch:**
+4. **Create it with the script, from the base branch:**
 
-       git worktree add .kilo/worktrees/<feature-slug> -b <type>/<feature-slug> <base-branch>
+       python3 .kilo/skills/git-worktree/scripts/worktree.py create <slug> --type <type> --base <base>
+
+   The script creates `.kilo/worktrees/<slug>/` on branch `<type>/<slug>` and refuses when the
+   branch or directory already exists. It never deletes anything.
 
 5. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
    happens there. The worktree must contain the code change **and** the matching scope-doc
@@ -926,22 +955,24 @@ reason on one line.
 - Clean up a worktree only after its row reaches `Merged`.
 - Never create, move, or use a worktree outside `.kilo/worktrees/`.
 
-### Guard rules (enforced by discipline, not by scripts)
+### Guard rules (enforced by the guard script, not by discipline)
 
-Kilo has no hook runner here, so these are agent responsibilities. Violate none of them.
+The guard script is the enforcement point. Run it before any destructive command:
 
-- **Worktree confinement.** Never create, move, or use a git worktree outside
-  `<project>/.kilo/worktrees/`.
-- **Never touch the base branch.** No commit, no checkout, no reset, no merge, no push on
-  `main`/`master`/`base` — not even a "small fix".
-- **Never commit to an existing branch from a worktree.** A branch belongs to exactly one
-  worktree and one task.
+```bash
+python3 .kilo/skills/git-worktree/scripts/guard.py check-delete -- "<command>"
+```
+
+Exit 0 → allowed. Exit 1 → denied; the reason is on stderr, and the command must not be run.
+
+- **Delete inside the worktree only.** Targets outside the current worktree, inside the main
+  checkout, at `/`, or at `$HOME` are denied. Temp dirs under `/tmp` and `$TMPDIR` are allowed.
+- **Worktree paths are confined** to `<project>/.kilo/worktrees/`. Check with
+  `guard.py check-worktree -- "<command>"`.
 - **Secrets.** Never read, grep, cat, or print `.env`, SSH keys, `.npmrc`, `credentials*`, or
   `*.pem`. Check key *presence* by name only, never by value. `.env.example` stays readable.
 - **Key literals.** Never write a live-looking API key, token, or secret into any file. Reference
   an environment variable name instead.
-- **Destructive scope.** Never run `rm`, `rmdir`, `find -delete`, or `git clean` against a path
-  outside the project root. `/` and `~` are forbidden even as the target.
 - **Protected branch.** Never push to or force-push `main`/`master`/`base`. Work lands through the
   user's merge.
 - **No live-looking secrets in the repo.** Secret values live only in the user's local
@@ -993,9 +1024,14 @@ Keep all written output in the same plain, verifiable style:
 
 The QA lane for frontend work uses **Playwright** and produces evidence, not assertions.
 
-- **Capture:** full-page screenshot per route per viewport (390×844, 834×1112, 1440×900,
-  1920×1080, plus 320×800 as the overflow floor), plus component screenshots for each changed
-  component at desktop and mobile.
+- **Capture:** the QA script drives the project's own Playwright:
+
+      node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
+          --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope>
+
+  It writes a full-page screenshot, `console.log`, `page-errors.log`, and `network.json` per route
+  per viewport (390×844, 834×1112, 1440×900, 1920×1080, plus 320×800 as the overflow floor), and
+  a `summary.json` with the counts and the overflow result.
 - **Store artifacts** under `apps/<scope>/artifacts/qa/<date>/<task-id>/` with `notes.md`
   recording what was checked and expected vs actual. Commit `notes.md` and small component shots;
   leave full-page captures out of git.
@@ -1025,8 +1061,19 @@ Both are read-only against application code. They report; they do not fix.
 
 A review finding is a **bug-fix unit of work**, so it becomes a board row.
 
-1. The reviewer writes the review file and reports the findings.
-2. The **orchestrator** creates one board row per finding:
+1. The reviewer writes the finding file and **validates it** — a finding that names no expected
+   behavior, no repro, or no evidence is refused:
+
+       python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+           --kind bug --priority medium --category functional --route /path
+
+   Exit 66 means the finding is too weak to act on. Fix the body, do not bypass the check.
+2. The **orchestrator** creates one board row per validated finding, with the script:
+
+       python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "<one line>" \
+           --type Fix --status Ready --priority P2 --risk "🟡 medium — <blast radius>" \
+           --blocked-by "BOARD-xxx" --note "<expected vs actual, repro, evidence path>"
+
    - `Type: Fix`
    - `Status: Ready` (or `Blocked` if the finding needs a product decision)
    - `Priority` from the finding severity
