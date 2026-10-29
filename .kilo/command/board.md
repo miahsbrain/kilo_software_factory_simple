@@ -14,10 +14,14 @@ Read `docs/BOARD.md` and report:
 
 Then, if asked to start it:
 
-- Create the worktree with git, named after the feature:
-  `git worktree add .kilo/worktrees/<feature-slug> -b <type>/<feature-slug> <base-branch>`
-  (see the `git-worktree` skill for the full procedure).
-- Record the worktree path and branch in the board row and set it to `In Progress`.
+- Create the worktree with the script, named after the feature:
+  `python3 .kilo/skills/git-worktree/scripts/worktree.py create <slug> --type <type> --base <base>`
+- Add the row with the script and record the worktree path and branch:
+  `python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "..." --type Feature \
+      --status Ready --priority P2 --risk "🟡 medium — one line" --blocked-by "None." \
+      --branch-worktree ".kilo/worktrees/<slug> · branch <type>/<slug>"`
+- Set it to `In Progress` with
+  `python3 .kilo/skills/board/scripts/board.py set-status <ID> "In Progress"`.
 - Delegate the work to a builder agent working inside that worktree. The builder does **not**
   edit this board — it updates the scope docs and reports back.
 - For frontend work, the builder builds the component factory and gallery first and waits for

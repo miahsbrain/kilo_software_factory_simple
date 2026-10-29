@@ -29,13 +29,14 @@ fake a review.
 1. **Read the acceptance criteria** for the row under review. Each one needs its own observable
    check. A criterion with no check is a finding, not a pass.
 2. **Run the verification command** from `docs/STACK.md`. Record the exact command and result.
-3. **Drive the app with Playwright** and capture evidence:
-   - Full-page screenshot per route per viewport: 390×844, 834×1112, 1440×900, 1920×1080, and
-     320×800 as the overflow floor.
-   - Component screenshots for each changed component, at desktop and mobile.
-   - Console errors and failed network requests during each flow.
-   - Use `npx playwright test`, `npx playwright screenshot <url> <file>`, and
-     `npx playwright codegen <url>` — these are the entry points.
+3. **Capture the evidence with the script** — do not hand-drive the browser:
+
+       node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
+           --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope>
+
+   It uses the project's own Playwright and writes a full-page screenshot, `console.log`,
+   `page-errors.log`, and `network.json` per route per viewport, plus a `summary.json` with the
+   counts and the horizontal-overflow result.
 4. **Check** and record the result of each:
    - keyboard focus, visible focus ring, focus trapping in dialogs
    - contrast and accessible names on every control, alt text
@@ -43,9 +44,14 @@ fake a review.
    - console errors, unexpected 4xx/5xx responses
    - no horizontal overflow at 320px
    - the happy path, plus at least one empty, loading, and error state where the feature has them
-5. **Store artifacts** under `apps/<scope>/artifacts/qa/<YYYY-MM-DD>/<task-id>/` with a
-   `notes.md` recording what was checked and expected vs actual. Commit `notes.md` and small
-   component shots; leave full-page captures out of git.
+5. **Write one finding file per defect** under
+   `apps/<scope>/artifacts/qa/<date>/<task-id>/finding-<n>.md`, in the template from
+   `docs/UI-UX.md` §4, and **validate it**:
+
+       python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+           --kind bug --priority medium --category functional --route /path
+
+   Exit 66 means the finding is too weak to act on. Fix the body — do not bypass the check.
 
 ## Submit your review
 
@@ -74,7 +80,9 @@ a repro, and the evidence that proves it.
 
 The verdict, the acceptance-criteria table, the findings list, and the artifact paths. Then say
 plainly: which findings should become board rows of type `Fix`, and which criterion (if any) must
-return to `In Progress`. Do not edit `docs/BOARD.md` — the orchestrator owns the board and creates
-the rows from your findings.
+return to `In Progress`.
+
+Do not edit `docs/BOARD.md` — the orchestrator owns the board and creates the rows from your
+findings.
 
 Never push. Never merge into `main`. Never create a pull request.

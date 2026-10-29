@@ -183,10 +183,16 @@ The QA lane for frontend work produces **evidence**, not assertions.
 
 ### What to capture
 
-- Full-page screenshot per route per viewport: `await page.screenshot({ path, fullPage: true })`.
-- Component screenshots for each changed component, at desktop and mobile.
-- Console errors and failed network requests.
-- Accessibility findings (only when `@axe-core/playwright` is already a dependency).
+The QA script drives the project's own Playwright and captures everything below:
+
+```bash
+node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
+  --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope>
+```
+
+Per route and viewport it writes `full.png`, `console.log`, `page-errors.log`, and
+`network.json`, plus a top-level `summary.json` with the counts and the horizontal-overflow
+result.
 
 ### Artifact layout
 
@@ -216,6 +222,8 @@ wants a visual record — they are large and churn.
 
 ### Playwright entry points
 
+The capture script is the entry point. When writing a spec by hand, these are the commands:
+
 ```bash
 npx playwright test                      # run tests
 npx playwright screenshot <url> <file>    # one-shot screenshot
@@ -227,6 +235,48 @@ npx playwright install chromium           # browsers
 
 Keep it minimal: one spec file per feature lane, one artifact-writing helper, no extra test
 framework. Add `@axe-core/playwright` only when accessibility assertions are in scope.
+
+### Finding template
+
+A finding is only actionable if it names what was expected, how to reproduce it, and the evidence
+that proves it. The validator enforces the shape:
+
+```markdown
+## Summary
+One sentence: what is wrong and where.
+
+## Repro steps
+1. exact route and action
+2. next action
+3. observed failure
+
+## Expected behavior
+What should happen, citing the acceptance criterion.
+
+## Actual behavior
+What happened instead.
+
+## Evidence
+- Screenshot: <path>
+- Console: <0 errors, or see console.log>
+- Network: <see network.json>
+- Spec: <path to the test>
+
+## Acceptance criteria
+- [ ] <observable behavior that must hold>
+- [ ] <second criterion>
+
+## Risk
+🟡 medium — <one-line blast radius>.
+Reversibility: two-way. Blast radius: <who breaks if this is wrong>.
+```
+
+```bash
+python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+  --kind bug --priority medium --category functional --route /path
+```
+
+Exit 0 → accepted. Exit 66 → the finding is too weak to act on; fix the body.
 
 ---
 

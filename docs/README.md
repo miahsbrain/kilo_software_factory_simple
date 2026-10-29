@@ -16,6 +16,14 @@
 | [ENVIRONMENT.md](ENVIRONMENT.md) | Which env vars and config keys exist? |
 | [changelog/CHANGELOG.md](changelog/CHANGELOG.md) | What changed, and why? (engineering log) |
 
+Skills (`.kilo/skills/`):
+
+| Skill | Script | Does |
+|---|---|---|
+| `git-worktree` | `worktree.py`, `guard.py` | create/verify/cleanup the worktree; block deletes outside it |
+| `board` | `board.py` | add rows, move lanes, set cells — never hand-edit the table |
+| `qa-review` | `browser-review.mjs`, `check-finding.py` | Playwright evidence capture; finding validation |
+
 Agents (`.kilo/agent/`): `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`.
 
 Commands: `/decide` (decision sheet before implementation), `/board` (live board + next task),
