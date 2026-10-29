@@ -100,9 +100,10 @@ The QA lane uses **Playwright** and produces evidence, not assertions. Spec: `do
 - Full-page screenshot per route per viewport: 390×844, 834×1112, 1440×900, 1920×1080, and
   320×800 as the overflow floor.
 - Component screenshots for each changed component, at desktop and mobile.
-- Artifacts under `apps/web/artifacts/qa/<date>/<task-id>/` with `notes.md` recording what was
+- Artifacts under `artifacts/web/qa/<date>/<task-id>/` with `notes.md` recording what was
   checked and expected vs actual. Commit `notes.md` and small component shots; leave full-page
-  captures out of git.
+  captures out of git. Review reports stay in `docs/reviews/<task-id>-qa.md` and
+  `docs/reviews/<task-id>-ui.md` — those are documents, not artifacts.
 - Check: keyboard focus and trapping, contrast, accessible names, tap targets ≥24×24 CSS px,
   console errors, unexpected network failures, no horizontal overflow at 320px, and whether the
   screen matches the approved gallery.

@@ -33,10 +33,26 @@ on screen now — not what the previous reviewer concluded.
 python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 ```
 
+## Ask before building a tool
+
+Before you write a script, client, or helper, check what already exists: the skills in
+`.kilo/skills/`, the MCP servers configured in `kilo.jsonc`, globally installed tools
+(`npm root -g`, `pip list`, system binaries), the language's standard library, and the scripts
+already in the repository.
+
+If the capability still looks missing, **stop and ask** the user or the architect — one question
+with your recommendation — before writing anything. Build it only after an explicit yes, and only
+when the answer is "no, it does not exist and yes, build it". A custom tool is a project-sized
+decision, not a local workaround.
+
+This rule exists because an agent needed browser automation and wrote a Chrome DevTools Protocol
+client from scratch while Playwright sat installed in the global npm tree. If you discover you
+were wrong about a missing capability, **say so plainly and correct the record**.
+
 ## What to do
 
 1. **Get the evidence.** Use the screenshots from the QA lane under
-   `apps/<scope>/artifacts/qa/<date>/<task-id>/`, or capture them yourself with the gated
+   `artifacts/<scope>/qa/<date>/<task-id>/`, or capture them yourself with the gated
    capture script at 1440×900 (desktop) and 390×844 (mobile). No screenshot, no verdict.
 
    **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
@@ -45,8 +61,12 @@ python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
    script — do not work around it with another tool.
 
        node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
-           --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope> \
+           --scope <scope> --task-id <task-id> --project apps/<scope> \
            --label <round-slug> --scheme both
+
+   Without `--artifact-dir` the script computes the canonical path itself:
+   `artifacts/<scope>/qa/<date>/<task-id>/` in the **main checkout**, so a capture taken from a
+   worktree still lands in one place.
 
    `--label` names the round's capture so rounds can be compared; `--compare <dir>` writes a
    before | after sheet; `--component <css-selector>` crops the elements you judge.

@@ -10,6 +10,8 @@ moved, or discovered to be different from what is recorded here.
     ├── DOMAIN.md              # product scope, terminology, user-facing rules
     ├── ROADMAP.md             # planned work not in progress
     ├── CHANGELOG.md           # product-facing changelog (user-approved only)
+    ├── artifacts/             # one canonical folder for UI evidence (git: notes and .md only)
+    │   └── <scope>/qa/<date>/<task-id>/
     ├── .kilo/command/         # Kilo slash commands (derived from AGENTS.md)
     ├── .kilo/agent/           # Kilo agent definitions (frontend-dev, backend-dev, qa-reviewer…)
     ├── .kilo/skills/          # Kilo skills (git-worktree, board, qa-review) + their scripts
@@ -26,6 +28,7 @@ moved, or discovered to be different from what is recorded here.
     │   ├── RISKS.md           # active risks
     │   ├── API_CONTRACTS.md   # API structure, auth, error formats
     │   ├── ENVIRONMENT.md     # env vars and config keys (placeholders only)
+    │   ├── reviews/           # QA and UI/UX reports and round ledgers (documents, not artifacts)
     │   └── changelog/         # engineering changelog
     └── apps/                  # only when this becomes a multi-app project
         ├── web/
@@ -38,6 +41,8 @@ moved, or discovered to be different from what is recorded here.
 |---|---|
 | `AGENTS.md` | Rules that govern every agent working here |
 | `docs/` | All project documentation |
+| `artifacts/` | The one canonical folder for UI evidence: `<scope>/qa/<date>/<task-id>/` |
+| `docs/reviews/` | Review reports and round ledgers — documents, not artifacts |
 | `apps/<name>/` | One folder per app or microservice (new projects only) |
 
 ## Rules

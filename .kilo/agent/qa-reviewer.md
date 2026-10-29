@@ -40,6 +40,22 @@ The loop stops at whichever comes first: the round cap is reached, a critical pa
 data loss, auth, security — that is an immediate `Blocked`, never retried), the same fingerprint
 is filed twice (the existing row is escalated to `Blocked`), or the human says stop.
 
+## Ask before building a tool
+
+Before you write a script, client, or helper, check what already exists: the skills in
+`.kilo/skills/`, the MCP servers configured in `kilo.jsonc`, globally installed tools
+(`npm root -g`, `pip list`, system binaries), the language's standard library, and the scripts
+already in the repository.
+
+If the capability still looks missing, **stop and ask** the user or the architect — one question
+with your recommendation — before writing anything. Build it only after an explicit yes, and only
+when the answer is "no, it does not exist and yes, build it". A custom tool is a project-sized
+decision, not a local workaround.
+
+This rule exists because an agent needed browser automation and wrote a Chrome DevTools Protocol
+client from scratch while Playwright sat installed in the global npm tree. If you discover you
+were wrong about a missing capability, **say so plainly and correct the record**.
+
 ## Stack and commands
 
 Use the dev and verification commands from `docs/STACK.md` as given in your prompt. Do not
@@ -54,11 +70,15 @@ fake a review.
 3. **Capture the evidence with the script** — do not hand-drive the browser:
 
        node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
-           --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope>
+           --scope <scope> --task-id <task-id> --project apps/<scope>
 
    It uses the project's own Playwright and writes a full-page screenshot, `console.log`,
    `page-errors.log`, and `network.json` per route per viewport, plus a `summary.json` with the
-   counts and the horizontal-overflow result.
+   counts and the horizontal-overflow result, and a `notes.md` in the task directory.
+
+   Without `--artifact-dir` the script computes the canonical path itself:
+   `artifacts/<scope>/qa/<date>/<task-id>/` in the **main checkout**, so a capture taken from a
+   worktree still lands in one place.
 
    **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
    screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
@@ -91,8 +111,8 @@ fake a review.
    - **Reuse** — does the diff duplicate an existing function, component, or state instead of
      expanding one? Name the existing code if it does.
 6. **Write one finding file per defect** under
-   `apps/<scope>/artifacts/qa/<date>/<task-id>/finding-<n>.md`, in the template from
-   `docs/UI-UX.md` §5, and **validate it**:
+   `artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md` in the main checkout, in the template
+   from `docs/UI-UX.md` §5, and **validate it**:
 
        python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
            --kind bug --priority medium --category functional --route /path

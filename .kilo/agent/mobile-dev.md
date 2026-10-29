@@ -82,6 +82,22 @@ Production-ready behavior appropriate to the task. No temporary hacks, placehold
 duplicated logic, fragile workarounds, or knowingly incomplete implementations. Follow existing
 architectural boundaries and stack conventions.
 
+## Ask before building a tool
+
+Before you write a script, client, or helper, check what already exists: the skills in
+`.kilo/skills/`, the MCP servers configured in `kilo.jsonc`, globally installed tools
+(`npm root -g`, `pip list`, system binaries), the language's standard library, and the scripts
+already in the repository.
+
+If the capability still looks missing, **stop and ask** the user or the architect — one question
+with your recommendation — before writing anything. Build it only after an explicit yes, and only
+when the answer is "no, it does not exist and yes, build it". A custom tool is a project-sized
+decision, not a local workaround.
+
+This rule exists because an agent needed browser automation and wrote a Chrome DevTools Protocol
+client from scratch while Playwright sat installed in the global npm tree. If you discover you
+were wrong about a missing capability, **say so plainly and correct the record**.
+
 ## Never guess a decision
 
 The task's approved decisions are settled before you start. If you hit an unknown they do not

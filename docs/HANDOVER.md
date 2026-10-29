@@ -41,7 +41,8 @@
 | `apps/api/` | Scope rules for the future API scope (`AGENTS.md` only). No code. |
 | `docs/` | The governance document set (see §5 and §14). |
 | `docs/changelog/` | Engineering log: `CHANGELOG.md` plus one `<date>-<slug>.md` per notable change. |
-| `docs/reviews/` | QA and UI/UX review reports. Does not exist yet; created by the reviewer agents. |
+| `docs/reviews/` | QA and UI/UX review reports and round ledgers. Does not exist yet; created by the reviewer agents. |
+| `artifacts/` | The one canonical folder for UI evidence: `artifacts/<scope>/qa/<date>/<task-id>/`. Lives in the main checkout. Git keeps the `.md` files only. |
 
 ## 3. Entry points
 
@@ -84,6 +85,7 @@ what it is responsible for, and whether reading or running it has side effects.
 | `qa-reviewer` | `.kilo/agent/qa-reviewer.md:8` | Verify behavior against acceptance criteria with Playwright evidence. | Delegated agent. | Effectful (runs Playwright, writes `docs/reviews/`) |
 | `ui-critic` | `.kilo/agent/ui-critic.md:8` | Judge screens against the anti-slop rules and the approved gallery. | Delegated agent. | Effectful (writes `docs/reviews/`) |
 | `apps/*/AGENTS.md` | `apps/web/AGENTS.md:1`, `apps/mobile/AGENTS.md:1`, `apps/api/AGENTS.md:1` | Scope rules for each future application. | Scope rules. | Pure |
+| `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs:1` | Captures Playwright evidence into the canonical artifacts folder and writes `summary.json` and `notes.md`. | CLI: `--base-url`, `--route`, `--scope`, `--task-id`, `--date`, `--artifact-dir`, `--project`, `--viewports`, `--label`, `--scheme`, `--component`, `--compare`. | Effectful (launches a browser, writes files) |
 
 > **Pure** = no I/O, no mutation of external state, deterministic.
 > **Effectful** = I/O, filesystem, git, app runtime, Playwright, logging, shared state.
@@ -231,8 +233,9 @@ There is no automated test suite in this repository. No test runner, no test fil
     screenshots, console and network checks, overflow at 320px. Spec in `docs/UI-UX.md` §4,
     driven by the `/ui` command.
   - The **reviewer agents** are independent of the builder's claims. `qa-reviewer` writes
-    `docs/reviews/<task-id>-qa.md` plus artifacts under `apps/<scope>/artifacts/qa/<date>/<task-id>/`;
-    `ui-critic` writes `docs/reviews/<task-id>-ui.md`.
+    `docs/reviews/<task-id>-qa.md` plus artifacts under `artifacts/<scope>/qa/<date>/<task-id>/`;
+    `ui-critic` writes `docs/reviews/<task-id>-ui.md`. The reports and the round ledger are
+    documents, not artifacts; they stay in `docs/reviews/`.
   - The **merge gate** (§B4) requires evidence before a row can reach `Pending Merge`.
 
 ## 11. Visual language

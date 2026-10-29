@@ -250,7 +250,7 @@ The QA script drives the project's own Playwright and captures everything below:
 
 ```bash
 node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
-  --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope>
+  --scope <scope> --task-id <task-id> --project apps/<scope>
 ```
 
 Per route and viewport it writes `full.png`, `console.log`, `page-errors.log`, and
@@ -259,15 +259,32 @@ result.
 
 ### Artifact layout
 
+There is one canonical artifacts folder, at the repository root:
+
 ```
-apps/<scope>/artifacts/qa/<YYYY-MM-DD>/<task-id>/
-├── desktop/<route>.full.png
-├── mobile/<route>.full.png
-├── components/<component>.<viewport>.png
-├── console.log
-├── network.json
-└── notes.md          # what was checked, expected vs actual
+artifacts/
+  <scope>/                    # web | api | mobile | factory
+    qa/
+      <YYYY-MM-DD>/
+        <task-id>/            # BOARD-005
+          <route-slug>/
+            <viewport>/
+              <scheme>/        # light | dark
+                <screenshot>.png
+                console.log
+                page-errors.log
+                network.json
+                compare.png
+          notes.md              # what was checked, expected vs actual
+          summary.json
 ```
+
+The script computes that path itself, so no agent has to remember it. The artifacts folder
+belongs to the **main checkout**, so a capture taken from a worktree still lands in one place.
+
+Review reports and the ledger are **documents, not artifacts**. They stay where documents live:
+`docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
+`docs/reviews/<task-id>-ledger.md`.
 
 Commit `notes.md` and small component shots. Keep full-page captures out of git unless the team
 wants a visual record — they are large and churn.

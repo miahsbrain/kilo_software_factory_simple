@@ -22,6 +22,9 @@ stays in the main checkout and only you write it.
      screenshot`, `curl`-and-guess, or any other browser command from bash is not acceptable
      evidence. If the script cannot do something the review needs, extend the script — do not
      work around it with another tool.
+   - UI artifacts land in the one canonical folder at the repository root:
+     `artifacts/<scope>/qa/<date>/<task-id>/`. The script computes that path itself. Review reports
+     and the ledger stay in `docs/reviews/` — those are documents, not artifacts.
    - A row goes through at most **3** QA↔fix rounds. Round 3 is the last. Each round's review is
      done by a fresh reviewer that reads `docs/reviews/<task-id>-ledger.md` and the current
      screenshots, not the previous reviewer's reasoning. The ledger script opens and closes rounds:

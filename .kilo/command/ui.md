@@ -12,7 +12,10 @@ Spec: `docs/UI-UX.md` §3 and §5.
    `summary.json` with the counts and the overflow result:
 
        node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
-           --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope>
+           --scope <scope> --task-id <task-id> --project apps/<scope>
+
+   The script computes the canonical artifact path itself — `artifacts/<scope>/qa/<date>/<task-id>/`
+   in the **main checkout** — so no agent has to remember it.
 
    Viewports: 390×844 (mobile), 834×1112 (tablet), 1440×900 (desktop), 1920×1080 (wide), and
    320×800 as the overflow floor.
@@ -32,9 +35,10 @@ Spec: `docs/UI-UX.md` §3 and §5.
        python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 
    The ledger lives at `docs/reviews/<task-id>-ledger.md`.
-4. **Store artifacts** under `apps/<scope>/artifacts/qa/<YYYY-MM-DD>/<task-id>/` with a
+4. **Store artifacts** under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` with a
    `notes.md` recording what was checked and expected vs actual. Commit `notes.md` and small
-   component shots only.
+   component shots only. Review reports stay in `docs/reviews/<task-id>-qa.md` and
+   `docs/reviews/<task-id>-ui.md` — those are documents, not artifacts.
 5. **Check** and report findings as expected-vs-actual:
    - keyboard focus, visible focus ring, focus trapping in dialogs
    - contrast, accessible names on controls, alt text

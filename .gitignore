@@ -13,3 +13,7 @@ __pycache__/
 .tmp/
 .DS_Store
 *.log
+artifacts/**
+!artifacts/**/
+!artifacts/**/notes.md
+!artifacts/**/*.md

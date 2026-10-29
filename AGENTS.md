@@ -734,6 +734,7 @@ a follow-up task.
 | New/changed state machine or transition | `docs/HANDOVER.md` (state transitions), `docs/BUSINESS-LOGIC.md` |
 | New/changed business rule | `docs/BUSINESS-LOGIC.md`, `DOMAIN.md` if user-facing |
 | New/changed UI component, token, or visual rule | `docs/UI-UX.md` (gallery, tokens, anti-slop findings) |
+| New/changed UI evidence capture | `artifacts/<scope>/qa/<date>/<task-id>/notes.md` (canonical artifacts folder) |
 | Architectural change or new decision | `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` |
 | Approved implementation decision | `docs/DECISIONS.md` (append-only, with the date) |
 | New dependency | `docs/ARCHITECTURE.md` (reason), `docs/HANDOVER.md` |
@@ -1199,11 +1200,35 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
 - **Capture:** the QA script drives the project's own Playwright:
 
       node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
-          --artifact-dir apps/<scope>/artifacts/qa/<date>/<task-id> --project apps/<scope>
+          --scope <scope> --task-id <task-id> --project apps/<scope>
 
   It writes a full-page screenshot, `console.log`, `page-errors.log`, and `network.json` per route
   per viewport (390×844, 834×1112, 1440×900, 1920×1080, plus 320×800 as the overflow floor), and
   a `summary.json` with the counts and the overflow result.
+- **One canonical artifacts folder.** Every UI artifact lives under the repository root:
+
+      artifacts/
+        <scope>/                    # web | api | mobile | factory
+          qa/
+            <YYYY-MM-DD>/
+              <task-id>/            # BOARD-005
+                <route-slug>/
+                  <viewport>/
+                    <scheme>/      # light | dark
+                      <screenshot>.png
+                      console.log
+                      page-errors.log
+                      network.json
+                      compare.png
+                notes.md            # what was checked, expected vs actual
+
+  The script builds that path itself, so no agent has to remember it. `--scope` (default
+  `factory`), `--task-id` (default `adhoc`) and `--date` (default today) name the folders;
+  `--artifact-dir` is an optional override. The artifacts folder belongs to the **main checkout**,
+  so a capture taken from a worktree still lands in one place.
+  **Review reports and the ledger are documents, not artifacts.** They stay where documents live:
+  `docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
+  `docs/reviews/<task-id>-ledger.md`.
 - **The script is the only way to capture UI evidence.** The QA reviewer and the UI critic capture
   screenshots **only** through `browser-review.mjs`. Ad-hoc `chromium`, `npx playwright
   screenshot`, `curl`-and-guess, or any other browser command run from bash is **not acceptable
@@ -1212,15 +1237,15 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   - `--scheme light|dark|both` — capture in one colour scheme or both; `both` names the files
     `<viewport>-light.png` / `<viewport>-dark.png`.
   - `--component <css-selector>` (repeatable) — capture a cropped screenshot of each matched
-    element, at `<artifact-dir>/<route-slug>/<viewport>/component-<n>.png`.
+    element, at `<task-dir>/<route-slug>/<viewport>/<scheme>/component-<n>.png`.
   - `--compare <dir>` — write a **before | after** sheet to
-    `<artifact-dir>/<route-slug>/<viewport>/compare.png` when that directory holds a previous
+    `<task-dir>/<route-slug>/<viewport>/<scheme>/compare.png` when that directory holds a previous
     capture with the same route-slug and viewport names.
   - `--label <slug>` — name the capture, so round 0, round 1 and round 2 can be compared.
   - `--chromium <path>` — a fallback browser binary for pages with no Playwright project of their
     own; the script drives it over CDP. When neither Playwright nor `--chromium` is available the
     script fails cleanly and exits 2.
-- **Store artifacts** under `apps/<scope>/artifacts/qa/<date>/<task-id>/` with `notes.md`
+- **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
   recording what was checked and expected vs actual. Commit `notes.md` and small component shots;
   leave full-page captures out of git.
 - **Check:** keyboard focus and focus trapping, contrast, accessible names, tap target size
@@ -1240,7 +1265,7 @@ independent of the builder's claims:
 
 | Agent | Role | Output |
 |---|---|---|
-| `qa-reviewer` | Verifies behavior against the acceptance criteria; drives Playwright | `docs/reviews/<task-id>-qa.md` + artifacts under `apps/<scope>/artifacts/qa/<date>/<task-id>/` |
+| `qa-reviewer` | Verifies behavior against the acceptance criteria; drives Playwright | `docs/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
 | `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `docs/reviews/<task-id>-ui.md` |
 
 Both are read-only against application code. They report; they do not fix.
@@ -1346,6 +1371,37 @@ changed inside it.
 
 The Review lane checks this: a diff that adds a function beside a near-identical existing one is
 a finding, and so is a second source of truth for state that already exists.
+
+## B6.1 Ask before building a tool (hard rule)
+
+§B6 governs application code. This rule governs **tooling** — the scripts, clients, and helpers an
+agent writes to get a job done. It applies the same reuse discipline one level up, because a
+custom tool is a project-sized decision, not a local workaround.
+
+**Before building a tool, check what exists — then ask.**
+
+1. **Check, in this order:**
+   - the skills in `.kilo/skills/` — a script may already do it
+   - the MCP servers configured in `kilo.jsonc` — a browser, a database, an API client
+   - globally installed tools (`npm root -g`, `pip list`, system binaries)
+   - the language's standard library
+   - the scripts already in the repository
+2. **Then ask.** If the capability still looks missing, **stop and ask the user or the
+   architect** — one question with your recommendation — before writing anything. Do not
+   improvise a tool to unblock yourself.
+3. **Only build it after an explicit yes**, and only when the answer is "no, it does not exist
+   and yes, build it".
+4. **A custom tool is a project-sized decision.** Writing one is a multi-hour, multi-thousand-token
+   commitment that another person has to maintain, so it gets a decision, not an improvisation.
+
+**Why this rule exists:** an agent that needed browser automation wrote a Chrome DevTools Protocol
+client from scratch while Playwright sat installed in the global npm tree. The capability existed.
+The agent never checked and never asked, and burned an hour and thousands of tokens
+reimplementing something that was already there.
+
+**Correct the record.** An agent that has just discovered it was wrong about a missing capability
+must say so plainly and correct the record, rather than quietly continuing. Name what was wrong,
+what the correct answer is, and what it changes.
 
 ## B7. Functional programming style
 
