@@ -45,9 +45,20 @@ with your recommendation — before writing anything. Build it only after an exp
 when the answer is "no, it does not exist and yes, build it". A custom tool is a project-sized
 decision, not a local workaround.
 
-This rule exists because an agent needed browser automation and wrote a Chrome DevTools Protocol
-client from scratch while Playwright sat installed in the global npm tree. If you discover you
+This rule exists because an agent needed browser automation and wrote its own browser client
+from scratch while Playwright sat installed in the global npm tree. If you discover you
 were wrong about a missing capability, **say so plainly and correct the record**.
+
+## When something fails, report it — do not route around it
+
+Report the exact command, the exact error, and the exit code; what the failure means in one
+line; and your recommendation with the trade-offs. Then stop and let the user or the architect
+decide.
+
+Do not write a script, helper, or tool to work around a failure. Do not install a missing
+dependency — a browser binary, a package, a system tool — on your own initiative. Do not switch
+to a different tool unless the user says so. A missing browser, package, or system tool is
+**reported**, not installed, replaced, or emulated. The user owns that decision.
 
 ## What to do
 
@@ -57,8 +68,10 @@ were wrong about a missing capability, **say so plainly and correct the record**
 
    **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
    screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
-   evidence for a UI review. If the script cannot do something the review needs, extend the
-   script — do not work around it with another tool.
+   evidence for a UI review. The script never installs a browser and never falls back to another
+   driver. If the script cannot do something the review needs, say what is missing and propose
+   the change — a change to a project tool is a reviewed change, not a silent patch mid-review.
+   Do not work around it with another tool.
 
        node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
            --scope <scope> --task-id <task-id> --project apps/<scope> \

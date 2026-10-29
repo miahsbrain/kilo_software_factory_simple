@@ -247,6 +247,8 @@ Ask the user before approving an approach when:
   naming, defaults, and error behavior;
 - **the builder hit an unknown while implementing** — the builder stops and asks instead of
   guessing.
+- a command, capture, or test failed for an environmental reason (missing browser, package, or
+  system tool).
 
 When asking, present concise options: the recommended option, its benefits, its drawbacks, when
 each option is appropriate, and the specific decision required. Do not present many equally
@@ -1232,8 +1234,10 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
 - **The script is the only way to capture UI evidence.** The QA reviewer and the UI critic capture
   screenshots **only** through `browser-review.mjs`. Ad-hoc `chromium`, `npx playwright
   screenshot`, `curl`-and-guess, or any other browser command run from bash is **not acceptable
-  evidence** for a UI review. If the script cannot do something the review needs, **extend the
-  script** — do not work around it with another tool.
+  evidence** for a UI review. The script never installs a browser and never falls back to another
+  driver. If the script cannot do something the review needs, **say what is missing and propose
+  the change** — a change to a project tool is a reviewed change, not a silent patch mid-review.
+  Do not work around it with another tool.
   - `--scheme light|dark|both` — capture in one colour scheme or both; `both` names the files
     `<viewport>-light.png` / `<viewport>-dark.png`.
   - `--component <css-selector>` (repeatable) — capture a cropped screenshot of each matched
@@ -1242,9 +1246,10 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
     `<task-dir>/<route-slug>/<viewport>/<scheme>/compare.png` when that directory holds a previous
     capture with the same route-slug and viewport names.
   - `--label <slug>` — name the capture, so round 0, round 1 and round 2 can be compared.
-  - `--chromium <path>` — a fallback browser binary for pages with no Playwright project of their
-    own; the script drives it over CDP. When neither Playwright nor `--chromium` is available the
-    script fails cleanly and exits 2.
+  - `--chromium <path>` — the path of a chromium binary handed to Playwright's launch. It
+    overrides `PLAYWRIGHT_CHROMIUM_PATH`. When no chromium is found at all — neither the flag,
+    nor the env var, nor the browser Playwright downloaded, nor the system chromium — the script
+    exits 2 with the list of places it searched and what to do about it.
 - **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
   recording what was checked and expected vs actual. Commit `notes.md` and small component shots;
   leave full-page captures out of git.
@@ -1394,14 +1399,26 @@ custom tool is a project-sized decision, not a local workaround.
 4. **A custom tool is a project-sized decision.** Writing one is a multi-hour, multi-thousand-token
    commitment that another person has to maintain, so it gets a decision, not an improvisation.
 
-**Why this rule exists:** an agent that needed browser automation wrote a Chrome DevTools Protocol
-client from scratch while Playwright sat installed in the global npm tree. The capability existed.
+**Why this rule exists:** an agent that needed browser automation wrote its own browser client
+from scratch while Playwright sat installed in the global npm tree. The capability existed.
 The agent never checked and never asked, and burned an hour and thousands of tokens
 reimplementing something that was already there.
 
 **Correct the record.** An agent that has just discovered it was wrong about a missing capability
 must say so plainly and correct the record, rather than quietly continuing. Name what was wrong,
 what the correct answer is, and what it changes.
+
+## B6.2 When something fails, report it — do not route around it
+
+1. The exact command, the exact error, and the exit code.
+2. What the failure means, in one line.
+3. Your recommendation, with the options and their trade-offs.
+4. Then stop, and let the user or the architect decide.
+
+Do not write a script, helper, or tool to work around a failure. Do not install a missing
+dependency — a browser binary, a package, a system tool — on your own initiative. Do not switch
+to a different tool unless the user says so. A missing browser, package, or system tool is
+**reported**, not installed, replaced, or emulated. The user owns that decision.
 
 ## B7. Functional programming style
 

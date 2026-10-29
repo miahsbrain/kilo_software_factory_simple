@@ -20,7 +20,9 @@ stays in the main checkout and only you write it.
    with the command and result and `file:line`. For UI work, capture screenshots.
    - The capture script is the only way to capture UI evidence. Ad-hoc `chromium`, `npx playwright
      screenshot`, `curl`-and-guess, or any other browser command from bash is not acceptable
-     evidence. If the script cannot do something the review needs, extend the script — do not
+     evidence. The script never installs a browser and never falls back to another driver. If
+     the script cannot do something the review needs, say what is missing and propose the change
+     — a change to a project tool is a reviewed change, not a silent patch mid-review. Do not
      work around it with another tool.
    - UI artifacts land in the one canonical folder at the repository root:
      `artifacts/<scope>/qa/<date>/<task-id>/`. The script computes that path itself. Review reports
