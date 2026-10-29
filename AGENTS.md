@@ -857,20 +857,25 @@ worktree.
    first** — work not on the board is unsanctioned work.
 2. **One worktree per task.** Never mix two features in one worktree. Never work directly in the
    main checkout for application changes.
-3. **The worktree carries the feature name.** Name the worktree and the branch after the feature,
-   not after the agent or the session:
-   - worktree directory: `.kilo/worktrees/<feature-slug>/`
-   - branch: `feat/<feature-slug>` | `fix/<feature-slug>` | `chore/<feature-slug>` |
-     `docs/<feature-slug>`
-   - `<feature-slug>` is short, kebab-case, and matches the board task name:
-     `feat/user-login`, `fix/session-timeout`, `docs/handover-template`.
-   - Record the exact worktree path and branch in the board row.
-4. **Create it with the script, from the base branch:**
+3. **The worktree carries the feature name.** The name is **derived from the board row**, never
+   typed by hand, so a bug fix can never land on `feat/…`:
+   - the **branch type** comes from the row's `Type` — `Feature` → `feat`, `Fix` → `fix`,
+     `Chore` → `chore`, `Docs` → `docs`, `Research` → `chore`
+   - the **slug** comes from the row's task title, kebab-cased, trimmed to the first 6 words
+     when longer than 48 characters
+   - branch: `feat/<slug>` | `fix/<slug>` | `chore/<slug>` | `docs/<slug>`
+   - worktree directory: `.kilo/worktrees/<slug>/`
+   - examples: `feat/user-login`, `fix/session-timeout`, `docs/handover-template`
+   - The script records the exact worktree path and branch back onto the board row, so the row
+     and the worktree can never drift apart.
+4. **Create it with the script, from the board row:**
 
-       python3 .kilo/skills/git-worktree/scripts/worktree.py create <slug> --type <type> --base <base>
+       python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
 
-   The script creates `.kilo/worktrees/<slug>/` on branch `<type>/<slug>` and refuses when the
-   branch or directory already exists. It never deletes anything.
+   The script reads the row, derives the type and slug, creates
+   `.kilo/worktrees/<slug>/` on branch `<type>/<slug>`, writes the row's `Branch/Worktree` and
+   `Status` cells in the main checkout, and refuses when the branch or directory already exists.
+   It never deletes anything.
 
 5. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
    happens there. The worktree must contain the code change **and** the matching scope-doc

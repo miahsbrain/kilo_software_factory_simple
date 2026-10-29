@@ -7,9 +7,9 @@ stays in the main checkout and only you write it.
 
 1. **Pick** the row: highest-priority `Ready`, not blocked by another row. Grade it
    low/medium/high (§B4 "Task grading") to set the rigor of review.
-2. **Build** in the worktree named after the feature. Create it with the script if it does not
-   exist: `python3 .kilo/skills/git-worktree/scripts/worktree.py create <slug> --type <type>
-   --base <base>`.
+2. **Build** in the worktree named after the feature. Create it from the board row if it does not
+   exist: `python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <ID> --base main`
+   (the branch type and slug are derived from the row).
    - Implement the smallest change that satisfies every acceptance criterion.
    - Update the scope docs (`HANDOVER.md`, `BUSINESS-LOGIC.md`, `ARCHITECTURE.md`,
      `DECISIONS.md`, `changelog/`) in the same change set (§B1).

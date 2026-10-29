@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Deterministic git worktree lifecycle for this factory.
 
-    worktree.py create <slug> [--type feat|fix|chore|docs|refactor|test|perf] [--base main]
+    worktree.py create --board BOARD-00X [--base main] [--slug <override>]
     worktree.py list
     worktree.py verify <slug> [--base main]
     worktree.py cleanup <slug> [--apply]
 
-create makes .kilo/worktrees/<slug> on branch <type>/<slug>. It never
-overwrites: an existing branch or directory is a refusal.
+create reads the board row named by --board from docs/BOARD.md, derives the
+branch type from its Type column and the slug from its task title, then makes
+.kilo/worktrees/<slug> on branch <type>/<slug> and records the worktree on the
+row. It never overwrites: an existing branch or directory is a refusal.
 
 verify reports branch, commits ahead of base, changed files and dirty state,
 and exits 0 only when the tree is clean and the branch has at least one commit
@@ -22,14 +24,19 @@ Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 """
 import argparse
 import datetime
+import importlib.util
 import os
 import re
 import subprocess
 import sys
 
-TYPES = ["feat", "fix", "chore", "docs", "refactor", "test", "perf"]
+TYPE_MAP = {"Feature": "feat", "Fix": "fix", "Chore": "chore", "Docs": "docs",
+            "Research": "chore"}
 SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 WORKTREES_DIR = os.path.join(".kilo", "worktrees")
+MAX_SLUG_LEN = 48
+STATUS_INDEX = 3
+BRANCH_INDEX = 7
 
 OK = 0
 REFUSED = 1
@@ -61,6 +68,42 @@ def repo_root(cwd):
     marker = os.sep + WORKTREES_DIR.replace(os.sep, os.sep) + os.sep
     at = top.find(marker)
     return top if at == -1 else top[:at]
+
+
+def main_checkout_root(cwd):
+    """The main working tree of the repository, from it or from any linked worktree."""
+    out = git_out(cwd, "worktree", "list", "--porcelain") or ""
+    for line in out.splitlines():
+        key, _, value = line.partition(" ")
+        if key == "worktree" and value:
+            return os.path.abspath(value)
+    return script_root()
+
+
+def script_root():
+    """The repo root that holds this script, whatever the cwd is."""
+    return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                        "..", "..", "..", ".."))
+
+
+def load_board_module(root):
+    """The sibling board.py, loaded by path so it works from anywhere."""
+    path = os.path.join(root, ".kilo", "skills", "board", "scripts", "board.py")
+    if not os.path.exists(path):
+        print("board script not found: %s" % path, file=sys.stderr)
+        return None
+    spec = importlib.util.spec_from_file_location("board", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def slugify(title):
+    """The kebab-case slug of a board task title."""
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    if len(slug) > MAX_SLUG_LEN:
+        slug = "-".join(slug.split("-")[:6])
+    return slug
 
 
 def common_dir(cwd):
@@ -110,33 +153,86 @@ def find_worktree(cwd, slug):
     return None
 
 
+def board_row(board, path, board_id):
+    table, err = board.read_table(path)
+    if table is None:
+        print(err, file=sys.stderr)
+        return None, None
+    index = board.row_by_id(table, board_id)
+    if index is None:
+        print("no row with ID %s on the board; add it first with "
+              "'board.py add --id %s --task \"...\"' (rule: every task gets a board row "
+              "before its worktree exists)" % (board_id, board_id), file=sys.stderr)
+        return None, None
+    return table, index
+
+
 def cmd_create(args, cwd):
-    if not SLUG_RE.match(args.slug):
-        print("invalid slug %r: use kebab-case, e.g. feat/user-login" % args.slug, file=sys.stderr)
-        return INVALID
-    if args.type not in TYPES:
-        print("invalid --type %r: use one of %s" % (args.type, ", ".join(TYPES)), file=sys.stderr)
-        return INVALID
-    root = repo_root(cwd)
-    if not root:
-        print("not inside a git repository", file=sys.stderr)
+    root = main_checkout_root(cwd)
+    git_root = cwd
+    board = load_board_module(script_root())
+    if board is None:
         return REFUSED
-    branch = "%s/%s" % (args.type, args.slug)
-    if git_out(root, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
+    board_file = os.path.join(root, "docs", "BOARD.md")
+    table, index = board_row(board, board_file, args.board)
+    if table is None:
+        return REFUSED
+    cells = board.cell_texts(table["lines"], index)
+    if len(cells) < 3:
+        print("row %s is malformed: %d cells" % (args.board, len(cells)), file=sys.stderr)
+        return REFUSED
+    task, row_type = cells[1], cells[2]
+    branch_type = TYPE_MAP.get(row_type)
+    if branch_type is None:
+        print("row %s has Type %r; allowed types are %s" %
+              (args.board, row_type,
+               ", ".join("%s -> %s" % (k, v) for k, v in TYPE_MAP.items())),
+              file=sys.stderr)
+        return INVALID
+    derived = slugify(task)
+    if not derived:
+        print("row %s has an empty task title; the task title needs a real name" % args.board,
+              file=sys.stderr)
+        return INVALID
+    slug = args.slug or derived
+    if not SLUG_RE.match(slug):
+        print("invalid slug %r: use kebab-case, e.g. user-login" % slug, file=sys.stderr)
+        return INVALID
+    if args.slug and args.slug != derived:
+        print("derived slug: %s" % derived)
+        print("used slug:    %s" % slug)
+    branch = "%s/%s" % (branch_type, slug)
+    if git_out(git_root, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
         print("branch %s already exists; pick another slug or type" % branch, file=sys.stderr)
         return REFUSED
-    path = worktree_path(root, args.slug)
+    path = worktree_path(root, slug)
     if os.path.exists(path):
         print("directory %s already exists; refusing to overwrite it" % path, file=sys.stderr)
         return REFUSED
-    if not git_out(root, "rev-parse", "-q", "--verify", "refs/heads/" + args.base):
+    if not git_out(git_root, "rev-parse", "-q", "--verify", "refs/heads/" + args.base):
         print("base branch %s does not exist" % args.base, file=sys.stderr)
         return REFUSED
-    code, _, err = git(root, "worktree", "add", path, "-b", branch, args.base)
+    code, _, err = git(git_root, "worktree", "add", path, "-b", branch, args.base)
     if code != 0:
         print("git worktree add failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         return REFUSED
-    print(os.path.abspath(path))
+    try:
+        lines = list(table["lines"])
+        lines[index] = board.replace_cell(lines[index], BRANCH_INDEX,
+                                          "%s · branch %s" % (os.path.join(WORKTREES_DIR, slug),
+                                                              branch))
+        lines[index] = board.replace_cell(lines[index], STATUS_INDEX, "In Progress")
+        board.write_atomic(board_file, lines)
+    except Exception as exc:
+        print("warning: worktree %s exists but row %s was not updated (%s)" %
+              (path, args.board, exc), file=sys.stderr)
+        return REFUSED
+    print("board:    %s" % args.board)
+    print("board file: %s" % board_file)
+    print("task:     %s" % task)
+    print("branch:   %s" % branch)
+    print("worktree: %s" % os.path.abspath(path))
+    print("base:     %s" % args.base)
     return OK
 
 
@@ -285,10 +381,10 @@ def main(argv):
         prog="worktree.py", description="Deterministic git worktree lifecycle.")
     sub = parser.add_subparsers(dest="command")
 
-    p = sub.add_parser("create", help="create a worktree on a new branch")
-    p.add_argument("slug")
-    p.add_argument("--type", default="feat", help="branch type (default: feat)")
+    p = sub.add_parser("create", help="create a worktree named from a board row")
+    p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
     p.add_argument("--base", default="main", help="base branch (default: main)")
+    p.add_argument("--slug", help="override the slug derived from the task title")
 
     sub.add_parser("list", help="list worktrees")
 
