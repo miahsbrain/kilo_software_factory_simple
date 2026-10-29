@@ -27,8 +27,8 @@ finding, `merged` records a landed fix, `stop` records why it stopped.
 
 ## The Playwright that was already there
 
-The previous pass concluded Playwright was missing and hand-built a Chrome DevTools Protocol
-client to drive a browser. That was built on a false premise.
+The previous pass concluded Playwright was missing and hand-built its own browser client to
+drive a browser. That was built on a false premise.
 
 The devcontainer installs `@playwright/mcp` globally, which brings `playwright` and
 `playwright-core` with it, plus system chromium at `/usr/bin/chromium` and
@@ -41,7 +41,7 @@ Two fixes:
 - **`browser-review.mjs` resolves Playwright properly** — the project's own copy first, then the
   global install (via `NODE_PATH`, `npm root -g`, and the well-known path), then it exits 2 with a
   message naming both places it searched. It launches `/usr/bin/chromium` when Playwright has no
-  downloaded browser. The hand-rolled CDP client is gone.
+  downloaded browser. The hand-rolled browser client is gone.
 - **The Playwright MCP is configured in `kilo.jsonc`**, so agents get the interactive browser tools
   — navigate, snapshot, click, read the console. They were installed but never wired up, which is
   why the agent reached for bash.
