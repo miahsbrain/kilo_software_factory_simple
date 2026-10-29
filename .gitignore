@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+.env.*.local
+!.env.example
+.kilo/worktrees/
+.kilo/agent-manager.json
+.DS_Store
+*.log

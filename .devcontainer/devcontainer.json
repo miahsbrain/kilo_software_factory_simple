@@ -1,0 +1,54 @@
+{
+  "name": "Software Factory",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "remoteUser": "node",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/rust:1": {
+      "profile": "default"
+    }
+  },
+  "mounts": [
+    "source=vscode-server-${devcontainerId},target=/home/node/.vscode-server,type=volume",
+    "source=kilo-config-${devcontainerId},target=/home/node/.config/kilo,type=volume",
+    "source=cargo-registry-${devcontainerId},target=/usr/local/cargo/registry,type=volume"
+  ],
+  "runArgs": [
+    "--add-host=host.docker.internal:host-gateway",
+    "--memory=${localEnv:FACTORY_MEM:12g}",
+    "--memory-swap=${localEnv:FACTORY_MEM:12g}",
+    "--cpus=${localEnv:FACTORY_CPUS:4}",
+    "--shm-size=2g"
+  ],
+  "remoteEnv": {
+    "OPENROUTER_API_KEY": "${localEnv:OPENROUTER_API_KEY}",
+    "DEEPSEEK_API_KEY": "${localEnv:DEEPSEEK_API_KEY}",
+    "CARGO_BUILD_JOBS": "${localEnv:FACTORY_CARGO_JOBS:2}"
+  },
+  "postCreateCommand": "git config --global --add safe.directory '*' && echo '--- versions ---' && node -v && python3 --version && rustc --version && git --version && kilo --version && tilt version && /usr/sbin/nginx -v && chromium --version; if [ -f .factory/tools/factory.mjs ]; then node .factory/tools/factory.mjs doctor || true; fi",
+  "forwardPorts": [8080, 10350],
+  "portsAttributes": {
+    "8080": {
+      "label": "Gateway",
+      "onAutoForward": "notify"
+    },
+    "10350": {
+      "label": "Tilt UI",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "kilocode.Kilo-Code",
+        "ms-python.python",
+        "rust-lang.rust-analyzer"
+      ],
+      "settings": {
+        "extensions.autoUpdate": true
+      }
+    }
+  }
+}
