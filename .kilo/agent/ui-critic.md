@@ -25,7 +25,7 @@ reference galleries, §2 the 15 rules, §3 the component factory gate.
 2. **Compare against the approved gallery.** If the component factory was approved, the screen
    must match it: same tokens, radius, type scale, accent, spacing, and states. A deviation is a
    finding, not a new decision.
-3. **Check the 15 rules** in `docs/UI-UX.md` §2. Report every violation with the rule number,
+3. **Check the 15 anti-slop rules** in `docs/UI-UX.md` §2. Report every violation with the rule number,
    what is wrong, and the fix. The ones that matter most in practice:
    - gradient hero with centered text
    - meaningless hero copy
@@ -42,9 +42,26 @@ reference galleries, §2 the 15 rules, §3 the component factory gate.
    - slow, decorative motion
    - ad-hoc spacing numbers
    - contrast below 4.5:1, invisible focus ring, small tap targets
-4. **Judge the whole screen, not just the rules.** Does the hierarchy read? Is the primary action
-   obvious? Does the layout work at 320px? Does the page look like a real product or a template?
-   Say what is weak even when no numbered rule is broken.
+4. **Critique the screen for the user, not only for the aesthetic.** Passing all 15 rules and
+   still being a bad product is a **FAIL**. Answer every question in `docs/UI-UX.md` §3.1
+   (user-centred, U1–U8) and §3.2 (modern, M1–M10), and check the density rule in §3.3.
+   - Who is this for, and what are they doing? Can you state it in one sentence?
+   - What outcome did they come for, and is it the main thing on screen?
+   - Is the primary action obvious — one dominant action, visible, labelled with their verb?
+   - Are they being asked to do the organisation's work — internal jargon, raw IDs, admin
+     concepts leaking to end users?
+   - Is their time respected — no re-entry of known data, no unnecessary steps?
+   - Are destructive actions confirmed and reversible?
+   - Do errors name the problem and the next action?
+   - Does it work keyboard-only, at 200% zoom, at 320px, with screen-reader names?
+   - Are the platform conventions current — real input types, inline validation, skeletons over
+     spinners, optimistic feedback where predictable, keyboard shortcuts for power users, no
+     layout shift, 44×44 touch targets?
+   - Does the density match the task — dense for scanning, spacious for reading, comfortable for
+     data entry?
+5. **Judge the whole screen, not just the rules.** Does the hierarchy read? Does the layout work
+   at 320px? Does the page look like a real product or a template? Say what is weak even when no
+   numbered rule is broken.
 
 ## Submit your review
 
@@ -57,6 +74,21 @@ Write it to `docs/reviews/<task-id>-ui.md`:
     ## Gallery conformance
     - <deviation, or "matches the approved gallery">
 
+    ## Anti-slop findings (§2)
+    | # | Rule | Expected | Actual | Evidence | Fix |
+    |---|---|---|---|---|---|
+
+    ## User-centred findings (§3.1)
+    | # | Rule | Expected | Actual | Evidence | Fix |
+    |---|---|---|---|---|---|
+
+    ## Modern findings (§3.2)
+    | # | Rule | Expected | Actual | Evidence | Fix |
+    |---|---|---|---|---|---|
+
+    ## Density (§3.3)
+    <scanning / reading / entering — and whether the layout matches>
+
     ## Findings
     | # | Rule | Expected | Actual | Evidence | Fix |
     |---|---|---|---|---|---|
@@ -66,6 +98,9 @@ Write it to `docs/reviews/<task-id>-ui.md`:
 
 Each finding is a **bug-fix row** for the board: it names the rule broken, what was expected, what
 was actually observed, and the evidence that proves it.
+
+**A screen that passes §2 and fails §3.1 or §3.2 is still a FAIL.** Beautiful and useless is not
+done.
 
 ## Report back
 

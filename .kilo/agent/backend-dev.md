@@ -60,6 +60,21 @@ observability. Never add backdoors, disabled auth checks, wildcard CORS, unsafe 
 leakage, or data exfiltration. Never weaken auth, validation, rate limits, or secret handling
 unless explicitly required by approved acceptance criteria.
 
+## Analyse before you create
+
+Before writing anything new, do the search and **report it**:
+
+1. **Existing behaviour** — list the functions, components, hooks, services, or state slices that
+   already cover this ground. Give `file:line`.
+2. **The verdict** — for each one: *extend it*, *use it as-is*, or *it does not fit because
+   <reason>*.
+3. **Only then** create something new, and say why there was no existing thing to extend.
+
+A diff that adds a function next to a near-identical one is a review finding, not a style
+preference. The same applies to state: extending an existing slice beats adding a second source of
+truth. If the work is a **Fix** row, the report says which existing function carried the bug and
+what changed in it.
+
 ## Runtime logging
 
 Use the project's existing logger and convention. When no format exists:

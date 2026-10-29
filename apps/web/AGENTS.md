@@ -63,7 +63,7 @@ checked. Do not pick an option and continue. Do not change an approved decision.
 
 A screen that deviates from the approved gallery is a review finding, not a new decision.
 
-The spec and reference galleries live in `docs/UI-UX.md` §3.
+The spec and reference galleries live in `docs/UI-UX.md` §4.
 
 ## Visual quality
 
@@ -76,9 +76,26 @@ spacing from a scale, and contrast ≥ 4.5:1 with a visible focus ring.
 
 Look at the reference galleries in `docs/UI-UX.md` §1 before inventing a look.
 
+### User-centred and modern
+
+Passing the anti-slop rules is not enough — the result also has to serve the user. `docs/UI-UX.md`
+§3 defines the standard the QA lane and the UI/UX critique enforce:
+
+- **§3.1 User-centred (U1–U8)** — who it is for and what they are doing; the outcome they came
+  for; one obvious primary action; no internal jargon or the organisation's work leaking in; the
+  user's time respected; destructive actions reversible; errors that name the next action; works
+  keyboard-only, at 200% zoom, at 320px, and with screen-reader names.
+- **§3.2 Modern (M1–M10)** — current platform convention: real input types, inline validation,
+  skeletons over spinners, optimistic feedback where predictable, one text face, keyboard
+  shortcuts for power users, dark mode when the product needs it, copy that names the job, no
+  layout shift, 44×44 touch targets in touch-primary flows.
+- **§3.3 Density** — dense for scanning, spacious for reading, comfortable for data entry.
+
+
+
 ## QA and UI/UX review
 
-The QA lane uses **Playwright** and produces evidence, not assertions. Spec: `docs/UI-UX.md` §4.
+The QA lane uses **Playwright** and produces evidence, not assertions. Spec: `docs/UI-UX.md` §5.
 
 - Full-page screenshot per route per viewport: 390×844, 834×1112, 1440×900, 1920×1080, and
   320×800 as the overflow floor.
