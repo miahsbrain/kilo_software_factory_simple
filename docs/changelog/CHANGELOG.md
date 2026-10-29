@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-10-29] Starter: front page, no test residue, empty board
+**Type:** Chore
+**Board:** BOARD-013 | **Branch:** chore/starter-repo-prep
+**Changed:** `README.md` (new), `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`, removed `artifacts/factory/qa/2026-10-29/BOARD-012/notes.md`, emptied `docs/BOARD.md`
+**Why:** The repo is going public as a starter to plug into any project, so it needs a front page, no test residue, and a board that starts empty.
+**Impact:** No behaviour change. A fresh clone has an empty board; the first row is added with `board.py add`. The handover and project state describe the starter, not a running project.
+
 ## [2026-10-29] One driver for the capture path, failures reported not routed around
 **Type:** Chore
 **Board:** BOARD-012 | **Branch:** chore/remove-cdp-and-report-failures
