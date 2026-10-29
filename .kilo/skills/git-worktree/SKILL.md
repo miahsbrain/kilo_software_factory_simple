@@ -28,16 +28,25 @@ Python 3.9+, standard library only.
 
 ## 2. Create the worktree
 
+The name comes from the **board row**, not from what you type. The script reads the row, derives
+the branch type from its `Type` column and the slug from its task title, creates the worktree,
+and records the path and branch back onto the row.
+
 ```bash
-python3 .kilo/skills/git-worktree/scripts/worktree.py create <slug> --type <type> --base <base>
+python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> [--base main]
 ```
 
-- `<slug>` — short, kebab-case, identical to the board task slug: `user-login`, `session-timeout`.
-- `<type>` — `feat` | `fix` | `chore` | `docs` | `refactor` | `test` | `perf`
-- `<base>` — `main` by default. A feature branch only when the board row's `Blocked by` says so.
+- The **branch type** comes from the row's `Type`: `Feature` → `feat`, `Fix` → `fix`,
+  `Chore` → `chore`, `Docs` → `docs`, `Research` → `chore`.
+- The **slug** comes from the task title, kebab-cased, trimmed to the first 6 words when it is
+  longer than 48 characters.
+- The branch is `<type>/<slug>` and the directory is `.kilo/worktrees/<slug>/`.
+- `--slug <override>` replaces the derived slug. It must be kebab-case.
+- `--base` defaults to `main`. Use a feature branch only when the row's `Blocked by` says so.
 
-The script creates `.kilo/worktrees/<slug>/` on branch `<type>/<slug>` and prints the absolute
-path. It refuses when the branch or the directory already exists. It never deletes anything.
+The script refuses when the row does not exist, when the branch or directory already exists, or
+when the row's type is unknown. It never deletes anything. It writes the board row in the **main
+checkout**, so the live board always points at the running worktree.
 
 Before creating, check for an in-flight worktree on the same task:
 
