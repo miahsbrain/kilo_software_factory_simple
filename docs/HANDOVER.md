@@ -85,7 +85,7 @@ what it is responsible for, and whether reading or running it has side effects.
 | `qa-reviewer` | `.kilo/agent/qa-reviewer.md:8` | Verify behavior against acceptance criteria with Playwright evidence. | Delegated agent. | Effectful (runs Playwright, writes `docs/reviews/`) |
 | `ui-critic` | `.kilo/agent/ui-critic.md:8` | Judge screens against the anti-slop rules and the approved gallery. | Delegated agent. | Effectful (writes `docs/reviews/`) |
 | `apps/*/AGENTS.md` | `apps/web/AGENTS.md:1`, `apps/mobile/AGENTS.md:1`, `apps/api/AGENTS.md:1` | Scope rules for each future application. | Scope rules. | Pure |
-| `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs:1` | Captures Playwright evidence into the canonical artifacts folder and writes `summary.json` and `notes.md`. | CLI: `--base-url`, `--route`, `--scope`, `--task-id`, `--date`, `--artifact-dir`, `--project`, `--viewports`, `--label`, `--scheme`, `--component`, `--compare`. | Effectful (launches a browser, writes files) |
+| `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs:1` | Captures Playwright evidence into the canonical artifacts folder and writes `summary.json` and `notes.md`. Resolves the chromium binary from `--chromium`, `PLAYWRIGHT_CHROMIUM_PATH`, the downloaded browser, then the system chromium; exits 2 with the searched list when none is found. | CLI: `--base-url`, `--route`, `--scope`, `--task-id`, `--date`, `--artifact-dir`, `--project`, `--viewports`, `--label`, `--scheme`, `--component`, `--compare`, `--chromium`. | Effectful (launches a browser, writes files) |
 
 > **Pure** = no I/O, no mutation of external state, deterministic.
 > **Effectful** = I/O, filesystem, git, app runtime, Playwright, logging, shared state.

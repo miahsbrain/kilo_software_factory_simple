@@ -46,10 +46,10 @@ job. It exits 2 on a fatal failure (browser launch, bad URL) — report that, do
 
 The QA reviewer and the UI critic capture screenshots **only** through `browser-review.mjs`.
 Ad-hoc `chromium`, `npx playwright screenshot`, `curl`-and-guess, or any other browser command
-run from bash is **not acceptable evidence** for a UI review.
-
-If the script cannot do something the review needs, **extend the script** — do not work around it
-with another tool.
+run from bash is **not acceptable evidence** for a UI review. The script never installs a
+browser and never falls back to another driver. If the script cannot do something the review
+needs, **say what is missing and propose the change** — a change to a project tool is a
+reviewed change, not a silent patch mid-review. Do not work around it with another tool.
 
 | Flag | What it adds |
 |---|---|
@@ -61,6 +61,7 @@ with another tool.
 | `--component <css-selector>` | A cropped screenshot of each matched element. Repeatable. |
 | `--compare <dir>` | A **before \| after** sheet against a previous capture, per scheme. |
 | `--label <slug>` | Names the capture, so round 0, round 1 and round 2 can be compared. |
+| `--chromium <path>` | The path of a chromium binary handed to Playwright's launch. Overrides `PLAYWRIGHT_CHROMIUM_PATH`. |
 
 ### Artifact layout
 
@@ -114,9 +115,32 @@ global install the devcontainer provides:
 
     /usr/local/share/npm-global/lib/node_modules/@playwright/mcp/node_modules/playwright
 
+The browser binary is the first of these that exists:
+
+1. `--chromium <path>`
+2. `$PLAYWRIGHT_CHROMIUM_PATH`
+3. the browser Playwright downloaded
+4. the system chromium: `/usr/bin/chromium`, `/usr/bin/chromium-browser`, `which chromium`
+
 The container sets `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` and installs system chromium, so the
-script launches `/usr/bin/chromium` when Playwright has no downloaded browser. Override the
-binary with `PLAYWRIGHT_CHROMIUM_PATH`.
+script launches `/usr/bin/chromium` when Playwright has no downloaded browser.
+
+**When no chromium is found, the script exits 2** and prints the list of places it searched plus
+the commands that point it at a binary. It never installs a browser and never falls back to
+another driver. A binary that exists but fails to start is reported the same way, with the
+underlying error.
+
+### When something fails, report it — do not route around it
+
+1. The exact command, the exact error, and the exit code.
+2. What the failure means, in one line.
+3. Your recommendation, with the options and their trade-offs.
+4. Then stop, and let the user or the architect decide.
+
+Do not write a script, helper, or tool to work around a failure. Do not install a missing
+dependency — a browser binary, a package, a system tool — on your own initiative. Do not switch
+to a different tool unless the user says so. A missing browser, package, or system tool is
+**reported**, not installed, replaced, or emulated. The user owns that decision.
 
 ### The interactive browser tool
 

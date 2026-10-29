@@ -3,7 +3,9 @@
  * browser-review.mjs — capture browser evidence for a QA review.
  *
  * Uses Playwright: the project's own copy when it has one, otherwise the global
- * install. When no downloaded browser exists, the system chromium binary is used.
+ * install. The browser binary is the first of: --chromium <path>,
+ * $PLAYWRIGHT_CHROMIUM_PATH, the browser Playwright downloaded, the system chromium.
+ * The script never installs a browser and never falls back to another driver.
  *
  * Usage:
  *   node browser-review.mjs --base-url <url> --route <path> [--route <path> ...]
@@ -13,6 +15,7 @@
  *                            [--viewports "390x844,834x1112,1440x900,1920x1080,320x800"]
  *                            [--label <slug>] [--scheme light|dark|both]
  *                            [--component <css-selector>] [--compare <dir>]
+ *                            [--chromium <path>]
  *
  * Without --artifact-dir the capture lands in the canonical artifacts folder of
  * the main checkout: <repo-root>/artifacts/<scope>/qa/<date>/<task-id>/.
@@ -45,6 +48,7 @@ function usage() {
     '                                [--scheme light|dark|both]',
     '                                [--component <css-selector>] [--component <css-selector> ...]',
     '                                [--compare <dir>]',
+    '                                [--chromium <path>]',
     '',
     'Options:',
     '  --base-url     Base URL of the running app (required).',
@@ -59,13 +63,18 @@ function usage() {
     '  --scheme       Colour scheme to capture: light, dark, or both. Default: light.',
     '  --component    CSS selector whose matched elements are captured as crops. Repeatable.',
     '  --compare      Directory holding a previous capture; writes a before | after sheet.',
+    '  --chromium     Path to a chromium binary. Overrides $PLAYWRIGHT_CHROMIUM_PATH.',
     '  --help         Show this message and exit.',
   ].join('\n');
 }
 
-function fail(message) {
-  process.stderr.write('browser-review: ' + message + '\n');
+function abort(message) {
+  process.stderr.write(message + '\n');
   process.exit(2);
+}
+
+function fail(message) {
+  abort('browser-review: ' + message);
 }
 
 function today() {
@@ -112,6 +121,7 @@ function parseArgs(argv) {
     scope: 'factory',
     taskId: 'adhoc',
     date: today(),
+    chromium: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -162,6 +172,9 @@ function parseArgs(argv) {
         break;
       case '--compare':
         options.compare = next();
+        break;
+      case '--chromium':
+        options.chromium = next();
         break;
       default:
         fail('unknown argument: ' + arg);
@@ -280,6 +293,8 @@ async function loadPlaywright(projectDir) {
 
 /* ---------- browser binary ---------- */
 
+const SYSTEM_CHROMIUM_CANDIDATES = ['/usr/bin/chromium', '/usr/bin/chromium-browser'];
+
 function whichChromium() {
   try {
     const output = execFileSync('which', ['chromium'], {encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']});
@@ -290,16 +305,16 @@ function whichChromium() {
   }
 }
 
+function existingPath(candidate) {
+  return candidate && existsSync(candidate) ? candidate : null;
+}
+
 function systemChromiumPath() {
-  const candidates = [];
-  if (process.env.PLAYWRIGHT_CHROMIUM_PATH) candidates.push(process.env.PLAYWRIGHT_CHROMIUM_PATH);
-  candidates.push('/usr/bin/chromium', '/usr/bin/chromium-browser');
-  const which = whichChromium();
-  if (which) candidates.push(which);
-  for (const candidate of candidates) {
-    if (candidate && existsSync(candidate)) return candidate;
+  for (const candidate of SYSTEM_CHROMIUM_CANDIDATES) {
+    const found = existingPath(candidate);
+    if (found) return found;
   }
-  return null;
+  return existingPath(whichChromium());
 }
 
 function downloadedChromiumPath(playwright) {
@@ -309,6 +324,66 @@ function downloadedChromiumPath(playwright) {
   } catch {
     return null;
   }
+}
+
+function resolveChromium(playwright, options) {
+  const resolution = {
+    project: resolve(options.project),
+    flag: options.chromium || null,
+    env: process.env.PLAYWRIGHT_CHROMIUM_PATH || null,
+    path: null,
+  };
+  if (resolution.flag) {
+    resolution.path = existingPath(resolution.flag);
+    return resolution;
+  }
+  if (resolution.env) {
+    resolution.path = existingPath(resolution.env);
+    return resolution;
+  }
+  resolution.path = downloadedChromiumPath(playwright);
+  if (resolution.path) return resolution;
+  resolution.path = systemChromiumPath();
+  return resolution;
+}
+
+function noChromiumMessage(resolution) {
+  const flagLine = resolution.flag ? '--chromium ' + resolution.flag : '--chromium <path>';
+  const envLine = resolution.env
+    ? '$PLAYWRIGHT_CHROMIUM_PATH=' + resolution.env
+    : '$PLAYWRIGHT_CHROMIUM_PATH';
+  return [
+    'browser-review: no chromium browser was found.',
+    '',
+    'Searched:',
+    '  - the browser Playwright downloaded for ' + resolution.project,
+    '  - ' + envLine,
+    '  - ' + flagLine,
+    '  - /usr/bin/chromium',
+    '  - /usr/bin/chromium-browser',
+    '  - `which chromium`',
+    '',
+    'This script does not install a browser and does not fall back to another driver.',
+    'Ask the user to install one or to point at an existing binary, then re-run:',
+    '',
+    '  npx playwright install chromium',
+    '  PLAYWRIGHT_CHROMIUM_PATH=/path/to/chromium node .kilo/skills/qa-review/scripts/browser-review.mjs ...',
+    '  node .kilo/skills/qa-review/scripts/browser-review.mjs --chromium /path/to/chromium ...',
+  ].join('\n');
+}
+
+function launchFailureMessage(resolution, error) {
+  return [
+    'browser-review: the chromium binary was found but failed to start.',
+    '',
+    'Browser: ' + resolution.path,
+    'Error: ' + String(error && error.message ? error.message : error),
+    '',
+    'This script does not install a browser and does not fall back to another driver.',
+    'Ask the user to point at a working binary, then re-run:',
+    '',
+    '  node .kilo/skills/qa-review/scripts/browser-review.mjs --chromium /path/to/chromium ...',
+  ].join('\n');
 }
 
 const OVERFLOW_EXPRESSION = '(() => {const r = document.documentElement; return r.scrollWidth > r.clientWidth + 1;})()';
@@ -594,8 +669,9 @@ async function main() {
     : options.taskDir;
 
   const launchOptions = {headless: true, args: ['--no-sandbox']};
-  const executablePath = downloadedChromiumPath(playwright) || systemChromiumPath();
-  if (executablePath) launchOptions.executablePath = executablePath;
+  const resolution = resolveChromium(playwright, options);
+  if (!resolution.path) abort(noChromiumMessage(resolution));
+  launchOptions.executablePath = resolution.path;
 
   const summary = {
     base_url: options.baseUrl,
@@ -611,7 +687,7 @@ async function main() {
     components: options.components,
     compare: options.compare || null,
     driver: 'playwright',
-    browser_executable: executablePath || null,
+    browser_executable: resolution.path,
     results: [],
   };
 
@@ -619,7 +695,7 @@ async function main() {
   try {
     browser = {kind: 'playwright', handle: await playwright.chromium.launch(launchOptions)};
   } catch (error) {
-    fail('could not launch chromium: ' + (error.message || error));
+    abort(launchFailureMessage(resolution, error));
   }
 
   try {

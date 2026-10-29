@@ -45,10 +45,20 @@ Library: `/usr/local/share/npm-global/lib/node_modules/@playwright/mcp/node_modu
 MCP server: `playwright-mcp` (on PATH), configured in `kilo.jsonc`
 Browser: system chromium at `/usr/bin/chromium` — the container sets
 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, so there is no downloaded browser
-Override the binary: `PLAYWRIGHT_CHROMIUM_PATH`
 
 The QA capture script uses the project's own Playwright when it has one, and the global install
 otherwise. It never installs anything.
+
+Browser resolution, highest priority first:
+
+1. `--chromium <path>`
+2. `PLAYWRIGHT_CHROMIUM_PATH`
+3. the browser Playwright downloaded
+4. the system chromium: `/usr/bin/chromium`, `/usr/bin/chromium-browser`, `which chromium`
+
+When no chromium is found, the capture script exits 2 and prints the list of places it searched
+plus the commands that point it at a binary. It never installs a browser and never falls back to
+another driver.
 
 ## Mobile
 

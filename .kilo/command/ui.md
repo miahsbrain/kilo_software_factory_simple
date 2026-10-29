@@ -22,12 +22,16 @@ Spec: `docs/UI-UX.md` §3 and §5.
 
    **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
    screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
-   evidence for a UI review. If the script cannot do something the review needs, extend the
-   script — do not work around it with another tool.
+   evidence for a UI review. The script never installs a browser and never falls back to another
+   driver. If the script cannot do something the review needs, say what is missing and propose
+   the change — a change to a project tool is a reviewed change, not a silent patch mid-review.
+   Do not work around it with another tool.
 
    Extra flags: `--scheme light|dark|both`, `--component <css-selector>` (repeatable),
    `--compare <dir>` (before | after sheet), `--label <slug>` (names the round's capture),
-   `--chromium <path>` (fallback binary over CDP when the project has no Playwright).
+   `--chromium <path>` (the path of a chromium binary handed to Playwright's launch; it
+   overrides `PLAYWRIGHT_CHROMIUM_PATH`). When no chromium is found at all, the script exits 2
+   with the list of places it searched.
 3. **Check the round ledger** — a row goes through at most 3 QA↔fix rounds, and each round's
    review is done by a fresh reviewer who reads the ledger, not the previous reviewer's
    reasoning:

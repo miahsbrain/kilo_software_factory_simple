@@ -302,11 +302,12 @@ wants a visual record — they are large and churn.
 
 ### Playwright entry points
 
-The capture script is the entry point. When writing a spec by hand, these are the commands:
+Evidence comes only from the capture script, `browser-review.mjs`. An ad-hoc
+`npx playwright screenshot` is not acceptable evidence. When writing a spec by hand, these are
+the commands — they are spec-authoring tools, not evidence:
 
 ```bash
 npx playwright test                      # run tests
-npx playwright screenshot <url> <file>    # one-shot screenshot
 npx playwright codegen <url>             # record actions into a script
 npx playwright show-report               # open the HTML report
 npx playwright show-trace <trace.zip>    # trace viewer
