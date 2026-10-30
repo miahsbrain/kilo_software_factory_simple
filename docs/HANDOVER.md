@@ -1,30 +1,41 @@
 # HANDOVER — Mini Light Factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** 2026-10-30 — added the guard-rail policy (BOARD-001) and the documentation
->   agent with the application memory map (BOARD-002): the `docs-writer` agent, `/handover`
->   routed to it, and `docs/handover/` holding the global index plus one file per application.
-> - **In flight:** branch `feat/add-a-documentation-agent-that-writes`, worktree
->   `.kilo/worktrees/add-a-documentation-agent-that-writes`. BOARD-002 is built and waiting for
->   review.
-> - **Next action:** the user merges `feat/add-a-documentation-agent-that-writes` into `main`, then
->   the discovery interview (`/decide`) runs for the first project in this checkout.
+> - **Last session:** 2026-10-30 — documented the whole platform (BOARD-001). The control repo is
+>   now a git repository seeded on `main`; the 75 microservice repositories under `apps/` are
+>   registered in `.kilo/repos.json` and `guard.py check-repos` exits 0. The application memory map
+>   is complete: 75 handover files, one per microservice, plus a global index at
+>   `docs/handover/README.md` with the system map, the 86-edge HTTP call graph, the shared
+>   collection map and the external-API matrix. `docs/ARCHITECTURE.md`, `docs/STACK.md`,
+>   `docs/API_CONTRACTS.md`, `docs/RISKS.md` and `docs/PROJECT_STRUCTURE.md` now describe the real
+>   system.
+> - **In flight:** branch `docs/document-all-75-microservices-and-their`, worktree
+>   `.kilo/worktrees/document-all-75-microservices-and-their`. BOARD-001 is built and waiting for
+>   the user to merge.
+> - **Next action:** the user merges `docs/document-all-75-microservices-and-their` into `main`.
+>   Then open the first defect row from the risk register in `docs/RISKS.md` — the cross-tenant
+>   credential bleed in `payment_gateway_ms` is the first one.
 
 ## 1. Overview
 
-- **What it is:** a software factory. It is a documentation and orchestration system: rules,
-  a work board, builder and reviewer agents, and workflow commands. It has no application
-  runtime of its own. `apps/web`, `apps/mobile`, and `apps/api` contain only scope rule files;
-  no source, no build, no server.
-- **Who uses it:** one human owner and the Kilo Code agents that act for them. The owner
-  approves decisions and merges branches; the agents build and review inside worktrees.
-- **Tech stack:** Markdown rules plus the Kilo Code agent and command system
-  (`.kilo/agent/`, `.kilo/command/`) running on git worktrees. No language runtime, no
-  package manager, no database. `docs/STACK.md` is still `TBD` for every application stack.
-- **How to use it:** open the repo in Kilo Code. Read `AGENTS.md` at the root. Run
-  `/board` to see the live board, `/decide` to approve a decision, `/run` to build a row in a
-  worktree,   `/ui` for the QA lane, `/closeout` to refresh docs, `/handover` to write the application
-  memory map under `docs/handover/`. There is no build or run command for the factory itself.
+- **What it is:** two things in one checkout. The **control repo** is a software factory — rules,
+  a work board, builder and reviewer agents, and workflow commands, with no runtime of its own.
+  The **application** is the Inhouz Cloud AI platform: 75 microservices, each its own git
+  repository under `apps/`, one Kubernetes cluster, one shared MongoDB, one tenant model
+  (`company`). The platform is documented in `docs/handover/` — one file per microservice plus the
+  global index at `docs/handover/README.md`. The rest of this file describes the factory.
+- **Who uses it:** one human owner and the Kilo Code agents that act for them. The owner approves
+  decisions and merges branches; the agents build and review inside worktrees.
+- **Tech stack (the factory):** Markdown rules plus the Kilo Code agent and command system
+  (`.kilo/agent/`, `.kilo/command/`) running on git worktrees. No language runtime, no package
+  manager, no database.
+- **Tech stack (the application):** Node.js and Express 4 over Mongoose 7 and MongoDB, one
+  repository per service. Full details in `docs/STACK.md`.
+- **How to use it:** open the repo in Kilo Code. Read `AGENTS.md` at the root. Run `/board` to see
+  the live board, `/decide` to approve a decision, `/run` to build a row in a worktree, `/ui` for
+  the QA lane, `/closeout` to refresh docs, `/handover` to refresh the application memory map.
+  There is no build or run command for the factory itself.
+
 
 ## 2. Directory map
 
@@ -37,18 +48,19 @@
 | `CHANGELOG.md` | Product-facing changelog. Updated only on the user's instruction. |
 | `.kilo/agent/` | The six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
 | `.kilo/policies/` | The canonical guard-rail policy: `git-policy.json`. |
-| `.kilo/repos.json` | The repo map: a repo id → path relative to the control repo root (`control`, `web`, `mobile`, `api`). A repo is addressed by id, never by a raw path. |
+| `.kilo/repos.json` | The repo map: a repo id → path relative to the control repo root. It registers `control`, the three scope folders, and all 75 microservice repositories under `apps/`. A repo is addressed by id, never by a raw path. |
 | `.kilo/scopes/` | The canonical scope rules, one file per scope (`web.md`, `mobile.md`, `api.md`). `guard.py sync --repo <id>` writes them to the scope's repository as its `AGENTS.md`. |
 | `.kilo/command/` | The eight slash commands: `decide`, `board`, `board-view`, `run`, `components`, `ui`, `handover`, `closeout`. |
 | `.kilo/worktrees/` | Agent Manager worktrees, one per task. Git-ignored. Not part of the committed tree. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, `devcontainer-lock.json`. |
+| `apps/` | 75 microservice repositories, each its own git repo with its own remote, plus three scope folders. Not tracked by the control repo. `apps/clone_repos.sh` clones or fast-forwards all 75. |
 | `apps/web/` | Scope rules for the future web app (`AGENTS.md` only). No code. |
 | `apps/mobile/` | Scope rules for the future mobile app (`AGENTS.md` only). No code. |
 | `apps/api/` | Scope rules for the future API scope (`AGENTS.md` only). No code. |
 | `docs/` | The governance document set (see §5 and §14). |
 | `docs/changelog/` | Engineering log: `CHANGELOG.md` plus one `<date>-<slug>.md` per notable change. |
 | `docs/reviews/` | QA and UI/UX review reports and round ledgers. Does not exist yet; created by the reviewer agents. |
-| `docs/handover/` | The application memory map: `README.md` is the global index, one `<unit>.md` per application. Written by the `docs-writer` agent. |
+| `docs/handover/` | The application memory map: `README.md` is the global index, one `<unit>.md` per microservice (75 of them) plus one per scope folder. Written by the `docs-writer` agent. |
 | `artifacts/` | The one canonical folder for UI evidence: `artifacts/<scope>/qa/<date>/<task-id>/`. Lives in the main checkout. Git keeps the `.md` files only. |
 
 ## 3. Entry points

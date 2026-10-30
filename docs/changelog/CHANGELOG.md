@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-10-30] Document the microservice fleet
+**Type:** Docs
+**Board:** BOARD-001 | **Branch:** docs/document-all-75-microservices-and-their
+**Changed:** `.gitignore` (new), `.kilo/repos.json` (75 microservice repos registered), `docs/handover/README.md` (rewritten as the global index), `docs/handover/<unit>.md` (75 new files, one per microservice), `docs/{ARCHITECTURE,STACK,API_CONTRACTS,RISKS,PROJECT_STRUCTURE,PROJECT_STATE,HANDOVER,DECISIONS}.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-10-30-document-the-microservice-fleet.md`
+**Why:** The platform is 75 microservices, each its own git repository under `apps/`, and the control repo had no git history, no board row for the platform, and a memory map that described the empty scope folders instead of the fleet.
+**Impact:** The control repo is seeded on `main` and every later change lands on a worktree branch; `guard.py check-repos` exits 0. The application memory map is complete: 75 handover files with the 14-section contract and `file:line` evidence, plus a global index with the domain system map, the 86-edge HTTP call graph, the 178-collection shared-database map and the external-API matrix. The governance documents now describe the real system. The map also surfaced the ranked defect list in `docs/RISKS.md` — a cross-tenant credential bleed in `payment_gateway_ms`, a double-charge risk in `late_payment_ms`, unrestricted request proxies, and 12 services whose image cannot boot. No application behaviour changes and no microservice repository is touched.
+
 ## [2026-10-30] Multi-repo support in the board and the git tools
 **Type:** Feature
 **Board:** BOARD-003, BOARD-004 | **Branch:** feat/multi-repo-support-in-the-board, docs/multi-repo-rules-agent-and-documentation
