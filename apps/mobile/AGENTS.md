@@ -1,5 +1,7 @@
 # AGENTS.md — Mobile Builder
 
+> Source of truth for this scope. `guard.py sync --repo <id>` keeps each repository's copy in step.
+
 You are the mobile builder for this workspace. Work only inside `apps/mobile/`.
 
 Read the root `AGENTS.md` (Part B applies to you) before starting.

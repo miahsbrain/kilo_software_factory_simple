@@ -8,6 +8,8 @@ command runs:
     guard.py check-worktree -- "git worktree add .kilo/worktrees/x -b feat/x main"
     guard.py check-git -- "git push origin main"
     guard.py check-policy [--write]
+    guard.py sync --repo <id> [--apply]
+    guard.py check-repos
     guard.py policy
 
 check-delete allows deletion only inside a linked worktree (the one under
@@ -27,14 +29,21 @@ rules with LAST MATCH WINS, exactly like Kilo's own permission evaluation.
 check-policy proves that the permission map in kilo.jsonc still matches the
 policy file. --write regenerates it; policy prints it for a human to paste.
 
+sync copies the .kilo slice, the scope rules and the permission map from the
+control repo into another repo named in .kilo/repos.json. It is a dry run
+unless --apply is given. check-repos proves that the map and the apps/ layout
+agree.
+
 Exit codes: 0 allowed, 1 denied, 2 usage error, 3 needs the user's approval.
 A failure inside the guard never blocks work: it exits 0 with a note.
 """
 import argparse
 import fnmatch
+import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 
@@ -43,6 +52,8 @@ TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
 GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 ADD_VALUE_OPTS = {"-b", "-B", "--reason"}
 LINKED_MARKER = os.sep + ".kilo" + os.sep + "worktrees" + os.sep
+SYNC_SLICE = ["agent", "command", "skills", "policies", "scopes"]
+SCHEMA_URL = "https://app.kilo.ai/config.json"
 
 OK = 0
 DENIED = 1
@@ -416,6 +427,7 @@ def check_worktree(command, cwd, ctx, env):
 
 PROTECTED_BRANCHES = ("main", "master", "base")
 POLICY_REL = os.path.join(".kilo", "policies", "git-policy.json")
+REPOS_REL = os.path.join(".kilo", "repos.json")
 FALLBACK_KEY = "*"
 ASK = 3
 
@@ -427,12 +439,19 @@ def script_project_root():
 
 
 def find_policy(ctx):
-    """(root, policy_path) for the tree that holds the policy file, else (None, None)."""
+    """(root, policy_path) for the tree that holds the policy file, else (None, None).
+
+    The tree the shell is in wins, so an agent in a worktree guards and
+    regenerates the files of that worktree, not the main checkout.
+    """
     roots = []
     if ctx:
-        roots.append(ctx["repo_root"])
+        roots.append(ctx.get("top"))
+        roots.append(ctx.get("repo_root"))
     roots.append(script_project_root())
     for root in roots:
+        if not root:
+            continue
         path = os.path.join(root, POLICY_REL)
         if os.path.exists(path):
             return root, path
@@ -618,6 +637,24 @@ def permission_block_text(policy):
     return json.dumps({"permission": generated_permission(policy)}, indent=2)
 
 
+def write_permission_map(config_path, policy, create_missing=False):
+    """(expected, message). Writes the generated permission block into config_path."""
+    expected = generated_permission(policy)
+    existed = os.path.exists(config_path)
+    config, bad_line = load_config(config_path)
+    if config is None:
+        if not create_missing:
+            return None, ("cannot parse %s%s" %
+                          (config_path, (" at line %d" % bad_line) if bad_line else ""))
+        config = {"$schema": SCHEMA_URL}
+    updated = {k: v for k, v in config.items() if k != "permission"}
+    updated["permission"] = expected
+    with open(config_path, "w", encoding="utf-8") as fh:
+        json.dump(updated, fh, indent=2, ensure_ascii=False)
+        fh.write("\n")
+    return expected, ("updated" if existed else "created")
+
+
 def cmd_check_policy(write, cwd, ctx):
     root, path = find_policy(ctx)
     if not path:
@@ -643,11 +680,7 @@ def cmd_check_policy(write, cwd, ctx):
         return OK
 
     if write:
-        updated = {k: v for k, v in config.items() if k != "permission"}
-        updated["permission"] = expected
-        with open(config_path, "w", encoding="utf-8") as fh:
-            json.dump(updated, fh, indent=2, ensure_ascii=False)
-            fh.write("\n")
+        write_permission_map(config_path, policy)
         print("permission map written to %s" % config_path)
         return OK
 
@@ -663,6 +696,207 @@ def cmd_policy(cwd, ctx):
         return USAGE
     print(permission_block_text(load_policy(path)))
     return OK
+
+
+def load_worktree_module():
+    """The sibling worktree.py, loaded by path so it works from anywhere."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "worktree.py")
+    if not os.path.exists(path):
+        return None
+    spec = importlib.util.spec_from_file_location("worktree", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def shell_tree(ctx):
+    """The tree the shell is in: the source of the .kilo slice and the scope rules."""
+    if ctx:
+        top = ctx.get("top")
+        if top:
+            return top
+    return script_project_root()
+
+
+def control_root(ctx):
+    """The control repo's main checkout: the place the target repositories live.
+
+    A nested app repository at apps/<name>/ is not tracked by the control repo,
+    so it exists only in the main checkout, never in a worktree of it.
+    """
+    if ctx:
+        root = ctx.get("repo_root")
+        if root:
+            return root
+    return script_project_root()
+
+
+def repo_targets(source_tree, control, repo_id):
+    """(target root, repos map, error). The map in .kilo/repos.json is the only way in.
+
+    The map is read from the tree the shell is in. The target is resolved in
+    the control repo's main checkout, except for 'control' itself, which is
+    the tree the shell is in.
+    """
+    wt = load_worktree_module()
+    if wt is None:
+        return None, None, "worktree.py not found next to guard.py"
+    repos, err = wt.load_repos(source_tree)
+    if repos is None:
+        return None, None, err
+    if repo_id == "control":
+        return source_tree, repos, None
+    target, err = wt.resolve_repo(control, repos, repo_id)
+    if err:
+        return None, repos, err
+    return target, repos, None
+
+
+def scope_files(source_tree, target, repo_id):
+    """[(source, destination)] for the scope rules of this target."""
+    pairs = []
+    scopes_dir = os.path.join(source_tree, ".kilo", "scopes")
+    if repo_id == "control":
+        for name in sorted(os.listdir(scopes_dir)) if os.path.isdir(scopes_dir) else []:
+            if not name.endswith(".md"):
+                continue
+            scope_id = name[:-3]
+            pairs.append((os.path.join(scopes_dir, name),
+                          os.path.join(source_tree, "apps", scope_id, "AGENTS.md")))
+        return pairs
+    source = os.path.join(scopes_dir, repo_id + ".md")
+    if os.path.exists(source):
+        pairs.append((source, os.path.join(target, "AGENTS.md")))
+    return pairs
+
+
+def file_state(source, destination):
+    """'new', 'changed' or 'identical' for one planned file."""
+    if not os.path.exists(destination):
+        return "new"
+    try:
+        with open(source, "rb") as fh:
+            a = fh.read()
+        with open(destination, "rb") as fh:
+            b = fh.read()
+    except OSError:
+        return "changed"
+    return "identical" if a == b else "changed"
+
+
+def cmd_sync(repo_id, apply, cwd, ctx):
+    source_tree = shell_tree(ctx)
+    control = control_root(ctx)
+    target, repos, err = repo_targets(source_tree, control, repo_id)
+    if err:
+        print(err, file=sys.stderr)
+        return DENIED
+    wt = load_worktree_module()
+    is_repo = bool(wt) and wt.is_git_repo(target)
+    if not is_repo and apply:
+        print("target %s is not a git repository; refusing to write into it" % target,
+              file=sys.stderr)
+        return DENIED
+    plan = []
+    for folder in SYNC_SLICE:
+        source_dir = os.path.join(source_tree, ".kilo", folder)
+        if not os.path.isdir(source_dir):
+            continue
+        for dirpath, dirnames, filenames in os.walk(source_dir):
+            dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+            rel = os.path.relpath(dirpath, source_dir)
+            for name in sorted(filenames):
+                if name.endswith(".pyc"):
+                    continue
+                source = os.path.join(dirpath, name)
+                rel_file = name if rel == "." else os.path.join(rel, name)
+                plan.append((source, os.path.join(target, ".kilo", folder, rel_file)))
+    plan.extend(scope_files(source_tree, target, repo_id))
+    config_path = os.path.join(target, "kilo.jsonc")
+
+    print("control repo: %s" % control)
+    print("target repo:  %s (%s)%s" % (target, repo_id,
+                                       "" if is_repo else " - not a git repository yet"))
+    print("plan:")
+    written = identical = 0
+    for source, destination in plan:
+        state = file_state(source, destination)
+        if state == "identical":
+            identical += 1
+        else:
+            written += 1
+        print("  %-9s %s" % (state, os.path.relpath(destination, target)))
+    print("  %-9s %s" % ("regen", os.path.relpath(config_path, target)))
+    if not is_repo:
+        print("note: the target is not a git repository; --apply would be refused.")
+
+    if not apply:
+        print("dry run; re-run with --apply to act")
+        return OK
+
+    for source, destination in plan:
+        if os.path.realpath(source) == os.path.realpath(destination):
+            continue
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        shutil.copyfile(source, destination)
+    policy = load_policy(os.path.join(source_tree, POLICY_REL))
+    written_config, message = write_permission_map(config_path, policy, create_missing=True)
+    print("permission map %s (%s)" % (os.path.relpath(config_path, target), message))
+    print("files written: %d, identical: %d, skipped: 0" % (written, identical))
+    return OK
+
+
+def cmd_check_repos(cwd, ctx):
+    source_tree = shell_tree(ctx)
+    control = control_root(ctx)
+    target, repos, err = repo_targets(source_tree, control, "control")
+    if err:
+        print(err, file=sys.stderr)
+        return DENIED
+    problems = []
+    registered = set()
+    for repo_id in sorted(repos):
+        resolved, err = resolve_repo_path(control, repos, repo_id)
+        if err:
+            problems.append(err)
+            continue
+        if not os.path.isdir(resolved):
+            problems.append("repo %r: %s does not exist" % (repo_id, resolved))
+            continue
+        registered.add(os.path.realpath(resolved))
+        wt = load_worktree_module()
+        if not wt or not wt.is_git_repo(resolved):
+            print("repo %r: %s - registered, not a git repository yet" % (repo_id, resolved))
+            continue
+        print("repo %r: %s - git repository" % (repo_id, resolved))
+    control_real = os.path.realpath(control)
+    if "control" not in repos:
+        problems.append("the control repo %s is not registered as 'control'" % control)
+    elif control_real not in registered:
+        problems.append("the 'control' entry does not point at the control repo %s" % control)
+    apps = os.path.join(control, "apps")
+    if os.path.isdir(apps):
+        for name in sorted(os.listdir(apps)):
+            folder = os.path.join(apps, name)
+            if os.path.isdir(folder) and os.path.exists(os.path.join(folder, ".git")):
+                if os.path.realpath(folder) not in registered:
+                    problems.append("apps/%s is a git repository but is not registered in %s"
+                                    % (name, REPOS_REL))
+    if problems:
+        for problem in problems:
+            print("problem: %s" % problem, file=sys.stderr)
+        print("the repo map and the layout disagree", file=sys.stderr)
+        return DENIED
+    print("repos in sync")
+    return OK
+
+
+def resolve_repo_path(control, repos, repo_id):
+    """The absolute path of a repo id, or an error message."""
+    wt = load_worktree_module()
+    if wt is None:
+        return None, "worktree.py not found next to guard.py"
+    return wt.resolve_repo(control, repos, repo_id)
 
 
 def main(argv):
@@ -685,6 +919,12 @@ def main(argv):
     p_pol = sub.add_parser("check-policy", help="prove kilo.jsonc matches the policy file")
     p_pol.add_argument("--write", action="store_true", help="regenerate the permission map")
 
+    p_sync = sub.add_parser("sync", help="copy the guard rails into another repo")
+    p_sync.add_argument("--repo", required=True, help="repo id from .kilo/repos.json")
+    p_sync.add_argument("--apply", action="store_true", help="act; without it this is a dry run")
+
+    sub.add_parser("check-repos", help="prove the repo map and the apps/ layout agree")
+
     sub.add_parser("policy", help="print the generated permission block")
 
     args = parser.parse_args(argv)
@@ -698,6 +938,13 @@ def main(argv):
         if args.command == "policy":
             return cmd_policy(cwd, ctx)
         return cmd_check_policy(args.write, cwd, ctx)
+
+    if args.command in ("sync", "check-repos"):
+        cwd = os.getcwd()
+        ctx = repo_context(cwd)
+        if args.command == "check-repos":
+            return cmd_check_repos(cwd, ctx)
+        return cmd_sync(args.repo, args.apply, cwd, ctx)
 
     parts = [args.shell_command] if args.shell_command else []
     parts.extend(args.rest or [])

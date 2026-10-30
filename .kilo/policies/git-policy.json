@@ -73,6 +73,7 @@
     {"pattern": ".kilo/command/*.md", "action": "ask", "reason": "A command definition. Changes to it need the user's approval."},
     {"pattern": ".kilo/skills/*.md", "action": "ask", "reason": "A skill definition. Changes to it need the user's approval."},
     {"pattern": ".kilo/policies/*.json", "action": "ask", "reason": "The guard-rail policy itself. Changes to it need the user's approval."},
+    {"pattern": ".kilo/scopes/*.md", "action": "ask", "reason": "A scope rules file. Changes to it need the user's approval."},
     {"pattern": "docs/BOARD.md", "action": "ask", "reason": "The board is the orchestrator's file and the user's view of the work."},
     {"pattern": ".env", "action": "deny", "reason": "The user writes the real .env. The agent adds .env.example instead."},
     {"pattern": ".env.*", "action": "deny", "reason": "The user writes the real .env. The agent adds .env.example instead."},

@@ -30,7 +30,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 LANES = ["Backlog", "Ready", "In Progress", "In Review", "Pending Merge",
          "Merged", "Blocked", "Dropped"]
 COLUMNS = ["ID", "Task", "Type", "Status", "Priority", "Risk", "Blocked by",
-           "Branch/Worktree", "Notes"]
+           "Repos", "Branch/Worktree", "Notes"]
 GIT_TIMEOUT = 5
 DEFAULT_PORT = 15180
 DEFAULT_HOST = "127.0.0.1"

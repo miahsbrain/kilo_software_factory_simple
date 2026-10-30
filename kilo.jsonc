@@ -83,6 +83,7 @@
       ".kilo/command/*.md": "ask",
       ".kilo/skills/*.md": "ask",
       ".kilo/policies/*.json": "ask",
+      ".kilo/scopes/*.md": "ask",
       "docs/BOARD.md": "ask",
       ".env": "deny",
       ".env.*": "deny",

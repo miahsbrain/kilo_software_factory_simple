@@ -37,6 +37,8 @@
 | `CHANGELOG.md` | Product-facing changelog. Updated only on the user's instruction. |
 | `.kilo/agent/` | The six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
 | `.kilo/policies/` | The canonical guard-rail policy: `git-policy.json`. |
+| `.kilo/repos.json` | The repo map: a repo id → path relative to the control repo root (`control`, `web`, `mobile`, `api`). A repo is addressed by id, never by a raw path. |
+| `.kilo/scopes/` | The canonical scope rules, one file per scope (`web.md`, `mobile.md`, `api.md`). `guard.py sync --repo <id>` writes them to the scope's repository as its `AGENTS.md`. |
 | `.kilo/command/` | The eight slash commands: `decide`, `board`, `board-view`, `run`, `components`, `ui`, `handover`, `closeout`. |
 | `.kilo/worktrees/` | Agent Manager worktrees, one per task. Git-ignored. Not part of the committed tree. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, `devcontainer-lock.json`. |
@@ -94,9 +96,13 @@ what it is responsible for, and whether reading or running it has side effects.
 | `apps/*/AGENTS.md` | `apps/web/AGENTS.md:1`, `apps/mobile/AGENTS.md:1`, `apps/api/AGENTS.md:1` | Scope rules for each future application. | Scope rules. | Pure |
 | `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs:1` | Captures Playwright evidence into the canonical artifacts folder and writes `summary.json` and `notes.md`. Resolves the chromium binary from `--chromium`, `PLAYWRIGHT_CHROMIUM_PATH`, the downloaded browser, then the system chromium; exits 2 with the searched list when none is found. | CLI: `--base-url`, `--route`, `--scope`, `--task-id`, `--date`, `--artifact-dir`, `--project`, `--viewports`, `--label`, `--scheme`, `--component`, `--compare`, `--chromium`. | Effectful (launches a browser, writes files) |
 | `git-policy.json` | `.kilo/policies/git-policy.json:1` | The canonical guard-rail policy: the allow/ask/deny rules for bash and edit commands, plus the three context checks. | The policy file itself; read by `guard.py` and by `guard.py check-policy --write`. | Pure |
-| `guard.py check-git` | `.kilo/skills/git-worktree/scripts/guard.py:517` | Classifies a git command against the policy: context checks first, then the bash rules. | CLI: `check-git -- "<command>"`; exit 0 allowed, 1 denied, 2 usage error, 3 needs approval. | Effectful (reads the policy file and the git repo context) |
-| `guard.py check-policy` | `.kilo/skills/git-worktree/scripts/guard.py:621` | Proves the `permission` map in `kilo.jsonc` still matches the policy file; `--write` regenerates the map. | CLI: `check-policy [--write]`; exit 0 in sync, 1 out of sync, 2 usage error. | Effectful (reads and, with `--write`, writes `kilo.jsonc`) |
-| `guard.py policy` | `.kilo/skills/git-worktree/scripts/guard.py:659` | Prints the generated permission block from the policy file, so the rules can be read without opening the JSON. | CLI: `policy`; exit 0 on success, 2 when the policy file is missing. | Effectful (reads the policy file) |
+| `guard.py check-git` | `.kilo/skills/git-worktree/scripts/guard.py:536` | Classifies a git command against the policy: context checks first, then the bash rules. | CLI: `check-git -- "<command>"`; exit 0 allowed, 1 denied, 2 usage error, 3 needs approval. | Effectful (reads the policy file and the git repo context) |
+| `guard.py check-policy` | `.kilo/skills/git-worktree/scripts/guard.py:658` | Proves the `permission` map in `kilo.jsonc` still matches the policy file; `--write` regenerates the map. | CLI: `check-policy [--write]`; exit 0 in sync, 1 out of sync, 2 usage error. | Effectful (reads and, with `--write`, writes `kilo.jsonc`) |
+| `guard.py policy` | `.kilo/skills/git-worktree/scripts/guard.py:692` | Prints the generated permission block from the policy file, so the rules can be read without opening the JSON. | CLI: `policy`; exit 0 on success, 2 when the policy file is missing. | Effectful (reads the policy file) |
+| `guard.py sync` | `.kilo/skills/git-worktree/scripts/guard.py:765` | Copies the `.kilo/` slice, the scope rules and the generated permission map from the control repo into another repo of the map. Dry run unless `--apply`. | CLI: `sync --repo <id> [--apply]`; exit 0 ok, 1 refused, 2 usage error. | Effectful (reads the control repo, writes into the target repo) |
+| `guard.py check-repos` | `.kilo/skills/git-worktree/scripts/guard.py:824` | Proves the repo map and the `apps/` layout agree: every mapped path exists, every git repository under `apps/` is registered, the control repo is registered as `control`. | CLI: `check-repos`; exit 0 in sync, 1 with the disagreement spelled out. | Effectful (reads the map and the layout) |
+| `worktree.py create --repo` | `.kilo/skills/git-worktree/scripts/worktree.py:316` | Creates the worktree in the repo named by the id in `.kilo/repos.json`, keeps the board in the control repo, and records the worktree path and the repo id on the row. | CLI: `create --board <ID> [--repo <id>]`; exit 0 ok, 1 refusal, 66 invalid input. | Effectful (runs git, writes the board row) |
+| `board.py add-column` | `.kilo/skills/board/scripts/board.py:353` | Inserts a column into the board table and gives every row an empty cell in it, without a hand edit. | CLI: `add-column --name <Col> [--after "<Col>"]`; exit 0 ok, 1 refused. | Effectful (rewrites the board file) |
 
 > **Pure** = no I/O, no mutation of external state, deterministic.
 > **Effectful** = I/O, filesystem, git, app runtime, Playwright, logging, shared state.
@@ -137,7 +143,8 @@ Markdown files and the git repository state.
   `.kilo/worktrees/<feature-slug>/`, on branch `feat|fix|chore|docs/<feature-slug>` (§B4).
 - The worktree is the unit of work. It carries the code change and its doc updates together.
 - `main` is never edited by agents, never pushed to, and never merged into by agents.
-- Board rows carry `ID | Task | Type | Status | Priority | Risk | Blocked by | Branch/Worktree | Notes`.
+- Board rows carry `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Branch/Worktree | Notes`.
+  `Repos` holds the repo ids from `.kilo/repos.json` that the row touches.
 - Validation rules: every board row needs 2–5 checkable acceptance criteria before it leaves
   `Backlog`; every doc update must land in the same change set as the change it documents (§B1).
 

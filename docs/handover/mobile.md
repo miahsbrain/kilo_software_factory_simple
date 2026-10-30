@@ -11,7 +11,13 @@ The mobile scope exists as a placeholder. The folder `apps/mobile/` holds exactl
 `apps/mobile/AGENTS.md:1`, the scope rules for the mobile builder. There is no source, no package
 manifest, no build, no app bundle and no test file. The unit is a rulebook for code that has not
 been written yet, and nothing may be written into it before the decision gate and the discovery
-interview have run (`AGENTS.md:145`).
+interview have run (`AGENTS.md:150`).
+
+**Repository:** `mobile`, registered at `apps/mobile` in `.kilo/repos.json:1`. This unit was read
+from the control repo checkout, because `apps/mobile` is not yet a git repository of its own. The
+scope rules are canonical in `.kilo/scopes/mobile.md:1` and copied into the app repo as its
+`AGENTS.md` by `guard.py sync --repo mobile`
+(`.kilo/skills/git-worktree/scripts/guard.py:774`).
 
 ## 2. Stack and commands
 
@@ -24,12 +30,12 @@ interview have run (`AGENTS.md:145`).
 | Port | `TBD` — `docs/STACK.md:69` |
 
 The stack is decided by the user at the decision gate (`AGENTS.md:214`); nothing is guessed. The
-scope rules also say the stack comes from `docs/STACK.md` (`apps/mobile/AGENTS.md:14`).
+scope rules also say the stack comes from `docs/STACK.md` (`apps/mobile/AGENTS.md:18`).
 
 ## 3. Entry points
 
 None yet. There is no executable, no dev server, no screen and no script in this scope. The files
-the scope will own once it is built are named by its own rules (`apps/mobile/AGENTS.md:19`):
+the scope will own once it is built are named by its own rules (`apps/mobile/AGENTS.md:23`):
 
 - screens/components
 - navigation
@@ -41,7 +47,7 @@ the scope will own once it is built are named by its own rules (`apps/mobile/AGE
 - tests
 
 The mobile scope must build a component factory before any screen
-(`apps/mobile/AGENTS.md:46`), and that gallery is approved by the user (`AGENTS.md:561`).
+(`apps/mobile/AGENTS.md:50`), and that gallery is approved by the user (`AGENTS.md:568`).
 
 ## 4. Module inventory
 
@@ -55,12 +61,12 @@ There is no other file in this scope, so there is no other row.
 
 None. There is no code in this scope, so it touches no database, network, filesystem, env, clock,
 randomness source or logger. Platform integrations and storage are named as future responsibilities
-(`apps/mobile/AGENTS.md:19`), not present ones.
+(`apps/mobile/AGENTS.md:23`), not present ones.
 
 ## 6. State and state transitions
 
 None yet. The scope rules name `state` and `storage` as places the future code will hold state
-(`apps/mobile/AGENTS.md:19`), but no state, no store and no transition exists today.
+(`apps/mobile/AGENTS.md:23`), but no state, no store and no transition exists today.
 
 ```mermaid
 stateDiagram-v2
@@ -82,18 +88,18 @@ future interface between the mobile app and the `api` unit is not written yet.
 
 None. No env var or config key is used by this scope. `docs/ENVIRONMENT.md:1` holds the empty
 table for the whole repository. Names only would be recorded here; values are never written
-(`AGENTS.md:1469`).
+(`AGENTS.md:1501`).
 
 ## 10. Dependencies
 
 None yet. There is no `package.json` in this scope, so the unit has no direct dependency. The
 scope rules forbid adding a dependency that the task does not justify
-(`apps/mobile/AGENTS.md:19`).
+(`apps/mobile/AGENTS.md:25`).
 
 ## 11. Testing
 
 None. There is no test runner, no test file and no CI in this scope. The scope rules require the
-verification command from `docs/STACK.md` (`apps/mobile/AGENTS.md:104`), which is `TBD` today.
+verification command from `docs/STACK.md` (`apps/mobile/AGENTS.md:108`), which is `TBD` today.
 
 ## 12. Known issues and risks
 
@@ -112,11 +118,11 @@ graph TD
 ```
 
 One node, because the scope holds one file. When code arrives it will grow: a component factory
-and a gallery first, then screens (`apps/mobile/AGENTS.md:46`).
+and a gallery first, then screens (`apps/mobile/AGENTS.md:50`).
 
 ## 14. Open questions
 
 - What application will this scope build? `DOMAIN.md:1` is `TBD` and the discovery interview
-  (`AGENTS.md:145`) has not run.
+  (`AGENTS.md:150`) has not run.
 - Which platform, framework and package manager? `docs/STACK.md:63` is `TBD`.
 - Will a mobile scope exist at all? `docs/STACK.md:18` leaves it optional.

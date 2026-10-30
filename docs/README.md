@@ -25,6 +25,8 @@ Skills (`.kilo/skills/`):
 | `board` | `board.py` | add rows, move lanes, set cells — never hand-edit the table |
 | `qa-review` | `browser-review.mjs`, `check-finding.py` | Playwright evidence capture; finding validation |
 
+Repos and scopes: `.kilo/repos.json` maps a repo id to a path, `.kilo/scopes/<id>.md` is the canonical copy of a scope's rules.
+
 Agents (`.kilo/agent/`): `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`.
 
 Commands: `/decide` (decision sheet before implementation), `/board` (live board + next task),

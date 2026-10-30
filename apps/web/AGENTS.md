@@ -1,5 +1,7 @@
 # AGENTS.md — Web Builder
 
+> Source of truth for this scope. `guard.py sync --repo <id>` keeps each repository's copy in step.
+
 You are the web builder for this workspace. Work only inside `apps/web/`.
 
 Read the root `AGENTS.md` (Part B applies to you) before starting.

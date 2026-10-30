@@ -29,10 +29,39 @@ the table cannot be parsed.
 |---|---|
 | `board.py show [ID]` | print all rows, or one row |
 | `board.py add --id ... --task ... --type ... --status ... --priority ... --risk ...` | append a row |
+| `board.py add-column --name <Col> [--after "<Col>"]` | insert a column into the table |
 | `board.py set-status <ID> "<status>"` | change one cell: the status |
 | `board.py set-field <ID> --field <field> --value "<value>"` | change one cell |
 | `board.py remove <ID>` | delete a row |
 | `board.py lanes` | count rows per lane |
+
+The columns are:
+
+    ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Branch/Worktree | Notes
+
+**Repos** holds the repo ids from `.kilo/repos.json` that the row touches, comma
+separated (`api`, `api,control`). It is written by `worktree.py create --repo`
+and can be set by hand:
+
+```bash
+python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "..." \
+  --type Feature --status Ready --priority P2 --risk "🟡 medium — one line" \
+  --blocked-by "None." --repos "api"
+
+python3 .kilo/skills/board/scripts/board.py set-field BOARD-00X \
+  --field repos --value "api,control"
+```
+
+A table that predates the `Repos` column is migrated with the script, never by
+hand:
+
+```bash
+python3 .kilo/skills/board/scripts/board.py add-column --name Repos --after "Blocked by"
+```
+
+It inserts the header cell in the right place, gives every row an empty cell in
+that column, keeps every other cell's bytes, refuses when the column already
+exists, and refuses when a row has a different cell count from the header.
 
 ---
 

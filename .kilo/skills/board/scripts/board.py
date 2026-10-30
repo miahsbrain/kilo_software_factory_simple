@@ -4,18 +4,27 @@
     board.py show [ID]
     board.py add --id BOARD-00X --task "..." --type Feature --status Backlog
                  --priority P1 --risk "🟢 low — one line" [--blocked-by "..."]
-                 [--branch-worktree "..."] [--note "..."] [--fingerprint "kind|category|route|subject"]
+                 [--repos "api,control"] [--branch-worktree "..."] [--note "..."]
+                 [--fingerprint "kind|category|route|subject"]
+    board.py add-column --name Repos [--after "Blocked by"]
     board.py note <ID> --value "..." [--escalate]
     board.py set-status <ID> "<new status>"
-    board.py set-field <ID> --field risk|priority|blocked-by|branch-worktree|notes --value "..."
+    board.py set-field <ID> --field risk|priority|blocked-by|repos|branch-worktree|notes --value "..."
     board.py remove <ID>
     board.py lanes
 
+The columns are ID | Task | Type | Status | Priority | Risk | Blocked by |
+Repos | Branch/Worktree | Notes. `Repos` holds the repo ids from
+.kilo/repos.json that the row touches, comma separated. `add-column` inserts a
+column into an existing table without a hand edit; it is the only way the table
+changes shape.
+
 The table is located by its header row and separator row. Rows are split on
 `|`, so an escaped or unescaped pipe inside a cell breaks the parse; the script
-refuses to touch the file when the table cannot be parsed. Only the named cell
-changes: every other cell keeps its bytes. The file is written atomically
-(temp file in the same directory, then os.replace).
+refuses to touch the file when the table cannot be parsed, or when a row has a
+different cell count from the header. Only the named cell changes: every other
+cell keeps its bytes. The file is written atomically (temp file in the same
+directory, then os.replace).
 
 A Fix row may carry a fingerprint — kind|category|route|subject — so the same
 complaint about the same thing is recognised when it is filed again. A row with
@@ -36,9 +45,11 @@ TYPES = ["Feature", "Fix", "Chore", "Docs", "Research"]
 STATUSES = ["Backlog", "Ready", "In Progress", "In Review", "Pending Merge",
             "Merged", "Blocked", "Dropped"]
 PRIORITIES = ["P1", "P2", "P3", "P4"]
-FIELDS = {"risk": 5, "priority": 4, "blocked-by": 6, "branch-worktree": 7, "notes": 8}
+FIELDS = {"risk": 5, "priority": 4, "blocked-by": 6, "repos": 7, "branch-worktree": 8, "notes": 9}
 COLUMNS = ["ID", "Task", "Type", "Status", "Priority", "Risk", "Blocked by",
-           "Branch/Worktree", "Notes"]
+           "Repos", "Branch/Worktree", "Notes"]
+COLUMN_FOR_FIELD = {"risk": "Risk", "priority": "Priority", "blocked-by": "Blocked by",
+                    "repos": "Repos", "branch-worktree": "Branch/Worktree", "notes": "Notes"}
 OPEN_STATUSES = ("Backlog", "Ready", "In Progress", "In Review", "Pending Merge", "Blocked")
 FINGERPRINT_PREFIX = "fp="
 
@@ -77,11 +88,15 @@ def read_table(path):
         return None, "the row after the board header is not a separator row"
 
     rows = []
+    width = len(split_row(lines[header]))
     for i in range(header + 2, len(lines)):
         if not lines[i].lstrip().startswith("|"):
             break
         cells = split_row(lines[i])
         if cells and cells[0].strip():
+            if len(cells) != width:
+                return None, ("row %d has %d cells, the header has %d; refusing to touch %s"
+                              % (i + 1, len(cells), width, path))
             rows.append(i)
     return {"lines": lines, "header": header, "rows": rows}, None
 
@@ -103,6 +118,40 @@ def cell_texts(lines, index):
     return [c.strip().replace("\\|", "|") for c in split_row(lines[index])]
 
 
+def header_cells(table):
+    """The raw header cells of the table."""
+    return split_row(table["lines"][table["header"]])
+
+
+def column_index(table, name):
+    """The index of a named column, or None when the table has no such column."""
+    for i, cell in enumerate(header_cells(table)):
+        if cell.strip().lower() == name.strip().lower():
+            return i
+    return None
+
+
+def field_index(table, field):
+    """The index of the column a field lives in, or None when the table lacks it."""
+    name = COLUMN_FOR_FIELD.get(field)
+    return column_index(table, name) if name else None
+
+
+def insert_cell(line, index, value):
+    """The same row with a new cell at `index`; every other cell keeps its bytes."""
+    stripped = line.strip()
+    lead = line[:len(line) - len(line.lstrip())]
+    parts = re.split(r"(?<!\\)\|", stripped)
+    leading_pipe = bool(parts) and parts[0].strip() == ""
+    if leading_pipe:
+        parts = parts[1:]
+    trailing_pipe = bool(parts) and parts[-1].strip() == ""
+    if trailing_pipe:
+        parts = parts[:-1]
+    parts.insert(index, value)
+    return lead + ("|" if leading_pipe else "") + "|".join(parts) + ("|" if trailing_pipe else "")
+
+
 def replace_cell(line, index, value):
     """The same row with only cell `index` changed; every other byte stays as it was."""
     stripped = line.strip()
@@ -114,7 +163,7 @@ def replace_cell(line, index, value):
     trailing_pipe = bool(parts) and parts[-1].strip() == ""
     if trailing_pipe:
         parts = parts[:-1]
-    if index >= len(parts):
+    if index is None or index >= len(parts):
         return line
     raw = parts[index]
     left = raw[:len(raw) - len(raw.lstrip())]
@@ -178,9 +227,9 @@ def normalize_fingerprint(value):
     return "|".join(parts[:4])
 
 
-def row_fingerprint(cells):
+def row_fingerprint(cells, notes_index):
     """The fingerprint carried by a row's Notes cell, or an empty string."""
-    notes = cells[8] if len(cells) > 8 else ""
+    notes = cells[notes_index] if notes_index is not None and len(cells) > notes_index else ""
     match = re.search(re.escape(FINGERPRINT_PREFIX) + r"([^\s|·]+\|[^\s|·]+\|[^\s|·]+\|[^\s|·]+)", notes)
     return normalize_fingerprint(match.group(1)) if match else ""
 
@@ -197,13 +246,14 @@ def fingerprint_notes(fingerprint, note):
 
 def find_open_fingerprint(table, fingerprint):
     """(id, status) of the open row carrying this fingerprint, or (None, None)."""
+    notes_index = field_index(table, "notes")
     for i in table["rows"]:
         cells = cell_texts(table["lines"], i)
         if len(cells) < 4:
             continue
         if cells[3] not in OPEN_STATUSES:
             continue
-        if row_fingerprint(cells) == fingerprint:
+        if row_fingerprint(cells, notes_index) == fingerprint:
             return cells[0], cells[3]
     return None, None
 
@@ -213,17 +263,18 @@ def cmd_show(args, path):
     if table is None:
         print(err, file=sys.stderr)
         return REFUSED
+    width = len(header_cells(table))
     wanted = args.id
     found = False
     for i in table["rows"]:
         cells = cell_texts(table["lines"], i)
-        if len(cells) < len(COLUMNS):
+        if len(cells) < width:
             print("skipping malformed row %d: %d cells" % (i + 1, len(cells)), file=sys.stderr)
             continue
         if wanted and cells[0] != wanted:
             continue
         found = True
-        print(" | ".join(cells[:8]))
+        print(" | ".join(cells[:-1]))
     if wanted and not found:
         print("no row with ID %s" % wanted, file=sys.stderr)
         return REFUSED
@@ -235,17 +286,18 @@ def escalate_repeat(table, existing_id, fingerprint):
     index = row_by_id(table, existing_id)
     if index is None:
         return
+    notes_index = field_index(table, "notes")
     cells = cell_texts(table["lines"], index)
-    notes = cells[8] if len(cells) > 8 else ""
+    notes = cells[notes_index] if notes_index is not None and len(cells) > notes_index else ""
     merged = notes + " · repeat finding: fingerprint " + fingerprint
-    table["lines"][index] = replace_cell(table["lines"][index], FIELDS["notes"], merged)
+    table["lines"][index] = replace_cell(table["lines"][index], notes_index, merged)
     table["lines"][index] = replace_cell(table["lines"][index], 3, "Blocked")
 
 
 def cmd_add(args, path):
     named_values = [("--id", args.id), ("--task", args.task), ("--risk", args.risk),
-                    ("--blocked-by", args.blocked_by), ("--branch-worktree", args.branch_worktree),
-                    ("--note", args.note)]
+                     ("--blocked-by", args.blocked_by), ("--repos", args.repos),
+                     ("--branch-worktree", args.branch_worktree), ("--note", args.note)]
     for name, value in named_values:
         if value is not None and reject_unsafe_value(name, value):
             return REFUSED
@@ -273,9 +325,22 @@ def cmd_add(args, path):
             print("  python3 %s note %s --value \"<the new evidence>\"" %
                   (sys.argv[0], existing_id), file=sys.stderr)
             return REFUSED
-    values = [args.id, args.task, args.type, args.status, args.priority, args.risk,
-              args.blocked_by or "- None.", args.branch_worktree or "-",
-              fingerprint_notes(fingerprint, args.note)]
+    by_column = {
+        "ID": args.id,
+        "Task": args.task,
+        "Type": args.type,
+        "Status": args.status,
+        "Priority": args.priority,
+        "Risk": args.risk,
+        "Blocked by": args.blocked_by or "- None.",
+        "Repos": args.repos or "-",
+        "Branch/Worktree": args.branch_worktree or "-",
+        "Notes": fingerprint_notes(fingerprint, args.note),
+    }
+    values = [by_column.get(cell.strip(), "-") for cell in header_cells(table)]
+    if args.repos and column_index(table, "Repos") is None:
+        print("note: the board has no Repos column, so --repos was not written; add it with "
+              "'board.py add-column --name Repos --after \"Blocked by\"'")
     new_row = "| " + " | ".join(v.replace("|", "\\|") for v in values) + " |"
     lines = list(table["lines"])
     insert_at = (table["rows"][-1] + 1) if table["rows"] else table["header"] + 2
@@ -285,6 +350,55 @@ def cmd_add(args, path):
     print("added %s (%s, %s)" % (args.id, args.type, args.status))
     if fingerprint:
         print("fingerprint: %s" % fingerprint)
+    return OK
+
+
+def cmd_add_column(args, path):
+    """Insert a column into the table; every row gets an empty cell in it."""
+    if "|" in args.name or "\n" in args.name:
+        print("invalid --name: the column name must be on one line and must not contain a pipe",
+              file=sys.stderr)
+        return INVALID
+    table, err = read_table(path)
+    if table is None:
+        print(err, file=sys.stderr)
+        return REFUSED
+    lines = list(table["lines"])
+    header = table["header"]
+    names = [cell.strip() for cell in split_row(lines[header])]
+    width = len(names)
+    if args.name.strip() in names:
+        print("column %s already exists" % args.name, file=sys.stderr)
+        return REFUSED
+    if args.after:
+        after = args.after.strip().lower()
+        index = None
+        for i, name in enumerate(names):
+            if name.lower() == after:
+                index = i
+                break
+        if index is None:
+            print("no column named %r; the table has: %s" % (args.after, ", ".join(names)),
+                  file=sys.stderr)
+            return REFUSED
+        at = index + 1
+    else:
+        at = width
+    for i in table["rows"]:
+        cells = split_row(lines[i])
+        if len(cells) != width:
+            print("row %d has %d cells, the header has %d; refusing to touch the file"
+                  % (i + 1, len(cells), width), file=sys.stderr)
+            return REFUSED
+    lines[header] = insert_cell(lines[header], at, " %s " % args.name.strip())
+    lines[header + 1] = insert_cell(lines[header + 1], at, "---")
+    for i in table["rows"]:
+        lines[i] = insert_cell(lines[i], at, " ")
+    note_uncommitted(path)
+    write_atomic(path, lines)
+    print("added column %s%s" % (args.name.strip(),
+                                 " after %s" % args.after.strip() if args.after else " at the end"))
+    print("rows updated: %d" % len(table["rows"]))
     return OK
 
 
@@ -300,13 +414,14 @@ def cmd_note(args, path):
         print("no row with ID %s" % args.id, file=sys.stderr)
         return REFUSED
     cells = cell_texts(table["lines"], index)
-    notes = cells[8] if len(cells) > 8 else ""
+    notes_index = field_index(table, "notes")
+    notes = cells[notes_index] if notes_index is not None and len(cells) > notes_index else ""
     if notes in ("", "-"):
         merged = args.value
     else:
         merged = notes + " · " + args.value
     lines = list(table["lines"])
-    lines[index] = replace_cell(lines[index], FIELDS["notes"], merged)
+    lines[index] = replace_cell(lines[index], notes_index, merged)
     if args.escalate:
         lines[index] = replace_cell(lines[index], 3, "Blocked")
     note_uncommitted(path)
@@ -343,8 +458,13 @@ def cmd_set_field(args, path):
     if index is None:
         print("no row with ID %s" % args.id, file=sys.stderr)
         return REFUSED
+    column = field_index(table, args.field)
+    if column is None:
+        print("the board has no %s column; add it with 'board.py add-column --name %s'"
+              % (COLUMN_FOR_FIELD[args.field], COLUMN_FOR_FIELD[args.field]), file=sys.stderr)
+        return REFUSED
     lines = list(table["lines"])
-    lines[index] = replace_cell(lines[index], FIELDS[args.field], args.value)
+    lines[index] = replace_cell(lines[index], column, args.value)
     note_uncommitted(path)
     write_atomic(path, lines)
     print("%s %s set" % (args.id, args.field))
@@ -404,9 +524,14 @@ def main(argv):
     p.add_argument("--priority", required=True)
     p.add_argument("--risk", required=True)
     p.add_argument("--blocked-by")
+    p.add_argument("--repos", help="comma separated repo ids from .kilo/repos.json")
     p.add_argument("--branch-worktree")
     p.add_argument("--note")
     p.add_argument("--fingerprint", help="kind|category|route|subject; a repeat is refused")
+
+    p = sub.add_parser("add-column", help="insert a column into the table")
+    p.add_argument("--name", required=True, help="the new column name")
+    p.add_argument("--after", help="the column the new one follows")
 
     p = sub.add_parser("note", help="append evidence to an existing row")
     p.add_argument("id")
@@ -446,6 +571,8 @@ def main(argv):
                   file=sys.stderr)
             return INVALID
         return cmd_add(args, path)
+    if args.command == "add-column":
+        return cmd_add_column(args, path)
     if args.command == "note":
         return cmd_note(args, path)
     if args.command == "set-status":

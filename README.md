@@ -17,6 +17,7 @@ it at a project and it builds that project.
 | `.kilo/command/` | Eight slash commands that package the workflow. |
 | `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
 | `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
+| `.kilo/repos.json`, `.kilo/scopes/` | The repo map and the canonical scope rules for a multi-repo setup. |
 | `docs/` | The documentation set: board, handover, business logic, UI/UX standard, decisions, changelog. |
 | `DOMAIN.md` | Product scope and business rules. The discovery interview fills it in. |
 | `apps/` | Scope folders (`web`, `mobile`, `api`), each with its own `AGENTS.md`. |
@@ -43,6 +44,34 @@ the factory builds the project in this checkout.
 
 **As the harness inside an existing project** — copy `AGENTS.md`, `.kilo/`, `docs/`, and
 `DOMAIN.md` into the project root, drop the parts that do not apply, and start with `/board`.
+
+## Multi-repo
+
+The factory is a control repo plus one repository per application.
+
+- **Control repo** — this one. It holds `AGENTS.md`, `docs/`, the board, the domain rules, the API
+  contracts and the guard-rail policy.
+- **App repos** — a git repository at `apps/<name>/`, nested inside the control repo. Each holds one
+  application and its own copy of the `.kilo/` slice, so the guard rails are the same wherever the
+  work happens.
+
+`.kilo/repos.json` maps a repo id to a path:
+
+    { "control": ".", "api": "apps/api" }
+
+To turn an application into its own repository:
+
+    cd apps/api
+    git init
+    git commit --allow-empty -m "chore: start the api repository"
+    cd ../..
+    # the control repo must not track the nested repository
+    printf 'apps/api/\n' >> .gitignore
+    python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
+
+After that, `worktree.py create --board BOARD-00X --repo api` puts the worktree in that
+repository, and the board still lives in the control repo. A row names the repos it touches in its
+`Repos` cell.
 
 ## Quick start
 

@@ -16,6 +16,8 @@ moved, or discovered to be different from what is recorded here.
     ├── .kilo/agent/           # Kilo agent definitions (frontend-dev, backend-dev, qa-reviewer…)
     ├── .kilo/skills/          # Kilo skills (git-worktree, board, qa-review) + their scripts
     ├── .kilo/policies/        # canonical guard-rail policy (git-policy.json)
+    ├── .kilo/repos.json       # repo id → path map (control, web, mobile, api)
+    ├── .kilo/scopes/          # canonical scope rules, one per scope (<id>.md)
     ├── docs/
     │   ├── PROJECT_STRUCTURE.md
     │   ├── HANDOVER.md        # living description of the app as it is now
@@ -47,6 +49,8 @@ moved, or discovered to be different from what is recorded here.
 | `docs/reviews/` | Review reports and round ledgers — documents, not artifacts |
 | `docs/handover/` | The application memory map: `README.md` is the global index, `<unit>.md` is one per application |
 | `.kilo/policies/git-policy.json` | Canonical guard-rail policy. The `permission` map in `kilo.jsonc` and `guard.py check-git` are both generated from it. |
+| `.kilo/repos.json` | The repo map: a repo id → path, relative to the control repo root. `control` is the control repo itself. A repo is addressed by id, never by a raw path. |
+| `.kilo/scopes/<id>.md` | The canonical copy of a scope's rules. `guard.py sync --repo <id>` writes it to the scope's repository as its `AGENTS.md`. `apps/<id>/AGENTS.md` is the monorepo copy and stays tracked here. |
 | `apps/<name>/` | One folder per app or microservice (new projects only) |
 
 ## Rules
@@ -54,3 +58,4 @@ moved, or discovered to be different from what is recorded here.
 - Existing layouts are kept as discovered; this file records reality, it does not impose it.
 - New projects use `apps/web`, `apps/mobile`, `apps/api` as the starting shape.
 - Every app or microservice gets its own folder and its own `AGENTS.md`.
+- The repo map in `.kilo/repos.json` is the only way into another repository; `guard.py check-repos` proves it matches the layout.
