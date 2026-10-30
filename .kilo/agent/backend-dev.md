@@ -107,6 +107,17 @@ This rule exists because an agent needed browser automation and wrote its own br
 from scratch while Playwright sat installed in the global npm tree. If you discover you
 were wrong about a missing capability, **say so plainly and correct the record**.
 
+## Git guard rails
+
+Run the guard before any git command that changes history or the remote:
+
+    python3 .kilo/skills/git-worktree/scripts/guard.py check-git -- "git merge feat/x"
+
+Exit 0 allowed, 1 denied, 2 usage error, 3 needs the user's approval. Never push, never commit on
+`main`/`master`/`base`, and never switch branches inside a worktree. `kilo.jsonc` carries the
+permission map, generated from `.kilo/policies/git-policy.json`; `guard.py check-policy` proves the
+two still match.
+
 ## When something fails, report it — do not route around it
 
 Report the exact command, the exact error, and the exit code; what the failure means in one

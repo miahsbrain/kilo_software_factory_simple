@@ -15,6 +15,7 @@ moved, or discovered to be different from what is recorded here.
     ├── .kilo/command/         # Kilo slash commands (derived from AGENTS.md)
     ├── .kilo/agent/           # Kilo agent definitions (frontend-dev, backend-dev, qa-reviewer…)
     ├── .kilo/skills/          # Kilo skills (git-worktree, board, qa-review) + their scripts
+    ├── .kilo/policies/        # canonical guard-rail policy (git-policy.json)
     ├── docs/
     │   ├── PROJECT_STRUCTURE.md
     │   ├── HANDOVER.md        # living description of the app as it is now
@@ -43,6 +44,7 @@ moved, or discovered to be different from what is recorded here.
 | `docs/` | All project documentation |
 | `artifacts/` | The one canonical folder for UI evidence: `<scope>/qa/<date>/<task-id>/` |
 | `docs/reviews/` | Review reports and round ledgers — documents, not artifacts |
+| `.kilo/policies/git-policy.json` | Canonical guard-rail policy. The `permission` map in `kilo.jsonc` and `guard.py check-git` are both generated from it. |
 | `apps/<name>/` | One folder per app or microservice (new projects only) |
 
 ## Rules

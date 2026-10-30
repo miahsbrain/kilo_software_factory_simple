@@ -309,6 +309,8 @@ the intent. Never have an agent hand-run the underlying command when a script co
 | The board is edited by lane and cell, never hand-written | `.kilo/skills/board/scripts/board.py` |
 | QA evidence capture: screenshots, console, page errors, network, overflow | `.kilo/skills/qa-review/scripts/browser-review.mjs` |
 | A finding is actionable before it becomes a board row | `.kilo/skills/qa-review/scripts/check-finding.py` |
+| Git commands that change history or the remote are classified before they run | `.kilo/skills/git-worktree/scripts/guard.py check-git` |
+| The permission map and the policy file cannot drift apart | `.kilo/skills/git-worktree/scripts/guard.py check-policy` |
 
 The skills in `.kilo/skills/` are the executable procedures behind these rules. When a rule
 changes, the script and the skill change with it.
@@ -1460,8 +1462,8 @@ Default to functional thinking; keep effects at the edges.
 - No new dependency without a stated reason in `docs/ARCHITECTURE.md` and `docs/DECISIONS.md`.
 - Never commit secrets or keys. Never log credentials. Never put real secret values in
   `.env.example`, docs, prompts, or tests.
-- Builders may create/update local `.env.example` files, and `.env` files with empty or dummy
-  values only. The user populates real secrets.
+- Builders create or update `.env.example` files. The permission map denies edits to the real
+  `.env`, so the user writes it and populates the real secrets.
 - Small, focused changes with a message that says *why*.
 - Run the project's own lint / typecheck / tests before declaring a change done.
 - Do not over-engineer. Documentation must describe reality, not intentions.
@@ -1504,6 +1506,44 @@ the port values.
 
 Types: `feat fix chore refactor test perf docs ci ui security revert wip`.
 Subject ≤ 72 characters, imperative voice, plain words. One logical change per commit.
+
+### The permission map and the guard
+
+`.kilo/policies/git-policy.json` is the single source of truth for what an agent may run without
+the user. `kilo.jsonc` carries the permission map generated from it, and
+`.kilo/skills/git-worktree/scripts/guard.py` reads the same file at runtime.
+
+- **Deny** — the irreversible: `git push`, `git reset --hard`, `git clean`, `git checkout --`,
+  `git branch -D`, a raw `git worktree remove`, `git filter-branch`, `git filter-repo`,
+  `git reflog expire`, `git gc`, `git update-ref -d`.
+- **Ask** — the rest of git that changes history or the remote: `git merge`, `git remote`,
+  `git rebase`, `git stash`, `git config`, `git tag`, `git checkout`, `git switch`, `git branch -d`
+  and `-m`, `git reset`, `git worktree add|move|prune`, `git fetch`, `git pull`, `git clone`,
+  `git init`, `git submodule`, `git cherry-pick`, `git revert`, `git commit --amend`.
+- **Allow** — reading and the normal workflow: `git status`, `git diff`, `git log`, `git show`,
+  `git add`, `git commit`, `git ls-files`, `git rev-parse`, `git blame`, `git describe`,
+  `git worktree list`, `git branch --show-current`.
+
+The guard adds three context checks a keyword list cannot see: **no commit on
+`main`/`master`/`base`**, **no branch switch inside a worktree**, and **no raw
+`git worktree remove`** — use `worktree.py cleanup`, which checks that the branch is merged and
+the tree is clean.
+
+Run the guard before any git command that changes history or the remote:
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/guard.py check-git -- "git merge feat/x"
+```
+
+Exit 0 allowed, 1 denied, 2 usage error, 3 needs the user's approval. The permission map in
+`kilo.jsonc` is the coarse net that stops the command before it runs; the guard is the precise
+layer. `guard.py check-policy` proves the two still match, and `check-policy --write`
+regenerates the map after the policy changes.
+
+Edits follow the same split: the rules files (`AGENTS.md`, `apps/*/AGENTS.md`,
+`.kilo/agent/*.md`, `.kilo/command/*.md`, `.kilo/skills/*.md`, `.kilo/policies/*.json`,
+`docs/BOARD.md`) ask first, and `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12` and `id_rsa*` are
+denied. The agent adds `.env.example`; the user writes the real `.env`.
 
 ### The human approval gate
 

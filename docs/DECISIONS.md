@@ -1,6 +1,6 @@
 # DECISIONS
 
-Append-only. Ultra-concise approved architectural decisions. Newest first.
+Append-only. Ultra-concise approved architectural decisions. New rows go at the end.
 
 ## How to record a decision
 
@@ -49,3 +49,4 @@ Append-only. Ultra-concise approved architectural decisions. Newest first.
 | ADR-037 | One canonical artifacts folder at the repository root: `artifacts/<scope>/qa/<date>/<task-id>/`; the capture script computes the path itself and review reports and ledgers stay in `docs/reviews/` | UI evidence was scattered across app folders, `docs/`, and `/tmp` | One place to look for evidence; the script owns the layout so no agent has to remember it | 2026-10-29 |
 | ADR-038 | An agent checks what exists — skills, MCP servers, global tools, standard library, repo scripts — and then asks before building a tool | An agent wrote its own browser client while Playwright was installed globally | A custom tool is a project-sized decision, not a local workaround | 2026-10-29 |
 | ADR-039 | The QA capture path drives Playwright only — no CDP client, no second driver; a missing chromium is reported (exit 2), never installed or replaced; and a failed command, capture, or test is reported instead of routed around | An agent built a browser client by hand instead of asking, and the capture script advertised a CDP fallback that did not exist | One driver owns the evidence, and a missing browser, package, or system tool stays the user's decision | 2026-10-29 |
+| ADR-040 | The guard rails live in one policy file that feeds two layers: the generated `permission` map in `kilo.jsonc` and `guard.py check-git`, which adds the context checks a keyword list cannot see | A keyword list cannot tell a commit on `main` from a commit on a worktree branch, and two copies of the rules drift apart | One file to edit, a check that proves the layers match, and the user's approval required for anything irreversible | 2026-10-30 |
