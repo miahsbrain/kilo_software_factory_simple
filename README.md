@@ -12,7 +12,8 @@ it at a project and it builds that project.
 | Path | What it holds |
 |---|---|
 | `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
-| `.kilo/agent/` | Five agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`. |
+| `.kilo/agent/` | Six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
+| `docs/handover/` | The application memory map: one handover per application plus the global index, written by the `docs-writer` agent. |
 | `.kilo/command/` | Eight slash commands that package the workflow. |
 | `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
 | `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
@@ -52,10 +53,12 @@ the factory builds the project in this checkout.
      --type Feature --status Ready --priority P1 --risk "🟡 medium — why" --blocked-by "None." \
      --note "- [ ] the criterion someone can check"
    ```
-3. `/decide` — the discovery interview. It fills `DOMAIN.md` and produces the first decisions.
-4. `/run BOARD-001` — build the row in a worktree.
-5. `/ui` — the QA and UI/UX lane, with Playwright evidence.
-6. Inspect the branch and merge it yourself. The agent never merges, never pushes, and never
+3. `/handover` — read the whole codebase and write the application memory map: one handover per
+   application plus the global index in `docs/handover/`.
+4. `/decide` — the discovery interview. It fills `DOMAIN.md` and produces the first decisions.
+5. `/run BOARD-001` — build the row in a worktree.
+6. `/ui` — the QA and UI/UX lane, with Playwright evidence.
+7. Inspect the branch and merge it yourself. The agent never merges, never pushes, and never
    opens a pull request.
 
 ## Requirements

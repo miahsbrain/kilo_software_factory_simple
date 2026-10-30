@@ -4,6 +4,7 @@
 |---|---|
 | [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Where does everything live? |
 | [HANDOVER.md](HANDOVER.md) | What is this app right now? Entry points, functions, data, states, pure vs effectful. |
+| [handover/](handover/) | What is the whole application? One memory map per application plus the global index. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How is it built and why? Domain, layers, decisions, roadmap. |
 | [BUSINESS-LOGIC.md](BUSINESS-LOGIC.md) | How does it behave? Question → answer with rules and `file:line`. |
 | [UI-UX.md](UI-UX.md) | What should it look like? References, anti-slop rules, component factory gate, Playwright QA spec. |
@@ -24,11 +25,11 @@ Skills (`.kilo/skills/`):
 | `board` | `board.py` | add rows, move lanes, set cells — never hand-edit the table |
 | `qa-review` | `browser-review.mjs`, `check-finding.py` | Playwright evidence capture; finding validation |
 
-Agents (`.kilo/agent/`): `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`.
+Agents (`.kilo/agent/`): `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`.
 
 Commands: `/decide` (decision sheet before implementation), `/board` (live board + next task),
 `/run` (Build → QA → Review for one row), `/components` (component factory + gallery, user
-approves), `/ui` (Playwright QA + UI/UX critique), `/handover` (refresh the doc set), `/closeout`
+approves), `/ui` (Playwright QA + UI/UX critique), `/handover` (read the codebase and write the application memory map), `/closeout`
 (docs + changelog, then hand the worktree to the user).
 
 Root-level: [AGENTS.md](../AGENTS.md) (rules), [DOMAIN.md](../DOMAIN.md) (product scope),

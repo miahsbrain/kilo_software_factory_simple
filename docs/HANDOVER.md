@@ -1,13 +1,14 @@
 # HANDOVER — Mini Light Factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** 2026-10-30 — added the guard-rail policy (BOARD-001): the canonical policy
->   file `.kilo/policies/git-policy.json`, the generated `permission` map in `kilo.jsonc`, the
->   `guard.py check-git` and `guard.py check-policy` commands, and the rule text that describes
->   them.
-> - **In flight:** branch `feat/add-a-permission-file-and-git`, worktree
->   `.kilo/worktrees/add-a-permission-file-and-git`. BOARD-001 is built and waiting for review.
-> - **Next action:** the user merges `feat/add-a-permission-file-and-git` into `main`.
+> - **Last session:** 2026-10-30 — added the guard-rail policy (BOARD-001) and the documentation
+>   agent with the application memory map (BOARD-002): the `docs-writer` agent, `/handover`
+>   routed to it, and `docs/handover/` holding the global index plus one file per application.
+> - **In flight:** branch `feat/add-a-documentation-agent-that-writes`, worktree
+>   `.kilo/worktrees/add-a-documentation-agent-that-writes`. BOARD-002 is built and waiting for
+>   review.
+> - **Next action:** the user merges `feat/add-a-documentation-agent-that-writes` into `main`, then
+>   the discovery interview (`/decide`) runs for the first project in this checkout.
 
 ## 1. Overview
 
@@ -22,8 +23,8 @@
   package manager, no database. `docs/STACK.md` is still `TBD` for every application stack.
 - **How to use it:** open the repo in Kilo Code. Read `AGENTS.md` at the root. Run
   `/board` to see the live board, `/decide` to approve a decision, `/run` to build a row in a
-  worktree, `/ui` for the QA lane, `/closeout` to refresh docs, `/handover` to refresh this
-  file. There is no build or run command for the factory itself.
+  worktree,   `/ui` for the QA lane, `/closeout` to refresh docs, `/handover` to write the application
+  memory map under `docs/handover/`. There is no build or run command for the factory itself.
 
 ## 2. Directory map
 
@@ -34,7 +35,7 @@
 | `DOMAIN.md` | Product scope and terminology for the first application. Still `TBD`; discovery has not run. |
 | `ROADMAP.md` | Planned work not in progress. |
 | `CHANGELOG.md` | Product-facing changelog. Updated only on the user's instruction. |
-| `.kilo/agent/` | The five agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`. |
+| `.kilo/agent/` | The six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
 | `.kilo/policies/` | The canonical guard-rail policy: `git-policy.json`. |
 | `.kilo/command/` | The eight slash commands: `decide`, `board`, `board-view`, `run`, `components`, `ui`, `handover`, `closeout`. |
 | `.kilo/worktrees/` | Agent Manager worktrees, one per task. Git-ignored. Not part of the committed tree. |
@@ -45,6 +46,7 @@
 | `docs/` | The governance document set (see §5 and §14). |
 | `docs/changelog/` | Engineering log: `CHANGELOG.md` plus one `<date>-<slug>.md` per notable change. |
 | `docs/reviews/` | QA and UI/UX review reports and round ledgers. Does not exist yet; created by the reviewer agents. |
+| `docs/handover/` | The application memory map: `README.md` is the global index, one `<unit>.md` per application. Written by the `docs-writer` agent. |
 | `artifacts/` | The one canonical folder for UI evidence: `artifacts/<scope>/qa/<date>/<task-id>/`. Lives in the main checkout. Git keeps the `.md` files only. |
 
 ## 3. Entry points
@@ -58,13 +60,14 @@ The factory has no executable. Its entry points are the Kilo commands and agents
 | `/run` | command | `.kilo/command/run.md:5` | Run Build → QA → Review for one board row in its worktree. |
 | `/components` | command | `.kilo/command/components.md:5` | Frontend UI gate: build the component factory and gallery, then ask for approval. |
 | `/ui` | command | `.kilo/command/ui.md:5` | QA lane and UI/UX critique with Playwright evidence. |
-| `/handover` | command | `.kilo/command/handover.md:5` | Read the repository and refresh the handover documentation set. |
+| `/handover` | command | `.kilo/command/handover.md:5` | Read the whole codebase and write the application memory map under `docs/handover/`. |
 | `/closeout` | command | `.kilo/command/closeout.md:5` | Update docs and changelog, then hand the worktree to the user. |
 | `frontend-dev` | agent | `.kilo/agent/frontend-dev.md:8` | Delegated web UI work. |
 | `backend-dev` | agent | `.kilo/agent/backend-dev.md:8` | Delegated API and service work. |
 | `mobile-dev` | agent | `.kilo/agent/mobile-dev.md:8` | Delegated mobile UI and platform work. |
 | `qa-reviewer` | agent | `.kilo/agent/qa-reviewer.md:8` | Verification lane; produces Playwright evidence. |
 | `ui-critic` | agent | `.kilo/agent/ui-critic.md:8` | Visual critique against the anti-slop rules. |
+| `docs-writer` | agent | `.kilo/agent/docs-writer.md:8` | Reads the codebase and writes the application memory map. |
 
 ## 4. Modules, classes, functions
 
@@ -87,6 +90,7 @@ what it is responsible for, and whether reading or running it has side effects.
 | `mobile-dev` | `.kilo/agent/mobile-dev.md:8` | Mobile UI and platform builder. | Delegated agent. | Effectful (writes code in the mobile scope) |
 | `qa-reviewer` | `.kilo/agent/qa-reviewer.md:8` | Verify behavior against acceptance criteria with Playwright evidence. | Delegated agent. | Effectful (runs Playwright, writes `docs/reviews/`) |
 | `ui-critic` | `.kilo/agent/ui-critic.md:8` | Judge screens against the anti-slop rules and the approved gallery. | Delegated agent. | Effectful (writes `docs/reviews/`) |
+| `docs-writer` | `.kilo/agent/docs-writer.md:8` | Read the codebase and write the application memory map: one handover per unit plus the global index. | Delegated agent. | Effectful (writes `docs/handover/`) |
 | `apps/*/AGENTS.md` | `apps/web/AGENTS.md:1`, `apps/mobile/AGENTS.md:1`, `apps/api/AGENTS.md:1` | Scope rules for each future application. | Scope rules. | Pure |
 | `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs:1` | Captures Playwright evidence into the canonical artifacts folder and writes `summary.json` and `notes.md`. Resolves the chromium binary from `--chromium`, `PLAYWRIGHT_CHROMIUM_PATH`, the downloaded browser, then the system chromium; exits 2 with the searched list when none is found. | CLI: `--base-url`, `--route`, `--scope`, `--task-id`, `--date`, `--artifact-dir`, `--project`, `--viewports`, `--label`, `--scheme`, `--component`, `--compare`, `--chromium`. | Effectful (launches a browser, writes files) |
 | `git-policy.json` | `.kilo/policies/git-policy.json:1` | The canonical guard-rail policy: the allow/ask/deny rules for bash and edit commands, plus the three context checks. | The policy file itself; read by `guard.py` and by `guard.py check-policy --write`. | Pure |
@@ -123,6 +127,7 @@ Markdown files and the git repository state.
 | `docs/API_CONTRACTS.md` | API structure, auth, error formats. Not started. |
 | `docs/ENVIRONMENT.md` | Env vars and config keys. Empty table today. |
 | `docs/README.md` | Index of the doc set. |
+| `docs/handover/README.md` | The global application map: every unit, the contracts between them, the global state and side effects. |
 | `docs/changelog/CHANGELOG.md` | Engineering log, newest first. Currently the template entry. |
 
 **Repository state**
@@ -182,7 +187,7 @@ stateDiagram-v2
 | `/run` | Build → QA → Review for one board row, ending at `Pending Merge`. |
 | `/components` | Component factory and gallery, then user approval of the visual language. |
 | `/ui` | Playwright QA lane plus UI/UX critique with artifacts. |
-| `/handover` | Refresh the handover document set. |
+| `/handover` | Write the application memory map under `docs/handover/`. |
 | `/closeout` | Documentation rule, changelog entry, worktree handover for merge. |
 
 **Agent surface**
@@ -194,6 +199,7 @@ stateDiagram-v2
 | `mobile-dev` | Mobile UI and platform behavior. |
 | `qa-reviewer` | Verification lane: Playwright evidence against acceptance criteria. |
 | `ui-critic` | Visual critique against the anti-slop rules and the approved gallery. |
+| `docs-writer` | The application memory map: one handover per unit plus the global index. |
 
 **Two contracts that matter**
 
@@ -303,6 +309,7 @@ The other two still apply.
 - [docs/README.md](README.md) — index of the doc set.
 - [docs/PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) — authoritative folder layout.
 - [docs/HANDOVER.md](HANDOVER.md) — this file.
+- [docs/handover/README.md](handover/README.md) — the global application map, written by the `docs-writer` agent.
 - [docs/ARCHITECTURE.md](ARCHITECTURE.md) — system shape and layers.
 - [docs/BUSINESS-LOGIC.md](BUSINESS-LOGIC.md) — business rules as question → answer.
 - [docs/UI-UX.md](UI-UX.md) — visual language, anti-slop rules, QA spec.

@@ -30,6 +30,7 @@ moved, or discovered to be different from what is recorded here.
     │   ├── API_CONTRACTS.md   # API structure, auth, error formats
     │   ├── ENVIRONMENT.md     # env vars and config keys (placeholders only)
     │   ├── reviews/           # QA and UI/UX reports and round ledgers (documents, not artifacts)
+    │   ├── handover/           # application memory map: one file per app + the global index
     │   └── changelog/         # engineering changelog
     └── apps/                  # only when this becomes a multi-app project
         ├── web/
@@ -44,6 +45,7 @@ moved, or discovered to be different from what is recorded here.
 | `docs/` | All project documentation |
 | `artifacts/` | The one canonical folder for UI evidence: `<scope>/qa/<date>/<task-id>/` |
 | `docs/reviews/` | Review reports and round ledgers — documents, not artifacts |
+| `docs/handover/` | The application memory map: `README.md` is the global index, `<unit>.md` is one per application |
 | `.kilo/policies/git-policy.json` | Canonical guard-rail policy. The `permission` map in `kilo.jsonc` and `guard.py check-git` are both generated from it. |
 | `apps/<name>/` | One folder per app or microservice (new projects only) |
 
