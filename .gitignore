@@ -1,0 +1,32 @@
+# Nested microservice repositories. Each apps/<name>/ is its own git repository with its own
+# remote, so the control repo must not track them. The three scope folders that hold only a
+# rules file are re-included.
+apps/*/
+!apps/web/
+!apps/mobile/
+!apps/api/
+
+# Agent worktrees: one per board row, created by .kilo/skills/git-worktree/scripts/worktree.py
+.kilo/worktrees/
+
+# QA evidence. The notes and the summaries are tracked; the captures are not.
+artifacts/**/*.png
+artifacts/**/*.log
+artifacts/**/network.json
+
+# Local scratch
+.tmp/
+**/__pycache__/
+*.pyc
+node_modules/
+
+# Secrets. The agent writes .env.example; the human writes .env.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+id_rsa*
+
+.DS_Store

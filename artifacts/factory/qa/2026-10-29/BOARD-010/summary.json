@@ -1,0 +1,72 @@
+{
+  "base_url": "http://127.0.0.1:15186",
+  "project": "/tmp/kilo/empty-project",
+  "artifact_dir": "/workspaces/kilo_software_factory_simple/artifacts/factory/qa/2026-10-29/BOARD-010",
+  "task_dir": "/workspaces/kilo_software_factory_simple/artifacts/factory/qa/2026-10-29/BOARD-010",
+  "scope": "factory",
+  "task_id": "BOARD-010",
+  "date": "2026-10-29",
+  "scheme": "both",
+  "viewports": [
+    "1440x900"
+  ],
+  "routes": [
+    "/"
+  ],
+  "components": [],
+  "compare": null,
+  "driver": "playwright",
+  "browser_executable": "/usr/bin/chromium",
+  "results": [
+    {
+      "route": "/",
+      "viewport": "1440x900",
+      "scheme": "light",
+      "width": 1440,
+      "height": 900,
+      "url": "http://127.0.0.1:15186/",
+      "screenshot": "/workspaces/kilo_software_factory_simple/artifacts/factory/qa/2026-10-29/BOARD-010/root/1440x900/light/1440x900-light.png",
+      "components": [],
+      "compare": null,
+      "console_errors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "page_errors": [],
+      "network_failures": [],
+      "console_error_count": 1,
+      "page_error_count": 0,
+      "network_failure_count": 0,
+      "horizontal_overflow": false,
+      "horizontal_overflow_check_passed": true,
+      "navigation": {
+        "ok": true,
+        "waitUntil": "networkidle"
+      },
+      "error": null
+    },
+    {
+      "route": "/",
+      "viewport": "1440x900",
+      "scheme": "dark",
+      "width": 1440,
+      "height": 900,
+      "url": "http://127.0.0.1:15186/",
+      "screenshot": "/workspaces/kilo_software_factory_simple/artifacts/factory/qa/2026-10-29/BOARD-010/root/1440x900/dark/1440x900-dark.png",
+      "components": [],
+      "compare": null,
+      "console_errors": [],
+      "page_errors": [],
+      "network_failures": [],
+      "console_error_count": 0,
+      "page_error_count": 0,
+      "network_failure_count": 0,
+      "horizontal_overflow": false,
+      "horizontal_overflow_check_passed": true,
+      "navigation": {
+        "ok": true,
+        "waitUntil": "networkidle"
+      },
+      "error": null
+    }
+  ]
+}
