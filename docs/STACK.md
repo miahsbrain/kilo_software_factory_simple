@@ -195,6 +195,27 @@ When no chromium is found, the capture script exits 2 and prints the list of pla
 plus the commands that point it at a binary. It never installs a browser and never falls back to
 another driver.
 
+## Credential redaction
+
+Every shell command the agent runs has its output scrubbed before the agent reads it.
+
+- **File:** `.devcontainer/kilo-redact.sh`, installed to `/home/node/.kilo-redact.sh`.
+- **How it loads:** `devcontainer.json` → `remoteEnv.BASH_ENV`. Kilo Code runs shell tools as
+  `/bin/bash -c "<command>"`, and `$BASH_ENV` is the one startup file bash always reads for a
+  non-interactive shell. Debian's `~/.bashrc` returns immediately for a non-interactive shell, so
+  a function defined there never reaches the agent.
+- **What it does:** redirects the shell's stdout and stderr through a `sed` filter that replaces
+  GitHub tokens (`ghp_`, `ghs_`, `gho_`, `ghu_`, `ghr_`, `github_pat_`), the `x-access-token:`
+  form, a URL with an inline password, a `KEY=`/`TOKEN=`/`SECRET=`/`PASSWORD=` assignment, and a
+  bearer header with `<REDACTED_TOKEN>`.
+- **What it leaves alone:** output with no credential is byte-identical, including binary output.
+  The exit code, the stdout/stderr split, and the order of the output are all preserved.
+- **Test:** `BASH_ENV=.devcontainer/kilo-redact.sh bash .devcontainer/test-kilo-redact.sh`
+  — 14 checks.
+
+The filter is a backstop. The credential itself belongs in `/home/node/.git-credentials` (mode
+`600`), served by git's credential helper, never in a URL.
+
 ## Notes
 
 - Update this file after the user approves a stack or after targeted discovery confirms values.
