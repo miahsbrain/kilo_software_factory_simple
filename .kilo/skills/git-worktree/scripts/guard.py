@@ -37,6 +37,7 @@ agree.
 Exit codes: 0 allowed, 1 denied, 2 usage error, 3 needs the user's approval.
 A failure inside the guard never blocks work: it exits 0 with a note.
 """
+
 import argparse
 import fnmatch
 import importlib.util
@@ -49,7 +50,14 @@ import sys
 
 RM_CMDS = {"rm", "rmdir", "unlink", "trash"}
 TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
-GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
+GIT_VALUE_OPTS = {
+    "-c",
+    "--git-dir",
+    "--work-tree",
+    "--namespace",
+    "--exec-path",
+    "--config-env",
+}
 ADD_VALUE_OPTS = {"-b", "-B", "--reason"}
 LINKED_MARKER = os.sep + ".kilo" + os.sep + "worktrees" + os.sep
 SYNC_SLICE = ["agent", "command", "skills", "policies", "scopes"]
@@ -137,8 +145,13 @@ def real(path):
 def git_out(cwd, *args):
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     try:
-        r = subprocess.run(["git", "-C", cwd] + list(args), capture_output=True, text=True,
-                           env=env, timeout=15)
+        r = subprocess.run(
+            ["git", "-C", cwd] + list(args),
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=15,
+        )
     except (OSError, subprocess.TimeoutExpired):
         return None
     return r.stdout.strip() if r.returncode == 0 else None
@@ -147,8 +160,13 @@ def git_out(cwd, *args):
 def git_rc(cwd, *args):
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     try:
-        r = subprocess.run(["git", "-C", cwd] + list(args), capture_output=True, text=True,
-                           env=env, timeout=15)
+        r = subprocess.run(
+            ["git", "-C", cwd] + list(args),
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=15,
+        )
     except (OSError, subprocess.TimeoutExpired):
         return 1
     return r.returncode
@@ -166,7 +184,7 @@ def list_worktrees(cwd):
             elif key == "HEAD":
                 wt["head"] = val
             elif key == "branch":
-                wt["branch"] = val[len("refs/heads/"):] if val.startswith("refs/heads/") else val
+                wt["branch"] = val[len("refs/heads/") :] if val.startswith("refs/heads/") else val
             elif key == "bare":
                 wt["bare"] = True
         if wt["path"]:
@@ -179,8 +197,9 @@ def repo_context(cwd):
     top = git_out(cwd, "rev-parse", "--show-toplevel")
     if not top:
         return None
-    common = (git_out(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
-              or git_out(cwd, "rev-parse", "--git-common-dir"))
+    common = git_out(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir") or git_out(
+        cwd, "rev-parse", "--git-common-dir"
+    )
     wts = list_worktrees(cwd)
     main = wts[0]["path"] if wts else top
     repo_root = real(main)
@@ -196,8 +215,10 @@ def repo_context(cwd):
 
 def verdict(path, ctx, env):
     """None when the deletion target is fine, else why it is not."""
-    forms = {os.path.normpath(path),
-             os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))}
+    forms = {
+        os.path.normpath(path),
+        os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path)),
+    }
     home = os.path.normpath(env["HOME"]) if env.get("HOME") else None
     for p in forms:
         if p == os.sep:
@@ -222,8 +243,10 @@ def verdict(path, ctx, env):
         if p == ctx["repo_root"]:
             return "is the repository root (%s)" % ctx["repo_root"]
         if under(p, ctx["worktrees_root"]):
-            return ("is another linked worktree, not the current one; remove it with "
-                    "worktree.py cleanup, not with rm")
+            return (
+                "is another linked worktree, not the current one; remove it with "
+                "worktree.py cleanup, not with rm"
+            )
         if under(p, ctx["repo_root"]):
             return "is inside the main checkout (%s), which is never deleted" % ctx["repo_root"]
     return "is outside the current worktree and the allowed temp roots"
@@ -231,15 +254,18 @@ def verdict(path, ctx, env):
 
 def denial(cmd, raw, resolved, why, ctx):
     if ctx["linked"]:
-        where = ("the current linked worktree (%s)" % ctx["top"])
+        where = "the current linked worktree (%s)" % ctx["top"]
         rule = "Deletion is allowed only inside %s" % where
         hint = "Delete inside the worktree, use a temp dir, or ask the user to run it themselves."
     else:
-        where = ("the main checkout (%s), where no repository path is deletable" % ctx["repo_root"])
-        rule = ("Deletion is allowed only inside a linked worktree, and this command runs in "
-                "%s" % where)
-        hint = ("Do not delete anything in the main checkout. Do the work in a linked worktree, "
-                "use a temp dir, or ask the user to run it themselves.")
+        where = "the main checkout (%s), where no repository path is deletable" % ctx["repo_root"]
+        rule = (
+            "Deletion is allowed only inside a linked worktree, and this command runs in %s" % where
+        )
+        hint = (
+            "Do not delete anything in the main checkout. Do the work in a linked worktree, "
+            "use a temp dir, or ask the user to run it themselves."
+        )
     return (
         'Blocked: %s target "%s" resolves to %s, which %s.\n'
         "%s, or inside a temp dir under /tmp or $TMPDIR (never the temp root itself).\n%s"
@@ -283,9 +309,10 @@ def collect_delete_targets(command, cwd, env, ctx):
             for w in words:
                 found.append((cmd, w, resolve(w)))
         elif cmd == "find":
-            if "-delete" in args or any(a == "-exec" and i + 1 < len(args)
-                                        and os.path.basename(args[i + 1]) in RM_CMDS
-                                        for i, a in enumerate(args)):
+            if "-delete" in args or any(
+                a == "-exec" and i + 1 < len(args) and os.path.basename(args[i + 1]) in RM_CMDS
+                for i, a in enumerate(args)
+            ):
                 for w in args:
                     if w.startswith("-") or w in ("!", "(", ")"):
                         break
@@ -311,7 +338,7 @@ def collect_delete_targets(command, cwd, env, ctx):
                     if not w.startswith("-"):
                         found.append(("git worktree remove", w, resolve(w)))
             elif sub == "checkout" and "--" in rest:
-                for w in rest[rest.index("--") + 1:]:
+                for w in rest[rest.index("--") + 1 :]:
                     found.append(("git checkout --", w, resolve(w)))
     return found
 
@@ -338,18 +365,24 @@ def check_delete(command, cwd, ctx, env):
             names = [rest[j + 1] for j, a in enumerate(rest) if a == "-D" and j + 1 < len(rest)]
             for name in names:
                 if git_rc(cwd, "merge-base", "--is-ancestor", name, "HEAD") != 0:
-                    return ('Blocked: git branch -D %s would delete commits that are not merged into HEAD.\n'
-                            "Delete a branch only after its work is merged; use `git branch -d` for a safe delete."
-                            % name)
+                    return (
+                        "Blocked: git branch -D %s would delete commits that are not merged into HEAD.\n"
+                        "Delete a branch only after its work is merged; use `git branch -d` for a safe delete."
+                        % name
+                    )
         if rest[0] == "reset" and "--hard" in rest:
             if not ctx["linked"]:
-                return ('Blocked: git reset --hard would touch the main checkout (%s).\n'
-                        "Do not run destructive git commands in the main checkout; run them inside "
-                        "a linked worktree." % ctx["repo_root"])
+                return (
+                    "Blocked: git reset --hard would touch the main checkout (%s).\n"
+                    "Do not run destructive git commands in the main checkout; run them inside "
+                    "a linked worktree." % ctx["repo_root"]
+                )
             status = git_out(cwd, "status", "--porcelain")
             if status:
-                return ('Blocked: git reset --hard would discard uncommitted changes in %s.\n'
-                        "Commit or stash the work first, then reset." % cwd)
+                return (
+                    "Blocked: git reset --hard would discard uncommitted changes in %s.\n"
+                    "Commit or stash the work first, then reset." % cwd
+                )
     return None
 
 
@@ -389,7 +422,7 @@ def worktree_targets(command, cwd, env, ctx):
         while j < len(args):
             a = args[j]
             if a == "--":
-                positional += args[j + 1:]
+                positional += args[j + 1 :]
                 break
             if a in ADD_VALUE_OPTS:
                 j += 1
@@ -413,7 +446,11 @@ def check_worktree(command, cwd, ctx, env):
     """None when allowed, else the deny reason."""
     allowed = ctx["worktrees_root"]
     for raw, resolved in worktree_targets(command, cwd, env, ctx):
-        if resolved and under(resolved, allowed) and os.path.normpath(resolved) != os.path.normpath(allowed):
+        if (
+            resolved
+            and under(resolved, allowed)
+            and os.path.normpath(resolved) != os.path.normpath(allowed)
+        ):
             continue
         where = ("resolves to " + resolved) if resolved else "cannot be resolved before it runs"
         return (
@@ -490,7 +527,7 @@ def git_commands(command):
         if i >= len(args):
             continue
         sub = args[i]
-        rest = args[i + 1:]
+        rest = args[i + 1 :]
         found.append(("git %s%s" % (sub, (" " + " ".join(rest)) if rest else ""), sub, rest))
     return found
 
@@ -510,7 +547,9 @@ def context_verdict(policy, command, cwd, ctx):
             parts = command.split()
             sub = parts[1] if len(parts) > 1 else ""
             rest = parts[2:]
-            switches = sub in ("checkout", "switch") and not (sub == "checkout" and rest[:1] == ["--"])
+            switches = sub in ("checkout", "switch") and not (
+                sub == "checkout" and rest[:1] == ["--"]
+            )
             fired = bool(ctx and ctx.get("linked")) and switches
         else:
             fired = False
@@ -536,9 +575,12 @@ def bash_verdict(policy, command):
 def cmd_check_git(command, cwd, ctx):
     root, path = find_policy(ctx)
     if not path:
-        print("policy file not found: %s\n"
-              "The canonical guard-rail policy is missing; run guard.py check-policy --write "
-              "after creating .kilo/policies/git-policy.json." % POLICY_REL, file=sys.stderr)
+        print(
+            "policy file not found: %s\n"
+            "The canonical guard-rail policy is missing; run guard.py check-policy --write "
+            "after creating .kilo/policies/git-policy.json." % POLICY_REL,
+            file=sys.stderr,
+        )
         return USAGE
     policy = load_policy(path)
 
@@ -553,21 +595,27 @@ def cmd_check_git(command, cwd, ctx):
             action = rule.get("action", "deny")
             reason = rule.get("reason", "")
             if action == "ask":
-                print("needs approval: %s\nreason: %s\nnext: the user must approve it before "
-                      "it runs." % (reconstructed, reason))
+                print(
+                    "needs approval: %s\nreason: %s\nnext: the user must approve it before "
+                    "it runs." % (reconstructed, reason)
+                )
                 return ASK
-            print("blocked: %s\nreason: %s\nnext: do not run this command." %
-                  (reconstructed, reason))
+            print(
+                "blocked: %s\nreason: %s\nnext: do not run this command." % (reconstructed, reason)
+            )
             return DENIED
 
         action, reason = bash_verdict(policy, reconstructed)
         if action == "deny":
-            print("blocked: %s\nreason: %s\nnext: do not run this command." %
-                  (reconstructed, reason))
+            print(
+                "blocked: %s\nreason: %s\nnext: do not run this command." % (reconstructed, reason)
+            )
             return DENIED
         if action == "ask":
-            print("needs approval: %s\nreason: %s\nnext: the user must approve it before "
-                  "it runs." % (reconstructed, reason))
+            print(
+                "needs approval: %s\nreason: %s\nnext: the user must approve it before "
+                "it runs." % (reconstructed, reason)
+            )
             return ASK
 
     print("allowed: %s" % command)
@@ -621,8 +669,15 @@ def load_config(path):
         return None, exc.lineno
 
 
+FILE_TOOLS = ("read", "grep", "glob", "list")
+
+
 def generated_permission(policy):
-    """The permission block generated from the policy: fallback first, then rules in file order."""
+    """The permission block generated from the policy: fallback first, then rules in file order.
+
+    `hidden_paths` is expanded into one deny rule per path for every file-reading tool, so a git
+    config or credential file is never readable by `read`, `grep`, `glob` or `list`.
+    """
     fallback = policy.get("fallback", {}).get("action", "allow")
     block = {}
     for kind in ("bash", "edit"):
@@ -630,6 +685,15 @@ def generated_permission(policy):
         for rule in policy.get(kind, []):
             mapping[rule["pattern"]] = rule["action"]
         block[kind] = mapping
+    hidden = policy.get("hidden_paths") or {}
+    tools = hidden.get("tools") or FILE_TOOLS
+    for tool in tools:
+        mapping = {FALLBACK_KEY: fallback}
+        for path in hidden.get("paths", []):
+            mapping[path] = "deny"
+        for path in hidden.get("allow", []):
+            mapping[path] = "allow"
+        block[tool] = mapping
     return block
 
 
@@ -644,8 +708,9 @@ def write_permission_map(config_path, policy, create_missing=False):
     config, bad_line = load_config(config_path)
     if config is None:
         if not create_missing:
-            return None, ("cannot parse %s%s" %
-                          (config_path, (" at line %d" % bad_line) if bad_line else ""))
+            return None, (
+                "cannot parse %s%s" % (config_path, (" at line %d" % bad_line) if bad_line else "")
+            )
         config = {"$schema": SCHEMA_URL}
     updated = {k: v for k, v in config.items() if k != "permission"}
     updated["permission"] = expected
@@ -666,14 +731,17 @@ def cmd_check_policy(write, cwd, ctx):
     config_path = os.path.join(root, "kilo.jsonc")
     config, bad_line = load_config(config_path)
     if config is None:
-        print("cannot parse %s%s" % (config_path,
-                                     (" at line %d" % bad_line) if bad_line else ""),
-              file=sys.stderr)
+        print(
+            "cannot parse %s%s" % (config_path, (" at line %d" % bad_line) if bad_line else ""),
+            file=sys.stderr,
+        )
         return USAGE
 
     current = config.get("permission") or {}
-    same = (list(current.get("bash", {}).items()) == list(expected["bash"].items())
-            and list(current.get("edit", {}).items()) == list(expected["edit"].items()))
+    same = set(current) == set(expected) and all(
+        list((current.get(kind) or {}).items()) == list(mapping.items())
+        for kind, mapping in expected.items()
+    )
 
     if same and not write:
         print("policy in sync")
@@ -761,8 +829,12 @@ def scope_files(source_tree, target, repo_id):
             if not name.endswith(".md"):
                 continue
             scope_id = name[:-3]
-            pairs.append((os.path.join(scopes_dir, name),
-                          os.path.join(source_tree, "apps", scope_id, "AGENTS.md")))
+            pairs.append(
+                (
+                    os.path.join(scopes_dir, name),
+                    os.path.join(source_tree, "apps", scope_id, "AGENTS.md"),
+                )
+            )
         return pairs
     source = os.path.join(scopes_dir, repo_id + ".md")
     if os.path.exists(source):
@@ -794,8 +866,10 @@ def cmd_sync(repo_id, apply, cwd, ctx):
     wt = load_worktree_module()
     is_repo = bool(wt) and wt.is_git_repo(target)
     if not is_repo and apply:
-        print("target %s is not a git repository; refusing to write into it" % target,
-              file=sys.stderr)
+        print(
+            "target %s is not a git repository; refusing to write into it" % target,
+            file=sys.stderr,
+        )
         return DENIED
     plan = []
     for folder in SYNC_SLICE:
@@ -815,8 +889,10 @@ def cmd_sync(repo_id, apply, cwd, ctx):
     config_path = os.path.join(target, "kilo.jsonc")
 
     print("control repo: %s" % control)
-    print("target repo:  %s (%s)%s" % (target, repo_id,
-                                       "" if is_repo else " - not a git repository yet"))
+    print(
+        "target repo:  %s (%s)%s"
+        % (target, repo_id, "" if is_repo else " - not a git repository yet")
+    )
     print("plan:")
     written = identical = 0
     for source, destination in plan:
@@ -880,8 +956,10 @@ def cmd_check_repos(cwd, ctx):
             folder = os.path.join(apps, name)
             if os.path.isdir(folder) and os.path.exists(os.path.join(folder, ".git")):
                 if os.path.realpath(folder) not in registered:
-                    problems.append("apps/%s is a git repository but is not registered in %s"
-                                    % (name, REPOS_REL))
+                    problems.append(
+                        "apps/%s is a git repository but is not registered in %s"
+                        % (name, REPOS_REL)
+                    )
     if problems:
         for problem in problems:
             print("problem: %s" % problem, file=sys.stderr)
@@ -901,7 +979,8 @@ def resolve_repo_path(control, repos, repo_id):
 
 def main(argv):
     parser = argparse.ArgumentParser(
-        prog="guard.py", description="Guard destructive shell commands in this factory.")
+        prog="guard.py", description="Guard destructive shell commands in this factory."
+    )
     sub = parser.add_subparsers(dest="command")
 
     p_del = sub.add_parser("check-delete", help="allow or deny a destructive shell command")

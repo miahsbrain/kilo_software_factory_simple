@@ -307,17 +307,17 @@ creating a worktree, editing a board row, capturing screenshots, validating a fi
 checking whether a destructive command is allowed — the script performs it and the agent supplies
 the intent. Never have an agent hand-run the underlying command when a script covers it.
 
-| Rule | Script that owns it |
-|---|---|
-| Every change gets a worktree with a feature-named path and branch | `.kilo/skills/git-worktree/scripts/worktree.py` |
-| Deletion only inside the worktree; worktree paths confined to `.kilo/worktrees/` | `.kilo/skills/git-worktree/scripts/guard.py` |
-| The board is edited by lane and cell, never hand-written | `.kilo/skills/board/scripts/board.py` |
-| QA evidence capture: screenshots, console, page errors, network, overflow | `.kilo/skills/qa-review/scripts/browser-review.mjs` |
-| A finding is actionable before it becomes a board row | `.kilo/skills/qa-review/scripts/check-finding.py` |
-| Git commands that change history or the remote are classified before they run | `.kilo/skills/git-worktree/scripts/guard.py check-git` |
-| The permission map and the policy file cannot drift apart | `.kilo/skills/git-worktree/scripts/guard.py check-policy` |
-| An app repo's guard rails match the control repo's | `.kilo/skills/git-worktree/scripts/guard.py sync` |
-| The repo map matches the layout on disk | `.kilo/skills/git-worktree/scripts/guard.py check-repos` |
+| Rule                                                                             | Script that owns it                                       |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Every change gets a worktree with a feature-named path and branch                | `.kilo/skills/git-worktree/scripts/worktree.py`           |
+| Deletion only inside the worktree; worktree paths confined to `.kilo/worktrees/` | `.kilo/skills/git-worktree/scripts/guard.py`              |
+| The board is edited by lane and cell, never hand-written                         | `.kilo/skills/board/scripts/board.py`                     |
+| QA evidence capture: screenshots, console, page errors, network, overflow        | `.kilo/skills/qa-review/scripts/browser-review.mjs`       |
+| A finding is actionable before it becomes a board row                            | `.kilo/skills/qa-review/scripts/check-finding.py`         |
+| Git commands that change history or the remote are classified before they run    | `.kilo/skills/git-worktree/scripts/guard.py check-git`    |
+| The permission map and the policy file cannot drift apart                        | `.kilo/skills/git-worktree/scripts/guard.py check-policy` |
+| An app repo's guard rails match the control repo's                               | `.kilo/skills/git-worktree/scripts/guard.py sync`         |
+| The repo map matches the layout on disk                                          | `.kilo/skills/git-worktree/scripts/guard.py check-repos`  |
 
 The skills in `.kilo/skills/` are the executable procedures behind these rules. When a rule
 changes, the script and the skill change with it.
@@ -545,14 +545,14 @@ not justified by the task.
 
 Use the dedicated agents rather than ad-hoc prompts where one fits:
 
-| Agent | Use for |
-|---|---|
-| `frontend-dev` | Web UI work — component factory, screens, styling, accessibility |
-| `backend-dev` | API and service work — routes, domain logic, persistence, integrations |
-| `mobile-dev` | Mobile UI and platform work |
-| `qa-reviewer` | Verification lane — Playwright evidence against acceptance criteria |
-| `ui-critic` | Visual critique lane — anti-slop rules and gallery conformance |
-| `docs-writer` | The application memory map — one handover per application plus the global index |
+| Agent          | Use for                                                                         |
+| -------------- | ------------------------------------------------------------------------------- |
+| `frontend-dev` | Web UI work — component factory, screens, styling, accessibility                |
+| `backend-dev`  | API and service work — routes, domain logic, persistence, integrations          |
+| `mobile-dev`   | Mobile UI and platform work                                                     |
+| `qa-reviewer`  | Verification lane — Playwright evidence against acceptance criteria             |
+| `ui-critic`    | Visual critique lane — anti-slop rules and gallery conformance                  |
+| `docs-writer`  | The application memory map — one handover per application plus the global index |
 
 Each agent file carries the scope, style, production, verification, git, and reporting rules that
 apply to it, so a delegated prompt can stay short and specific.
@@ -645,13 +645,13 @@ permanent architect rule · permanent web/mobile/API builder rule.
 
 Permanent rules live in:
 
-| File | Owns |
-|---|---|
-| root `AGENTS.md` | architect behavior, quality, governance, orchestration, delegation, chunking, prompts, review, boot, documentation, subagent use, logging governance, learning from feedback |
-| `.kilo/agent/*.md` | The builder and reviewer agent definitions (frontend-dev, backend-dev, mobile-dev, qa-reviewer, ui-critic) |
-| `apps/web/AGENTS.md` | web builder execution, modularity, structure, naming, testing, API consumption, auth/session, styling, accessibility, exploration limits, reference handling |
-| `apps/mobile/AGENTS.md` | mobile builder execution, modularity, structure, naming, testing, API consumption, auth/session, platform behavior, accessibility, exploration limits |
-| `apps/api/AGENTS.md` | API builder execution, modularity, structure, naming, testing, implementation, database behavior, security, runtime logging/observability, exploration limits |
+| File                    | Owns                                                                                                                                                                         |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| root `AGENTS.md`        | architect behavior, quality, governance, orchestration, delegation, chunking, prompts, review, boot, documentation, subagent use, logging governance, learning from feedback |
+| `.kilo/agent/*.md`      | The builder and reviewer agent definitions (frontend-dev, backend-dev, mobile-dev, qa-reviewer, ui-critic)                                                                   |
+| `apps/web/AGENTS.md`    | web builder execution, modularity, structure, naming, testing, API consumption, auth/session, styling, accessibility, exploration limits, reference handling                 |
+| `apps/mobile/AGENTS.md` | mobile builder execution, modularity, structure, naming, testing, API consumption, auth/session, platform behavior, accessibility, exploration limits                        |
+| `apps/api/AGENTS.md`    | API builder execution, modularity, structure, naming, testing, implementation, database behavior, security, runtime logging/observability, exploration limits                |
 
 Product behavior and domain rules go in `DOMAIN.md`, not in an `AGENTS.md`. Approved architectural
 decisions go in `docs/DECISIONS.md`, not in an `AGENTS.md`.
@@ -697,27 +697,27 @@ human gate. Prefer the option with the smallest blast radius that still satisfie
 Keep governance files **concise**. Do not duplicate the same information across files unless
 each file genuinely needs its own short reference. Do not turn them into implementation journals.
 
-| File | Purpose |
-|---|---|
-| `DOMAIN.md` | Product scope, business rules, terminology, user-facing logic, requirements |
-| `ROADMAP.md` | Compact backlog of planned/decided work not in progress; completed items get ✅ |
-| `CHANGELOG.md` | **Product/user-facing** changelog — updated **only** on the user's explicit instruction |
-| `docs/PROJECT_STRUCTURE.md` | Authoritative folder layout and path→purpose map |
-| `docs/HANDOVER.md` | Living description of the app as it is **right now** (see B2) |
-| `docs/handover/` | The application memory map: one handover per application plus the global index |
-| `docs/ARCHITECTURE.md` | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap |
-| `docs/BUSINESS-LOGIC.md` | Every business rule as question → answer (see B2) |
-| `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, Playwright QA spec |
-| `docs/reviews/*.md` | QA and UI/UX review reports — one per task, produced by the reviewer agents |
-| `docs/BOARD.md` | Work tracking board (see B3) |
-| `docs/STACK.md` | Stack, package managers, dev/verification commands, ports, database, auth |
-| `docs/PROJECT_STATE.md` | Current phase, progress, active task, next step |
-| `docs/DECISIONS.md` | Append-only, ultra-concise approved architectural decisions |
-| `docs/RISKS.md` | Short bullets of active architectural/project risks |
-| `docs/API_CONTRACTS.md` | API structure, auth, error formats |
-| `docs/ENVIRONMENT.md` | Env vars and config keys only, with placeholders — never real values |
-| `docs/changelog/CHANGELOG.md` | Engineering log of every change, newest first |
-| `docs/changelog/<date>-<slug>.md` | Longer rationale for a notable change |
+| File                              | Purpose                                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| `DOMAIN.md`                       | Product scope, business rules, terminology, user-facing logic, requirements              |
+| `ROADMAP.md`                      | Compact backlog of planned/decided work not in progress; completed items get ✅          |
+| `CHANGELOG.md`                    | **Product/user-facing** changelog — updated **only** on the user's explicit instruction  |
+| `docs/PROJECT_STRUCTURE.md`       | Authoritative folder layout and path→purpose map                                         |
+| `docs/HANDOVER.md`                | Living description of the app as it is **right now** (see B2)                            |
+| `docs/handover/`                  | The application memory map: one handover per application plus the global index           |
+| `docs/ARCHITECTURE.md`            | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap                 |
+| `docs/BUSINESS-LOGIC.md`          | Every business rule as question → answer (see B2)                                        |
+| `docs/UI-UX.md`                   | Visual language: references, anti-slop rules, component factory gate, Playwright QA spec |
+| `docs/reviews/*.md`               | QA and UI/UX review reports — one per task, produced by the reviewer agents              |
+| `docs/BOARD.md`                   | Work tracking board (see B3)                                                             |
+| `docs/STACK.md`                   | Stack, package managers, dev/verification commands, ports, database, auth                |
+| `docs/PROJECT_STATE.md`           | Current phase, progress, active task, next step                                          |
+| `docs/DECISIONS.md`               | Append-only, ultra-concise approved architectural decisions                              |
+| `docs/RISKS.md`                   | Short bullets of active architectural/project risks                                      |
+| `docs/API_CONTRACTS.md`           | API structure, auth, error formats                                                       |
+| `docs/ENVIRONMENT.md`             | Env vars and config keys only, with placeholders — never real values                     |
+| `docs/changelog/CHANGELOG.md`     | Engineering log of every change, newest first                                            |
+| `docs/changelog/<date>-<slug>.md` | Longer rationale for a notable change                                                    |
 
 ### CHANGELOG protocol
 
@@ -739,29 +739,30 @@ Two changelogs, on purpose:
 update the affected documents **in the same change set**. Documentation is part of the work, not
 a follow-up task.
 
-| Change | Documents to update |
-|---|---|
-| New/changed function, class, module | `docs/HANDOVER.md` (inventory, pure/effectful) |
-| New/changed entry point, route, command | `docs/HANDOVER.md` (entry points, API) |
-| New or changed app behaviour | `docs/handover/<unit>.md` (written by the `docs-writer` agent) |
-| New or changed app behaviour in another repo | `docs/handover/<unit>.md` (the unit's repository is read through `.kilo/repos.json`) |
-| New/changed data model, schema, migration | `docs/HANDOVER.md` (data), `docs/ARCHITECTURE.md` if boundaries shift |
-| New/changed state machine or transition | `docs/HANDOVER.md` (state transitions), `docs/BUSINESS-LOGIC.md` |
-| New/changed business rule | `docs/BUSINESS-LOGIC.md`, `DOMAIN.md` if user-facing |
-| New/changed UI component, token, or visual rule | `docs/UI-UX.md` (gallery, tokens, anti-slop findings) |
-| New/changed UI evidence capture | `artifacts/<scope>/qa/<date>/<task-id>/notes.md` (canonical artifacts folder) |
-| Architectural change or new decision | `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` |
-| Approved implementation decision | `docs/DECISIONS.md` (append-only, with the date) |
-| New dependency | `docs/ARCHITECTURE.md` (reason), `docs/HANDOVER.md` |
-| New env var / config key | `docs/ENVIRONMENT.md` |
-| New or changed API endpoint | `docs/API_CONTRACTS.md` |
-| Any change at all | `docs/changelog/` (new entry) |
-| Lane transitions | `docs/BOARD.md` status — written by the **orchestrator in the main checkout only** (§B3) |
+| Change                                          | Documents to update                                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| New/changed function, class, module             | `docs/HANDOVER.md` (inventory, pure/effectful)                                           |
+| New/changed entry point, route, command         | `docs/HANDOVER.md` (entry points, API)                                                   |
+| New or changed app behaviour                    | `docs/handover/<unit>.md` (written by the `docs-writer` agent)                           |
+| New or changed app behaviour in another repo    | `docs/handover/<unit>.md` (the unit's repository is read through `.kilo/repos.json`)     |
+| New/changed data model, schema, migration       | `docs/HANDOVER.md` (data), `docs/ARCHITECTURE.md` if boundaries shift                    |
+| New/changed state machine or transition         | `docs/HANDOVER.md` (state transitions), `docs/BUSINESS-LOGIC.md`                         |
+| New/changed business rule                       | `docs/BUSINESS-LOGIC.md`, `DOMAIN.md` if user-facing                                     |
+| New/changed UI component, token, or visual rule | `docs/UI-UX.md` (gallery, tokens, anti-slop findings)                                    |
+| New/changed UI evidence capture                 | `artifacts/<scope>/qa/<date>/<task-id>/notes.md` (canonical artifacts folder)            |
+| Architectural change or new decision            | `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`                                              |
+| Approved implementation decision                | `docs/DECISIONS.md` (append-only, with the date)                                         |
+| New dependency                                  | `docs/ARCHITECTURE.md` (reason), `docs/HANDOVER.md`                                      |
+| New env var / config key                        | `docs/ENVIRONMENT.md`                                                                    |
+| New or changed API endpoint                     | `docs/API_CONTRACTS.md`                                                                  |
+| Any change at all                               | `docs/changelog/` (new entry)                                                            |
+| Lane transitions                                | `docs/BOARD.md` status — written by the **orchestrator in the main checkout only** (§B3) |
 
 ### Changelog format (`docs/changelog/CHANGELOG.md`, newest first)
 
 ```md
 ## [YYYY-MM-DD] <short title>
+
 **Type:** Feature | Fix | Chore | Docs
 **Board:** BOARD-### | **Branch:** feat/slug
 **Changed:** files and modules touched
@@ -871,7 +872,7 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Bra
 
 ## B4. Worktree workflow (every change, every session)
 
-**Every change happens inside a git worktree. There is no exception.** The worktree *is* the unit
+**Every change happens inside a git worktree. There is no exception.** The worktree _is_ the unit
 of work and it carries the code **and** every documentation update for that change. `main` stays
 clean and untouched by agents.
 
@@ -881,66 +882,66 @@ worktree.
 
 ### The enforced rules
 
-| Rule | Consequence if broken |
-|---|---|
-| Every change happens in a worktree | The change is unsanctioned work and does not exist for review |
-| The worktree is named after the feature | Unfindable; the board row cannot point at it |
-| Work only inside the worktree | Edits in the main checkout are invisible to the merge |
-| **Never commit to `main`/`master`/`base`** | The human loses control of the base branch |
-| **Never commit to an existing branch from a worktree** | Two worktrees on one branch corrupt each other |
-| **Never merge, push, or open a PR** | The human's approval step is skipped |
-| Local commits on the worktree branch are required | There is nothing for the human to merge |
-| Never delete a worktree holding unmerged work | Work is destroyed |
+| Rule                                                   | Consequence if broken                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------- |
+| Every change happens in a worktree                     | The change is unsanctioned work and does not exist for review |
+| The worktree is named after the feature                | Unfindable; the board row cannot point at it                  |
+| Work only inside the worktree                          | Edits in the main checkout are invisible to the merge         |
+| **Never commit to `main`/`master`/`base`**             | The human loses control of the base branch                    |
+| **Never commit to an existing branch from a worktree** | Two worktrees on one branch corrupt each other                |
+| **Never merge, push, or open a PR**                    | The human's approval step is skipped                          |
+| Local commits on the worktree branch are required      | There is nothing for the human to merge                       |
+| Never delete a worktree holding unmerged work          | Work is destroyed                                             |
 
 ### Rules
 
-1. **Board first.** Pick the task from `docs/BOARD.md`. If it is not on the board, **add the row
-   first** — work not on the board is unsanctioned work.
-2. **One worktree per task.** Never mix two features in one worktree. Never work directly in the
-   main checkout for application changes.
-3. **The worktree carries the feature name.** The name is **derived from the board row**, never
-   typed by hand, so a bug fix can never land on `feat/…`:
-   - the **branch type** comes from the row's `Type` — `Feature` → `feat`, `Fix` → `fix`,
-     `Chore` → `chore`, `Docs` → `docs`, `Research` → `chore`
-   - the **slug** comes from the row's task title, kebab-cased, trimmed to the first 6 words
-     when longer than 48 characters
-   - branch: `feat/<slug>` | `fix/<slug>` | `chore/<slug>` | `docs/<slug>`
-   - worktree directory: `.kilo/worktrees/<slug>/`
-   - examples: `feat/user-login`, `fix/session-timeout`, `docs/handover-template`
-   - The script records the exact worktree path and branch back onto the board row, so the row
-     and the worktree can never drift apart.
-4. **Create it with the script, from the board row:**
+1.  **Board first.** Pick the task from `docs/BOARD.md`. If it is not on the board, **add the row
+    first** — work not on the board is unsanctioned work.
+2.  **One worktree per task.** Never mix two features in one worktree. Never work directly in the
+    main checkout for application changes.
+3.  **The worktree carries the feature name.** The name is **derived from the board row**, never
+    typed by hand, so a bug fix can never land on `feat/…`:
+    - the **branch type** comes from the row's `Type` — `Feature` → `feat`, `Fix` → `fix`,
+      `Chore` → `chore`, `Docs` → `docs`, `Research` → `chore`
+    - the **slug** comes from the row's task title, kebab-cased, trimmed to the first 6 words
+      when longer than 48 characters
+    - branch: `feat/<slug>` | `fix/<slug>` | `chore/<slug>` | `docs/<slug>`
+    - worktree directory: `.kilo/worktrees/<slug>/`
+    - examples: `feat/user-login`, `fix/session-timeout`, `docs/handover-template`
+    - The script records the exact worktree path and branch back onto the board row, so the row
+      and the worktree can never drift apart.
+4.  **Create it with the script, from the board row:**
 
-       python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
+        python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
 
-   The script reads the row, derives the type and slug, creates
-   `.kilo/worktrees/<slug>/` on branch `<type>/<slug>`, writes the row's `Branch/Worktree` and
-   `Status` cells in the main checkout, and refuses when the branch or directory already exists.
-   It never deletes anything.
+    The script reads the row, derives the type and slug, creates
+    `.kilo/worktrees/<slug>/` on branch `<type>/<slug>`, writes the row's `Branch/Worktree` and
+    `Status` cells in the main checkout, and refuses when the branch or directory already exists.
+    It never deletes anything.
 
-5. **A worktree is created in the repo the row names.** `worktree.py create --board BOARD-00X
-   --repo api` creates it under that repo's own `.kilo/worktrees/`. The board stays in the control
-   repo, and the row's `Branch/Worktree` cell records the worktree path relative to the control
-   repo. The repo id comes from `.kilo/repos.json` — the map is the only way into another
-   repository.
-6. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
-   happens there. The worktree must contain the code change **and** the matching scope-doc
-   updates (§B1) so it can be reviewed as one self-contained unit.
-   **Never edit `docs/BOARD.md` from a worktree** — the orchestrator owns the live board (§B3).
-7. **Three lanes, in order.** For meaningful work the board drives lanes:
-   - **Build** — implement the change in the worktree, smallest safe diff, run the verification
-     command, update the docs.
-   - **QA** — verify the behavior with evidence (test run, manual steps, or screenshots for UI).
-     If evidence is missing, bounce back to Build rather than declaring success.
-   - **Review** — review the diff against the acceptance criteria and the production/modularity
-     standards in §A8.
-   Trivial changes (copy, styling, comments, docs-only) may skip QA and go straight to Review.
-8. **Merge gate.** A worktree is only offered for merge when: the verification command passed,
-   QA produced evidence, the review found no blocking issue, and the documentation is updated.
-9. **Pending merge means human approval is required.** When the work is ready, the orchestrator
-   sets the board row to `Pending Merge` and **asks the user to review and merge**. The merge
-   target is the human's choice — `main` or a feature branch. Never merge into any branch on your
-   own initiative, never push, never open a PR (§B11).
+5.  **A worktree is created in the repo the row names.** `worktree.py create --board BOARD-00X
+--repo api` creates it under that repo's own `.kilo/worktrees/`. The board stays in the control
+    repo, and the row's `Branch/Worktree` cell records the worktree path relative to the control
+    repo. The repo id comes from `.kilo/repos.json` — the map is the only way into another
+    repository.
+6.  **Work only inside the worktree.** Every code edit, every doc edit, every verification run
+    happens there. The worktree must contain the code change **and** the matching scope-doc
+    updates (§B1) so it can be reviewed as one self-contained unit.
+    **Never edit `docs/BOARD.md` from a worktree** — the orchestrator owns the live board (§B3).
+7.  **Three lanes, in order.** For meaningful work the board drives lanes:
+    - **Build** — implement the change in the worktree, smallest safe diff, run the verification
+      command, update the docs.
+    - **QA** — verify the behavior with evidence (test run, manual steps, or screenshots for UI).
+      If evidence is missing, bounce back to Build rather than declaring success.
+    - **Review** — review the diff against the acceptance criteria and the production/modularity
+      standards in §A8.
+      Trivial changes (copy, styling, comments, docs-only) may skip QA and go straight to Review.
+8.  **Merge gate.** A worktree is only offered for merge when: the verification command passed,
+    QA produced evidence, the review found no blocking issue, and the documentation is updated.
+9.  **Pending merge means human approval is required.** When the work is ready, the orchestrator
+    sets the board row to `Pending Merge` and **asks the user to review and merge**. The merge
+    target is the human's choice — `main` or a feature branch. Never merge into any branch on your
+    own initiative, never push, never open a PR (§B11).
 10. **After the merge**, the orchestrator marks the row `Merged` in the main checkout, and the
     worktree is cleaned up by the human (or by the agent once the branch is confirmed merged).
 
@@ -949,16 +950,16 @@ worktree.
 `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged`
 (or `Blocked` / `Dropped`)
 
-| Lane | Meaning |
-|---|---|
-| `Backlog` | Identified, not yet started |
-| `Ready` | Scoped, has acceptance criteria, can be picked up |
-| `In Progress` | Worktree exists, Build lane running |
-| `In Review` | Build done, QA/Review lanes running |
-| `Pending Merge` | Green and **waiting for human approval to merge** |
-| `Merged` | The user merged it; worktree can be removed |
-| `Blocked` | Parked for a human: needs a decision, unclear scope, or duplicate. Record what unblocks it |
-| `Dropped` | Abandoned; record why |
+| Lane            | Meaning                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------ |
+| `Backlog`       | Identified, not yet started                                                                |
+| `Ready`         | Scoped, has acceptance criteria, can be picked up                                          |
+| `In Progress`   | Worktree exists, Build lane running                                                        |
+| `In Review`     | Build done, QA/Review lanes running                                                        |
+| `Pending Merge` | Green and **waiting for human approval to merge**                                          |
+| `Merged`        | The user merged it; worktree can be removed                                                |
+| `Blocked`       | Parked for a human: needs a decision, unclear scope, or duplicate. Record what unblocks it |
+| `Dropped`       | Abandoned; record why                                                                      |
 
 ### Lane rules
 
@@ -1090,12 +1091,12 @@ python3 .kilo/skills/board/scripts/board.py note BOARD-010 --value "<the new evi
 
 **The stop conditions.** The loop stops when any of these fires — whichever comes first:
 
-| Stop condition | What happens |
-|---|---|
+| Stop condition                                                  | What happens                                                                                                                   |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | **The round cap is reached** (3 rounds done, row still failing) | The row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round is opened. |
-| **A critical path is red** (money, data loss, auth, security) | The row is `Blocked` immediately. It is never retried silently. |
-| **The same fingerprint is filed twice** | The existing row is escalated to `Blocked` rather than a new one opening. |
-| **The human says stop** | The row is `Blocked` with the human's reason recorded in the ledger's stop reason. |
+| **A critical path is red** (money, data loss, auth, security)   | The row is `Blocked` immediately. It is never retried silently.                                                                |
+| **The same fingerprint is filed twice**                         | The existing row is escalated to `Blocked` rather than a new one opening.                                                      |
+| **The human says stop**                                         | The row is `Blocked` with the human's reason recorded in the ledger's stop reason.                                             |
 
 A finding that repeats three times is a `Blocked` row, not a fourth attempt. The same finding
 failing the same way three times means the approach is wrong, not the implementation. Park it,
@@ -1106,11 +1107,11 @@ write down what was tried, and ask the human.
 Both the QA lane and the Review lane check the same three things, from different angles. A gap in
 any one of them is a finding.
 
-| Check | Question | Who |
-|---|---|---|
-| **Reuse** | Did the change duplicate an existing function, component, or state instead of expanding one? | review |
-| **User-centred** | Does the result serve a named user doing a named task, with an obvious primary action? | QA + critique |
-| **Spec** | Does every acceptance criterion pass, proven by evidence? | QA |
+| Check            | Question                                                                                     | Who           |
+| ---------------- | -------------------------------------------------------------------------------------------- | ------------- |
+| **Reuse**        | Did the change duplicate an existing function, component, or state instead of expanding one? | review        |
+| **User-centred** | Does the result serve a named user doing a named task, with an obvious primary action?       | QA + critique |
+| **Spec**         | Does every acceptance criterion pass, proven by evidence?                                    | QA            |
 
 The reuse check is not a feeling. For a Feature row, the acceptance criteria must contain one of:
 
@@ -1169,7 +1170,7 @@ Exit 0 → allowed. Exit 1 → denied; the reason is on stderr, and the command 
 - **Worktree paths are confined** to `<project>/.kilo/worktrees/`. Check with
   `guard.py check-worktree -- "<command>"`.
 - **Secrets.** Never read, grep, cat, or print `.env`, SSH keys, `.npmrc`, `credentials*`, or
-  `*.pem`. Check key *presence* by name only, never by value. `.env.example` stays readable.
+  `*.pem`. Check key _presence_ by name only, never by value. `.env.example` stays readable.
 - **Key literals.** Never write a live-looking API key, token, or secret into any file. Reference
   an environment variable name instead.
 - **Protected branch.** Never push to or force-push `main`/`master`/`base`. Work lands through the
@@ -1247,6 +1248,7 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   It writes a full-page screenshot, `console.log`, `page-errors.log`, and `network.json` per route
   per viewport (390×844, 834×1112, 1440×900, 1920×1080, plus 320×800 as the overflow floor), and
   a `summary.json` with the counts and the overflow result.
+
 - **One canonical artifacts folder.** Every UI artifact lives under the repository root:
 
       artifacts/
@@ -1271,9 +1273,10 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   **Review reports and the ledger are documents, not artifacts.** They stay where documents live:
   `docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
   `docs/reviews/<task-id>-ledger.md`.
+
 - **The script is the only way to capture UI evidence.** The QA reviewer and the UI critic capture
   screenshots **only** through `browser-review.mjs`. Ad-hoc `chromium`, `npx playwright
-  screenshot`, `curl`-and-guess, or any other browser command run from bash is **not acceptable
+screenshot`, `curl`-and-guess, or any other browser command run from bash is **not acceptable
   evidence** for a UI review. The script never installs a browser and never falls back to another
   driver. If the script cannot do something the review needs, **say what is missing and propose
   the change** — a change to a project tool is a reviewed change, not a silent patch mid-review.
@@ -1308,10 +1311,10 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
 Two dedicated agents do the review work. They run as separate sessions so their findings are
 independent of the builder's claims:
 
-| Agent | Role | Output |
-|---|---|---|
-| `qa-reviewer` | Verifies behavior against the acceptance criteria; drives Playwright | `docs/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
-| `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `docs/reviews/<task-id>-ui.md` |
+| Agent         | Role                                                                      | Output                                                                                    |
+| ------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `qa-reviewer` | Verifies behavior against the acceptance criteria; drives Playwright      | `docs/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
+| `ui-critic`   | Judges the screen against the 15 anti-slop rules and the approved gallery | `docs/reviews/<task-id>-ui.md`                                                            |
 
 Both are read-only against application code. They report; they do not fix.
 
@@ -1319,35 +1322,37 @@ Both are read-only against application code. They report; they do not fix.
 
 A review finding is a **bug-fix unit of work**, so it becomes a board row.
 
-1. The reviewer writes the finding file and **validates it** — a finding that names no expected
-   behavior, no repro, or no evidence is refused:
+1.  The reviewer writes the finding file and **validates it** — a finding that names no expected
+    behavior, no repro, or no evidence is refused:
 
-       python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
-           --kind bug --priority medium --category functional --route /path
+        python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+            --kind bug --priority medium --category functional --route /path
 
-   Exit 66 means the finding is too weak to act on. Fix the body, do not bypass the check.
-   Exit 0 prints the finding's **fingerprint** on stdout, ready to be pasted into the board row.
-2. The **orchestrator** creates one board row per validated finding, with the script:
+    Exit 66 means the finding is too weak to act on. Fix the body, do not bypass the check.
+    Exit 0 prints the finding's **fingerprint** on stdout, ready to be pasted into the board row.
 
-       python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "<one line>" \
-           --type Fix --status Ready --priority P2 --risk "🟡 medium — <blast radius>" \
-           --blocked-by "BOARD-xxx" --fingerprint "<kind|category|route|subject>" \
-           --note "<expected vs actual, repro, evidence path>"
+2.  The **orchestrator** creates one board row per validated finding, with the script:
 
-   - `Type: Fix`
-   - `Status: Ready` (or `Blocked` if the finding needs a product decision)
-   - `Priority` from the finding severity
-   - `Risk` from the blast radius of the defect
-   - `Blocked by: BOARD-xxx` — the row that produced the finding
-   - `Fingerprint` — from `check-finding.py`; the row carries it so a repeat is recognisable
-   - `Notes` — the finding text: expected, actual, repro, evidence path
-   - A fingerprint that is already open is **refused**. The refusal names the existing row and
-     prints the command that updates it: `board.py note <ID> --value "<the new evidence>"`.
-3. The reviewed row's status depends on the verdict:
-   - **FAIL** → the reviewed row returns to `In Progress` with the failing findings restated.
-   - **PASS** → the reviewed row may proceed to `Pending Merge`.
-4. The new `Fix` rows are picked up in the normal order: `/decide` → worktree → build → QA →
-   review → `Pending Merge`.
+        python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "<one line>" \
+            --type Fix --status Ready --priority P2 --risk "🟡 medium — <blast radius>" \
+            --blocked-by "BOARD-xxx" --fingerprint "<kind|category|route|subject>" \
+            --note "<expected vs actual, repro, evidence path>"
+
+    - `Type: Fix`
+    - `Status: Ready` (or `Blocked` if the finding needs a product decision)
+    - `Priority` from the finding severity
+    - `Risk` from the blast radius of the defect
+    - `Blocked by: BOARD-xxx` — the row that produced the finding
+    - `Fingerprint` — from `check-finding.py`; the row carries it so a repeat is recognisable
+    - `Notes` — the finding text: expected, actual, repro, evidence path
+    - A fingerprint that is already open is **refused**. The refusal names the existing row and
+      prints the command that updates it: `board.py note <ID> --value "<the new evidence>"`.
+
+3.  The reviewed row's status depends on the verdict:
+    - **FAIL** → the reviewed row returns to `In Progress` with the failing findings restated.
+    - **PASS** → the reviewed row may proceed to `Pending Merge`.
+4.  The new `Fix` rows are picked up in the normal order: `/decide` → worktree → build → QA →
+    review → `Pending Merge`.
 
 The reviewers never edit `docs/BOARD.md`. The orchestrator writes every row, so the board keeps a
 single writer.
@@ -1405,11 +1410,11 @@ exist — or can an existing one be tweaked to do it?"**
 The search must leave a trace in the builder's report, because a rule nobody can check is a rule
 nobody follows. For every new function, component, endpoint, or state slice, the report says:
 
-| Question | Answer |
-|---|---|
-| What existing code covers this? | `file:line` — or "none, after searching for X, Y, Z" |
-| What did you do about it? | extended it · used it as-is · it did not fit because <reason> |
-| What is new, and why? | the new symbol and the reason there was nothing to extend |
+| Question                        | Answer                                                        |
+| ------------------------------- | ------------------------------------------------------------- |
+| What existing code covers this? | `file:line` — or "none, after searching for X, Y, Z"          |
+| What did you do about it?       | extended it · used it as-is · it did not fit because <reason> |
+| What is new, and why?           | the new symbol and the reason there was nothing to extend     |
 
 For a **Fix** row, the report additionally says which existing function carried the bug and what
 changed inside it.
@@ -1481,7 +1486,7 @@ Default to functional thinking; keep effects at the edges.
 
 **Comments are minimal and rare.** The code should explain itself.
 
-- Do not comment *what* the code does — the code says that. Comment *why* a non-obvious decision
+- Do not comment _what_ the code does — the code says that. Comment _why_ a non-obvious decision
   was made.
 - No banner comments, no section dividers, no commented-out code, no docstrings restating the
   signature, no ownerless TODOs.
@@ -1502,7 +1507,7 @@ Default to functional thinking; keep effects at the edges.
   `.env.example`, docs, prompts, or tests.
 - Builders create or update `.env.example` files. The permission map denies edits to the real
   `.env`, so the user writes it and populates the real secrets.
-- Small, focused changes with a message that says *why*.
+- Small, focused changes with a message that says _why_.
 - Run the project's own lint / typecheck / tests before declaring a change done.
 - Do not over-engineer. Documentation must describe reality, not intentions.
 
@@ -1534,6 +1539,13 @@ the port values.
 - **Never run destructive commands (`rm -rf`, `git clean`, `find -delete`) outside the project
   root or `~`.**
 - **Never read or print the contents of `.env`, `~/.ssh`, or credential files into a transcript.**
+- **Never let a credential reach a transcript through a URL.** A `url.<base>.insteadOf` or
+  `url.<base>.pushInsteadOf` rewrite whose base embeds a credential makes every command that
+  prints a remote URL print the credential — `git remote -v`, and the error message of any git
+  command that fails. Keep credentials in git's credential store (`credential.helper`), never in a
+  URL, a command line, or a config value a command prints. The dev container scrubs both output
+  streams of every shell command (`.devcontainer/kilo-redact.sh`), but that filter is a backstop,
+  not the plan.
 
 ### Commit format
 
@@ -1603,14 +1615,14 @@ The agent stops at `Pending Merge`. It does not merge, does not push, and does n
 
 ### How the user checks the worktree
 
-| Question | Answer |
-|---|---|
-| What worktrees exist? | `git worktree list` |
-| What changed in mine? | `git -C .kilo/worktrees/<slug> status` and `git -C .kilo/worktrees/<slug> diff main` |
-| What is on my branch? | `git -C .kilo/worktrees/<slug> log --oneline main..HEAD` |
-| Is it mergeable? | `git -C .kilo/worktrees/<slug> merge-base --is-ancestor main HEAD && echo "no conflicts expected"` |
-| Clean it up after merge | `git worktree remove .kilo/worktrees/<slug>` and `git branch -d <branch>` |
-| Which row owns it? | The board row's `Branch/Worktree` column |
+| Question                | Answer                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------- |
+| What worktrees exist?   | `git worktree list`                                                                                |
+| What changed in mine?   | `git -C .kilo/worktrees/<slug> status` and `git -C .kilo/worktrees/<slug> diff main`               |
+| What is on my branch?   | `git -C .kilo/worktrees/<slug> log --oneline main..HEAD`                                           |
+| Is it mergeable?        | `git -C .kilo/worktrees/<slug> merge-base --is-ancestor main HEAD && echo "no conflicts expected"` |
+| Clean it up after merge | `git worktree remove .kilo/worktrees/<slug>` and `git branch -d <branch>`                          |
+| Which row owns it?      | The board row's `Branch/Worktree` column                                                           |
 
 Worktrees live under `.kilo/worktrees/<feature-slug>/` and are git-ignored. The full procedure is
 the `git-worktree` skill at `.kilo/skills/git-worktree/SKILL.md`.

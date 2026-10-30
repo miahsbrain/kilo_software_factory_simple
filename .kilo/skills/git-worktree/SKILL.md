@@ -17,10 +17,10 @@ the script can do it — the script is where the naming rules and the refusals l
 
 ## 1. The scripts
 
-| Script | Does |
-|---|---|
-| `.kilo/skills/git-worktree/scripts/worktree.py` | create · list · verify · cleanup |
-| `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · policy |
+| Script                                          | Does                                                                                   |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `.kilo/skills/git-worktree/scripts/worktree.py` | create · list · verify · cleanup                                                       |
+| `.kilo/skills/git-worktree/scripts/guard.py`    | check-delete · check-worktree · check-git · check-policy · sync · check-repos · policy |
 
 Python 3.9+, standard library only.
 
@@ -141,13 +141,26 @@ python3 .kilo/skills/git-worktree/scripts/guard.py check-git -- "git push origin
 options), then evaluates the **context checks first**, because they are more specific than any
 keyword list:
 
-| Context check | Fires when |
-|---|---|
-| `protected_branch` | the current branch is `main`, `master` or `base` |
+| Context check               | Fires when                                                          |
+| --------------------------- | ------------------------------------------------------------------- |
+| `protected_branch`          | the current branch is `main`, `master` or `base`                    |
 | `branch_switch_in_worktree` | the shell is in a linked worktree and the command switches branches |
-| `always` | always — used for the raw `git worktree remove` |
+| `always`                    | always — used for the raw `git worktree remove`                     |
 
 Then the `bash` rules apply with **last match wins**, exactly like Kilo.
+
+The policy's `hidden_paths` block is expanded into `deny` rules for the file-reading tools —
+`read`, `grep`, `glob` and `list` — so no agent can read a git config, credential file or `.env`
+that may carry a secret. It covers `.env`, `.env.*` (except `.env.example`), `.git/config`,
+`*.git/config`, submodule configs, `.git-credentials`, `~/.gitconfig`, the XDG git config and
+credential stores, `.npmrc` and private keys. The list lives in `.kilo/policies/git-policy.json`;
+add a path there, not in `kilo.jsonc`.
+
+A shell command has no path awareness, so the same rule is enforced for bash by the
+`$BASH_ENV` startup file (`.devcontainer/kilo-redact.sh`): it refuses any `bash -c` command whose
+text names one of those files. `devcontainer.json` sets `KILO_CONFIG` to the root `kilo.jsonc`, so
+a nested app repository inherits the permission map without a copy. The map needs a Kilo restart;
+the shell guard is live as soon as the file is installed.
 
 Keep the two layers in sync:
 
@@ -291,16 +304,16 @@ acting. **Never delete a worktree holding unmerged work.**
 
 ## 10. Failure modes
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `fatal: invalid reference: HEAD` | The repository has no commits | The base branch needs one commit before any worktree exists |
-| `branch ... is already checked out` | The branch already has a worktree | Use a new branch, or clean up the old worktree first |
-| `worktree.py create` refuses | The slug, branch, or directory already exists | Pick another slug, or clean up first |
-| `guard.py check-delete` denies | The target is outside the worktree | Delete inside the worktree, use a temp dir, or ask the user |
-| Merge conflict at merge time | The base branch moved since the worktree started | Merge the base into the worktree, resolve there, re-verify, hand off again |
-| `git stash` conflicts across worktrees | Stashes are shared | Do not stash. Resolve conflicts inside the worktree |
-| `worktree.py create --repo x` refuses | `x` is unknown in `.kilo/repos.json`, or its path is not a git repository | Register the repo in the map, or make the folder a repository first |
-| `guard.py sync --repo x` refuses to apply | The target is not a git repository | Make the folder a repository, then sync again |
+| Symptom                                   | Cause                                                                     | Fix                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `fatal: invalid reference: HEAD`          | The repository has no commits                                             | The base branch needs one commit before any worktree exists                |
+| `branch ... is already checked out`       | The branch already has a worktree                                         | Use a new branch, or clean up the old worktree first                       |
+| `worktree.py create` refuses              | The slug, branch, or directory already exists                             | Pick another slug, or clean up first                                       |
+| `guard.py check-delete` denies            | The target is outside the worktree                                        | Delete inside the worktree, use a temp dir, or ask the user                |
+| Merge conflict at merge time              | The base branch moved since the worktree started                          | Merge the base into the worktree, resolve there, re-verify, hand off again |
+| `git stash` conflicts across worktrees    | Stashes are shared                                                        | Do not stash. Resolve conflicts inside the worktree                        |
+| `worktree.py create --repo x` refuses     | `x` is unknown in `.kilo/repos.json`, or its path is not a git repository | Register the repo in the map, or make the folder a repository first        |
+| `guard.py sync --repo x` refuses to apply | The target is not a git repository                                        | Make the folder a repository, then sync again                              |
 
 ---
 
