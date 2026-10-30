@@ -1,16 +1,28 @@
 # PROJECT STATE
 
-- **Phase:** Setup — factory scaffold complete, repository bootstrapped, no application yet.
-- **Progress:** Documentation, orchestration rules, the agent team (`.kilo/agent/`), the command
-  surface (`.kilo/command/`), and the CLI-only worktree skill (`.kilo/skills/git-worktree/`) are
-  in place. The QA capture path drives Playwright only, and a missing browser is reported rather
-  than installed (`AGENTS.md` §B6.2). The guard-rail policy (`.kilo/policies/git-policy.json`) is
-  in place and feeds two layers: the generated `permission` map in `kilo.jsonc` and
-  `guard.py check-git`, which adds the context checks a keyword list cannot make. The repo is now
-  a starter: root `README.md` in place, test capture removed, board empty. The `docs-writer`
-  agent (`.kilo/agent/docs-writer.md`) owns the application memory map under `docs/handover/`,
-  and `/handover` routes to it.
-- **Active task:** BOARD-002 in progress on branch `feat/add-a-documentation-agent-that-writes`.
-- **Next step:** the user merges `feat/add-a-documentation-agent-that-writes` into `main`, then the
-  discovery interview (`/decide`) runs for the first project in this checkout and the first board
-  row is added with `board.py add`.
+- **Phase:** Documentation — the fleet is mapped; no application change has been made.
+- **Progress:** The control repo is a git repository with a seed commit on `main` (ADR-043). The 75
+  microservice repositories under `apps/` are registered in `.kilo/repos.json`, and
+  `guard.py check-repos` exits 0. The application memory map is complete: **75 handover files, one
+  per microservice**, each with the 14 sections of the docs-writer contract and `file:line`
+  evidence, plus a global index at `docs/handover/README.md` carrying the system map, the 86-edge
+  HTTP call graph, the shared-collection map and the external-API matrix.
+  `docs/ARCHITECTURE.md`, `docs/STACK.md`, `docs/API_CONTRACTS.md`, `docs/RISKS.md` and
+  `docs/PROJECT_STRUCTURE.md` now describe the real system.
+- **Active task:** BOARD-001 — documented on branch `docs/document-all-75-microservices-and-their`
+  in `.kilo/worktrees/document-all-75-microservices-and-their`, waiting for the user to merge.
+- **Next step:** the user merges `docs/document-all-75-microservices-and-their` into `main`. Then
+  the first defect row is opened — the risk register in `docs/RISKS.md` already carries the ranked
+  list, with the cross-tenant credential bleed in `payment_gateway_ms` first.
+
+## The shape of the system, for the next agent
+
+- 75 microservices, one Kubernetes cluster, one shared MongoDB, one tenant model (`company`).
+- 178 collections, 143 written by more than one service. The service boundary is real at the HTTP
+  layer and absent at the data layer.
+- 86 HTTP call edges between distinct services. The public surface is declared in exactly one file:
+  `apps/authentication_ms/k8s/inhouz-ingress-service.yml`.
+- **No test suite exists.** Every `package.json` carries the placeholder `test` script. Any row
+  that changes service behaviour has to state its own verification step.
+- **No shared package.** The tenant model, the auth middleware, the crypto helper and the
+  sanitizer are copied into every repository, and the copies have drifted.
