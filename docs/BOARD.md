@@ -13,8 +13,8 @@ Type: `Feature` `Fix` `Chore` `Docs` `Research`
 Lanes: `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged`
 (plus `Blocked` for parked work and `Dropped` for abandoned work)
 
-| ID | Task | Type | Status | Priority | Risk | Blocked by | Branch/Worktree | Notes |
-|---|---|---|---|---|---|---|---|---|
+| ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Branch/Worktree | Notes |
+|---|---|---|---|---|---|---|---|---|---|
 
 ## Rules
 
