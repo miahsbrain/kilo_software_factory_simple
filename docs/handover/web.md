@@ -11,7 +11,12 @@ The web scope exists as a placeholder. The folder `apps/web/` holds exactly one 
 `apps/web/AGENTS.md:1`, the scope rules for the web builder. There is no source, no package
 manifest, no build, no server and no test file. The unit is a rulebook for code that has not been
 written yet, and nothing may be written into it before the decision gate and the discovery
-interview have run (`AGENTS.md:145`).
+interview have run (`AGENTS.md:150`).
+
+**Repository:** `web`, registered at `apps/web` in `.kilo/repos.json:1`. This unit was read from the
+control repo checkout, because `apps/web` is not yet a git repository of its own. The scope rules
+are canonical in `.kilo/scopes/web.md:1` and copied into the app repo as its `AGENTS.md` by
+`guard.py sync --repo web` (`.kilo/skills/git-worktree/scripts/guard.py:774`).
 
 ## 2. Stack and commands
 
@@ -24,12 +29,12 @@ interview have run (`AGENTS.md:145`).
 | Port | `15173` — `docs/STACK.md:31` |
 
 The stack is decided by the user at the decision gate (`AGENTS.md:214`); nothing is guessed. The
-scope rules also say the stack comes from `docs/STACK.md` (`apps/web/AGENTS.md:14`).
+scope rules also say the stack comes from `docs/STACK.md` (`apps/web/AGENTS.md:18`).
 
 ## 3. Entry points
 
 None yet. There is no executable, no dev server, no route and no script in this scope. The files
-the scope will own once it is built are named by its own rules (`apps/web/AGENTS.md:19`):
+the scope will own once it is built are named by its own rules (`apps/web/AGENTS.md:23`):
 
 - pages
 - components
@@ -42,7 +47,7 @@ the scope will own once it is built are named by its own rules (`apps/web/AGENTS
 - tests
 
 The web scope must build a component factory and a gallery route before any screen
-(`apps/web/AGENTS.md:48`), and that gallery is approved by the user (`AGENTS.md:561`).
+(`apps/web/AGENTS.md:52`), and that gallery is approved by the user (`AGENTS.md:568`).
 
 ## 4. Module inventory
 
@@ -56,12 +61,12 @@ There is no other file in this scope, so there is no other row.
 
 None. There is no code in this scope, so it touches no database, network, filesystem, env, clock,
 randomness source or logger. The rules it will impose on the code that arrives are about
-structure and quality (`apps/web/AGENTS.md:19`), not effects.
+structure and quality (`apps/web/AGENTS.md:23`), not effects.
 
 ## 6. State and state transitions
 
 None yet. The scope rules name `stores/context` as a place the future code will hold state
-(`apps/web/AGENTS.md:19`), but no state, no store and no transition exists today.
+(`apps/web/AGENTS.md:23`), but no state, no store and no transition exists today.
 
 ```mermaid
 stateDiagram-v2
@@ -84,18 +89,18 @@ contract between them is not written yet.
 
 None. No env var or config key is used by this scope. `docs/ENVIRONMENT.md:1` holds the empty
 table for the whole repository. Names only would be recorded here; values are never written
-(`AGENTS.md:1469`).
+(`AGENTS.md:1501`).
 
 ## 10. Dependencies
 
 None yet. There is no `package.json` in this scope, so the unit has no direct dependency. The
 scope rules forbid adding a dependency that the task does not justify
-(`apps/web/AGENTS.md:19`).
+(`apps/web/AGENTS.md:27`).
 
 ## 11. Testing
 
 None. There is no test runner, no test file and no CI in this scope. The scope rules require the
-verification command from `docs/STACK.md` (`apps/web/AGENTS.md:123`), which is `TBD` today. Once
+verification command from `docs/STACK.md` (`apps/web/AGENTS.md:127`), which is `TBD` today. Once
 an interface exists, the QA lane captures Playwright evidence (`AGENTS.md:1208`).
 
 ## 12. Known issues and risks
@@ -106,7 +111,7 @@ an interface exists, the QA lane captures Playwright evidence (`AGENTS.md:1208`)
 - **The stack is `TBD`** (`docs/STACK.md:25`), so no command in this scope can be run, and the
   UI gate cannot be cleared.
 - **The visual language is not decided.** Tokens, component factory and gallery route do not
-  exist (`AGENTS.md:557`).
+  exist (`AGENTS.md:564`).
 
 ## 13. Module map
 
@@ -116,12 +121,12 @@ graph TD
 ```
 
 One node, because the scope holds one file. When code arrives it will grow: a component factory
-and a gallery first, then screens (`apps/web/AGENTS.md:48`).
+and a gallery first, then screens (`apps/web/AGENTS.md:52`).
 
 ## 14. Open questions
 
 - What application will this scope build? `DOMAIN.md:1` is `TBD` and the discovery interview
-  (`AGENTS.md:145`) has not run.
+  (`AGENTS.md:150`) has not run.
 - Which framework, package manager and verification command? `docs/STACK.md:25` is `TBD`.
 - Will the web scope be the first unit built, or the api or mobile scope? The order decides
   which builder agent is needed first.

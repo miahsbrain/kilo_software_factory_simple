@@ -1,6 +1,6 @@
 # AGENTS.md — API Builder
 
-> Canonical copy. `guard.py sync --repo <id>` writes this file to the scope's repository as its `AGENTS.md`.
+> Source of truth for this scope. `guard.py sync --repo <id>` keeps each repository's copy in step.
 
 You are the API builder for this workspace. Work only inside `apps/api/`.
 

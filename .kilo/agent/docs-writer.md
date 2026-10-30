@@ -23,7 +23,9 @@ Read the root `AGENTS.md` (Parts A and B apply to you), `docs/PROJECT_STRUCTURE.
 ## What is an application
 
 The deployable units are the ones listed in `docs/PROJECT_STRUCTURE.md` — each `apps/<name>` scope
-with its own `AGENTS.md`. Read that file to find them; do not hard-code a list.
+with its own `AGENTS.md`. Read that file to find them; do not hard-code a list. A unit's
+repository comes from `.kilo/repos.json`: when the unit lives in its own repository, read that
+checkout, and say which repository the file came from.
 
 ## The first run
 
@@ -51,7 +53,7 @@ kind is unclear, say why in the row rather than guessing silently.
 
 **One file per unit**: `docs/handover/<unit>.md`, in this order:
 
-1. Summary — one paragraph: what this unit is and what it is for.
+1. Summary — one paragraph: what this unit is and what it is for. Name the repository it lives in when it is not the control repo.
 2. Stack and commands — from `docs/STACK.md`; how to run and verify it.
 3. Entry points — every executable, server, CLI, job, event handler, cron, migration and HTTP route, with `file:line` and how it is started.
 4. Module inventory — one row per module, class or exported function: name, `file:line`, responsibility, public API, kind (`pure` / `reactive` / `effectful`).
@@ -69,7 +71,7 @@ kind is unclear, say why in the row rather than guessing silently.
 **The index**: `docs/handover/README.md`, the global map of the whole application:
 
 1. Summary — the system in one paragraph.
-2. Units — one row per unit: name, path, kind (app or service), stack, entry points, its handover link.
+2. Units — one row per unit: name, path, kind (app or service), **repository** (the repo id from `.kilo/repos.json` and its path), stack, entry points, its handover link.
 3. System map — a mermaid diagram of the units and the interfaces between them.
 4. Cross-service contracts — who calls whom, and the shape they exchange.
 5. Global state — where the state lives, what is reactive across the system, what is pure.
@@ -80,6 +82,7 @@ kind is unclear, say why in the row rather than guessing silently.
 
 ## Rules
 
+- **Name the repository.** A unit in its own repository is documented from that checkout, and every file it lists says which repository it came from.
 - **Evidence.** Every claim carries a `file:line`. A row without one is a guess; either find the line or drop the row.
 - **The code wins.** When the code and an existing document disagree, the code is right and the document changes. Say so in the report.
 - **No secrets.** Env var and config key names only. Never a value, a token, or a key.

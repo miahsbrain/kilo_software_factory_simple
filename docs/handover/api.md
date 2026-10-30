@@ -11,7 +11,12 @@ The API scope exists as a placeholder. The folder `apps/api/` holds exactly one 
 `apps/api/AGENTS.md:1`, the scope rules for the API builder. There is no source, no package
 manifest, no server, no schema and no test file. The unit is a rulebook for code that has not been
 written yet, and nothing may be written into it before the decision gate and the discovery
-interview have run (`AGENTS.md:145`).
+interview have run (`AGENTS.md:150`).
+
+**Repository:** `api`, registered at `apps/api` in `.kilo/repos.json:1`. This unit was read from the
+control repo checkout, because `apps/api` is not yet a git repository of its own. The scope rules
+are canonical in `.kilo/scopes/api.md:1` and copied into the app repo as its `AGENTS.md` by
+`guard.py sync --repo api` (`.kilo/skills/git-worktree/scripts/guard.py:774`).
 
 ## 2. Stack and commands
 
@@ -26,12 +31,12 @@ interview have run (`AGENTS.md:145`).
 | Auth approach | `TBD` — `docs/STACK.md:83` |
 
 The stack is decided by the user at the decision gate (`AGENTS.md:214`); nothing is guessed. The
-scope rules also say the stack comes from `docs/STACK.md` (`apps/api/AGENTS.md:14`).
+scope rules also say the stack comes from `docs/STACK.md` (`apps/api/AGENTS.md:18`).
 
 ## 3. Entry points
 
 None yet. There is no server, no route, no CLI and no migration in this scope. The files the
-scope will own once it is built are named by its own rules (`apps/api/AGENTS.md:19`):
+scope will own once it is built are named by its own rules (`apps/api/AGENTS.md:23`):
 
 - routes
 - controllers
@@ -55,12 +60,12 @@ There is no other file in this scope, so there is no other row.
 
 None. There is no code in this scope, so it touches no database, network, filesystem, env, clock,
 randomness source or logger. The rules it will impose on the code that arrives are about
-structure, logging and runtime behaviour (`apps/api/AGENTS.md:60`), not effects.
+structure, logging and runtime behaviour (`apps/api/AGENTS.md:62`), not effects.
 
 ## 6. State and state transitions
 
 None yet. The scope rules name `repositories` and `schemas` as future places state is held
-(`apps/api/AGENTS.md:19`), but no state, no store and no transition exists today.
+(`apps/api/AGENTS.md:23`), but no state, no store and no transition exists today.
 
 ```mermaid
 stateDiagram-v2
@@ -78,24 +83,24 @@ in `docs/API_CONTRACTS.md:1`, still a placeholder.
 
 None yet. No HTTP route, event, queue topic or CLI command is exposed by this scope. The rules
 that will govern them — route, controller, service, repository, schema, middleware — are listed
-at `apps/api/AGENTS.md:19`.
+at `apps/api/AGENTS.md:23`.
 
 ## 9. Configuration
 
 None. No env var or config key is used by this scope. `docs/ENVIRONMENT.md:1` holds the empty
 table for the whole repository. Names only would be recorded here; values are never written
-(`AGENTS.md:1469`).
+(`AGENTS.md:1501`).
 
 ## 10. Dependencies
 
 None yet. There is no `package.json` or `requirements.txt` in this scope, so the unit has no
-direct dependency. The scope rules forbid adding a dependency that the task does not justify
-(`apps/api/AGENTS.md:19`).
+direct dependency. The scope rules ask for production-ready behaviour with no placeholder
+architecture (`apps/api/AGENTS.md:55`).
 
 ## 11. Testing
 
 None. There is no test runner, no test file and no CI in this scope. The scope rules require the
-verification command from `docs/STACK.md` (`apps/api/AGENTS.md:76`), which is `TBD` today.
+verification command from `docs/STACK.md` (`apps/api/AGENTS.md:80`), which is `TBD` today.
 
 ## 12. Known issues and risks
 
@@ -113,12 +118,12 @@ graph TD
 ```
 
 One node, because the scope holds one file. When code arrives it will grow along the
-route → controller → service → repository → schema chain (`apps/api/AGENTS.md:19`).
+route → controller → service → repository → schema chain (`apps/api/AGENTS.md:23`).
 
 ## 14. Open questions
 
 - What application will this scope serve? `DOMAIN.md:1` is `TBD` and the discovery interview
-  (`AGENTS.md:145`) has not run.
+  (`AGENTS.md:150`) has not run.
 - Which framework, database and auth approach? `docs/STACK.md:71` is `TBD`.
 - Will this scope be the first unit built? The API scope is usually built before the clients
-  (`AGENTS.md:573`).
+  (`AGENTS.md:580`).

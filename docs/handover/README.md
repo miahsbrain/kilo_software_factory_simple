@@ -14,17 +14,29 @@ rules file (`apps/web/AGENTS.md:1`, `apps/mobile/AGENTS.md:1`, `apps/api/AGENTS.
 application has been built, so no unit below has code, an entry point, or a runtime. The factory
 tooling is the only thing here that runs.
 
+This repository is the **control repo**: it holds the rules, the board, the documentation and the
+policy. Each application scope is registered as a repo of its own in `.kilo/repos.json:1`, so an
+application can become a separate git repository at `apps/<name>/` and still receive the same
+guard rails through `guard.py sync` (`.kilo/skills/git-worktree/scripts/guard.py:774`). Today all
+three app repos are plain folders inside the control repo.
+
 ## 2. Units
 
-| Unit | Path | Kind | Stack | Entry points | Handover |
-|---|---|---|---|---|---|
-| `web` | `apps/web/` | app | `TBD` — see `docs/STACK.md:25` | none yet | [web.md](web.md) |
-| `mobile` | `apps/mobile/` | app | `TBD` — see `docs/STACK.md:63` | none yet | [mobile.md](mobile.md) |
-| `api` | `apps/api/` | service | `TBD` — see `docs/STACK.md:71` | none yet | [api.md](api.md) |
+| Unit | Path | Repository | Kind | Stack | Entry points | Handover |
+|---|---|---|---|---|---|---|
+| `web` | `apps/web/` | `web` — `apps/web` | app | `TBD` — see `docs/STACK.md:25` | none yet | [web.md](web.md) |
+| `mobile` | `apps/mobile/` | `mobile` — `apps/mobile` | app | `TBD` — see `docs/STACK.md:63` | none yet | [mobile.md](mobile.md) |
+| `api` | `apps/api/` | `api` — `apps/api` | service | `TBD` — see `docs/STACK.md:71` | none yet | [api.md](api.md) |
 
 The units are the `apps/<name>` scopes that own their own `AGENTS.md`, as listed in
 `docs/PROJECT_STRUCTURE.md:35`. No other unit exists: the factory tooling (agents, commands,
 skills) is not a deployable application.
+
+Each unit's repository comes from `.kilo/repos.json:1`: `control` is this repository, and `web`,
+`mobile` and `api` are the app repos registered at `apps/web`, `apps/mobile` and `apps/api`. Today
+those three folders are plain folders inside the control repo — `guard.py check-repos` reports them
+as registered but not yet git repositories — so every unit below was read from the control repo
+checkout.
 
 ## 3. System map
 
@@ -68,10 +80,10 @@ queue topic or shared schema exists. The contract that will bind them is recorde
 | What | Where | Kind | file:line |
 |---|---|---|---|
 | Work rows and their lanes | `docs/BOARD.md:16` | stateful — written by `board.py` only | `docs/BOARD.md:1` |
-| Branch and worktree layout | `.kilo/worktrees/<slug>/` per worktree, on branch `<type>/<slug>` | stateful — git and the filesystem | `AGENTS.md:897`, `.gitignore:11` |
-| Git remote `origin` | the repository git config (`.git/config` in the main checkout; a worktree's `.git` is a file pointing at the common git dir) | stateful — network on fetch/push | `AGENTS.md:1497` |
+| Branch and worktree layout | `.kilo/worktrees/<slug>/` per worktree, on branch `<type>/<slug>` | stateful — git and the filesystem | `AGENTS.md:908`, `.gitignore:11` |
+| Git remote `origin` | the repository git config (`.git/config` in the main checkout; a worktree's `.git` is a file pointing at the common git dir) | stateful — network on fetch/push | `AGENTS.md:1528` |
 | The rules themselves | `AGENTS.md:1`, the six agent files, the eight command files | pure — Markdown, no runtime | `AGENTS.md:1` |
-| Unit scope rules | `apps/web/AGENTS.md:1`, `apps/mobile/AGENTS.md:1`, `apps/api/AGENTS.md:1` | pure — Markdown, no runtime | `apps/web/AGENTS.md:1` |
+| Unit scope rules | `.kilo/scopes/web.md:1`, `.kilo/scopes/mobile.md:1`, `.kilo/scopes/api.md:1` (canonical), copied to `apps/web/AGENTS.md:1`, `apps/mobile/AGENTS.md:1`, `apps/api/AGENTS.md:1` | pure — Markdown, no runtime | `.kilo/scopes/web.md:1` |
 
 Nothing is reactive across the system: there is no signal, store, observable, context or cache
 anywhere in the repository. The factory is a set of files plus scripts that read and write them.
@@ -127,6 +139,7 @@ runtime loads.
 | The three skills and their scripts | `.kilo/skills/board/SKILL.md:1`, `.kilo/skills/git-worktree/SKILL.md:1`, `.kilo/skills/qa-review/SKILL.md:1` | the rules that must be a script are a script |
 | The board as the only state | `docs/BOARD.md:1` | one place shows what is in flight, including unmerged work |
 | The guard-rail policy | `.kilo/policies/git-policy.json:1` | one policy file feeds both the `kilo.jsonc` permission map and `guard.py` |
+| The repo map and the scope rules | `.kilo/repos.json:1`, `.kilo/scopes/web.md:1` | the map is the only way into a repository; the scope rules are copied into each repo as its `AGENTS.md` |
 | Markdown as the only file format | `docs/README.md:1` | rules, docs and the board are text |
 
 ## 9. Document map

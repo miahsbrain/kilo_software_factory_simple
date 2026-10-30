@@ -78,6 +78,11 @@ document.
           ├── ENVIRONMENT.md
           └── changelog/
 
+- **Multi-repo:** an application may be its own git repository, nested at `apps/<name>/`. The repo
+  that holds `AGENTS.md`, `docs/` and the board is the **control repo**; each app repo is a
+  **work surface**. `.kilo/repos.json` maps a repo id to its path, and it is the only way into
+  another repository. The board, the domain rules and the API contracts stay in the control repo.
+
 - **Existing project:** the actual layout wins. Keep it. Document the discovered structure in
   `docs/PROJECT_STRUCTURE.md` and map actual paths to purposes
   (`frontend/` → web, `backend/` → api, `packages/` → shared, etc.).
@@ -311,6 +316,8 @@ the intent. Never have an agent hand-run the underlying command when a script co
 | A finding is actionable before it becomes a board row | `.kilo/skills/qa-review/scripts/check-finding.py` |
 | Git commands that change history or the remote are classified before they run | `.kilo/skills/git-worktree/scripts/guard.py check-git` |
 | The permission map and the policy file cannot drift apart | `.kilo/skills/git-worktree/scripts/guard.py check-policy` |
+| An app repo's guard rails match the control repo's | `.kilo/skills/git-worktree/scripts/guard.py sync` |
+| The repo map matches the layout on disk | `.kilo/skills/git-worktree/scripts/guard.py check-repos` |
 
 The skills in `.kilo/skills/` are the executable procedures behind these rules. When a rule
 changes, the script and the skill change with it.
@@ -737,6 +744,7 @@ a follow-up task.
 | New/changed function, class, module | `docs/HANDOVER.md` (inventory, pure/effectful) |
 | New/changed entry point, route, command | `docs/HANDOVER.md` (entry points, API) |
 | New or changed app behaviour | `docs/handover/<unit>.md` (written by the `docs-writer` agent) |
+| New or changed app behaviour in another repo | `docs/handover/<unit>.md` (the unit's repository is read through `.kilo/repos.json`) |
 | New/changed data model, schema, migration | `docs/HANDOVER.md` (data), `docs/ARCHITECTURE.md` if boundaries shift |
 | New/changed state machine or transition | `docs/HANDOVER.md` (state transitions), `docs/BUSINESS-LOGIC.md` |
 | New/changed business rule | `docs/BUSINESS-LOGIC.md`, `DOMAIN.md` if user-facing |
@@ -821,7 +829,10 @@ going on, including work that has not been merged yet.
 - **If a worktree needs to record its own lane transition**, it does so in the changelog entry
   and in its report — not in the board file.
 
-Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Branch/Worktree | Notes`
+Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Branch/Worktree | Notes`
+
+- **Repos** — the repositories the row touches, by id from `.kilo/repos.json`: `control` for the
+  control repo, or the app repo ids. A row that touches two repos names both, comma-separated.
 
 - Status lanes: `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged` /
   `Blocked` / `Dropped` (see §B4 for what each lane means)
@@ -907,11 +918,16 @@ worktree.
    `Status` cells in the main checkout, and refuses when the branch or directory already exists.
    It never deletes anything.
 
-5. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
+5. **A worktree is created in the repo the row names.** `worktree.py create --board BOARD-00X
+   --repo api` creates it under that repo's own `.kilo/worktrees/`. The board stays in the control
+   repo, and the row's `Branch/Worktree` cell records the worktree path relative to the control
+   repo. The repo id comes from `.kilo/repos.json` — the map is the only way into another
+   repository.
+6. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
    happens there. The worktree must contain the code change **and** the matching scope-doc
    updates (§B1) so it can be reviewed as one self-contained unit.
    **Never edit `docs/BOARD.md` from a worktree** — the orchestrator owns the live board (§B3).
-6. **Three lanes, in order.** For meaningful work the board drives lanes:
+7. **Three lanes, in order.** For meaningful work the board drives lanes:
    - **Build** — implement the change in the worktree, smallest safe diff, run the verification
      command, update the docs.
    - **QA** — verify the behavior with evidence (test run, manual steps, or screenshots for UI).
@@ -919,14 +935,14 @@ worktree.
    - **Review** — review the diff against the acceptance criteria and the production/modularity
      standards in §A8.
    Trivial changes (copy, styling, comments, docs-only) may skip QA and go straight to Review.
-7. **Merge gate.** A worktree is only offered for merge when: the verification command passed,
+8. **Merge gate.** A worktree is only offered for merge when: the verification command passed,
    QA produced evidence, the review found no blocking issue, and the documentation is updated.
-8. **Pending merge means human approval is required.** When the work is ready, the orchestrator
+9. **Pending merge means human approval is required.** When the work is ready, the orchestrator
    sets the board row to `Pending Merge` and **asks the user to review and merge**. The merge
    target is the human's choice — `main` or a feature branch. Never merge into any branch on your
    own initiative, never push, never open a PR (§B11).
-9. **After the merge**, the orchestrator marks the row `Merged` in the main checkout, and the
-   worktree is cleaned up by the human (or by the agent once the branch is confirmed merged).
+10. **After the merge**, the orchestrator marks the row `Merged` in the main checkout, and the
+    worktree is cleaned up by the human (or by the agent once the branch is confirmed merged).
 
 ### Board lanes
 
@@ -1160,6 +1176,22 @@ Exit 0 → allowed. Exit 1 → denied; the reason is on stderr, and the command 
   user's merge.
 - **No live-looking secrets in the repo.** Secret values live only in the user's local
   environment.
+
+### The control repo and the work surfaces
+
+The **control repo** holds the board, the domain rules, the API contracts, the documentation and
+the guard-rail policy. An **app repo** is a git repository nested at `apps/<name>/` that holds one
+application's code. Both carry the same `.kilo/` slice, so the guard rails are the same wherever
+the work happens.
+
+- `.kilo/repos.json` maps a repo id to its path. `guard.py check-repos` fails when the map and the
+  layout disagree.
+- `.kilo/scopes/<id>.md` is the canonical copy of a scope's rules. `guard.py sync --repo <id>`
+  writes it into that repository as its `AGENTS.md`, next to the `.kilo/` slice. It is a dry run
+  until `--apply`.
+- The board lives in the control repo only. A row names the repos it touches in its `Repos` cell.
+- The builder works in the app repo's scope; the orchestrator works in the control repo. The
+  documentation, the board and the memory map stay in the control repo.
 
 ### Merge gate
 

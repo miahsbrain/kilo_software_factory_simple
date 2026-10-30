@@ -58,3 +58,4 @@ moved, or discovered to be different from what is recorded here.
 - Existing layouts are kept as discovered; this file records reality, it does not impose it.
 - New projects use `apps/web`, `apps/mobile`, `apps/api` as the starting shape.
 - Every app or microservice gets its own folder and its own `AGENTS.md`.
+- The repo map in `.kilo/repos.json` is the only way into another repository; `guard.py check-repos` proves it matches the layout.

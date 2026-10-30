@@ -709,38 +709,60 @@ def load_worktree_module():
     return module
 
 
-def control_root(ctx):
-    """The main checkout of the repo the script runs in: the control repo."""
-    if ctx and ctx.get("repo_root"):
-        return ctx["repo_root"]
+def shell_tree(ctx):
+    """The tree the shell is in: the source of the .kilo slice and the scope rules."""
+    if ctx:
+        top = ctx.get("top")
+        if top:
+            return top
     return script_project_root()
 
 
-def repo_targets(control, repo_id):
-    """(target root, repos map, error). The map in .kilo/repos.json is the only way in."""
+def control_root(ctx):
+    """The control repo's main checkout: the place the target repositories live.
+
+    A nested app repository at apps/<name>/ is not tracked by the control repo,
+    so it exists only in the main checkout, never in a worktree of it.
+    """
+    if ctx:
+        root = ctx.get("repo_root")
+        if root:
+            return root
+    return script_project_root()
+
+
+def repo_targets(source_tree, control, repo_id):
+    """(target root, repos map, error). The map in .kilo/repos.json is the only way in.
+
+    The map is read from the tree the shell is in. The target is resolved in
+    the control repo's main checkout, except for 'control' itself, which is
+    the tree the shell is in.
+    """
     wt = load_worktree_module()
     if wt is None:
         return None, None, "worktree.py not found next to guard.py"
-    repos, err = wt.load_repos(control)
+    repos, err = wt.load_repos(source_tree)
     if repos is None:
         return None, None, err
+    if repo_id == "control":
+        return source_tree, repos, None
     target, err = wt.resolve_repo(control, repos, repo_id)
     if err:
         return None, repos, err
     return target, repos, None
 
 
-def scope_files(control, target, repo_id):
+def scope_files(source_tree, target, repo_id):
     """[(source, destination)] for the scope rules of this target."""
     pairs = []
-    scopes_dir = os.path.join(control, ".kilo", "scopes")
-    if os.path.realpath(target) == os.path.realpath(control):
+    scopes_dir = os.path.join(source_tree, ".kilo", "scopes")
+    if repo_id == "control":
         for name in sorted(os.listdir(scopes_dir)) if os.path.isdir(scopes_dir) else []:
             if not name.endswith(".md"):
                 continue
             scope_id = name[:-3]
             pairs.append((os.path.join(scopes_dir, name),
-                          os.path.join(control, "apps", scope_id, "AGENTS.md")))
+                          os.path.join(source_tree, "apps", scope_id, "AGENTS.md")))
         return pairs
     source = os.path.join(scopes_dir, repo_id + ".md")
     if os.path.exists(source):
@@ -763,8 +785,9 @@ def file_state(source, destination):
 
 
 def cmd_sync(repo_id, apply, cwd, ctx):
+    source_tree = shell_tree(ctx)
     control = control_root(ctx)
-    target, repos, err = repo_targets(control, repo_id)
+    target, repos, err = repo_targets(source_tree, control, repo_id)
     if err:
         print(err, file=sys.stderr)
         return DENIED
@@ -776,7 +799,7 @@ def cmd_sync(repo_id, apply, cwd, ctx):
         return DENIED
     plan = []
     for folder in SYNC_SLICE:
-        source_dir = os.path.join(control, ".kilo", folder)
+        source_dir = os.path.join(source_tree, ".kilo", folder)
         if not os.path.isdir(source_dir):
             continue
         for dirpath, dirnames, filenames in os.walk(source_dir):
@@ -788,7 +811,7 @@ def cmd_sync(repo_id, apply, cwd, ctx):
                 source = os.path.join(dirpath, name)
                 rel_file = name if rel == "." else os.path.join(rel, name)
                 plan.append((source, os.path.join(target, ".kilo", folder, rel_file)))
-    plan.extend(scope_files(control, target, repo_id))
+    plan.extend(scope_files(source_tree, target, repo_id))
     config_path = os.path.join(target, "kilo.jsonc")
 
     print("control repo: %s" % control)
@@ -812,9 +835,11 @@ def cmd_sync(repo_id, apply, cwd, ctx):
         return OK
 
     for source, destination in plan:
+        if os.path.realpath(source) == os.path.realpath(destination):
+            continue
         os.makedirs(os.path.dirname(destination), exist_ok=True)
         shutil.copyfile(source, destination)
-    policy = load_policy(os.path.join(control, POLICY_REL))
+    policy = load_policy(os.path.join(source_tree, POLICY_REL))
     written_config, message = write_permission_map(config_path, policy, create_missing=True)
     print("permission map %s (%s)" % (os.path.relpath(config_path, target), message))
     print("files written: %d, identical: %d, skipped: 0" % (written, identical))
@@ -822,8 +847,9 @@ def cmd_sync(repo_id, apply, cwd, ctx):
 
 
 def cmd_check_repos(cwd, ctx):
+    source_tree = shell_tree(ctx)
     control = control_root(ctx)
-    target, repos, err = repo_targets(control, "control")
+    target, repos, err = repo_targets(source_tree, control, "control")
     if err:
         print(err, file=sys.stderr)
         return DENIED

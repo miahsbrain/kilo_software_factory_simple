@@ -1,6 +1,7 @@
 # Multi-repo support in the board and the git tools
 
-**Board:** BOARD-003 | **Branch:** feat/multi-repo-support-in-the-board
+**Board:** BOARD-003, BOARD-004 | **Branch:** feat/multi-repo-support-in-the-board,
+docs/multi-repo-rules-agent-and-documentation
 **Date:** 2026-10-30
 
 ## The problem
@@ -30,6 +31,34 @@ give that repo the same agents, policy and skills the control repo has.
 | `worktree.py` | `create --repo <id>` creates the worktree in that repo, under that repo's own `.kilo/worktrees/`, keeps the board in the control repo, and records the path relative to the control repo root plus the repo id on the row. `cleanup` and `verify` find the worktree from the row's cell. `list` covers every repo in the map. |
 | `guard.py` | `sync --repo <id>` copies the `.kilo/` slice, the scope rules and the generated permission map into the target repo, dry run by default. `check-repos` proves the map and the `apps/` layout agree. |
 | `git-policy.json` | `.kilo/scopes/*.md` joins the rules files that need the user's approval. |
+
+## The rules and the documentation half
+
+BOARD-004 added the half that tells an agent what the model means.
+
+| Piece | What it does |
+|---|---|
+| `AGENTS.md` | §A1 names the control repo and the work surfaces. §A7 lists `guard.py sync` and `guard.py check-repos` as the scripts that own the guard-rail rules. §B1 sends a change in another repo to the same handover files. §B3 gives the board a `Repos` column and says what it holds. §B4 rule 5 creates the worktree in the repo the row names, and a new subsection, "The control repo and the work surfaces", states the split: board, docs and memory map in the control repo, code and scope in the app repo. |
+| `.kilo/agent/docs-writer.md` | A unit's repository comes from `.kilo/repos.json`. The unit file names the repository it was read from, and the index's units table carries the repository id and path. |
+| `README.md` | A "Multi-repo" section: what the control repo and the app repos are, the map, and the four commands that turn an application into its own repository. |
+| `docs/PROJECT_STRUCTURE.md` | The repo map and the scope rules in the layout tree and the path → purpose map, and the rule that the map is the only way into a repository. |
+| `docs/README.md` | The same map and scope rules in one line, under the skills table. |
+| `docs/handover/{README,web,mobile,api}.md` | The index names the repository of every unit, the index and the unit files name the repository they were read from, and every `file:line` citation that moved was fixed. |
+| `docs/DECISIONS.md` | ADR-042 now covers the whole change: the map, the `Repos` column, the sync, the scope rules as the canonical copy and the control-repo split. |
+
+The scope rules changed too: `.kilo/scopes/<id>.md` is now the source of truth for its scope, and
+`apps/<id>/AGENTS.md` is the copy `guard.py sync` keeps in step. The three copies were synced and
+now match their canonical files byte for byte.
+
+## Two fixes the sync needed
+
+`guard.py sync --repo control` failed, so the sync could not be run from a worktree at all.
+
+- **It wrote to the main checkout.** The sync now resolves the control repo to the tree the shell
+  is in, the same rule `guard.py check-policy` already follows, so a sync run in a worktree writes
+  that worktree's copies and never the main checkout's.
+- **It crashed on the control repo itself.** Copying the `.kilo/` slice onto itself raised
+  `SameFileError`. A file that is already its own destination is now skipped.
 
 ## Decisions inside the decisions
 

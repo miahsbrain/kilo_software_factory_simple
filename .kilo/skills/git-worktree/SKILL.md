@@ -109,8 +109,13 @@ python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
 - The scope rules live in `.kilo/scopes/<id>.md`. `sync --repo <id>` writes that file to the
   scope's repository as its `AGENTS.md`. For the control repo itself the scope rules go to
   `apps/<id>/AGENTS.md`.
-- The source of the sync is the **control repo's main checkout**: the guard rails that are
-  merged, reviewed content. A branch's own changes are distributed after they are merged.
+- The **slice source** is the **tree the shell is in**, the same rule `check-policy` follows: a
+  sync run in a worktree copies that worktree's `.kilo/` slice and scope rules.
+- The **target repository** is resolved in the control repo's **main checkout**, because a nested
+  app repository under `apps/` is not tracked by the control repo and exists only there. The
+  exception is `control` itself, which is the tree the shell is in, so `sync --repo control` in a
+  worktree updates that worktree's own `apps/<id>/AGENTS.md` copies and never the main checkout's.
+- A file that is already its own destination is skipped, so `sync --repo control` is safe to run.
 
 ---
 
