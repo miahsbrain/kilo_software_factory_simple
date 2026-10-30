@@ -1,11 +1,13 @@
 # HANDOVER — Mini Light Factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** 2026-10-29 — prepared the factory as a public starter: added the root
->   `README.md`, dropped the test capture, and cleared the board.
-> - **In flight:** nothing. The board is empty and no application has been built yet.
-> - **Next action:** run the discovery interview (`AGENTS.md` §A4) for the first project in this
->   checkout, then add the first board row.
+> - **Last session:** 2026-10-30 — added the guard-rail policy (BOARD-001): the canonical policy
+>   file `.kilo/policies/git-policy.json`, the generated `permission` map in `kilo.jsonc`, the
+>   `guard.py check-git` and `guard.py check-policy` commands, and the rule text that describes
+>   them.
+> - **In flight:** branch `feat/add-a-permission-file-and-git`, worktree
+>   `.kilo/worktrees/add-a-permission-file-and-git`. BOARD-001 is built and waiting for review.
+> - **Next action:** the user merges `feat/add-a-permission-file-and-git` into `main`.
 
 ## 1. Overview
 
@@ -33,6 +35,7 @@
 | `ROADMAP.md` | Planned work not in progress. |
 | `CHANGELOG.md` | Product-facing changelog. Updated only on the user's instruction. |
 | `.kilo/agent/` | The five agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`. |
+| `.kilo/policies/` | The canonical guard-rail policy: `git-policy.json`. |
 | `.kilo/command/` | The eight slash commands: `decide`, `board`, `board-view`, `run`, `components`, `ui`, `handover`, `closeout`. |
 | `.kilo/worktrees/` | Agent Manager worktrees, one per task. Git-ignored. Not part of the committed tree. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, `devcontainer-lock.json`. |
@@ -86,6 +89,10 @@ what it is responsible for, and whether reading or running it has side effects.
 | `ui-critic` | `.kilo/agent/ui-critic.md:8` | Judge screens against the anti-slop rules and the approved gallery. | Delegated agent. | Effectful (writes `docs/reviews/`) |
 | `apps/*/AGENTS.md` | `apps/web/AGENTS.md:1`, `apps/mobile/AGENTS.md:1`, `apps/api/AGENTS.md:1` | Scope rules for each future application. | Scope rules. | Pure |
 | `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs:1` | Captures Playwright evidence into the canonical artifacts folder and writes `summary.json` and `notes.md`. Resolves the chromium binary from `--chromium`, `PLAYWRIGHT_CHROMIUM_PATH`, the downloaded browser, then the system chromium; exits 2 with the searched list when none is found. | CLI: `--base-url`, `--route`, `--scope`, `--task-id`, `--date`, `--artifact-dir`, `--project`, `--viewports`, `--label`, `--scheme`, `--component`, `--compare`, `--chromium`. | Effectful (launches a browser, writes files) |
+| `git-policy.json` | `.kilo/policies/git-policy.json:1` | The canonical guard-rail policy: the allow/ask/deny rules for bash and edit commands, plus the three context checks. | The policy file itself; read by `guard.py` and by `guard.py check-policy --write`. | Pure |
+| `guard.py check-git` | `.kilo/skills/git-worktree/scripts/guard.py:517` | Classifies a git command against the policy: context checks first, then the bash rules. | CLI: `check-git -- "<command>"`; exit 0 allowed, 1 denied, 2 usage error, 3 needs approval. | Effectful (reads the policy file and the git repo context) |
+| `guard.py check-policy` | `.kilo/skills/git-worktree/scripts/guard.py:621` | Proves the `permission` map in `kilo.jsonc` still matches the policy file; `--write` regenerates the map. | CLI: `check-policy [--write]`; exit 0 in sync, 1 out of sync, 2 usage error. | Effectful (reads and, with `--write`, writes `kilo.jsonc`) |
+| `guard.py policy` | `.kilo/skills/git-worktree/scripts/guard.py:659` | Prints the generated permission block from the policy file, so the rules can be read without opening the JSON. | CLI: `policy`; exit 0 on success, 2 when the policy file is missing. | Effectful (reads the policy file) |
 
 > **Pure** = no I/O, no mutation of external state, deterministic.
 > **Effectful** = I/O, filesystem, git, app runtime, Playwright, logging, shared state.

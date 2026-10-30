@@ -16,6 +16,9 @@ stays in the main checkout and only you write it.
    - Do **not** edit `docs/BOARD.md` from the worktree.
    - Run the project's verification command from `docs/STACK.md`.
    - Commit locally on the worktree branch. Never push, never merge, never open a PR.
+   - Run `python3 .kilo/skills/git-worktree/scripts/guard.py check-git -- "<command>"` before any git
+     command that changes history or the remote. A denied command is not run; a command that needs
+     approval waits for the user.
 3. **QA** — produce evidence, not assertion. One observable check per acceptance criterion,
    with the command and result and `file:line`. For UI work, capture screenshots.
    - The capture script is the only way to capture UI evidence. Ad-hoc `chromium`, `npx playwright

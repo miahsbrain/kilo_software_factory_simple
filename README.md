@@ -15,6 +15,7 @@ it at a project and it builds that project.
 | `.kilo/agent/` | Five agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`. |
 | `.kilo/command/` | Eight slash commands that package the workflow. |
 | `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
+| `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
 | `docs/` | The documentation set: board, handover, business logic, UI/UX standard, decisions, changelog. |
 | `DOMAIN.md` | Product scope and business rules. The discovery interview fills it in. |
 | `apps/` | Scope folders (`web`, `mobile`, `api`), each with its own `AGENTS.md`. |
@@ -91,6 +92,13 @@ python3 .kilo/skills/board/scripts/board_serve.py --port 15180
 | UI evidence comes from one capture script | `.kilo/skills/qa-review/scripts/browser-review.mjs` |
 | A finding becomes a row only if it names expected, actual, and evidence | `.kilo/skills/qa-review/scripts/check-finding.py` |
 | The QA↔fix loop stops after three rounds | `.kilo/skills/qa-review/scripts/ledger.py` |
+| Git commands that change history or the remote are classified before they run | `.kilo/skills/git-worktree/scripts/guard.py check-git` |
+| The permission map and the policy file cannot drift apart | `.kilo/skills/git-worktree/scripts/guard.py check-policy` |
+
+The permission map in `kilo.jsonc` is the coarse net: it denies the irreversible git commands and
+asks before the rest. `guard.py check-git` is the precise layer — it knows the current branch and
+whether the shell sits in a worktree, so it refuses a commit on `main` and a branch switch inside a
+worktree.
 
 Two rules have no script behind them, so they need your attention: no screen is built before the
 component gallery is approved, and a failed command is reported to you instead of being routed
