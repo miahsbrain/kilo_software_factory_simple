@@ -1534,6 +1534,13 @@ the port values.
 - **Never run destructive commands (`rm -rf`, `git clean`, `find -delete`) outside the project
   root or `~`.**
 - **Never read or print the contents of `.env`, `~/.ssh`, or credential files into a transcript.**
+- **Never let a credential reach a transcript through a URL.** A `url.<base>.insteadOf` or
+  `url.<base>.pushInsteadOf` rewrite whose base embeds a credential makes every command that
+  prints a remote URL print the credential — `git remote -v`, and the error message of any git
+  command that fails. Keep credentials in git's credential store (`credential.helper`), never in a
+  URL, a command line, or a config value a command prints. The dev container scrubs both output
+  streams of every shell command (`.devcontainer/kilo-redact.sh`), but that filter is a backstop,
+  not the plan.
 
 ### Commit format
 

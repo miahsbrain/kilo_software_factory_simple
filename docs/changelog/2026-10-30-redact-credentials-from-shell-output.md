@@ -113,3 +113,4 @@ transcript.
 | `docs/STACK.md` | the redaction section |
 | `docs/RISKS.md` | the token risk updated to the fixed state, plus the filter's residual risk |
 | `docs/DECISIONS.md` | ADR-049, ADR-050 |
+| `AGENTS.md` | §B11 — the rule that keeps a credential out of a URL, so it never reaches a transcript |
