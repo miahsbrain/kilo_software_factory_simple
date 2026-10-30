@@ -9,11 +9,19 @@
   HTTP call graph, the shared-collection map and the external-API matrix.
   `docs/ARCHITECTURE.md`, `docs/STACK.md`, `docs/API_CONTRACTS.md`, `docs/RISKS.md` and
   `docs/PROJECT_STRUCTURE.md` now describe the real system.
-- **Active task:** BOARD-001 — documented on branch `docs/document-all-75-microservices-and-their`
-  in `.kilo/worktrees/document-all-75-microservices-and-their`, waiting for the user to merge.
-- **Next step:** the user merges `docs/document-all-75-microservices-and-their` into `main`. Then
-  the first defect row is opened — the risk register in `docs/RISKS.md` already carries the ranked
-  list, with the cross-tenant credential bleed in `payment_gateway_ms` first.
+  A GitHub token that sat in the machine's global git config has been moved into a credential
+  store behind git's credential helper, and every shell command the agent runs now has its output
+  scrubbed by the container's `$BASH_ENV` redaction filter (ADR-049, ADR-050).
+- **Active task:** BOARD-002 — the credential redaction filter, on branch
+  `chore/redact-credentials-from-every-shell-command` in
+  `.kilo/worktrees/redact-credentials-from-every-shell-command`.
+- **Next step:** two things, both owned by the user. **Rebuild or reopen the dev container** so
+  `remoteEnv.BASH_ENV` takes effect and the filter loads for every shell command. Then **rotate
+  the GitHub token** at GitHub — it was printed in plaintext once, before the fix. After that the
+  first defect row opens from the risk register in `docs/RISKS.md`, with the cross-tenant
+  credential bleed in `payment_gateway_ms` first; it lives in that service's own repository, so
+  the row names that repo in its `Repos` cell and the worktree is created there with
+  `worktree.py create --board <id> --repo payment_gateway_ms`.
 
 ## The shape of the system, for the next agent
 

@@ -94,6 +94,11 @@ list, with `file:line` and the affected services, is in each service's handover 
 - **CORS is pinned to `/inhouz.localhost/` in production**, and `function_parser_ms` allows any
   origin. `function_parser_ms/lib/index.js:52`
 
+- **A credential can still reach the agent outside the filter.** The redaction file scrubs the
+  output of every shell command, but it does not cover a token written to a file that the agent
+  reads by another route, a token in the harness's own error reporting, or a credential pasted
+  into a prompt. Treat the filter as a backstop, not a guarantee.
+
 ## Project risks
 
 - **Documentation drift risk:** doc updates depend on the agent following AGENTS.md §B1 in the
@@ -106,9 +111,10 @@ list, with `file:line` and the affected services, is in each service's handover 
   invisible to the control repo's history and must be made in that service's own repository. This
   is the intended design (ADR-019), but it means the board's `Repos` cell is the only place the
   relationship between a row and its repository is recorded.
-- **A GitHub personal access token sits in the machine's global git config.** The 75 repositories'
-  own remotes are clean, but `/home/node/.gitconfig` defines a
+- **A GitHub personal access token sat in the machine's global git config.** The 75 repositories'
+  own remotes were always clean, but `/home/node/.gitconfig` defined a
   `url.https://<token>@github.com/.insteadOf https://github.com/` rewrite, so `git remote -v`
-  prints the token. It is not committed to any repository, but it lands in every log and agent
-  transcript that echoes a remote. Rotating it and dropping the rewrite is the user's call — the
-  user chose to report it rather than have it remediated (ADR-048).
+  printed the token and it landed in an agent transcript. **Fixed:** the rewrite is removed, the
+  token now lives in `/home/node/.git-credentials` (mode `600`) and is served by git's credential
+  helper, so no URL carries a credential (ADR-049). The token was still printed once, so it must
+  be rotated at GitHub (ADR-048).
