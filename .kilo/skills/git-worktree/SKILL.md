@@ -20,7 +20,7 @@ the script can do it — the script is where the naming rules and the refusals l
 | Script | Does |
 |---|---|
 | `.kilo/skills/git-worktree/scripts/worktree.py` | create · list · verify · cleanup |
-| `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · policy |
+| `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · policy |
 
 Python 3.9+, standard library only.
 
@@ -53,6 +53,64 @@ Before creating, check for an in-flight worktree on the same task:
 ```bash
 python3 .kilo/skills/git-worktree/scripts/worktree.py list
 ```
+
+---
+
+## 2a. Repos: a work surface in its own repository
+
+`.kilo/repos.json` maps a **repo id** to a path relative to the control repo root:
+
+```json
+{
+  "control": ".",
+  "web": "apps/web",
+  "mobile": "apps/mobile",
+  "api": "apps/api"
+}
+```
+
+`control` is the control repo itself. An app may live in its own git repository under `apps/`;
+that repo is a **work surface** — it gets the same `.kilo/` slice and the same guard rails,
+synced from the control repo.
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> --repo api
+```
+
+- The id comes from the map. The default is `control`. A repo is addressed by id, never by a raw
+  path on the command line, and the map is the only way in.
+- The **board stays in the control repo**. The **worktree is created in the target repo**, under
+  that repo's own `.kilo/worktrees/`.
+- The row's `Branch/Worktree` cell records the path relative to the control repo root, for example
+  `apps/api/.kilo/worktrees/<slug> · branch feat/<slug>`. A row with worktrees in several repos
+  holds several entries.
+- The row's `Repos` cell gains the repo id.
+- `--base` must exist in the target repo.
+
+`cleanup` and `verify` find the worktree from the row's `Branch/Worktree` cell, so they work for
+worktrees in any repo. `list` shows the worktrees of every repo in the map, with the repo id next
+to each.
+
+### The repo map and the guard rails
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/guard.py check-repos   # map vs layout
+python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api   # dry run
+python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
+```
+
+- `check-repos` fails when a mapped path is missing, when a git repository under `apps/` is not
+  registered, or when the control repo is not registered as `control`. A registered folder that
+  is not a git repository yet is reported, not a failure.
+- `sync` copies the `.kilo/` slice (`agent/`, `command/`, `skills/`, `policies/`, `scopes/`) and
+  the scope rules into the target repo and regenerates the target's `kilo.jsonc` permission map.
+  It is a dry run unless `--apply` is given. It copies files only: it never deletes anything and
+  never touches the target's `docs/`.
+- The scope rules live in `.kilo/scopes/<id>.md`. `sync --repo <id>` writes that file to the
+  scope's repository as its `AGENTS.md`. For the control repo itself the scope rules go to
+  `apps/<id>/AGENTS.md`.
+- The source of the sync is the **control repo's main checkout**: the guard rails that are
+  merged, reviewed content. A branch's own changes are distributed after they are merged.
 
 ---
 
@@ -236,6 +294,8 @@ acting. **Never delete a worktree holding unmerged work.**
 | `guard.py check-delete` denies | The target is outside the worktree | Delete inside the worktree, use a temp dir, or ask the user |
 | Merge conflict at merge time | The base branch moved since the worktree started | Merge the base into the worktree, resolve there, re-verify, hand off again |
 | `git stash` conflicts across worktrees | Stashes are shared | Do not stash. Resolve conflicts inside the worktree |
+| `worktree.py create --repo x` refuses | `x` is unknown in `.kilo/repos.json`, or its path is not a git repository | Register the repo in the map, or make the folder a repository first |
+| `guard.py sync --repo x` refuses to apply | The target is not a git repository | Make the folder a repository, then sync again |
 
 ---
 

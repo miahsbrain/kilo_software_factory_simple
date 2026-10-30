@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-10-30] Multi-repo support in the board and the git tools
+**Type:** Feature
+**Board:** BOARD-003 | **Branch:** feat/multi-repo-support-in-the-board
+**Changed:** `.kilo/repos.json` (new), `.kilo/scopes/{web,mobile,api}.md` (new), `.kilo/skills/board/scripts/board.py` (`Repos` column, `add-column`, `add --repos`, `set-field --field repos`, strict row parsing), `.kilo/skills/board/scripts/board_serve.py` (column list), `.kilo/skills/git-worktree/scripts/worktree.py` (`create --repo`, board-driven `cleanup`/`verify`, repo-wide `list`), `.kilo/skills/git-worktree/scripts/guard.py` (`sync`, `check-repos`, policy root follows the shell), `.kilo/policies/git-policy.json` (`.kilo/scopes/*.md` asks), `kilo.jsonc` (generated), `.kilo/skills/{board,git-worktree}/SKILL.md`, `docs/{PROJECT_STRUCTURE,HANDOVER,DECISIONS}.md`, `docs/changelog/2026-10-30-multi-repo-support-in-the-board.md`
+**Why:** An application that keeps its own git repository under `apps/` could not be worked in: nothing could name the repo a row belonged to, and nothing could give that repo the same guard rails.
+**Impact:** The board gains a `Repos` column, migrated by `board.py add-column` instead of a hand edit. `worktree.py create --repo <id>` creates the worktree in that repo and keeps the board in the control repo. `guard.py sync --repo <id>` copies the `.kilo/` slice, the scope rules and the permission map into the target repo; `guard.py check-repos` proves the map and the `apps/` layout agree. `guard.py check-policy` now reads and writes the policy and config of the tree the shell is in, so a builder in a worktree no longer rewrites the main checkout.
+
 ## [2026-10-30] A documentation agent owns the application memory map
 **Type:** Feature
 **Board:** BOARD-002 | **Branch:** feat/add-a-documentation-agent-that-writes

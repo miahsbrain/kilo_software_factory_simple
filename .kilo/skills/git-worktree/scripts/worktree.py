@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic git worktree lifecycle for this factory.
 
-    worktree.py create --board BOARD-00X [--base main] [--slug <override>]
+    worktree.py create --board BOARD-00X [--base main] [--slug <override>] [--repo <id>]
     worktree.py list
     worktree.py verify <slug> [--base main]
     worktree.py cleanup <slug> [--apply]
@@ -10,6 +10,11 @@ create reads the board row named by --board from docs/BOARD.md, derives the
 branch type from its Type column and the slug from its task title, then makes
 .kilo/worktrees/<slug> on branch <type>/<slug> and records the worktree on the
 row. It never overwrites: an existing branch or directory is a refusal.
+
+--repo picks the repository the worktree is created in. The id comes from
+.kilo/repos.json in the control repo; the default is "control", the control
+repo itself. The board stays in the control repo; the worktree is created in
+the target repo, under that repo's own .kilo/worktrees/.
 
 verify reports branch, commits ahead of base, changed files and dirty state,
 and exits 0 only when the tree is clean and the branch has at least one commit
@@ -25,6 +30,7 @@ Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 import argparse
 import datetime
 import importlib.util
+import json
 import os
 import re
 import subprocess
@@ -36,7 +42,8 @@ SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 WORKTREES_DIR = os.path.join(".kilo", "worktrees")
 MAX_SLUG_LEN = 48
 STATUS_INDEX = 3
-BRANCH_INDEX = 7
+REPOS_REL = os.path.join(".kilo", "repos.json")
+DEFAULT_REPOS = {"control": "."}
 
 OK = 0
 REFUSED = 1
@@ -84,6 +91,89 @@ def script_root():
     """The repo root that holds this script, whatever the cwd is."""
     return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                         "..", "..", "..", ".."))
+
+
+def load_repos(root):
+    """(map, error). The map is {repo id: path relative to the control repo root}.
+
+    The control repo's own copy wins; the tree that holds this script is the
+    fallback, so a branch that adds the map works before it is merged.
+    """
+    candidates = [root]
+    own = script_root()
+    if own != root:
+        candidates.append(own)
+    for candidate in candidates:
+        path = os.path.join(candidate, REPOS_REL)
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except OSError as e:
+            return None, "cannot read %s: %s" % (path, e.strerror)
+        except ValueError as e:
+            return None, "cannot parse %s: %s" % (path, e)
+        if not isinstance(data, dict) or not data:
+            return None, "%s must hold an object of repo id -> path" % path
+        repos = {}
+        for key, value in data.items():
+            if not isinstance(key, str) or not isinstance(value, str) or not value.strip():
+                return None, "%s: entry %r must map a repo id to a path" % (path, key)
+            repos[key.strip()] = value.strip()
+        return repos, None
+    return dict(DEFAULT_REPOS), None
+
+
+def resolve_repo(root, repos, repo_id):
+    """(absolute repo root, error). The map is the only way in."""
+    if repo_id not in repos:
+        return None, ("unknown repo id %r; known ids: %s" %
+                      (repo_id, ", ".join(sorted(repos))))
+    rel = repos[repo_id]
+    target = os.path.abspath(os.path.join(root, rel))
+    inside = target == root or target.startswith(root.rstrip(os.sep) + os.sep)
+    if not os.path.isabs(rel) and not inside:
+        return None, ("repo %r resolves to %s, outside the control repo %s; the map in %s "
+                      "is the only way in" % (repo_id, target, root, REPOS_REL))
+    return target, None
+
+
+def is_git_repo(path):
+    """True when the path is the top of its own git repository."""
+    top = git_out(path, "rev-parse", "--show-toplevel")
+    if not top:
+        return False
+    return os.path.realpath(top) == os.path.realpath(path)
+
+
+def repo_of_path(path):
+    """The main checkout root of the repository that owns this path, or None."""
+    common = git_out(path, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if not common:
+        return None
+    common = os.path.abspath(common)
+    return os.path.dirname(common) if os.path.basename(common) == ".git" else common
+
+
+def parse_worktree_entries(value):
+    """[(path, branch)] from a Branch/Worktree cell."""
+    entries = []
+    for part in (value or "").split(","):
+        part = part.strip()
+        if not part or part == "-":
+            continue
+        path, _, branch = part.partition("·")
+        entries.append((path.strip(), branch.strip()))
+    return entries
+
+
+def branch_name(text):
+    """The branch name from a cell fragment like 'branch feat/x'."""
+    name = (text or "").strip()
+    if name.startswith("branch "):
+        name = name[len("branch "):].strip()
+    return name
 
 
 def load_board_module(root):
@@ -168,6 +258,43 @@ def find_worktree(cwd, slug):
     return None
 
 
+def board_worktree(board, root, slug):
+    """(path, branch) of the worktree the board row records for this slug, or (None, None)."""
+    if board is None:
+        return None, None
+    board_file = os.path.join(root, "docs", "BOARD.md")
+    if not os.path.exists(board_file):
+        return None, None
+    table, err = board.read_table(board_file)
+    if table is None:
+        return None, None
+    index = board.field_index(table, "branch-worktree")
+    if index is None:
+        return None, None
+    suffix = os.path.join(WORKTREES_DIR, slug)
+    for i in table["rows"]:
+        cells = board.cell_texts(table["lines"], i)
+        if len(cells) <= index:
+            continue
+        for path, branch in parse_worktree_entries(cells[index]):
+            if path.endswith(suffix):
+                absolute = path if os.path.isabs(path) else os.path.join(root, path)
+                if os.path.isdir(absolute):
+                    return absolute, branch_name(branch)
+    return None, None
+
+
+def find_worktree_for_slug(board, root, slug, cwd):
+    """(path, branch) of the worktree for the slug: from the board row first, then the cwd repo."""
+    path, branch = board_worktree(board, root, slug)
+    if path:
+        return path, branch
+    wt = find_worktree(cwd, slug)
+    if wt:
+        return wt["path"], wt["branch"]
+    return None, None
+
+
 def board_row(board, path, board_id):
     table, err = board.read_table(path)
     if table is None:
@@ -184,7 +311,6 @@ def board_row(board, path, board_id):
 
 def cmd_create(args, cwd):
     root = main_checkout_root(cwd)
-    git_root = cwd
     board = load_board_module(script_root())
     if board is None:
         return REFUSED
@@ -195,6 +321,28 @@ def cmd_create(args, cwd):
     cells = board.cell_texts(table["lines"], index)
     if len(cells) < 3:
         print("row %s is malformed: %d cells" % (args.board, len(cells)), file=sys.stderr)
+        return REFUSED
+    repos, err = load_repos(root)
+    if repos is None:
+        print(err, file=sys.stderr)
+        return REFUSED
+    repo_id = args.repo or "control"
+    target, err = resolve_repo(root, repos, repo_id)
+    if err:
+        print(err, file=sys.stderr)
+        return REFUSED
+    if not is_git_repo(target):
+        print("%s is not a git repository; the repo id %r cannot hold a worktree"
+              % (target, repo_id), file=sys.stderr)
+        return REFUSED
+    branch_index = board.field_index(table, "branch-worktree")
+    repos_index = board.field_index(table, "repos")
+    if branch_index is None:
+        print("the board has no Branch/Worktree column", file=sys.stderr)
+        return REFUSED
+    if repos_index is None and repo_id != "control":
+        print("the board has no Repos column; add it with "
+              "'board.py add-column --name Repos --after \"Blocked by\"'", file=sys.stderr)
         return REFUSED
     task, row_type = cells[1], cells[2]
     branch_type = TYPE_MAP.get(row_type)
@@ -217,25 +365,37 @@ def cmd_create(args, cwd):
         print("derived slug: %s" % derived)
         print("used slug:    %s" % slug)
     branch = "%s/%s" % (branch_type, slug)
-    if git_out(git_root, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
-        print("branch %s already exists; pick another slug or type" % branch, file=sys.stderr)
+    if git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
+        print("branch %s already exists in %s; pick another slug or type"
+              % (branch, target), file=sys.stderr)
         return REFUSED
-    path = worktree_path(root, slug)
+    path = worktree_path(target, slug)
     if os.path.exists(path):
         print("directory %s already exists; refusing to overwrite it" % path, file=sys.stderr)
         return REFUSED
-    if not git_out(git_root, "rev-parse", "-q", "--verify", "refs/heads/" + args.base):
-        print("base branch %s does not exist" % args.base, file=sys.stderr)
+    if not git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + args.base):
+        print("base branch %s does not exist in %s" % (args.base, target), file=sys.stderr)
         return REFUSED
-    code, _, err = git(git_root, "worktree", "add", path, "-b", branch, args.base)
+    code, _, err = git(target, "worktree", "add", path, "-b", branch, args.base)
     if code != 0:
         print("git worktree add failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         return REFUSED
     try:
         lines = list(table["lines"])
-        lines[index] = board.replace_cell(lines[index], BRANCH_INDEX,
-                                          "%s · branch %s" % (os.path.join(WORKTREES_DIR, slug),
-                                                              branch))
+        rel_path = os.path.relpath(path, root).replace(os.sep, "/")
+        entry = "%s · branch %s" % (rel_path, branch)
+        existing = cells[branch_index] if len(cells) > branch_index else ""
+        entries = parse_worktree_entries(existing)
+        if not any(p == rel_path for p, _ in entries):
+            entries.append((rel_path, branch))
+        merged = ", ".join("%s · branch %s" % (p, branch_name(b)) for p, b in entries)
+        lines[index] = board.replace_cell(lines[index], branch_index, merged)
+        if repos_index is not None:
+            ids = [i.strip() for i in (cells[repos_index] if len(cells) > repos_index else "").split(",")]
+            ids = [i for i in ids if i and i != "-"]
+            if repo_id not in ids:
+                ids.append(repo_id)
+            lines[index] = board.replace_cell(lines[index], repos_index, ",".join(ids))
         lines[index] = board.replace_cell(lines[index], STATUS_INDEX, "In Progress")
         board.write_atomic(board_file, lines)
     except Exception as exc:
@@ -245,6 +405,7 @@ def cmd_create(args, cwd):
     print("board:    %s" % args.board)
     print("board file: %s" % board_file)
     print("task:     %s" % task)
+    print("repo:     %s (%s)" % (repo_id, target))
     print("branch:   %s" % branch)
     print("worktree: %s" % os.path.abspath(path))
     print("base:     %s" % args.base)
@@ -256,13 +417,27 @@ def cmd_list(args, cwd):
     if not root:
         print("not inside a git repository", file=sys.stderr)
         return REFUSED
-    wts = list_worktrees(cwd)
-    main = os.path.realpath(wts[0]["path"]) if wts else os.path.realpath(root)
-    for wt in wts:
-        path = os.path.abspath(wt["path"])
-        kind = "main" if os.path.realpath(path) == main else "linked"
-        print("%s | %s | %s | %s | %s" % (slug_of(path, root), path,
-                                         wt["branch"] or "(detached)", wt["head"], kind))
+    control = main_checkout_root(cwd)
+    repos, err = load_repos(control)
+    if repos is None:
+        print(err, file=sys.stderr)
+        return REFUSED
+    print("repo | slug | path | branch | head | kind")
+    for repo_id in sorted(repos):
+        target, err = resolve_repo(control, repos, repo_id)
+        if err:
+            print("%s | (unresolved) | %s" % (repo_id, err))
+            continue
+        if not is_git_repo(target):
+            print("%s | (not a git repository) | %s" % (repo_id, target))
+            continue
+        wts = list_worktrees(target)
+        main = os.path.realpath(wts[0]["path"]) if wts else os.path.realpath(target)
+        for wt in wts:
+            path = os.path.abspath(wt["path"])
+            kind = "main" if os.path.realpath(path) == main else "linked"
+            print("%s | %s | %s | %s | %s | %s" % (repo_id, slug_of(path, target), path,
+                                                  wt["branch"] or "(detached)", wt["head"], kind))
     return OK
 
 
@@ -271,12 +446,13 @@ def cmd_verify(args, cwd):
     if not root:
         print("not inside a git repository", file=sys.stderr)
         return REFUSED
-    wt = find_worktree(cwd, args.slug)
-    if not wt:
+    board = load_board_module(script_root())
+    control = main_checkout_root(cwd)
+    path, board_branch = find_worktree_for_slug(board, control, args.slug, cwd)
+    if not path:
         print("no worktree with slug %s" % args.slug, file=sys.stderr)
         return REFUSED
-    path = wt["path"]
-    branch = wt["branch"] or "(detached)"
+    branch = board_branch or (git_out(path, "rev-parse", "--abbrev-ref", "HEAD") or "(detached)")
     ahead = git_out(path, "log", "--oneline", "%s..HEAD" % args.base) or ""
     changed = git_out(path, "diff", "--stat", args.base) or ""
     dirty = git_out(path, "status", "--short") or ""
@@ -318,14 +494,19 @@ def cmd_cleanup(args, cwd):
     if not root:
         print("not inside a git repository", file=sys.stderr)
         return REFUSED
-    wt = find_worktree(cwd, args.slug)
-    if not wt:
+    board = load_board_module(script_root())
+    control = main_checkout_root(cwd)
+    path, board_branch = find_worktree_for_slug(board, control, args.slug, cwd)
+    if not path:
         print("no worktree with slug %s" % args.slug, file=sys.stderr)
         return REFUSED
-    path = wt["path"]
-    branch = wt["branch"]
-    sha = wt["head"]
-    common = common_dir(cwd)
+    branch = board_branch or (git_out(path, "rev-parse", "--abbrev-ref", "HEAD") or "")
+    sha = git_out(path, "rev-parse", "HEAD") or ""
+    repo = repo_of_path(path) or root
+    common = common_dir(repo)
+    if not git_out(repo, "rev-parse", "-q", "--verify", "refs/heads/" + args.base):
+        print("base branch %s does not exist in %s" % (args.base, repo), file=sys.stderr)
+        return REFUSED
     now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
     dirty = git_out(path, "status", "--short") or ""
@@ -374,13 +555,13 @@ def cmd_cleanup(args, cwd):
         return OK
 
     done = []
-    code, _, err = git(root, "worktree", "remove", path)
+    code, _, err = git(repo, "worktree", "remove", path)
     if code != 0:
         print("worktree remove failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         print("recovery TSV: %s" % tsv)
         return REFUSED
     done.append("removed worktree " + path)
-    code, _, err = git(root, "branch", "-D", branch)
+    code, _, err = git(repo, "branch", "-D", branch)
     if code == 0:
         done.append("deleted branch " + branch)
     else:
@@ -400,6 +581,7 @@ def main(argv):
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
     p.add_argument("--base", default="main", help="base branch (default: main)")
     p.add_argument("--slug", help="override the slug derived from the task title")
+    p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
 
     sub.add_parser("list", help="list worktrees")
 
