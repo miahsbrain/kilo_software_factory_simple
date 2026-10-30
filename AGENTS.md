@@ -545,6 +545,7 @@ Use the dedicated agents rather than ad-hoc prompts where one fits:
 | `mobile-dev` | Mobile UI and platform work |
 | `qa-reviewer` | Verification lane — Playwright evidence against acceptance criteria |
 | `ui-critic` | Visual critique lane — anti-slop rules and gallery conformance |
+| `docs-writer` | The application memory map — one handover per application plus the global index |
 
 Each agent file carries the scope, style, production, verification, git, and reporting rules that
 apply to it, so a delegated prompt can stay short and specific.
@@ -696,6 +697,7 @@ each file genuinely needs its own short reference. Do not turn them into impleme
 | `CHANGELOG.md` | **Product/user-facing** changelog — updated **only** on the user's explicit instruction |
 | `docs/PROJECT_STRUCTURE.md` | Authoritative folder layout and path→purpose map |
 | `docs/HANDOVER.md` | Living description of the app as it is **right now** (see B2) |
+| `docs/handover/` | The application memory map: one handover per application plus the global index |
 | `docs/ARCHITECTURE.md` | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap |
 | `docs/BUSINESS-LOGIC.md` | Every business rule as question → answer (see B2) |
 | `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, Playwright QA spec |
@@ -734,6 +736,7 @@ a follow-up task.
 |---|---|
 | New/changed function, class, module | `docs/HANDOVER.md` (inventory, pure/effectful) |
 | New/changed entry point, route, command | `docs/HANDOVER.md` (entry points, API) |
+| New or changed app behaviour | `docs/handover/<unit>.md` (written by the `docs-writer` agent) |
 | New/changed data model, schema, migration | `docs/HANDOVER.md` (data), `docs/ARCHITECTURE.md` if boundaries shift |
 | New/changed state machine or transition | `docs/HANDOVER.md` (state transitions), `docs/BUSINESS-LOGIC.md` |
 | New/changed business rule | `docs/BUSINESS-LOGIC.md`, `DOMAIN.md` if user-facing |
@@ -783,6 +786,9 @@ Also write `docs/changelog/<YYYY-MM-DD>-<slug>.md` when a change needs longer re
 - **Known issues / risks.**
 - **Open questions** — things that could not be determined.
 - **Document map** — links to the other docs and to `AGENTS.md`.
+
+For an application with code, the same inventory lives in `docs/handover/<unit>.md`, written by the
+`docs-writer` agent, and `docs/handover/README.md` is the global map of every unit.
 
 ### BUSINESS-LOGIC.md must contain
 
