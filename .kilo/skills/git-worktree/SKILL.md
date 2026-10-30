@@ -20,7 +20,7 @@ the script can do it — the script is where the naming rules and the refusals l
 | Script | Does |
 |---|---|
 | `.kilo/skills/git-worktree/scripts/worktree.py` | create · list · verify · cleanup |
-| `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree |
+| `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · policy |
 
 Python 3.9+, standard library only.
 
@@ -56,7 +56,54 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py list
 
 ---
 
-## 3. Work inside it
+## 3. Guard-rail policy and the permission map
+
+`.kilo/policies/git-policy.json` is the **single source of truth** for the guard rails. Every rule
+lives there with its reason. The `permission` block in `kilo.jsonc` is **generated** from that file
+and is never hand-edited.
+
+Kilo evaluates permission rules **in config order, and the last matching rule wins**. The
+generated map therefore puts the broad fallback first and the narrow exceptions after it.
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/guard.py check-git -- "git push origin main"
+```
+
+- Exit 0 → allowed. Run the command.
+- Exit 1 → denied. The reason is on stdout. Do not run the command.
+- Exit 2 → usage error, or the policy file is missing.
+- Exit 3 → needs the user's approval. Ask the user; do not run it silently.
+
+`check-git` resolves the real git subcommand (past `-C <path>`, `-c <k=v>` and the other global
+options), then evaluates the **context checks first**, because they are more specific than any
+keyword list:
+
+| Context check | Fires when |
+|---|---|
+| `protected_branch` | the current branch is `main`, `master` or `base` |
+| `branch_switch_in_worktree` | the shell is in a linked worktree and the command switches branches |
+| `always` | always — used for the raw `git worktree remove` |
+
+Then the `bash` rules apply with **last match wins**, exactly like Kilo.
+
+Keep the two layers in sync:
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/guard.py check-policy          # proves they match
+python3 .kilo/skills/git-worktree/scripts/guard.py check-policy --write  # regenerates kilo.jsonc
+python3 .kilo/skills/git-worktree/scripts/guard.py policy                 # prints the block to paste
+```
+
+`check-policy` exits 0 and prints `policy in sync` when `kilo.jsonc` still matches the policy
+file. On a mismatch it exits 1 and prints the exact `permission` block to paste.
+
+**Known limitation.** A permission pattern cannot see a command a shell wrapper hides — for example
+`sh -c "git push …"`. `guard.py check-git` is the precise layer, so **run it before a mutating git
+command**. The permission map is the coarse net; the guard is the enforcement point.
+
+---
+
+## 4. Work inside it
 
 Every edit, command, and verification run happens with the worktree as the working directory.
 
@@ -74,7 +121,7 @@ git -C .kilo/worktrees/<slug> diff
 
 ---
 
-## 4. Guarded deletes
+## 5. Guarded deletes
 
 **Deletion inside the worktree only.** Before any destructive command, run the guard:
 
@@ -98,7 +145,7 @@ python3 .kilo/skills/git-worktree/scripts/guard.py check-worktree -- "git worktr
 
 ---
 
-## 5. Commit locally
+## 6. Commit locally
 
 Local commits on the worktree branch are required — they are what the human reviews and merges.
 
@@ -120,7 +167,7 @@ Subject ≤ 72 characters, imperative voice. One logical change per commit.
 
 ---
 
-## 6. Verify before handing off
+## 7. Verify before handing off
 
 ```bash
 python3 .kilo/skills/git-worktree/scripts/worktree.py verify <slug> --base main
@@ -139,7 +186,7 @@ A worktree is ready for handoff only when:
 
 ---
 
-## 7. Hand off for human approval
+## 8. Hand off for human approval
 
 The agent **never** merges.
 
@@ -166,7 +213,7 @@ larger feature.
 
 ---
 
-## 8. Clean up
+## 9. Clean up
 
 ```bash
 python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug>           # dry run
@@ -179,7 +226,7 @@ acting. **Never delete a worktree holding unmerged work.**
 
 ---
 
-## 9. Failure modes
+## 10. Failure modes
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -192,7 +239,7 @@ acting. **Never delete a worktree holding unmerged work.**
 
 ---
 
-## 10. Relationship to the rest of the factory
+## 11. Relationship to the rest of the factory
 
 - The board row is the work item; the worktree is where it happens; the row records the path.
 - The builder agents (`frontend-dev`, `backend-dev`, `mobile-dev`) work inside the worktree.
