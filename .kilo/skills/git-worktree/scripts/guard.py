@@ -53,6 +53,7 @@ GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"
 ADD_VALUE_OPTS = {"-b", "-B", "--reason"}
 LINKED_MARKER = os.sep + ".kilo" + os.sep + "worktrees" + os.sep
 SYNC_SLICE = ["agent", "command", "skills", "policies", "scopes"]
+DEFAULT_SCOPE = "service"
 SCHEMA_URL = "https://app.kilo.ai/config.json"
 
 OK = 0
@@ -778,12 +779,19 @@ def scope_files(source_tree, target, repo_id):
             if not name.endswith(".md"):
                 continue
             scope_id = name[:-3]
+            if scope_id == DEFAULT_SCOPE:
+                continue
             pairs.append((os.path.join(scopes_dir, name),
                           os.path.join(source_tree, "apps", scope_id, "AGENTS.md")))
         return pairs
     source = os.path.join(scopes_dir, repo_id + ".md")
     if os.path.exists(source):
         pairs.append((source, os.path.join(target, "AGENTS.md")))
+        return pairs
+    default = os.path.join(scopes_dir, DEFAULT_SCOPE + ".md")
+    destination = os.path.join(target, "AGENTS.md")
+    if os.path.exists(default) and not os.path.exists(destination):
+        pairs.append((default, destination))
     return pairs
 
 
@@ -799,6 +807,36 @@ def file_state(source, destination):
     except OSError:
         return "changed"
     return "identical" if a == b else "changed"
+
+
+def cmd_sync_all(apply, cwd, ctx):
+    """Sync every repo in the map, except the control repo itself."""
+    source_tree = shell_tree(ctx)
+    control = control_root(ctx)
+    wt = load_worktree_module()
+    if wt is None:
+        print("worktree.py not found next to guard.py", file=sys.stderr)
+        return DENIED
+    repos, err = wt.load_repos(source_tree)
+    if repos is None:
+        print(err, file=sys.stderr)
+        return DENIED
+    ids = [rid for rid in sorted(repos) if rid != "control"]
+    if not ids:
+        print("the repo map registers no repository besides the control repo")
+        return OK
+    failures = []
+    for repo_id in ids:
+        code = cmd_sync(repo_id, apply, cwd, ctx)
+        if code != OK:
+            failures.append(repo_id)
+    print("")
+    print("synced %d repository(ies)%s" %
+          (len(ids) - len(failures), "" if apply else " (dry run)"))
+    if failures:
+        print("failed: %s" % ", ".join(failures), file=sys.stderr)
+        return DENIED
+    return OK
 
 
 def cmd_sync(repo_id, apply, cwd, ctx):
@@ -828,6 +866,9 @@ def cmd_sync(repo_id, apply, cwd, ctx):
                 source = os.path.join(dirpath, name)
                 rel_file = name if rel == "." else os.path.join(rel, name)
                 plan.append((source, os.path.join(target, ".kilo", folder, rel_file)))
+    slice_ignore = os.path.join(source_tree, ".kilo", ".gitignore")
+    if os.path.exists(slice_ignore):
+        plan.append((slice_ignore, os.path.join(target, ".kilo", ".gitignore")))
     plan.extend(scope_files(source_tree, target, repo_id))
     config_path = os.path.join(target, "kilo.jsonc")
 
@@ -937,7 +978,9 @@ def main(argv):
     p_pol.add_argument("--write", action="store_true", help="regenerate the permission map")
 
     p_sync = sub.add_parser("sync", help="copy the guard rails into another repo")
-    p_sync.add_argument("--repo", required=True, help="repo id from .kilo/repos.json")
+    p_sync.add_argument("--repo", help="repo id from .kilo/repos.json")
+    p_sync.add_argument("--all", action="store_true",
+                        help="sync every repository in the map, except the control repo")
     p_sync.add_argument("--apply", action="store_true", help="act; without it this is a dry run")
 
     sub.add_parser("check-repos", help="prove the repo map and the apps/ layout agree")
@@ -961,6 +1004,11 @@ def main(argv):
         ctx = repo_context(cwd)
         if args.command == "check-repos":
             return cmd_check_repos(cwd, ctx)
+        if args.all:
+            return cmd_sync_all(args.apply, cwd, ctx)
+        if not args.repo:
+            print("name a repository with --repo, or sync them all with --all", file=sys.stderr)
+            return USAGE
         return cmd_sync(args.repo, args.apply, cwd, ctx)
 
     parts = [args.shell_command] if args.shell_command else []

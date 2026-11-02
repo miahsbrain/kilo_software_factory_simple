@@ -156,6 +156,36 @@ def repo_of_path(path):
     return os.path.dirname(common) if os.path.basename(common) == ".git" else common
 
 
+def default_base(target):
+    """The branch a worktree in this repository should branch from.
+
+    ``main`` wins whenever it exists, so the control repo keeps its documented
+    base. A repository that does not have ``main`` names its own default branch
+    through ``origin/HEAD``; the checked-out branch is the last resort.
+    """
+    if git_out(target, "rev-parse", "-q", "--verify", "refs/heads/main"):
+        return "main"
+    head = git_out(target, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    if head:
+        return head.split("/", 1)[1] if "/" in head else head
+    current = git_out(target, "rev-parse", "--abbrev-ref", "HEAD")
+    if current and current != "HEAD":
+        return current
+    return "main"
+
+
+def resolve_base(target, requested):
+    """(branch, error). An explicit request wins; otherwise the repo decides."""
+    if requested:
+        if not git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + requested):
+            return None, ("base branch %s does not exist in %s" % (requested, target))
+        return requested, None
+    branch = default_base(target)
+    if not git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
+        return None, ("no base branch found in %s; name one with --base" % target)
+    return branch, None
+
+
 def parse_worktree_entries(value):
     """[(path, branch)] from a Branch/Worktree cell."""
     entries = []
@@ -373,10 +403,11 @@ def cmd_create(args, cwd):
     if os.path.exists(path):
         print("directory %s already exists; refusing to overwrite it" % path, file=sys.stderr)
         return REFUSED
-    if not git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + args.base):
-        print("base branch %s does not exist in %s" % (args.base, target), file=sys.stderr)
+    base, base_err = resolve_base(target, args.base)
+    if base_err:
+        print(base_err, file=sys.stderr)
         return REFUSED
-    code, _, err = git(target, "worktree", "add", path, "-b", branch, args.base)
+    code, _, err = git(target, "worktree", "add", path, "-b", branch, base)
     if code != 0:
         print("git worktree add failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         return REFUSED
@@ -408,7 +439,7 @@ def cmd_create(args, cwd):
     print("repo:     %s (%s)" % (repo_id, target))
     print("branch:   %s" % branch)
     print("worktree: %s" % os.path.abspath(path))
-    print("base:     %s" % args.base)
+    print("base:     %s" % base)
     return OK
 
 
@@ -453,13 +484,18 @@ def cmd_verify(args, cwd):
         print("no worktree with slug %s" % args.slug, file=sys.stderr)
         return REFUSED
     branch = board_branch or (git_out(path, "rev-parse", "--abbrev-ref", "HEAD") or "(detached)")
-    ahead = git_out(path, "log", "--oneline", "%s..HEAD" % args.base) or ""
-    changed = git_out(path, "diff", "--stat", args.base) or ""
+    repo = repo_of_path(path) or root
+    base, base_err = resolve_base(repo, args.base)
+    if base_err:
+        print(base_err, file=sys.stderr)
+        return REFUSED
+    ahead = git_out(path, "log", "--oneline", "%s..HEAD" % base) or ""
+    changed = git_out(path, "diff", "--stat", base) or ""
     dirty = git_out(path, "status", "--short") or ""
 
     print("worktree: %s" % os.path.abspath(path))
     print("branch:   %s" % branch)
-    print("base:     %s" % args.base)
+    print("base:     %s" % base)
     print("commits ahead of base:")
     print(ahead if ahead else "  (none)")
     print("changed files:")
@@ -471,9 +507,9 @@ def cmd_verify(args, cwd):
         print("NOT READY: the worktree has uncommitted changes")
         return REFUSED
     if not ahead:
-        print("NOT READY: no commit ahead of %s" % args.base)
+        print("NOT READY: no commit ahead of %s" % base)
         return REFUSED
-    print("READY FOR MERGE: clean tree, %d commit(s) ahead of %s" % (len(ahead.splitlines()), args.base))
+    print("READY FOR MERGE: clean tree, %d commit(s) ahead of %s" % (len(ahead.splitlines()), base))
     return OK
 
 
@@ -504,13 +540,14 @@ def cmd_cleanup(args, cwd):
     sha = git_out(path, "rev-parse", "HEAD") or ""
     repo = repo_of_path(path) or root
     common = common_dir(repo)
-    if not git_out(repo, "rev-parse", "-q", "--verify", "refs/heads/" + args.base):
-        print("base branch %s does not exist in %s" % (args.base, repo), file=sys.stderr)
+    base, base_err = resolve_base(repo, args.base)
+    if base_err:
+        print(base_err, file=sys.stderr)
         return REFUSED
     now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
     dirty = git_out(path, "status", "--short") or ""
-    unmerged = git_out(path, "log", "--oneline", "%s..%s" % (args.base, branch)) if branch else None
+    unmerged = git_out(path, "log", "--oneline", "%s..%s" % (base, branch)) if branch else None
     reason = None
     if dirty:
         reason = "worktree is dirty; uncommitted work would be lost"
@@ -518,14 +555,14 @@ def cmd_cleanup(args, cwd):
         reason = "worktree has a detached HEAD; no branch to delete"
     elif unmerged:
         reason = "branch %s has %d commit(s) not reachable from %s" % (
-            branch, len(unmerged.splitlines()), args.base)
+            branch, len(unmerged.splitlines()), base)
 
     actions = []
     if reason is None:
         actions = [("worktree", branch or "(detached)", sha, path, "remove-worktree",
-                    "merged into %s and clean" % args.base),
+                    "merged into %s and clean" % base),
                    ("branch", branch, sha, path, "delete-branch",
-                    "merged into %s" % args.base)]
+                    "merged into %s" % base)]
 
     rows = [{"when": now, "kind": k, "name": n, "sha": s, "path": p,
              "action": (a if args.apply else "would-" + a), "reason": r}
@@ -579,7 +616,7 @@ def main(argv):
 
     p = sub.add_parser("create", help="create a worktree named from a board row")
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
-    p.add_argument("--base", default="main", help="base branch (default: main)")
+    p.add_argument("--base", help="base branch (default: the repository's own default branch)")
     p.add_argument("--slug", help="override the slug derived from the task title")
     p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
 
@@ -587,12 +624,12 @@ def main(argv):
 
     p = sub.add_parser("verify", help="check whether a worktree is ready to merge")
     p.add_argument("slug")
-    p.add_argument("--base", default="main", help="base branch (default: main)")
+    p.add_argument("--base", help="base branch (default: the repository's own default branch)")
 
     p = sub.add_parser("cleanup", help="remove a merged worktree and its branch")
     p.add_argument("slug")
     p.add_argument("--apply", action="store_true", help="act; without it this is a dry run")
-    p.add_argument("--base", default="main", help="base branch (default: main)")
+    p.add_argument("--base", help="base branch (default: the repository's own default branch)")
 
     args = parser.parse_args(argv)
     if not args.command:
