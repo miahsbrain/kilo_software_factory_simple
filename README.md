@@ -7,22 +7,26 @@ agents, and a loop that carries every task from decision to merged branch.
 There is no application runtime here. The factory is rules, agents, commands, and scripts. Point
 it at a project and it builds that project.
 
+**The factory is not the project.** This repository holds the harness and nothing else. Every
+project lives in its own git repository, copies the harness in, and is never tracked here
+(ADR-053). Product documentation — the board, the domain rules, the handover, the changelog —
+belongs to the project, not to the factory.
+
 ## What is in the box
 
 | Path | What it holds |
 |---|---|
 | `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
 | `.kilo/agent/` | Six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
-| `docs/handover/` | The application memory map: one handover per application plus the global index, written by the `docs-writer` agent. |
 | `.kilo/command/` | Eight slash commands that package the workflow. |
 | `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
 | `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
 | `.kilo/repos.json`, `.kilo/scopes/` | The repo map and the canonical scope rules for a multi-repo setup. |
-| `docs/` | The documentation set: board, handover, business logic, UI/UX standard, decisions, changelog. |
-| `DOMAIN.md` | Product scope and business rules. The discovery interview fills it in. |
-| `apps/` | Scope folders (`web`, `mobile`, `api`), each with its own `AGENTS.md`. |
-| `kilo.jsonc` | Project settings, including the Playwright MCP server. |
+| `docs/` | The factory's own documentation set: board, handover, structure, decisions, changelog. |
+| `templates/project/` | The blank project skeleton a new project starts from. |
+| `kilo.jsonc` | Kilo settings, including the Playwright MCP server and the generated permission map. |
 | `.devcontainer/` | The container this was built in: Node, Python, Rust, chromium, Kilo Code. |
+| `project/` | A project repository in this workspace. Its own git repository. Never tracked here. |
 
 ## The loop
 
@@ -39,18 +43,33 @@ blocks the row instead of opening another one.
 
 ## Plug it into a project
 
-**As its own repo** — the usual way for a new project. Clone it, run the discovery interview, and
-the factory builds the project in this checkout.
+A project is its own git repository. It copies the harness in and owns the copy from then on
+(ADR-054).
 
-**As the harness inside an existing project** — copy `AGENTS.md`, `.kilo/`, `docs/`, and
-`DOMAIN.md` into the project root, drop the parts that do not apply, and start with `/board`.
+**New project** — copy the skeleton, make it a repository, start the discovery interview:
+
+```bash
+cp -r templates/project/. /path/to/project/
+cd /path/to/project
+git init && git commit -m "chore: start the project"
+```
+
+Then open it in Kilo Code and run `/decide` to fill `DOMAIN.md`, `/board` to open the first row.
+
+**Existing project** — copy `AGENTS.md` and `.kilo/` into the project root, then add the
+documentation set the project needs (`DOMAIN.md`, `docs/BOARD.md`, `docs/STACK.md`) and run
+`guard.py sync` for each app repository. Drop the parts that do not apply.
+
+**In this workspace** — `project/` is a project repository that already exists. The factory
+never tracks it: it is listed in `.gitignore`, and it is a separate git repository with its own
+board and its own documentation.
 
 ## Multi-repo
 
-The factory is a control repo plus one repository per application.
+A project is a control repo plus one repository per application.
 
-- **Control repo** — this one. It holds `AGENTS.md`, `docs/`, the board, the domain rules, the API
-  contracts and the guard-rail policy.
+- **Control repo** — the project repository. It holds `AGENTS.md`, `docs/`, the board, the domain
+  rules, the API contracts and the guard-rail policy.
 - **App repos** — a git repository at `apps/<name>/`, nested inside the control repo. Each holds one
   application and its own copy of the `.kilo/` slice, so the guard rails are the same wherever the
   work happens.
@@ -104,7 +123,8 @@ The devcontainer image carries all of them, including chromium at `/usr/bin/chro
 
 ## The board
 
-`docs/BOARD.md` is the only state. One row per unit of work, and a row needs acceptance
+`docs/BOARD.md` is the only state of the factory itself. A project has its own board, in its own
+repository, and the orchestrator of that project is the only writer of it. One row per unit of work, and a row needs acceptance
 criteria, a risk line, and a `Blocked by` before it leaves `Backlog`. It is edited by `board.py`
 in the main checkout — never by hand, and never from a worktree.
 
@@ -145,8 +165,9 @@ around with a new tool.
 
 ## Status
 
-The board is empty and no application has been built yet. `docs/changelog/CHANGELOG.md` is the
-engineering log of the factory itself.
+The factory board is empty and the harness is complete. `docs/changelog/CHANGELOG.md` is the
+engineering log of the factory itself. The Inhouz Cloud AI platform — 75 microservices, each its
+own git repository — is the project in `project/`.
 
 ## Licence
 

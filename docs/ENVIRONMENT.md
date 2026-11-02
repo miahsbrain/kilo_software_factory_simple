@@ -1,11 +1,12 @@
-# ENVIRONMENT
+# ENVIRONMENT — software factory
 
 Environment variables and config keys only. Placeholders only — never real secret values.
 The user populates real secrets.
 
 | Variable | Where used | Required | Default | Notes |
 |---|---|---|---|---|
-| `BASH_ENV` | the whole dev container | no | `/home/node/.kilo-redact.sh` | Points bash at the credential-redaction startup file. Set by `devcontainer.json` → `remoteEnv`. If the file is missing bash ignores it. |
+| `BASH_ENV` | the whole dev container | no | `/home/node/.kilo-redact.sh` | Points bash at the startup file that scrubs credentials from command output and refuses any `bash -c` command that names a protected file. Set by `devcontainer.json` → `remoteEnv`. If the file is missing bash ignores it. |
+| `KILO_CONFIG` | the whole dev container | no | `${containerWorkspaceFolder}/kilo.jsonc` | Loads the permission map in every folder and every nested repository, so the protected-file denies apply without a copied config. Set by `devcontainer.json` → `remoteEnv`. |
 | `REMOTE_CONTAINERS_IPC` | VS Code Dev Containers | no | set by VS Code | The socket the VS Code credential helper talks to. Not set by hand. |
 | `OPENROUTER_API_KEY` | the agent's model provider | no | — | Value lives in the host environment and is passed through `remoteEnv`. |
 | `DEEPSEEK_API_KEY` | the agent's model provider | no | — | Value lives in the host environment and is passed through `remoteEnv`. |
@@ -15,8 +16,8 @@ The user populates real secrets.
 
 | Key | Where | Notes |
 |---|---|---|
-| `/home/node/.kilo-redact.sh` | the whole dev container | The redaction startup file. Installed by `postCreateCommand` from `.devcontainer/kilo-redact.sh`. |
-| `/home/node/.git-credentials` | the whole dev container | The git credential store, mode `600`. Holds the GitHub token for `github.com`. Never commit it and never read it into a transcript. |
+| `/home/node/.kilo-redact.sh` | the whole dev container | The startup file. It scrubs credentials from command output and refuses `bash -c` commands that name a protected file. Installed by `postCreateCommand` from `.devcontainer/kilo-redact.sh`. |
+| `/home/node/.git-credentials` | the whole dev container | The git credential store, mode `600`. Never commit it and never read it into a transcript. |
 | `/home/node/.gitconfig` | the whole dev container | Holds `credential.helper`, `user.*` and `safe.directory`. It must not hold a `url.*.insteadOf` rewrite that embeds a credential. |
 
 ## Rules

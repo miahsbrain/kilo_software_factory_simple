@@ -1,10 +1,6 @@
-# Nested microservice repositories. Each apps/<name>/ is its own git repository with its own
-# remote, so the control repo must not track them. The three scope folders that hold only a
-# rules file are re-included.
-apps/*/
-!apps/web/
-!apps/mobile/
-!apps/api/
+# The project control repo lives inside this workspace but is its own git repository.
+# The factory never tracks it. See AGENTS.md §"The factory and the project".
+/project/
 
 # Agent worktrees: one per board row, created by .kilo/skills/git-worktree/scripts/worktree.py
 .kilo/worktrees/
@@ -30,3 +26,4 @@ node_modules/
 id_rsa*
 
 .DS_Store
+.vscode/

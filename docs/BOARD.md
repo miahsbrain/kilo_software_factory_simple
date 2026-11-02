@@ -1,4 +1,7 @@
-# BOARD
+# BOARD — software factory
+
+**This board carries factory work only.** Product work is tracked on the project's own board,
+in that project's repository. See `AGENTS.md` §A1.
 
 **The board is the only state.** Re-read it at the start of every session and every task.
 One row per unit of work. Never run two orchestrators against this board.

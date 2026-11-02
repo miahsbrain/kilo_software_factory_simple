@@ -621,8 +621,15 @@ def load_config(path):
         return None, exc.lineno
 
 
+FILE_TOOLS = ("read", "grep", "glob", "list")
+
+
 def generated_permission(policy):
-    """The permission block generated from the policy: fallback first, then rules in file order."""
+    """The permission block generated from the policy: fallback first, then rules in file order.
+
+    `hidden_paths` is expanded into one deny rule per path for every file-reading tool, so a git
+    config or credential file is never readable by `read`, `grep`, `glob` or `list`.
+    """
     fallback = policy.get("fallback", {}).get("action", "allow")
     block = {}
     for kind in ("bash", "edit"):
@@ -630,6 +637,15 @@ def generated_permission(policy):
         for rule in policy.get(kind, []):
             mapping[rule["pattern"]] = rule["action"]
         block[kind] = mapping
+    hidden = policy.get("hidden_paths") or {}
+    tools = hidden.get("tools") or FILE_TOOLS
+    for tool in tools:
+        mapping = {FALLBACK_KEY: fallback}
+        for path in hidden.get("paths", []):
+            mapping[path] = "deny"
+        for path in hidden.get("allow", []):
+            mapping[path] = "allow"
+        block[tool] = mapping
     return block
 
 
@@ -672,8 +688,9 @@ def cmd_check_policy(write, cwd, ctx):
         return USAGE
 
     current = config.get("permission") or {}
-    same = (list(current.get("bash", {}).items()) == list(expected["bash"].items())
-            and list(current.get("edit", {}).items()) == list(expected["edit"].items()))
+    same = (set(current) == set(expected)
+            and all(list((current.get(kind) or {}).items()) == list(mapping.items())
+                    for kind, mapping in expected.items()))
 
     if same and not write:
         print("policy in sync")
