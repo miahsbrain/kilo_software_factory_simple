@@ -84,6 +84,21 @@ out=$(BASH_ENV="$REDACT" bash -c 'echo "S-OUT"; echo "S-ERR" >&2' 2>"$TMP/err")
 check "stdout stays on stdout" "S-OUT" "$out"
 check "stderr stays on stderr" "S-ERR" "$(cat "$TMP/err")"
 
+echo "the protected-file guard"
+
+guard_rc() { BASH_ENV="$REDACT" bash -c "$1" >/dev/null 2>"$TMP/err"; echo $?; }
+
+check "a .env read is blocked" "1" "$(guard_rc 'cat .env')"
+check "a nested .env read is blocked" "1" "$(guard_rc 'cat config/.env.local')"
+check "a git config read is blocked" "1" "$(guard_rc 'cat .git/config')"
+check "a credential store read is blocked" "1" "$(guard_rc 'cat /home/node/.git-credentials')"
+check "a global git config read is blocked" "1" "$(guard_rc 'cat ~/.gitconfig')"
+check "an npmrc read is blocked" "1" "$(guard_rc 'cat .npmrc')"
+check "a private key read is blocked" "1" "$(guard_rc 'openssl pkey -in server.key')"
+check ".env.example stays readable" "0" "$(guard_rc 'echo .env.example')"
+check "a process.env argument is not blocked" "0" "$(guard_rc 'echo process.env')"
+check "a plain command is not blocked" "0" "$(guard_rc 'echo safe')"
+
 echo "the repository holds no token-shaped literal"
 
 stored=$(grep -roE 'gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{16,}' "$REDACT" ./test-kilo-redact.sh 2>/dev/null | wc -l)

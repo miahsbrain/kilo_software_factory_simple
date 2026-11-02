@@ -33,7 +33,7 @@ the branch type from its `Type` column and the slug from its task title, creates
 and records the path and branch back onto the row.
 
 ```bash
-python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> [--base main]
+python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> [--base <branch>]
 ```
 
 - The **branch type** comes from the row's `Type`: `Feature` → `feat`, `Fix` → `fix`,
@@ -42,7 +42,9 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> 
   longer than 48 characters.
 - The branch is `<type>/<slug>` and the directory is `.kilo/worktrees/<slug>/`.
 - `--slug <override>` replaces the derived slug. It must be kebab-case.
-- `--base` defaults to `main`. Use a feature branch only when the row's `Blocked by` says so.
+- `--base` defaults to the target repository's own base: `main` when it exists, otherwise the
+  branch it names as `origin/HEAD` (the microservices use `dev`). Name one with `--base` to
+  override. Use a feature branch only when the row's `Blocked by` says so.
 
 The script refuses when the row does not exist, when the branch or directory already exists, or
 when the row's type is unknown. It never deletes anything. It writes the board row in the **main
@@ -85,7 +87,7 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> 
   `apps/api/.kilo/worktrees/<slug> · branch feat/<slug>`. A row with worktrees in several repos
   holds several entries.
 - The row's `Repos` cell gains the repo id.
-- `--base` must exist in the target repo.
+- `--base` must exist in the target repo. Without it, the repo's own base is used.
 
 `cleanup` and `verify` find the worktree from the row's `Branch/Worktree` cell, so they work for
 worktrees in any repo. `list` shows the worktrees of every repo in the map, with the repo id next
@@ -148,6 +150,19 @@ keyword list:
 | `always` | always — used for the raw `git worktree remove` |
 
 Then the `bash` rules apply with **last match wins**, exactly like Kilo.
+
+The policy's `hidden_paths` block is expanded into `deny` rules for the file-reading tools —
+`read`, `grep`, `glob` and `list` — so no agent can read a git config, credential file or `.env`
+that may carry a secret. It covers `.env`, `.env.*` (except `.env.example`), `.git/config`,
+`*.git/config`, submodule configs, `.git-credentials`, `~/.gitconfig`, the XDG git config and
+credential stores, `.npmrc` and private keys. The list lives in `.kilo/policies/git-policy.json`;
+add a path there, not in `kilo.jsonc`.
+
+A shell command has no path awareness, so the same rule is enforced for bash by the
+`$BASH_ENV` startup file (`.devcontainer/kilo-redact.sh`): it refuses any `bash -c` command whose
+text names one of those files. `devcontainer.json` sets `KILO_CONFIG` to the root `kilo.jsonc`, so
+a nested app repository inherits the permission map without a copy. The map needs a Kilo restart;
+the shell guard is live as soon as the file is installed.
 
 Keep the two layers in sync:
 
@@ -233,7 +248,7 @@ Subject ≤ 72 characters, imperative voice. One logical change per commit.
 ## 7. Verify before handing off
 
 ```bash
-python3 .kilo/skills/git-worktree/scripts/worktree.py verify <slug> --base main
+python3 .kilo/skills/git-worktree/scripts/worktree.py verify <slug> [--base <branch>]
 ```
 
 Prints the branch, the commits ahead of base, the changed files, the dirty state, and a

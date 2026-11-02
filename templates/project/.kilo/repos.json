@@ -1,0 +1,6 @@
+{
+  "control": ".",
+  "web": "apps/web",
+  "mobile": "apps/mobile",
+  "api": "apps/api"
+}

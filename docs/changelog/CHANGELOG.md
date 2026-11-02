@@ -3,19 +3,26 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-02] Split the factory from the project
+**Type:** Chore
+**Board:** - | **Branch:** chore/split-factory-and-project
+**Changed:** `AGENTS.md` (§A1 "The factory and the project", §A2 boot sequence), `README.md`, `.gitignore` (ignores `/project/`), `.kilo/repos.json` (the control repo only), `docs/{BOARD,DECISIONS,ENVIRONMENT,HANDOVER,PROJECT_STATE,PROJECT_STRUCTURE,README,STACK}.md` (rewritten for the factory), `docs/changelog/CHANGELOG.md`, `templates/project/**` (new: the blank project skeleton)
+**Why:** The factory and the product shared one repository, so 79 project handover files, the platform architecture and the product's risk register were committed to the software factory, and the factory's board carried product rows.
+**Impact:** The factory holds the harness only — rules, agents, commands, skills, policies, scope rules and the blank project skeleton. The Inhouz Cloud AI platform is its own git repository in `project/`, with its own board, documentation set, domain rules and 75 application repositories. `guard.py check-repos` exits 0 in both. The decision log is split: ADR-001 to ADR-099 are the factory's, the project's own decisions start at ADR-100. A project copies the harness in and owns the copy, so a factory change does not reach a project automatically. No behaviour changes.
+
+## [2026-10-30] Deny every tool read access to git config, credential and .env files
+**Type:** Security
+**Board:** - | **Branch:** main (uncommitted)
+**Changed:** `.kilo/policies/git-policy.json` (expanded `hidden_paths`, added `allow` list and edit denials), `.kilo/skills/git-worktree/scripts/guard.py` (expands `hidden_paths` into `read`/`grep`/`glob`/`list` deny rules and honours the allow list; `check-policy` compares every generated tool key), `kilo.jsonc` (generated), `.devcontainer/kilo-redact.sh` (new protected-file guard in the `$BASH_ENV` startup file), `.devcontainer/test-kilo-redact.sh` (10 guard checks), `.devcontainer/devcontainer.json` (`KILO_CONFIG` points at the root `kilo.jsonc`, so no subfolder copy is needed), `.kilo/skills/git-worktree/SKILL.md` (§3), `docs/DECISIONS.md` (ADR-052), `docs/HANDOVER.md`
+**Why:** A git config or credential file can hold a token in a URL, a credential helper or an extra HTTP header, and a `.env` file holds application secrets. The agent never needs to read any of them, but only the `read` tool was blocked before, and a nested app repository did not load the root config.
+**Impact:** `read`, `grep`, `glob` and `list` deny `.env`, `.env.*` (except `.env.example`), `.git/config`, `*.git/config`, submodule configs, `.git-credentials`, `~/.gitconfig`, the XDG git config and credential stores, `.npmrc`, `*.pem`, `*.key`, `*.p12` and `id_rsa*`. `edit` denies the same secret files. The `$BASH_ENV` guard refuses any `bash -c` command whose text names a protected file, in every subfolder and every repository; `.env.example` and `process.env` stay allowed. `KILO_CONFIG` points at the root config so nested repositories inherit it without a copy. No application behaviour changes. A Kilo restart is needed for the new permission block; the shell guard is active as soon as the file is installed. Shell commands that merely mention `.env` (for example a commit message) are also refused by the guard.
+
 ## [2026-10-30] Redact credentials from every shell command's output
 **Type:** Security
 **Board:** BOARD-002 | **Branch:** chore/redact-credentials-from-every-shell-command
 **Changed:** `AGENTS.md` (§B11 — a credential never reaches a transcript through a URL), `.devcontainer/kilo-redact.sh` (new), `.devcontainer/test-kilo-redact.sh` (new), `.devcontainer/devcontainer.json` (`remoteEnv.BASH_ENV`, install step in `postCreateCommand`), `docs/{ENVIRONMENT,STACK,RISKS,DECISIONS,PROJECT_STATE}.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-10-30-redact-credentials-from-shell-output.md`
 **Why:** The machine's global git config carried a `url.https://<token>@github.com/.insteadOf` rewrite, so `git remote -v` printed the credential in plaintext and it reached an agent transcript. The rewrite is removed — the token now lives in `/home/node/.git-credentials` (mode `600`) behind git's credential helper — and a `sed` filter installed as the container's `$BASH_ENV` startup file now scrubs both output streams of every shell command.
 **Impact:** No URL carries a credential, so no routine git command can disclose one. `$BASH_ENV` is used because Kilo Code runs shell tools as `/bin/bash -c` and Debian's `~/.bashrc` returns immediately for a non-interactive shell. Output with no credential is byte-identical, including binary output; the exit code, the stdout/stderr split and the output order are preserved. The filter needs a container rebuild or window reopen to activate. The token itself was printed once and must be rotated at GitHub.
-
-## [2026-10-30] Document the microservice fleet
-**Type:** Docs
-**Board:** BOARD-001 | **Branch:** docs/document-all-75-microservices-and-their
-**Changed:** `.gitignore` (new), `.kilo/repos.json` (75 microservice repos registered), `docs/handover/README.md` (rewritten as the global index), `docs/handover/<unit>.md` (75 new files, one per microservice), `docs/{ARCHITECTURE,STACK,API_CONTRACTS,RISKS,PROJECT_STRUCTURE,PROJECT_STATE,HANDOVER,DECISIONS}.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-10-30-document-the-microservice-fleet.md`
-**Why:** The platform is 75 microservices, each its own git repository under `apps/`, and the control repo had no git history, no board row for the platform, and a memory map that described the empty scope folders instead of the fleet.
-**Impact:** The control repo is seeded on `main` and every later change lands on a worktree branch; `guard.py check-repos` exits 0. The application memory map is complete: 75 handover files with the 14-section contract and `file:line` evidence, plus a global index with the domain system map, the 86-edge HTTP call graph, the 178-collection shared-database map and the external-API matrix. The governance documents now describe the real system. The map also surfaced the ranked defect list in `docs/RISKS.md` — a cross-tenant credential bleed in `payment_gateway_ms`, a double-charge risk in `late_payment_ms`, unrestricted request proxies, and 12 services whose image cannot boot. No application behaviour changes and no microservice repository is touched.
 
 ## [2026-10-30] Multi-repo support in the board and the git tools
 **Type:** Feature

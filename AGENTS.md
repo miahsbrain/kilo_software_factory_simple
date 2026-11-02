@@ -93,12 +93,38 @@ document.
 - Each app folder gets its own `AGENTS.md` with builder rules for that scope
   (`apps/web/AGENTS.md`, `apps/mobile/AGENTS.md`, `apps/api/AGENTS.md`).
 
+### The factory and the project
+
+This repository is the **factory**. It holds the harness and nothing else (ADR-053). A project is
+a separate git repository that copies the harness in and owns the copy from then on (ADR-054).
+
+| | Factory repository | Project repository |
+|---|---|---|
+| Holds | `AGENTS.md`, `.kilo/`, `.devcontainer/`, `kilo.jsonc`, `docs/`, `templates/` | `AGENTS.md`, `.kilo/`, `DOMAIN.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/`, `apps/` |
+| Board | `docs/BOARD.md` — factory work only | `docs/BOARD.md` — project work only |
+| Decisions | `docs/DECISIONS.md`, ADR-001… | `docs/DECISIONS.md`, ADR-100… |
+| Changelog | `docs/changelog/` — the harness | `docs/changelog/` — the product |
+
+- **Never write project content into the factory.** A product rule, a product document, a product
+  board row or a product decision belongs in the project repository. The factory tracks no
+  project: `project/` is git-ignored here.
+- **A project gets the harness by copy**, from `templates/project/` for a new project, or by
+  copying `AGENTS.md` and `.kilo/` into an existing one. The copy is deliberate — a project
+  owns its harness and does not depend on a path outside itself.
+- **In this workspace the project is `project/`.** It is its own git repository. Work on the
+  product happens there; work on the harness happens here.
+
 ---
 
 ## A2. Boot sequence and resumption
 
-On starting a conversation or being awakened, determine whether this is a new or existing project
+On starting a conversation or being awakened, determine whether this is the factory or a project
 by checking for: `DOMAIN.md`, `docs/PROJECT_STATE.md`, `CHANGELOG.md`, `ROADMAP.md`.
+
+**In the factory repository** (`DOMAIN.md` and `ROADMAP.md` are absent), the work is harness
+maintenance. Read `docs/PROJECT_STRUCTURE.md`, `docs/PROJECT_STATE.md`, `docs/BOARD.md` and
+`docs/DECISIONS.md`. A project repository inside the workspace (`project/`) is worked from its own
+root, with its own copy of these rules.
 
 ### Existing project
 
