@@ -20,7 +20,7 @@ the script can do it — the script is where the naming rules and the refusals l
 | Script | Does |
 |---|---|
 | `.kilo/skills/git-worktree/scripts/worktree.py` | create · list · verify · cleanup |
-| `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · policy |
+| `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · install-hooks · policy |
 
 Python 3.9+, standard library only.
 
@@ -157,10 +157,25 @@ keyword list:
 | Context check | Fires when |
 |---|---|
 | `protected_branch` | the current branch is on the policy's `protected_branches` list, or is the branch the repository names as its default through `origin/HEAD` |
+| `in_worktree` | the shell is **not** in a linked worktree under `.kilo/worktrees/` — `git commit` is denied in the main checkout |
 | `branch_switch_in_worktree` | the shell is in a linked worktree and the command switches branches |
 | `always` | always — used for the raw `git worktree remove` |
 
 Then the `bash` rules apply with **last match wins**, exactly like Kilo.
+
+The `edit` map is the deterministic file-change gate. Its fallback is `deny`; the only allow is
+`**/.kilo/worktrees/**`. So a file tool cannot write anywhere except inside a linked worktree,
+whatever the model decides. `docs/BOARD.md` is `deny` for file tools; the board is written only by
+`board.py`. The map is loaded at Kilo start, so a policy change takes effect on the next session.
+
+The same commit rule is enforced without the model: `guard.py install-hooks` writes a fail-closed
+`pre-commit` hook into the control repo and every repository in the map. The hook finds the
+nearest `guard.py` and runs `check-git`. A missing guard refuses the commit.
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/guard.py install-hooks --all          # dry run
+python3 .kilo/skills/git-worktree/scripts/guard.py install-hooks --all --apply  # install
+```
 
 The policy's `hidden_paths` block is expanded into `deny` rules for the file-reading tools —
 `read`, `grep`, `glob` and `list` — so no agent can read a git config, credential file or `.env`

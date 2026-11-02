@@ -76,7 +76,9 @@
       "rm -rf *": "ask"
     },
     "edit": {
-      "*": "allow",
+      "*": "deny",
+      ".kilo/worktrees/**": "allow",
+      "**/.kilo/worktrees/**": "allow",
       "AGENTS.md": "ask",
       "apps/*/AGENTS.md": "ask",
       ".kilo/agent/*.md": "ask",
@@ -84,7 +86,8 @@
       ".kilo/skills/*.md": "ask",
       ".kilo/policies/*.json": "ask",
       ".kilo/scopes/*.md": "ask",
-      "docs/BOARD.md": "ask",
+      "docs/BOARD.md": "deny",
+      "**/docs/BOARD.md": "deny",
       ".env": "deny",
       "**/.env": "deny",
       ".env.*": "deny",

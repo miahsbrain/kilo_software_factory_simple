@@ -510,6 +510,24 @@ def git_commands(command):
     return found
 
 
+def is_linked_worktree(cwd):
+    """True only when cwd is inside a linked worktree under .kilo/worktrees/.
+
+    A linked worktree has a git dir that differs from the common dir. The path check keeps
+    the rule tied to worktree.py's location, so a hand-made worktree elsewhere does not count.
+    """
+    git_dir = git_out(cwd, "rev-parse", "--absolute-git-dir")
+    common = git_out(cwd, "rev-parse", "--git-common-dir")
+    top = git_out(cwd, "rev-parse", "--show-toplevel")
+    if not git_dir or not common or not top:
+        return False
+    common_path = common if os.path.isabs(common) else os.path.join(cwd, common)
+    linked = os.path.realpath(git_dir) != os.path.realpath(common_path)
+    normalised = os.path.realpath(top).replace(os.sep, "/")
+    under = "/.kilo/worktrees/" in normalised + "/"
+    return bool(linked and under)
+
+
 def context_verdict(policy, command, cwd, ctx):
     """The context rule that fires for this command, or None."""
     for rule in policy.get("context", []):
@@ -522,6 +540,8 @@ def context_verdict(policy, command, cwd, ctx):
             branch = git_out(cwd, "rev-parse", "--abbrev-ref", "HEAD")
             top = git_out(cwd, "rev-parse", "--show-toplevel") or cwd
             fired = branch in protected_branch_names(top, policy)
+        elif check == "in_worktree":
+            fired = not is_linked_worktree(cwd)
         elif check == "branch_switch_in_worktree":
             parts = command.split()
             sub = parts[1] if len(parts) > 1 else ""
@@ -1041,6 +1061,96 @@ def resolve_repo_path(control, repos, repo_id):
     return wt.resolve_repo(control, repos, repo_id)
 
 
+HOOK_MARKER = "# installed by guard.py install-hooks"
+HOOK_BODY = """#!/bin/sh
+%s
+# A commit is allowed only inside a linked worktree. Fail closed when the guard is missing.
+top=$(git rev-parse --show-toplevel) || exit 1
+d=$top
+while [ "$d" != "/" ]; do
+  if [ -f "$d/.kilo/skills/git-worktree/scripts/guard.py" ]; then
+    exec python3 "$d/.kilo/skills/git-worktree/scripts/guard.py" check-git -- "git commit"
+  fi
+  d=$(dirname "$d")
+done
+echo "guard.py not found; commit refused" >&2
+exit 1
+""" % HOOK_MARKER
+
+
+def hooks_dir(repo):
+    """The hooks directory shared by every worktree of a repository."""
+    common = git_out(repo, "rev-parse", "--git-common-dir")
+    if not common:
+        return None
+    path = common if os.path.isabs(common) else os.path.join(repo, common)
+    return os.path.join(os.path.realpath(path), "hooks")
+
+
+def install_hook(repo, apply):
+    """(state, message). Writes a pre-commit hook that calls guard.py check-git."""
+    hooks = hooks_dir(repo)
+    if not hooks:
+        return "error", "not a git repository"
+    path = os.path.join(hooks, "pre-commit")
+    if os.path.exists(path):
+        try:
+            current = open(path, encoding="utf-8", errors="ignore").read()
+        except OSError as exc:
+            return "error", "cannot read %s (%s)" % (path, exc)
+        if HOOK_MARKER not in current:
+            return "conflict", "existing pre-commit hook not installed by guard.py: %s" % path
+    if not apply:
+        return "would-write", path
+    try:
+        os.makedirs(hooks, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(HOOK_BODY)
+        os.chmod(path, 0o755)
+    except OSError as exc:
+        return "error", "cannot write %s (%s)" % (path, exc)
+    return "written", path
+
+
+def cmd_install_hooks(all_flag, repo_id, apply, cwd, ctx):
+    """Install the worktree-only pre-commit hook in the control repo and every app repo."""
+    wt = load_worktree_module()
+    if wt is None:
+        print("worktree.py not found next to guard.py", file=sys.stderr)
+        return USAGE
+    control = control_root(ctx)
+    source = shell_tree(ctx)
+    repos, err = wt.load_repos(source)
+    if repos is None:
+        print(err or "no repo map", file=sys.stderr)
+        return USAGE
+    targets = [("control", control)]
+    if all_flag:
+        for rid in sorted(repos):
+            if rid == "control":
+                continue
+            path, rerr = wt.resolve_repo(control, repos, rid)
+            if rerr:
+                print("skip %s: %s" % (rid, rerr), file=sys.stderr)
+                continue
+            targets.append((rid, path))
+    elif repo_id:
+        path, rerr = wt.resolve_repo(control, repos, repo_id)
+        if rerr:
+            print(rerr, file=sys.stderr)
+            return INVALID
+        targets = [(repo_id, path)]
+    failed = False
+    for rid, path in targets:
+        state, message = install_hook(path, apply)
+        print("%-10s %-10s %s" % (state, rid, message))
+        if state in ("error", "conflict"):
+            failed = True
+    if not apply:
+        print("dry run; add --apply to write")
+    return DENIED if failed else OK
+
+
 def main(argv):
     parser = argparse.ArgumentParser(
         prog="guard.py", description="Guard destructive shell commands in this factory.")
@@ -1069,6 +1179,13 @@ def main(argv):
 
     sub.add_parser("check-repos", help="prove the repo map and the apps/ layout agree")
 
+    p_hooks = sub.add_parser("install-hooks",
+                             help="install the worktree-only pre-commit hook")
+    p_hooks.add_argument("--repo", help="repo id from .kilo/repos.json")
+    p_hooks.add_argument("--all", action="store_true",
+                         help="install in the control repo and every repository in the map")
+    p_hooks.add_argument("--apply", action="store_true", help="write; without it this is a dry run")
+
     sub.add_parser("policy", help="print the generated permission block")
 
     args = parser.parse_args(argv)
@@ -1082,6 +1199,10 @@ def main(argv):
         if args.command == "policy":
             return cmd_policy(cwd, ctx)
         return cmd_check_policy(args.write, cwd, ctx)
+
+    if args.command == "install-hooks":
+        cwd = os.getcwd()
+        return cmd_install_hooks(args.all, args.repo, args.apply, cwd, repo_context(cwd))
 
     if args.command in ("sync", "check-repos"):
         cwd = os.getcwd()

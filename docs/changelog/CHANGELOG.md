@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-02] Make worktree-only changes deterministic
+**Type:** Fix
+**Board:** BOARD-001 | **Branch:** chore/enforce-worktree-only-changes-and-serve
+**Changed:** `.kilo/policies/git-policy.json`, `kilo.jsonc`, `.kilo/skills/git-worktree/scripts/guard.py`, `.kilo/skills/git-worktree/SKILL.md`, `.kilo/skills/board/scripts/board_serve.py`, `docs/changelog/CHANGELOG.md`
+**Why:** The worktree rule was prose the model had to obey. Edits in the main checkout were allowed, `git commit` was allow-listed, no hook enforced the rule, and the board server showed one board.
+**Impact:** The `edit` permission map now denies every path by default and allows only `**/.kilo/worktrees/**`; `docs/BOARD.md` is denied to file tools. A new `in_worktree` policy check denies `git commit` in the main checkout, and `guard.py install-hooks` writes a fail-closed pre-commit hook into the control repo and every mapped repository. `board_serve.py` discovers and renders both the harness board and the project board, and `/api/board` returns both. Verified: main-checkout commit denied, worktree commit allowed, `check-policy` in sync, both boards listed over HTTP.
+
 ## [2026-11-02] Close the last two gaps in the worktree rule
 **Type:** Fix
 **Board:** - | **Branch:** chore/split-factory-and-project
