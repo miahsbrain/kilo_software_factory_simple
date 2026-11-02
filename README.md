@@ -114,14 +114,19 @@ The harness reaches a repository by copy, and the copy is a command:
     # every repository in the map, except the control repo
     python3 .kilo/skills/git-worktree/scripts/guard.py sync --all --apply
 
-A sync copies the `.kilo/` slice, the scope rules, the `.kilo/.gitignore` and the generated
-permission map. It never overwrites a repository's own `AGENTS.md`: a repository without a scope
-file of its own receives the default `service` scope, and one that already has an `AGENTS.md`
-keeps it.
+A **control repo** — one that holds a repo map and a board — receives the `.kilo/` slice and a
+generated permission map. A **work surface** receives one generated file: `AGENTS.md`, a pointer
+that names the project, the canonical scope rules and the unit's documentation. The pointer is
+never committed: it is listed in the repository's `.git/info/exclude`, which belongs to the clone,
+is shared by every worktree of that repository, and never enters a commit. A work surface's
+committed content is its application code alone.
 
 The factory and the project are two repositories, so a change in the factory's `.kilo/` reaches
-the project the same way — sync it into the project, then sync from the project into the app
-repositories. The project is registered in the factory's `.kilo/repos.json` for exactly that.
+the project the same way — sync it into the project, then sync from the project into the work
+surfaces. The project is registered in the factory's `.kilo/repos.json` for exactly that.
+
+The harness finds the control repo by walking up, so the board, the repo map and the guard rails
+work from inside a work surface as well as from the control repo.
 
 ## Quick start
 

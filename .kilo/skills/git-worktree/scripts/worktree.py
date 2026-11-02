@@ -87,6 +87,36 @@ def main_checkout_root(cwd):
     return script_root()
 
 
+def control_root(cwd):
+    """The control repo of the work: the repo that owns the board and the map.
+
+    A work surface holds application code only, so running the harness from
+    inside one must still find the project that governs it. The control repo
+    is the nearest ancestor that holds a repo map and a board. Its main
+    checkout is returned, because the board has one writer and that writer
+    works in the main checkout.
+    """
+    path = os.path.abspath(cwd)
+    found = None
+    while True:
+        if (os.path.exists(os.path.join(path, REPOS_REL))
+                and os.path.exists(os.path.join(path, "docs", "BOARD.md"))):
+            found = path
+            break
+        parent = os.path.dirname(path)
+        if parent == path:
+            break
+        path = parent
+    if found is None:
+        return main_checkout_root(cwd)
+    out = git_out(found, "worktree", "list", "--porcelain") or ""
+    for line in out.splitlines():
+        key, _, value = line.partition(" ")
+        if key == "worktree" and value:
+            return os.path.abspath(value)
+    return found
+
+
 def script_root():
     """The repo root that holds this script, whatever the cwd is."""
     return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -218,6 +248,17 @@ def load_board_module(root):
     return module
 
 
+def load_scope_module(root):
+    """The sibling scope.py, loaded by path so it works from anywhere."""
+    path = os.path.join(root, ".kilo", "skills", "git-worktree", "scripts", "scope.py")
+    if not os.path.exists(path):
+        return None
+    spec = importlib.util.spec_from_file_location("scope", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 TRAILING_STOPWORDS = {
     "with", "and", "or", "but", "for", "from", "to", "of", "in", "on", "at", "by", "as",
     "that", "which", "the", "a", "an", "is", "are", "was", "were", "be", "been", "it", "its",
@@ -340,7 +381,7 @@ def board_row(board, path, board_id):
 
 
 def cmd_create(args, cwd):
-    root = main_checkout_root(cwd)
+    root = control_root(cwd)
     board = load_board_module(script_root())
     if board is None:
         return REFUSED
@@ -411,6 +452,17 @@ def cmd_create(args, cwd):
     if code != 0:
         print("git worktree add failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         return REFUSED
+    scope = load_scope_module(script_root())
+    if scope is not None:
+        content = scope.pointer_content(root, repo_id, path)
+        if content:
+            state, note = scope.write_pointer(path, content)
+            if state == "kept":
+                print("warning: %s has a hand-written AGENTS.md; left alone" % path,
+                      file=sys.stderr)
+            else:
+                print("scope pointer: %s" % note)
+            scope.ensure_ignored(target)
     try:
         lines = list(table["lines"])
         rel_path = os.path.relpath(path, root).replace(os.sep, "/")
@@ -448,7 +500,7 @@ def cmd_list(args, cwd):
     if not root:
         print("not inside a git repository", file=sys.stderr)
         return REFUSED
-    control = main_checkout_root(cwd)
+    control = control_root(cwd)
     repos, err = load_repos(control)
     if repos is None:
         print(err, file=sys.stderr)
@@ -478,7 +530,7 @@ def cmd_verify(args, cwd):
         print("not inside a git repository", file=sys.stderr)
         return REFUSED
     board = load_board_module(script_root())
-    control = main_checkout_root(cwd)
+    control = control_root(cwd)
     path, board_branch = find_worktree_for_slug(board, control, args.slug, cwd)
     if not path:
         print("no worktree with slug %s" % args.slug, file=sys.stderr)
@@ -531,7 +583,7 @@ def cmd_cleanup(args, cwd):
         print("not inside a git repository", file=sys.stderr)
         return REFUSED
     board = load_board_module(script_root())
-    control = main_checkout_root(cwd)
+    control = control_root(cwd)
     path, board_branch = find_worktree_for_slug(board, control, args.slug, cwd)
     if not path:
         print("no worktree with slug %s" % args.slug, file=sys.stderr)

@@ -59,8 +59,40 @@ USAGE = 2
 INVALID = 66
 
 
+def control_root(cwd):
+    """The control repo's main checkout: the repository that owns the board.
+
+    A work surface holds application code only, so the board is not in the
+    directory the shell sits in. The control repo is the nearest ancestor
+    that holds a board, and its main checkout is used: the board has one
+    writer, and that writer works in the main checkout.
+    """
+    path = os.path.abspath(cwd)
+    found = None
+    while True:
+        if os.path.exists(os.path.join(path, BOARD_PATH)):
+            found = path
+            break
+        parent = os.path.dirname(path)
+        if parent == path:
+            break
+        path = parent
+    if found is None:
+        return os.path.abspath(cwd)
+    try:
+        out = subprocess.run(["git", "-C", found, "worktree", "list", "--porcelain"],
+                             capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return found
+    for line in out.splitlines():
+        key, _, value = line.partition(" ")
+        if key == "worktree" and value:
+            return os.path.abspath(value)
+    return found
+
+
 def board_path(explicit):
-    return explicit or os.path.join(os.getcwd(), BOARD_PATH)
+    return explicit or os.path.join(control_root(os.getcwd()), BOARD_PATH)
 
 
 def read_table(path):

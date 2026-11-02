@@ -72,8 +72,8 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py list
 ```
 
 `control` is the control repo itself. An app may live in its own git repository under `apps/`;
-that repo is a **work surface** — it gets the same `.kilo/` slice and the same guard rails,
-synced from the control repo.
+that repo is a **work surface** — it holds application code and nothing else. The harness stays
+in the control repo, and the work surface carries a generated pointer to it.
 
 ```bash
 python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> --repo api
@@ -88,6 +88,9 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> 
   holds several entries.
 - The row's `Repos` cell gains the repo id.
 - `--base` must exist in the target repo. Without it, the repo's own base is used.
+- The new worktree gets the generated pointer as its `AGENTS.md`. Untracked files do not travel
+  into a worktree, so `create` writes it there. The pointer is never committed: it is listed in
+  the repository's `.git/info/exclude`.
 
 `cleanup` and `verify` find the worktree from the row's `Branch/Worktree` cell, so they work for
 worktrees in any repo. `list` shows the worktrees of every repo in the map, with the repo id next
@@ -104,10 +107,18 @@ python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
 - `check-repos` fails when a mapped path is missing, when a git repository under `apps/` is not
   registered, or when the control repo is not registered as `control`. A registered folder that
   is not a git repository yet is reported, not a failure.
-- `sync` copies the `.kilo/` slice (`agent/`, `command/`, `skills/`, `policies/`, `scopes/`) and
-  the scope rules into the target repo and regenerates the target's `kilo.jsonc` permission map.
-  It is a dry run unless `--apply` is given. It copies files only: it never deletes anything and
-  never touches the target's `docs/`.
+- `sync` gives the target the pointer it needs. A **control repo** — one that holds a repo map
+  and a board — receives the `.kilo/` slice (`agent/`, `command/`, `skills/`, `policies/`,
+  `scopes/`) and a regenerated `kilo.jsonc` permission map. A **work surface** receives one
+  generated file: `AGENTS.md`, a pointer that names the project, the canonical scope rules and the
+  unit's documentation. It is a dry run unless `--apply` is given. It copies files only: it never
+  deletes anything and never touches the target's `docs/`.
+- The pointer is never committed. `sync` adds `AGENTS.md`, `.kilo/` and `kilo.jsonc` to the
+  target's `.git/info/exclude`, which belongs to the clone, is shared by every worktree of that
+  repository, and never enters a commit. A work surface's committed content is its own code.
+- `sync --all` does the same for every repository in the map except the control repo.
+- A pointer that is already current is left alone, and a hand-written `AGENTS.md` is never
+  replaced.
 - The scope rules live in `.kilo/scopes/<id>.md`. `sync --repo <id>` writes that file to the
   scope's repository as its `AGENTS.md`. For the control repo itself the scope rules go to
   `apps/<id>/AGENTS.md`.

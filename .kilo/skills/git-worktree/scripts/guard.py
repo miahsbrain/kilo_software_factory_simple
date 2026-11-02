@@ -727,6 +727,17 @@ def load_worktree_module():
     return module
 
 
+def load_scope_module():
+    """The sibling scope.py, loaded by path so it works from anywhere."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scope.py")
+    if not os.path.exists(path):
+        return None
+    spec = importlib.util.spec_from_file_location("scope", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def shell_tree(ctx):
     """The tree the shell is in: the source of the .kilo slice and the scope rules."""
     if ctx:
@@ -740,8 +751,15 @@ def control_root(ctx):
     """The control repo's main checkout: the place the target repositories live.
 
     A nested app repository at apps/<name>/ is not tracked by the control repo,
-    so it exists only in the main checkout, never in a worktree of it.
+    so it exists only in the main checkout, never in a worktree of it. A work
+    surface holds application code only, so the control repo is found by
+    walking up to the nearest ancestor that holds a repo map and a board.
     """
+    wt = load_worktree_module()
+    if wt is not None:
+        root = wt.control_root(os.getcwd())
+        if root:
+            return root
     if ctx:
         root = ctx.get("repo_root")
         if root:
@@ -770,38 +788,64 @@ def repo_targets(source_tree, control, repo_id):
     return target, repos, None
 
 
-def scope_files(source_tree, target, repo_id):
-    """[(source, destination)] for the scope rules of this target."""
-    pairs = []
-    scopes_dir = os.path.join(source_tree, ".kilo", "scopes")
+def is_control_repo(path):
+    """True when this repository owns a harness: a repo map and a board."""
+    return (os.path.exists(os.path.join(path, REPOS_REL))
+            and os.path.exists(os.path.join(path, "docs", "BOARD.md")))
+
+
+def scope_files(rules_root, target, repo_id):
+    """The scope pointer this target carries.
+
+    A work surface does not hold a second copy of the project's rules. It
+    holds one generated pointer, AGENTS.md, that names the project and the
+    canonical scope rules inside it. The pointer is listed in the target's
+    local exclude file, so it is never committed.
+    """
+    scope = load_scope_module()
+    if scope is None:
+        return []
     if repo_id == "control":
+        pairs = []
+        scopes_dir = os.path.join(rules_root, ".kilo", "scopes")
         for name in sorted(os.listdir(scopes_dir)) if os.path.isdir(scopes_dir) else []:
             if not name.endswith(".md"):
                 continue
             scope_id = name[:-3]
-            if scope_id == DEFAULT_SCOPE:
+            if scope_id == scope.DEFAULT_SCOPE:
                 continue
-            pairs.append((os.path.join(scopes_dir, name),
-                          os.path.join(source_tree, "apps", scope_id, "AGENTS.md")))
+            destination_dir = os.path.join(rules_root, "apps", scope_id)
+            if not os.path.isdir(destination_dir):
+                continue
+            destination = os.path.join(destination_dir, "AGENTS.md")
+            existing = scope.read_existing(destination)
+            if existing is not None and scope.POINTER_MARKER not in existing:
+                continue
+            content = scope.pointer_content(rules_root, scope_id, destination_dir)
+            if content:
+                pairs.append((content, destination))
         return pairs
-    source = os.path.join(scopes_dir, repo_id + ".md")
-    if os.path.exists(source):
-        pairs.append((source, os.path.join(target, "AGENTS.md")))
-        return pairs
-    default = os.path.join(scopes_dir, DEFAULT_SCOPE + ".md")
     destination = os.path.join(target, "AGENTS.md")
-    if os.path.exists(default) and not os.path.exists(destination):
-        pairs.append((default, destination))
-    return pairs
+    existing = scope.read_existing(destination)
+    if existing is not None and scope.POINTER_MARKER not in existing:
+        return []
+    content = scope.pointer_content(rules_root, repo_id, target)
+    return [(content, destination)] if content else []
 
 
 def file_state(source, destination):
-    """'new', 'changed' or 'identical' for one planned file."""
+    """'new', 'changed' or 'identical' for one planned file.
+
+    The source is either a path to copy or the literal content to write.
+    """
     if not os.path.exists(destination):
         return "new"
     try:
-        with open(source, "rb") as fh:
-            a = fh.read()
+        if isinstance(source, str) and os.path.exists(source):
+            with open(source, "rb") as fh:
+                a = fh.read()
+        else:
+            a = source.encode("utf-8") if isinstance(source, str) else source
         with open(destination, "rb") as fh:
             b = fh.read()
     except OSError:
@@ -853,23 +897,28 @@ def cmd_sync(repo_id, apply, cwd, ctx):
               file=sys.stderr)
         return DENIED
     plan = []
-    for folder in SYNC_SLICE:
-        source_dir = os.path.join(source_tree, ".kilo", folder)
-        if not os.path.isdir(source_dir):
-            continue
-        for dirpath, dirnames, filenames in os.walk(source_dir):
-            dirnames[:] = [d for d in dirnames if d != "__pycache__"]
-            rel = os.path.relpath(dirpath, source_dir)
-            for name in sorted(filenames):
-                if name.endswith(".pyc"):
-                    continue
-                source = os.path.join(dirpath, name)
-                rel_file = name if rel == "." else os.path.join(rel, name)
-                plan.append((source, os.path.join(target, ".kilo", folder, rel_file)))
-    slice_ignore = os.path.join(source_tree, ".kilo", ".gitignore")
-    if os.path.exists(slice_ignore):
-        plan.append((slice_ignore, os.path.join(target, ".kilo", ".gitignore")))
-    plan.extend(scope_files(source_tree, target, repo_id))
+    # The rules live in the control repo. A work surface receives a pointer
+    # to them and nothing else; the harness itself stays in the project.
+    rules_root = control
+    target_is_control = is_control_repo(target)
+    if target_is_control:
+        for folder in SYNC_SLICE:
+            source_dir = os.path.join(source_tree, ".kilo", folder)
+            if not os.path.isdir(source_dir):
+                continue
+            for dirpath, dirnames, filenames in os.walk(source_dir):
+                dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+                rel = os.path.relpath(dirpath, source_dir)
+                for name in sorted(filenames):
+                    if name.endswith(".pyc"):
+                        continue
+                    source = os.path.join(dirpath, name)
+                    rel_file = name if rel == "." else os.path.join(rel, name)
+                    plan.append((source, os.path.join(target, ".kilo", folder, rel_file)))
+        slice_ignore = os.path.join(source_tree, ".kilo", ".gitignore")
+        if os.path.exists(slice_ignore):
+            plan.append((slice_ignore, os.path.join(target, ".kilo", ".gitignore")))
+    plan.extend(scope_files(rules_root, target, repo_id))
     config_path = os.path.join(target, "kilo.jsonc")
 
     print("control repo: %s" % control)
@@ -884,7 +933,10 @@ def cmd_sync(repo_id, apply, cwd, ctx):
         else:
             written += 1
         print("  %-9s %s" % (state, os.path.relpath(destination, target)))
-    print("  %-9s %s" % ("regen", os.path.relpath(config_path, target)))
+    if target_is_control:
+        print("  %-9s %s" % ("regen", os.path.relpath(config_path, target)))
+    else:
+        print("  %-9s %s" % ("pointer", "AGENTS.md"))
     if not is_repo:
         print("note: the target is not a git repository; --apply would be refused.")
 
@@ -893,14 +945,30 @@ def cmd_sync(repo_id, apply, cwd, ctx):
         return OK
 
     for source, destination in plan:
-        if os.path.realpath(source) == os.path.realpath(destination):
-            continue
-        os.makedirs(os.path.dirname(destination), exist_ok=True)
-        shutil.copyfile(source, destination)
-    policy = load_policy(os.path.join(source_tree, POLICY_REL))
-    written_config, message = write_permission_map(config_path, policy, create_missing=True)
-    print("permission map %s (%s)" % (os.path.relpath(config_path, target), message))
+        if isinstance(source, str) and os.path.exists(source):
+            if os.path.realpath(source) == os.path.realpath(destination):
+                continue
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            shutil.copyfile(source, destination)
+        else:
+            scope = load_scope_module()
+            if scope is not None and os.path.basename(destination) == scope.IGNORED_NAME:
+                state, note = scope.write_pointer(os.path.dirname(destination), source)
+                if state == "kept":
+                    print("kept: %s" % note)
+                continue
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            with open(destination, "w", encoding="utf-8") as fh:
+                fh.write(source)
+    if target_is_control:
+        policy = load_policy(os.path.join(source_tree, POLICY_REL))
+        written_config, message = write_permission_map(config_path, policy, create_missing=True)
+        print("permission map %s (%s)" % (os.path.relpath(config_path, target), message))
     print("files written: %d, identical: %d, skipped: 0" % (written, identical))
+    scope = load_scope_module()
+    if scope is not None and is_repo and not target_is_control:
+        ok, note = scope.ensure_ignored(target)
+        print("generated files excluded: %s" % note)
     return OK
 
 

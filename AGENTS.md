@@ -342,7 +342,7 @@ the intent. Never have an agent hand-run the underlying command when a script co
 | A finding is actionable before it becomes a board row | `.kilo/skills/qa-review/scripts/check-finding.py` |
 | Git commands that change history or the remote are classified before they run | `.kilo/skills/git-worktree/scripts/guard.py check-git` |
 | The permission map and the policy file cannot drift apart | `.kilo/skills/git-worktree/scripts/guard.py check-policy` |
-| An app repo's guard rails match the control repo's | `.kilo/skills/git-worktree/scripts/guard.py sync` |
+| A work surface's pointer matches the project's rules | `.kilo/skills/git-worktree/scripts/guard.py sync` |
 | The repo map matches the layout on disk | `.kilo/skills/git-worktree/scripts/guard.py check-repos` |
 
 The skills in `.kilo/skills/` are the executable procedures behind these rules. When a rule
@@ -1207,15 +1207,20 @@ Exit 0 → allowed. Exit 1 → denied; the reason is on stderr, and the command 
 
 The **control repo** holds the board, the domain rules, the API contracts, the documentation and
 the guard-rail policy. An **app repo** is a git repository nested at `apps/<name>/` that holds one
-application's code. Both carry the same `.kilo/` slice, so the guard rails are the same wherever
-the work happens.
+application's code and nothing else. The harness lives in the control repo; a work surface never
+carries a second copy of it.
 
 - `.kilo/repos.json` maps a repo id to its path. `guard.py check-repos` fails when the map and the
   layout disagree.
-- `.kilo/scopes/<id>.md` is the canonical copy of a scope's rules. `guard.py sync --repo <id>`
-  writes it into that repository as its `AGENTS.md`, next to the `.kilo/` slice. It is a dry run
-  until `--apply`.
+- `.kilo/scopes/<id>.md` is the canonical copy of a scope's rules. A work surface carries a
+  **generated pointer** — an `AGENTS.md` that names the project, the canonical scope rules and the
+  unit's documentation — instead of a copy of the rules. `guard.py sync --repo <id>` writes it. It
+  is a dry run until `--apply`.
+- The pointer is **never committed**. `guard.py sync` adds it to the repository's
+  `.git/info/exclude`, which belongs to the clone, is shared by every worktree, and never enters a
+  commit. A work surface's committed content is its application code alone.
 - The board lives in the control repo only. A row names the repos it touches in its `Repos` cell.
+  The harness finds the board from a work surface by walking up to the control repo.
 - The builder works in the app repo's scope; the orchestrator works in the control repo. The
   documentation, the board and the memory map stay in the control repo.
 

@@ -1,24 +1,24 @@
 # AGENTS.md — Service Builder
 
-> Source of truth for this scope. `guard.py sync --repo <id>` keeps each repository's copy in step.
->
-> This is the default scope for a repository that has no scope file of its own. It applies to the
-> repository it was written into, whichever one that is.
+> The canonical scope rules for a work surface. The copy in the project's
+> `.kilo/scopes/` is the one that counts; a work surface carries a pointer to
+> it, never a second copy of these rules.
 
 You are the builder for this repository. Work only inside it.
 
-Read the root `AGENTS.md` of the control repo (Part B applies to you) before starting.
+Read the project's root `AGENTS.md` (Part B applies to you) before starting. The
+`AGENTS.md` in this repository points at it.
 
 ## Scope
 
 - Work only inside this repository. Do not read, list, search, or modify files outside it.
-- Do not inspect the control repo, `.devcontainer/`, or a sibling repository.
+- Do not inspect the project, `.devcontainer/`, or a sibling repository.
 - Read only the files named in your task. One narrow directory listing if a path is unknown.
 - Do not inspect `PATH`, runtimes, env vars, package files, or lockfiles unless a command fails.
 
 ## Stack
 
-Use the stack and commands from the control repo's `docs/STACK.md` as given in your prompt. Do not
+Use the stack and commands from the project's `docs/STACK.md` as given in your prompt. Do not
 assume a language, framework, or runtime unless it is confirmed there or in your prompt.
 
 ## Structure
@@ -86,5 +86,5 @@ auth, contracts, persistence, deployment, or critical product behavior.
 ## Report back
 
 Changed files, verification run and result, assumptions, blockers, limitations, and any
-documentation that needs updating (`docs/HANDOVER.md`, `docs/BUSINESS-LOGIC.md`,
-`docs/API_CONTRACTS.md`, `docs/changelog/`, `docs/BOARD.md`).
+documentation that needs updating in the project (`docs/HANDOVER.md`,
+`docs/BUSINESS-LOGIC.md`, `docs/API_CONTRACTS.md`, `docs/changelog/`, `docs/BOARD.md`).
