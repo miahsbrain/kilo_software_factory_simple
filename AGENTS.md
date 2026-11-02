@@ -1552,8 +1552,10 @@ the port values.
 
 - **Local commits on the worktree branch are allowed and expected.** The builder commits its own
   work in its worktree, on its own branch, with the message format in §B4.1.
-- **Never commit on `main`/`master`/`base`.** Not for a fix, not for a typo, not for a doc. The
-  human owns the base branch.
+- **Never commit on a protected branch.** Not for a fix, not for a typo, not for a doc. The human
+  owns the base branch. `.kilo/policies/git-policy.json` names the protected branches
+  (`protected_branches`), and the repository's own default branch from `origin/HEAD` is always
+  included — the microservices base on `dev`, so `dev` is protected too.
 - **Never commit to a branch that already has a worktree.** One branch, one worktree, one task.
 - **Never merge.** Not into `main`, not into a feature branch, not with `--no-ff`, not at all.
 - **Never push.** No `git push`, no force push, no `--all`/`--mirror`, to any branch.

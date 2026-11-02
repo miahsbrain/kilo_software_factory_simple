@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-02] Close the last two gaps in the worktree rule
+**Type:** Fix
+**Board:** - | **Branch:** chore/split-factory-and-project
+**Changed:** `.kilo/skills/git-worktree/scripts/{guard.py,worktree.py}`, `.kilo/policies/git-policy.json`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Two things were documented but not true. A commit straight onto `dev` in a microservice was allowed, because only `main`, `master` and `base` were protected, and the microservices base on `dev`. And `worktree.py create` wrote the pointer into the new worktree but not into the repository root, so a brand-new repository had no pointer until a separate `sync` ran.
+**Impact:** `protected_branches` in `.kilo/policies/git-policy.json` now names `dev` as well, and the repository's own default branch from `origin/HEAD` is always added. `guard.py check-git` refuses a commit on the base branch in every repository. `worktree.py create` writes the pointer into the repository root and into the new worktree, so a new repository is complete the moment its first worktree is created. Verified on a throwaway repository: the pointer appeared in both places, was excluded from git, a commit on `dev` was blocked and a commit on the worktree branch was allowed.
+
 ## [2026-11-02] Give a work surface a pointer instead of a copy of the rules
 **Type:** Chore
 **Board:** - | **Branch:** chore/split-factory-and-project

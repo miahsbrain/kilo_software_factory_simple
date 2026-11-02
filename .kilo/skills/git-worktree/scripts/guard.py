@@ -427,6 +427,20 @@ def check_worktree(command, cwd, ctx, env):
 
 
 PROTECTED_BRANCHES = ("main", "master", "base")
+
+
+def protected_branch_names(repo, policy=None):
+    """The branches a commit must never land on in this repository.
+
+    The list comes from the policy, so a project that bases on ``dev``
+    protects ``dev``. The branch the repository names as its own default
+    through ``origin/HEAD`` is always included.
+    """
+    names = set((policy or {}).get("protected_branches") or PROTECTED_BRANCHES)
+    head = git_out(repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    if head:
+        names.add(head.split("/", 1)[1] if "/" in head else head)
+    return names
 POLICY_REL = os.path.join(".kilo", "policies", "git-policy.json")
 REPOS_REL = os.path.join(".kilo", "repos.json")
 FALLBACK_KEY = "*"
@@ -506,7 +520,8 @@ def context_verdict(policy, command, cwd, ctx):
             fired = True
         elif check == "protected_branch":
             branch = git_out(cwd, "rev-parse", "--abbrev-ref", "HEAD")
-            fired = branch in PROTECTED_BRANCHES
+            top = git_out(cwd, "rev-parse", "--show-toplevel") or cwd
+            fired = branch in protected_branch_names(top, policy)
         elif check == "branch_switch_in_worktree":
             parts = command.split()
             sub = parts[1] if len(parts) > 1 else ""

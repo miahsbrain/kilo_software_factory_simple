@@ -156,7 +156,7 @@ keyword list:
 
 | Context check | Fires when |
 |---|---|
-| `protected_branch` | the current branch is `main`, `master` or `base` |
+| `protected_branch` | the current branch is on the policy's `protected_branches` list, or is the branch the repository names as its default through `origin/HEAD` |
 | `branch_switch_in_worktree` | the shell is in a linked worktree and the command switches branches |
 | `always` | always — used for the raw `git worktree remove` |
 
