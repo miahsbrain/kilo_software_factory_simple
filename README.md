@@ -92,6 +92,37 @@ After that, `worktree.py create --board BOARD-00X --repo api` puts the worktree 
 repository, and the board still lives in the control repo. A row names the repos it touches in its
 `Repos` cell.
 
+### Where the work happens
+
+Every change lands in a worktree **inside the repository it touches**, and the row that tracks it
+lives on the control repo's board:
+
+    board row  →  docs/BOARD.md of the control repo          (one writer: the orchestrator)
+    worktree   →  apps/<name>/.kilo/worktrees/<slug>/         (one per row, per repository)
+
+The base branch is the target repository's own: `main` when it exists, otherwise the branch it
+names as `origin/HEAD`. Name one with `--base` to override. A row's `Repos` cell lists every
+repository it touches, and its `Branch/Worktree` cell records the exact path and branch.
+
+### Carrying the harness across
+
+The harness reaches a repository by copy, and the copy is a command:
+
+    # one repository
+    python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
+
+    # every repository in the map, except the control repo
+    python3 .kilo/skills/git-worktree/scripts/guard.py sync --all --apply
+
+A sync copies the `.kilo/` slice, the scope rules, the `.kilo/.gitignore` and the generated
+permission map. It never overwrites a repository's own `AGENTS.md`: a repository without a scope
+file of its own receives the default `service` scope, and one that already has an `AGENTS.md`
+keeps it.
+
+The factory and the project are two repositories, so a change in the factory's `.kilo/` reaches
+the project the same way — sync it into the project, then sync from the project into the app
+repositories. The project is registered in the factory's `.kilo/repos.json` for exactly that.
+
 ## Quick start
 
 1. Open the repo in Kilo Code, or open the devcontainer: `code .`

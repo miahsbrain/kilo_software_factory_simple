@@ -38,6 +38,7 @@
 | `.kilo/worktrees/` | Agent worktrees, one per task. Git-ignored. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, the redaction script. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
+| `.kilo/scopes/service.md` | The default scope rules for a repository with no scope file of its own. Written into it as its `AGENTS.md` by `guard.py sync`. |
 | `templates/project/` | The blank project skeleton a new project starts from. |
 | `project/` | A project repository in this workspace. Its own git repository. Never tracked here. |
 
@@ -50,7 +51,7 @@
 | `.kilo/skills/board/scripts/board.py` | The board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`. |
 | `.kilo/skills/board/scripts/board_serve.py` | The read-only board viewer on port 15180. |
 | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. |
-| `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync`. |
+| `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.kilo/skills/qa-review/scripts/browser-review.mjs` | The only UI evidence capture path. Drives Playwright. |
 | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a QA finding and prints its fingerprint. |
 | `.kilo/skills/qa-review/scripts/ledger.py` | Opens, closes and reports the QA↔fix rounds of a row. |
@@ -117,6 +118,8 @@ ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup fi
 ## 12. Open questions
 
 - Where the factory repository is published, and where the project repository is pushed.
+- Whether the factory's `.kilo/` changes reach the project by a command the user runs, or by a
+  hook. Today it is `guard.py sync --repo project --apply`.
 
 ## 13. Document map
 
