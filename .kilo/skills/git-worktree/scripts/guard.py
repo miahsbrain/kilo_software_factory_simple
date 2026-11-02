@@ -819,15 +819,16 @@ def scope_files(rules_root, target, repo_id):
                 continue
             destination = os.path.join(destination_dir, "AGENTS.md")
             existing = scope.read_existing(destination)
-            if existing is not None and scope.POINTER_MARKER not in existing:
+            if existing is not None and not scope.is_generated(existing):
                 continue
-            content = scope.pointer_content(rules_root, scope_id, destination_dir)
+            content = scope.pointer_content(rules_root, scope_id, destination_dir,
+                                            excluded=False)
             if content:
                 pairs.append((content, destination))
         return pairs
     destination = os.path.join(target, "AGENTS.md")
     existing = scope.read_existing(destination)
-    if existing is not None and scope.POINTER_MARKER not in existing:
+    if existing is not None and not scope.is_generated(existing):
         return []
     content = scope.pointer_content(rules_root, repo_id, target)
     return [(content, destination)] if content else []
