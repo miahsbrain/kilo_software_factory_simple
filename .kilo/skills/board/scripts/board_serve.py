@@ -79,6 +79,29 @@ def board_file(path, root):
     return os.path.join(root, "docs", "BOARD.md")
 
 
+def discover_boards(root):
+    """[(label, path)] for the harness board and the project board, when both exist.
+
+    The factory root has no DOMAIN.md; the project root has one. From either root the
+    sibling board is found, so one server shows both boards.
+    """
+    root = os.path.abspath(root)
+    is_project = os.path.exists(os.path.join(root, "DOMAIN.md"))
+    boards = []
+    if is_project:
+        boards.append(("project", os.path.join(root, "docs", "BOARD.md")))
+        parent = os.path.dirname(root)
+        if (os.path.exists(os.path.join(parent, ".kilo"))
+                and os.path.exists(os.path.join(parent, "docs", "BOARD.md"))):
+            boards.append(("harness", os.path.join(parent, "docs", "BOARD.md")))
+    else:
+        boards.append(("harness", os.path.join(root, "docs", "BOARD.md")))
+        child = os.path.join(root, "project", "docs", "BOARD.md")
+        if os.path.exists(child):
+            boards.append(("project", child))
+    return [(label, path) for label, path in boards if os.path.exists(path)]
+
+
 def read_rows(board, path):
     """(rows, error). The board is read fresh; nothing is cached."""
     table, err = board.read_table(path)
@@ -427,10 +450,37 @@ def render_lane(lane, rows):
     ) % (esc(lane), esc(lane), len(cards), body)
 
 
-def build_html(rows, lanes, worktrees, generated_at, error, refresh):
-    board_counts = {lane: len(lanes.get(lane, [])) for lane in LANES}
-    total = len(rows)
-    lane_html = "\n".join(render_lane(lane, rows) for lane in LANES)
+def render_board(entry):
+    """One board: its heading and every lane."""
+    rows = entry["rows"]
+    counts = entry["counts"]
+    banner = ""
+    if entry.get("error"):
+        banner = '<p class="banner">%s</p>' % esc(entry["error"])
+    lanes_html = "\n".join(render_lane(lane, rows) for lane in LANES)
+    return (
+        '<section class="board" data-board="%s">'
+        '<div class="panel-head"><h2>%s board</h2>'
+        '<span class="meta">%d card(s) &middot; %s</span></div>'
+        '<p class="meta">%s</p>%s'
+        '<div class="lanes">%s</div>'
+        '</section>'
+    ) % (
+        esc(entry["label"]),
+        esc(entry["label"]),
+        len(rows),
+        esc(", ".join("%s %d" % (lane, counts[lane]) for lane in LANES)),
+        esc(entry["path"]),
+        banner,
+        lanes_html,
+    )
+
+
+def build_html(boards, worktrees, generated_at, error, refresh):
+    total = sum(len(entry["rows"]) for entry in boards)
+    boards_html = "\n".join(render_board(entry) for entry in boards)
+    if not boards_html:
+        boards_html = '<p class="empty">No board file found.</p>'
     wt_html = "".join(render_worktree(wt) for wt in worktrees)
     if not wt_html:
         wt_html = '<p class="empty">No git worktrees found.</p>'
@@ -458,8 +508,8 @@ def build_html(rows, lanes, worktrees, generated_at, error, refresh):
         '<span class="meta">%d worktree(s)</span></div>\n'
         '<div class="wt-list">%s</div>\n'
         "</section>\n"
-        '<section class="lanes">\n%s\n</section>\n'
-        '<footer>%d card(s) on the board &middot; %s</footer>\n'
+        '%s\n'
+        '<footer>%d card(s) across %d board(s)</footer>\n'
         "<script>%s</script>\n"
         "</body></html>"
     ) % (
@@ -470,9 +520,9 @@ def build_html(rows, lanes, worktrees, generated_at, error, refresh):
         banner,
         len(worktrees),
         wt_html,
-        lane_html,
+        boards_html,
         total,
-        esc(", ".join("%s %d" % (lane, board_counts[lane]) for lane in LANES)),
+        len(boards),
         JS,
     )
 
@@ -518,16 +568,27 @@ class Handler(BaseHTTPRequestHandler):
         self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
 
 
-def build_payloads(board, worktree, path, root):
-    def board_payload():
+def board_states(board, paths):
+    states = []
+    for label, path in paths:
         rows, error = read_rows(board, path)
         lanes = lane_map(rows)
-        return {
+        states.append({
+            "label": label,
+            "path": path,
             "rows": rows,
             "lanes": lanes,
             "counts": {lane: len(lanes.get(lane, [])) for lane in LANES},
-            "generated_at": now(),
             "error": error,
+        })
+    return states
+
+
+def build_payloads(board, worktree, paths, root):
+    def board_payload():
+        return {
+            "boards": board_states(board, paths),
+            "generated_at": now(),
         }
 
     def worktree_payload():
@@ -538,13 +599,13 @@ def build_payloads(board, worktree, path, root):
 
     def html_page():
         try:
-            rows, error = read_rows(board, path)
-            lanes = lane_map(rows)
+            states = board_states(board, paths)
             state = worktree_state(worktree, root)
+            error = None
         except Exception as exc:
-            rows, lanes, state = [], lane_map([]), []
+            states, state = [], []
             error = "could not read the board: %s" % exc
-        return build_html(rows, lanes, state, now(), error, Handler.state["refresh"])
+        return build_html(states, state, now(), error, Handler.state["refresh"])
 
     return board_payload, worktree_payload, html_page
 
@@ -571,9 +632,14 @@ def main(argv):
     board, worktree = load_helpers()
     cwd = os.getcwd()
     root = repo_root(worktree, cwd)
-    path = board_file(args.file, root)
+    if args.file:
+        paths = [("board", board_file(args.file, root))]
+    else:
+        paths = discover_boards(root)
+        if not paths:
+            paths = [("board", board_file(None, root))]
 
-    board_payload, worktree_payload, html_page = build_payloads(board, worktree, path, root)
+    board_payload, worktree_payload, html_page = build_payloads(board, worktree, paths, root)
     Handler.state = {
         "board_payload": board_payload,
         "worktree_payload": worktree_payload,
@@ -587,7 +653,8 @@ def main(argv):
         print("cannot bind %s:%d (%s)" % (args.host, args.port, exc), file=sys.stderr)
         return 1
     url = "http://%s:%d/" % ("127.0.0.1" if args.host == "0.0.0.0" else args.host, args.port)
-    print("board:   %s" % path)
+    for label, path in paths:
+        print("board:   %-8s %s" % (label, path))
     print("serving: %s" % url)
     print("stop with Ctrl-C")
     if args.open:
