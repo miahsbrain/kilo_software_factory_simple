@@ -134,6 +134,11 @@ Run the smallest relevant verification command from `docs/STACK.md`. For tiny co
 className, spacing, or static UI changes, skip command verification and say: "Verification
 limited to file review because this was a low-risk visual/static change." Never run lint and build
 together unless the first fails.
+**Never run a production build.** `npm run build`, `buildProd`, `buildProd2`, `buildDev` and
+`npx react-scripts build` are not verification steps. Read the run command in `docs/RUNNING.md` and
+`docs/STACK.md` first, start the app with it, and verify against the running development server.
+For UI work, prove the result in a browser with the QA capture script. A production build runs
+only when the user asks for one by name.
 
 ## Git
 

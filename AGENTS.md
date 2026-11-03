@@ -450,6 +450,15 @@ Specify whether verification is required.
   verification command.
 - Full build only when compilation, bundling, routing, imports, types, or app-wide behavior could
   be affected, or the user asks.
+### No production builds
+
+**Never run a production build.** A production build is not a verification step.
+
+- Before running anything, read the documented run command in `docs/RUNNING.md` and `docs/STACK.md`.
+  Do not invent a command from memory and do not substitute your own.
+- Verify against the running development server, started with the documented command.
+- For UI work, prove the result in a browser with the QA capture script (§B4.2).
+- A production build runs only when the user asks for one by name.
 - Never reduce verification on security, auth, contracts, persistence, deployment, or critical
   product behavior.
 
