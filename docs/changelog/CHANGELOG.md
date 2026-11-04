@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-04] Board viewer fixes from QA round 1
+**Type:** Fix
+**Board:** BOARD-102 | **Branch:** feat/compact-accordion-redesign-of-the-live
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/changelog/CHANGELOG.md`
+**Why:** The first QA pass found text clipped at narrow widths, a favicon request to the network, and lanes that looked populated while holding no cards.
+**Impact:** Long values now wrap instead of clipping, the favicon is inline so the page makes no extra request, a lane with no cards stays collapsed, the board path is shown as a path, and a 480px breakpoint tightens the header, filter and panels. Content, behaviour, the JSON endpoints and the escaping are unchanged.
+
 ## [2026-11-04] Compact accordion board viewer
 **Type:** Feature
 **Board:** BOARD-102 | **Branch:** feat/compact-accordion-redesign-of-the-live

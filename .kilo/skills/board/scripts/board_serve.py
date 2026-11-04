@@ -40,6 +40,10 @@ GIT_TIMEOUT = 5
 DEFAULT_PORT = 15180
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_REFRESH = 10
+# Inline favicon: the page stays offline and makes no favicon request.
+FAVICON = ("data:image/svg+xml,"
+           "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E"
+           "%3Crect width='16' height='16' rx='3' fill='%232f6feb'/%3E%3C/svg%3E")
 
 
 def load_module(name, path):
@@ -206,10 +210,14 @@ header {
   border-bottom: 1px solid var(--line);
   display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s3) var(--s6);
 }
+header > * { min-width: 0; }
 h1 { font-size: var(--t-xl); line-height: 1.15; margin: 0; letter-spacing: -0.02em; font-weight: 650; }
 .sub { color: var(--ink-soft); font-size: var(--t-sm); margin: 0; }
 .spacer { flex: 1 1 auto; }
-.meta { color: var(--ink-faint); font-size: var(--t-sm); font-family: var(--mono); }
+.meta {
+  color: var(--ink-faint); font-size: var(--t-sm); font-family: var(--mono);
+  overflow-wrap: anywhere; word-break: break-word; min-width: 0;
+}
 .banner {
   margin: var(--s4) var(--s6) 0; padding: var(--s3) var(--s4);
   border: 1px solid var(--bad); border-left-width: 3px; border-radius: var(--radius);
@@ -219,14 +227,15 @@ h1 { font-size: var(--t-xl); line-height: 1.15; margin: 0; letter-spacing: -0.02
 .filter input {
   font: var(--t-sm)/1.4 var(--sans); color: var(--ink); background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--radius); padding: var(--s2) var(--s3);
-  min-width: 260px; min-height: 32px;
+  min-width: 0; flex: 1 1 200px; max-width: 320px; min-height: 32px;
 }
 .filter input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .panel { margin: var(--s6) var(--s6) 0; }
 .panel-head {
-  display: flex; align-items: baseline; gap: var(--s3);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s3);
   border-bottom: 1px solid var(--line); padding-bottom: var(--s2); margin-bottom: var(--s3);
 }
+.panel-head > * { min-width: 0; }
 .panel-head h2 { font-size: var(--t-md); margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 .panel-head .meta { margin-left: auto; }
 details.panel > summary {
@@ -246,7 +255,7 @@ details.panel > summary:focus-visible { outline: 2px solid var(--accent); outlin
 }
 .wt.branch { border-left: 3px solid var(--accent); }
 .wt-branch { font-family: var(--mono); font-size: var(--t-sm); font-weight: 600; overflow-wrap: break-word; flex: 1 1 180px; min-width: 0; }
-.wt-path { flex: 1 1 100%; font-family: var(--mono); font-size: var(--t-xs); color: var(--ink-faint); overflow-wrap: normal; word-break: normal; min-width: 0; }
+.wt-path { flex: 1 1 100%; font-family: var(--mono); font-size: var(--t-xs); color: var(--ink-faint); overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
 .wt-stat { font-family: var(--mono); font-size: var(--t-xs); color: var(--ink-soft); }
 .wt-stat b { font-weight: 600; color: var(--ink); }
 .tag {
@@ -316,7 +325,7 @@ details.panel > summary:focus-visible { outline: 2px solid var(--accent); outlin
 }
 .card-kv { display: grid; grid-template-columns: auto 1fr; gap: 0 var(--s2); font-size: var(--t-xs); margin: var(--s2) 0 0; }
 .card-kv dt { color: var(--ink-faint); font-family: var(--mono); }
-.card-kv dd { margin: 0; color: var(--ink-soft); font-family: var(--mono); overflow-wrap: normal; word-break: normal; min-width: 0; }
+.card-kv dd { margin: 0; color: var(--ink-soft); font-family: var(--mono); overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
 .more {
   align-self: flex-start; font: var(--t-xs)/1.4 var(--mono); color: var(--accent);
   background: transparent; border: 1px solid var(--line); border-radius: var(--radius);
@@ -330,6 +339,16 @@ details.panel > summary:focus-visible { outline: 2px solid var(--accent); outlin
 footer { padding: 0 var(--s6) var(--s8); color: var(--ink-faint); font-size: var(--t-xs); font-family: var(--mono); }
 .hidden { display: none !important; }
 .filtered { display: none !important; }
+@media (max-width: 480px) {
+  header { padding: var(--s4) var(--s3) var(--s3); gap: var(--s2) var(--s3); }
+  h1 { font-size: var(--t-lg); }
+  .meta { font-size: var(--t-xs); }
+  .banner { margin: var(--s3) var(--s3) 0; }
+  .filter { padding: var(--s4) var(--s3) 0; }
+  .panel { margin: var(--s4) var(--s3) 0; }
+  .lane-stack { margin: var(--s4) var(--s3) var(--s6); }
+  footer { padding: 0 var(--s3) var(--s6); }
+}
 """
 
 JS = """
@@ -584,6 +603,13 @@ def render_card(row, board_label, lane, extra=False):
     )
 
 
+def lane_open_by_default(lane, card_count):
+    """A lane with no cards stays collapsed; the server knows the card count."""
+    if card_count == 0:
+        return False
+    return lane not in COLLAPSED_BY_DEFAULT
+
+
 def render_lane(lane, rows, board_label):
     lane_rows = [row for row in rows if row["Status"] == lane]
     preview = lane_rows
@@ -602,7 +628,7 @@ def render_lane(lane, rows, board_label):
         ) % (len(lane_rows), MERGED_PREVIEW, len(lane_rows))
     body = "".join(cards)
     body += '<p class="empty%s">Nothing in this lane.</p>' % (" hidden" if cards else "")
-    open_attr = "" if lane in COLLAPSED_BY_DEFAULT else " open"
+    open_attr = " open" if lane_open_by_default(lane, len(lane_rows)) else ""
     return (
         '<details class="lane" data-board="%s" data-lane="%s"%s>'
         '<summary>'
@@ -635,7 +661,7 @@ def render_board(entry):
         '<section class="board" data-board="%s">'
         '<div class="panel-head"><h2>%s board</h2>'
         '<span class="meta">%d card(s) &middot; %s</span></div>'
-        '<p class="meta">%s</p>%s'
+        '<p class="meta board-path" title="%s">%s</p>%s'
         '<div class="lane-stack">%s</div>'
         '</section>'
     ) % (
@@ -644,6 +670,7 @@ def render_board(entry):
         len(rows),
         esc(", ".join("%s %d" % (lane, counts.get(lane, 0)) for lane in LANE_ORDER)),
         esc(entry["path"]),
+        esc_path(entry["path"]),
         banner,
         lanes_html,
     )
@@ -678,6 +705,7 @@ def build_html(boards, worktrees, generated_at, error, refresh):
         '<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
         '<meta http-equiv="refresh" content="%d">'
+        '<link rel="icon" href="%s">'
         "<title>Live board</title>"
         "<style>%s</style></head><body>\n"
         "<header>\n"
@@ -705,6 +733,7 @@ def build_html(boards, worktrees, generated_at, error, refresh):
         "</body></html>"
     ) % (
         refresh,
+        FAVICON,
         CSS,
         esc(count_text),
         esc(generated_at),
