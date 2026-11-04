@@ -11,11 +11,14 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **In flight:** nothing. The split from the previous single-repository layout is committed on
-  the current branch and waiting for the user to merge.
-- **Next action:** the user reviews the split and merges it into `main`. After that, pick the
-  first project row from the project's board — `project/docs/RISKS.md` holds the ranked defect
-  list, and the top one is the cross-tenant credential bleed in `payment_gateway_ms`.
+- **In flight:** two branches wait for the user to merge. `feat/compact-accordion-redesign-of-the-live`
+  (BOARD-102) turns the live board viewer into a vertical accordion of collapsible lanes with compact
+  cards and folds kept in the browser; `docs/add-the-no-production-build-rule` (BOARD-101) adds the
+  no-production-build rule. The split from the previous single-repository layout is committed on the
+  current branch and waiting for the user to merge.
+- **Next action:** the user reviews and merges the two branches. Then pick the first project row
+  from the project's board — `project/docs/RISKS.md` holds the ranked defect list, and the top one
+  is the cross-tenant credential bleed in `payment_gateway_ms`.
 
 ## Open questions
 

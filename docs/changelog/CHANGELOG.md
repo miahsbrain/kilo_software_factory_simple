@@ -3,6 +3,27 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-04] Board heading gets the page gutter
+**Type:** Fix
+**Board:** BOARD-102 | **Branch:** feat/compact-accordion-redesign-of-the-live
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/changelog/CHANGELOG.md`
+**Why:** The board section had no CSS rule, so its heading and count line ran flush to the viewport edge while the lane stack and the header had a 24px gutter.
+**Impact:** The board section now carries the same horizontal gutter as the header and the lane stack, and the lane stack's own margins were made relative so its cards stay aligned with the heading above them. Content, behaviour, the JSON endpoints and the escaping are unchanged.
+
+## [2026-11-04] Board viewer fixes from QA round 1
+**Type:** Fix
+**Board:** BOARD-102 | **Branch:** feat/compact-accordion-redesign-of-the-live
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/changelog/CHANGELOG.md`
+**Why:** The first QA pass found text clipped at narrow widths, a favicon request to the network, and lanes that looked populated while holding no cards.
+**Impact:** Long values now wrap instead of clipping, the favicon is inline so the page makes no extra request, a lane with no cards stays collapsed, the board path is shown as a path, and a 480px breakpoint tightens the header, filter and panels. Content, behaviour, the JSON endpoints and the escaping are unchanged.
+
+## [2026-11-04] Compact accordion board viewer
+**Type:** Feature
+**Board:** BOARD-102 | **Branch:** feat/compact-accordion-redesign-of-the-live
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`
+**Why:** The viewer was a horizontal kanban with every lane always open, so the growing Merged lane forced an endless scroll and hid the work that was in flight.
+**Impact:** The dashboard now renders the lanes as a vertical accordion of collapsible sections, cards as compact rows that expand to their detail, the Merged lane as the last 10 rows with a "Show all" control, and fold state kept in the browser. Read-only behaviour, the board file and the JSON endpoints are unchanged.
+
 ## [2026-11-02] Make worktree-only changes deterministic
 **Type:** Fix
 **Board:** BOARD-001 | **Branch:** chore/enforce-worktree-only-changes-and-serve
