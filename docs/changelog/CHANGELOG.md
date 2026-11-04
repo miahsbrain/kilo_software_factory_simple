@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-04] Compact accordion board viewer
+**Type:** Feature
+**Board:** BOARD-102 | **Branch:** feat/compact-accordion-redesign-of-the-live
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`
+**Why:** The viewer was a horizontal kanban with every lane always open, so the growing Merged lane forced an endless scroll and hid the work that was in flight.
+**Impact:** The dashboard now renders the lanes as a vertical accordion of collapsible sections, cards as compact rows that expand to their detail, the Merged lane as the last 10 rows with a "Show all" control, and fold state kept in the browser. Read-only behaviour, the board file and the JSON endpoints are unchanged.
+
 ## [2026-11-02] Make worktree-only changes deterministic
 **Type:** Fix
 **Board:** BOARD-001 | **Branch:** chore/enforce-worktree-only-changes-and-serve

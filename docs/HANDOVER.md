@@ -1,13 +1,18 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** 2026-11-02 — split the factory from the project. The factory repository now
+> - **Last session:** 2026-11-04 — the live board viewer became a vertical accordion: collapsible
+>   lanes, compact cards that expand to their detail, the last 10 merged rows with a "Show all"
+>   control, and folds kept in the browser. BOARD-102, branch
+>   `feat/compact-accordion-redesign-of-the-live`.
+> - **In flight:** that branch waits for the user to merge it. The board file and the JSON
+>   endpoints are unchanged; the viewer still writes nothing.
+> - **Next action:** the user reviews and merges the branch. The earlier factory/project split
+>   (2026-11-02) also still waits for a merge.
+> - **Before:** 2026-11-02 — split the factory from the project. The factory repository now
 >   holds only the harness; the Inhouz Cloud AI platform moved to its own git repository at
 >   `project/`, with its own board, documentation set and 75 microservice repositories under
 >   `project/apps/`. ADR-053, ADR-054 and ADR-055 record the split.
-> - **In flight:** the split is on the current branch and waits for the user to merge it.
-> - **Next action:** the user reviews and merges. Then the first project row opens on the
->   project's board, starting with the top defect in `project/docs/RISKS.md`.
 
 ## 1. Overview
 
@@ -49,7 +54,7 @@
 | `AGENTS.md` | The rule set, read by every agent at the start of a task. |
 | `.kilo/command/*.md` | Slash commands that package the workflow. |
 | `.kilo/skills/board/scripts/board.py` | The board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`. |
-| `.kilo/skills/board/scripts/board_serve.py` | The read-only board viewer on port 15180. |
+| `.kilo/skills/board/scripts/board_serve.py` | The read-only board viewer on port 15180. Vertical accordion of collapsible lanes, compact cards that expand to their detail, folds remembered in the browser. |
 | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. |
 | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.kilo/skills/git-worktree/scripts/scope.py` | The generated pointer a work surface carries, and the local exclude rule that keeps it out of every commit. |
@@ -62,7 +67,7 @@
 | Symbol | File | Responsibility | Kind |
 |---|---|---|---|
 | `board.py` | `.kilo/skills/board/scripts/board.py` | Deterministic manipulation of the markdown board. Never writes prose. | effectful (file I/O) |
-| `board_serve.py` | `.kilo/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only. | effectful (network, file I/O) |
+| `board_serve.py` | `.kilo/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a collapsible accordion dashboard with compact cards and persisted folds. | effectful (network, file I/O) |
 | `worktree.py` | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. | effectful (git, filesystem) |
 | `guard.py` | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails and the sync that carries them into an app repository. | effectful (git, filesystem) |
 | `check-finding.py` | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a finding and derives its fingerprint. | pure |
