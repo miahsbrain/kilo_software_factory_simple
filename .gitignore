@@ -6,6 +6,7 @@
 .kilo/worktrees/
 
 # QA evidence. The notes and the summaries are tracked; the captures are not.
+artifacts/
 artifacts/**/*.png
 artifacts/**/*.log
 artifacts/**/network.json
