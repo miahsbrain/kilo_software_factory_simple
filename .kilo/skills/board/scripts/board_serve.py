@@ -264,8 +264,9 @@ details.panel > summary:focus-visible { outline: 2px solid var(--accent); outlin
 }
 .tag.main { border-color: var(--accent); color: var(--accent); }
 .tag.dirty { border-color: var(--bad); color: var(--bad); }
+.board { margin: 0 var(--s6); }
 .lane-stack {
-  margin: var(--s6) var(--s6) var(--s8);
+  margin: var(--s6) 0 var(--s8);
   display: flex; flex-direction: column; gap: var(--s2);
   max-width: 1080px;
 }
@@ -346,7 +347,8 @@ footer { padding: 0 var(--s6) var(--s8); color: var(--ink-faint); font-size: var
   .banner { margin: var(--s3) var(--s3) 0; }
   .filter { padding: var(--s4) var(--s3) 0; }
   .panel { margin: var(--s4) var(--s3) 0; }
-  .lane-stack { margin: var(--s4) var(--s3) var(--s6); }
+  .board { margin: 0 var(--s3); }
+  .lane-stack { margin: var(--s4) 0 var(--s6); }
   footer { padding: 0 var(--s3) var(--s6); }
 }
 """

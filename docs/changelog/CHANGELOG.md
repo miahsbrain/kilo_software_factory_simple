@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-04] Board heading gets the page gutter
+**Type:** Fix
+**Board:** BOARD-102 | **Branch:** feat/compact-accordion-redesign-of-the-live
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/changelog/CHANGELOG.md`
+**Why:** The board section had no CSS rule, so its heading and count line ran flush to the viewport edge while the lane stack and the header had a 24px gutter.
+**Impact:** The board section now carries the same horizontal gutter as the header and the lane stack, and the lane stack's own margins were made relative so its cards stay aligned with the heading above them. Content, behaviour, the JSON endpoints and the escaping are unchanged.
+
 ## [2026-11-04] Board viewer fixes from QA round 1
 **Type:** Fix
 **Board:** BOARD-102 | **Branch:** feat/compact-accordion-redesign-of-the-live
