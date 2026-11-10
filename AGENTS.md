@@ -921,6 +921,8 @@ worktree.
 | Every change happens in a worktree | The change is unsanctioned work and does not exist for review |
 | The worktree is named after the feature | Unfindable; the board row cannot point at it |
 | Work only inside the worktree | Edits in the main checkout are invisible to the merge |
+| Env files are provisioned into every new worktree and are never committed | The application cannot start in a worktree, and a local env file can leak into a commit |
+| A live worktree for a board row is resumed or discarded, never duplicated | Two worktrees for one row, and in-flight work nobody finds |
 | **Never commit to `main`/`master`/`base`** | The human loses control of the base branch |
 | **Never commit to an existing branch from a worktree** | Two worktrees on one branch corrupt each other |
 | **Never merge, push, or open a PR** | The human's approval step is skipped |
@@ -978,6 +980,17 @@ worktree.
    own initiative, never push, never open a PR (§B11).
 10. **After the merge**, the orchestrator marks the row `Merged` in the main checkout, and the
     worktree is cleaned up by the human (or by the agent once the branch is confirmed merged).
+11. **Env files are provisioned into every new worktree, and are never committed.**
+    `worktree.py create` copies `.env` and `.env.local` from the repository's main checkout into
+    the new worktree, with mode `0600` and listed in the repository's `.git/info/exclude`. The
+    agent still may not read them: the app reads the file, the agent runs the app. `cleanup` and
+    `discard` remove the copies.
+12. **A live worktree for a board row is resumed or discarded, never duplicated.**
+    `worktree.py create` refuses when the row already has a live worktree and prints the three
+    options: `resume`, `discard`, or a new `--slug`. When the slug directory is taken by
+    *another* row's worktree, the refusal names that owning row and offers only the ways that
+    work: a new `--slug`, or `discard` for that owning row. `worktree.py resume --board <ID>`
+    reuses the worktree and puts the row back in `In Progress`.
 
 ### Board lanes
 

@@ -55,7 +55,8 @@
 | `.kilo/command/*.md` | Slash commands that package the workflow. |
 | `.kilo/skills/board/scripts/board.py` | The board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`. |
 | `.kilo/skills/board/scripts/board_serve.py` | The read-only board viewer on port 15180. Vertical accordion of collapsible lanes, compact cards that expand to their detail, folds remembered in the browser. |
-| `.kilo/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. |
+| `.kilo/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, `discard`, `list`, `verify`, `cleanup`. |
+| `.kilo/skills/git-worktree/scripts/env.py` | Provisions the local env files of a worktree. `sync`, `status`, `clean`. |
 | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.kilo/skills/git-worktree/scripts/scope.py` | The generated pointer a work surface carries, and the local exclude rule that keeps it out of every commit. |
 | `.kilo/skills/qa-review/scripts/browser-review.mjs` | The only UI evidence capture path. Drives Playwright. |
@@ -68,7 +69,9 @@
 |---|---|---|---|
 | `board.py` | `.kilo/skills/board/scripts/board.py` | Deterministic manipulation of the markdown board. Never writes prose. | effectful (file I/O) |
 | `board_serve.py` | `.kilo/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a collapsible accordion dashboard with compact cards and persisted folds. | effectful (network, file I/O) |
-| `worktree.py` | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. | effectful (git, filesystem) |
+| `worktree.py` | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, `discard` removes one. | effectful (git, filesystem) |
+| `env.py` | `.kilo/skills/git-worktree/scripts/env.py` | Copies the two local env files from a repository's main checkout into a worktree, excludes them from git, and removes them again. Never prints a value. | effectful (filesystem, git exclude) |
+| `test_env.py` | `.kilo/skills/git-worktree/scripts/test_env.py` | Self-test for the env provisioning and the worktree reuse rules, in a throwaway repository under a temp directory. | effectful (filesystem, git) |
 | `guard.py` | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails and the sync that carries them into an app repository. | effectful (git, filesystem) |
 | `check-finding.py` | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a finding and derives its fingerprint. | pure |
 | `ledger.py` | `.kilo/skills/qa-review/scripts/ledger.py` | The round ledger of a row. | effectful (file I/O) |
@@ -94,7 +97,8 @@ QA↔fix loop is capped at three rounds. Full rules in `AGENTS.md` §B4.
 ## 7. Public interfaces
 
 The factory exposes no network API. Its public surface is the file layout above and the CLI of
-the three scripts.
+the scripts. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `list`, `verify`,
+`cleanup`) and `env.py` (`sync`, `status`, `clean`).
 
 ## 8. Configuration and environment
 
@@ -114,6 +118,10 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 No test suite. The verification of a change is the smallest relevant script run, recorded with
 its result and a `file:line` proof (AGENTS.md §B4 "Verification cost rule"). The dev container
 ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup file.
+
+`python3 .kilo/skills/git-worktree/scripts/test_env.py` is the one script-level test: it builds
+a throwaway git repository under a temp directory and proves the env provisioning and the
+worktree reuse rules.
 
 ## 11. Known issues and risks
 
