@@ -21,9 +21,9 @@ without --apply.
 Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 """
 import argparse
+import errno
 import importlib.util
 import os
-import shutil
 import sys
 
 ENV_NAMES = (".env", ".env.local")
@@ -146,6 +146,30 @@ def ensure_excluded(repo_root):
     return path, None
 
 
+def write_file(dst, data):
+    """Write the bytes to a regular file at dst, never through a symlink.
+
+    A symlink planted at the destination is replaced by the copy, so the link
+    target is never written to.
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if nofollow:
+        flags |= nofollow
+    elif os.path.islink(dst):
+        os.unlink(dst)
+    try:
+        fd = os.open(dst, flags, 0o600)
+    except OSError as e:
+        if e.errno != errno.ELOOP or not os.path.islink(dst):
+            raise
+        os.unlink(dst)
+        fd = os.open(dst, flags, 0o600)
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(data)
+    os.chmod(dst, 0o600)
+
+
 def sync_into(worktree_path, repo_root):
     """(lines, error). Copies the env files into the worktree and excludes them."""
     wt = worktree_module()
@@ -161,8 +185,9 @@ def sync_into(worktree_path, repo_root):
             lines.append("%s: no file in the main checkout" % name)
             continue
         try:
-            shutil.copyfile(src, dst)
-            os.chmod(dst, 0o600)
+            with open(src, "rb") as fh:
+                data = fh.read()
+            write_file(dst, data)
         except OSError as e:
             return None, "cannot copy %s: %s" % (name, e.strerror)
         lines.append("%s: copied (%d bytes)" % (name, os.path.getsize(dst)))

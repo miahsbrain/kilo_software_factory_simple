@@ -48,17 +48,31 @@ provisioned. `cleanup` and `discard` remove the copies.
 ### One row, one worktree (ADR-064)
 
 `create` now looks for a live worktree for the same board row, and for the same slug in the
-target repository. When it finds one it refuses and prints the three ways forward:
+target repository. When it finds one it refuses, with a message that matches the situation:
 
-    resume:  worktree.py resume --board BOARD-00X
-    discard: worktree.py discard --board BOARD-00X --apply
-    new slug: worktree.py create --board BOARD-00X --slug <other-slug>
+- The worktree **is this row's own** — found through the row's `Branch/Worktree` cell. The
+  refusal names it and prints the three ways forward:
+
+      resume:  worktree.py resume --board BOARD-00X
+      discard: worktree.py discard --board BOARD-00X --apply
+      new slug: worktree.py create --board BOARD-00X --slug <other-slug>
+
+- The worktree **belongs to another row** — the slug directory is already taken in that
+  repository, because another row has the same task title or a different `Type` with the same
+  slug. A `resume` or a `discard` for the new row would both fail with "no live worktree", so
+  the refusal names the slug directory, names the owning row when the board records one, and
+  offers only the ways that work: `--slug <other-slug>`, or
+  `worktree.py discard --board <owning-row> --apply` for that other row.
 
 `resume` reuses the live worktree, puts the row back in `In Progress`, and re-provisions the
 env files. `discard` removes it, under exactly the checks `cleanup` uses: a dirty tree and a
 branch with commits the base does not have both refuse, so unmerged work is never deleted.
 With `--apply` it removes the worktree, deletes the branch, removes the env copies, clears the
 row's `Branch/Worktree` cell, and writes a recovery TSV.
+
+The copy is written through `os.open` with `O_NOFOLLOW`, so a symlink planted at the
+destination inside a worktree is replaced by the copy instead of being written through: the
+link target is never touched and the copy lands as a regular file with mode `0600`.
 
 `list` gained a `state` column so a leftover is visible: `active`, `merged`, `stale` (the row
 says `Merged` or `Dropped` but the worktree is still there), or `unknown` (no row records it).

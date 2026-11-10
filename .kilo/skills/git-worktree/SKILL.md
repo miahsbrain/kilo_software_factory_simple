@@ -55,6 +55,12 @@ checkout**, so the live board always points at the running worktree.
 forward: `resume` the worktree, `discard` it, or create with `--slug <other-slug>`. A second
 worktree for one row is never created.
 
+**When the slug directory is already taken by another row's worktree, `create` refuses too**,
+with a different message: it names the slug directory, the row that owns it when the board
+records one, and the ways that actually work — `--slug <other-slug>`, or
+`worktree.py discard --board <owning-row> --apply` for that other row. It never offers a
+`resume` for a row whose worktree does not exist.
+
 Before creating, check for an in-flight worktree on the same task:
 
 ```bash
@@ -63,7 +69,7 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py list
 
 ---
 
-## 2b. Env files: provisioned, never committed
+## 2a. Env files: provisioned, never committed
 
 A new worktree has no local env files, so the application cannot start there. `create` copies
 them from the repository's **main checkout** into the new worktree, and `cleanup` removes the
@@ -97,7 +103,7 @@ A main checkout with no env file is not an error: the script says so and exits 0
 
 ---
 
-## 2c. Reuse a worktree: resume and discard
+## 2b. Reuse a worktree: resume and discard
 
 A board row that already has a worktree is **resumed**, not duplicated.
 
@@ -123,7 +129,7 @@ says `Merged` or `Dropped` but that still exists is `stale` — a leftover to cl
 
 ---
 
-## 2a. Repos: a work surface in its own repository
+## 2c. Repos: a work surface in its own repository
 
 `.kilo/repos.json` maps a **repo id** to a path relative to the control repo root:
 
@@ -404,6 +410,7 @@ unmerged work.**
 | `branch ... is already checked out` | The branch already has a worktree | Use a new branch, or clean up the old worktree first |
 | `worktree.py create` refuses | The slug, branch, or directory already exists | Pick another slug, or clean up first |
 | `worktree.py create` refuses with resume / discard / new slug | The row already has a live worktree | `resume` it, `discard` it, or create with `--slug` — never a second worktree |
+| `worktree.py create` refuses with new slug / discard <other row> | The slug directory is taken by another row's worktree | Create with `--slug`, or discard that other row's worktree with its own row id |
 | `worktree.py resume` refuses | The row has no live worktree | `create` one, or `discard` the stale entry first |
 | `worktree.py discard` refuses | The worktree is dirty or holds commits the base does not have | Commit or hand the work over first; unmerged work is never deleted |
 | The application does not start in a worktree | The env files were never provisioned | `env.py sync --board <BOARD-ID>` — never read the file yourself |

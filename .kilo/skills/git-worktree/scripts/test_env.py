@@ -65,7 +65,9 @@ def make_repo(base):
         "Branch/Worktree | Notes |\n"
         "|---|---|---|---|---|---|---|---|---|---|\n"
         "| BOARD-900 | Provision env files in the scratch repo | Feature | Ready | P2 | "
-        "test | None. | control | - | test row |\n"))
+        "test | None. | control | - | test row |\n"
+        "| BOARD-901 | Provision env files in the scratch repo | Feature | Ready | P2 | "
+        "test | None. | control | - | a second row with the same title |\n"))
     write(os.path.join(repo, "README.md"), "scratch\n")
     git(repo, "init", "-b", "main")
     git(repo, "config", "user.email", "test@example.invalid")
@@ -131,6 +133,13 @@ def main():
     check("resume" in out + err, "the refusal does not name the resume option")
     check("discard" in out + err, "the refusal does not name the discard option")
 
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-901")
+    check(code != 0, "create did not refuse for a row whose slug directory is taken")
+    check("BOARD-900" in out + err, "the refusal does not name the row that owns the worktree")
+    check("resume" not in out + err,
+          "the refusal offers a resume for a row that has no worktree")
+    check("--slug" in out + err, "the refusal does not offer a new slug")
+
     code, out, err = call(env_script, "status", "--board", "BOARD-900")
     check(code == 0, "status failed: %s%s" % (out, err))
     for name in env_names(repo):
@@ -150,6 +159,21 @@ def main():
     os.makedirs(outside, exist_ok=True)
     code, out, err = call(env_script, "sync", "--worktree", outside)
     check(code != 0, "sync accepted a destination outside .kilo/worktrees/")
+
+    link_target = os.path.join(base, "link-target.txt")
+    write(link_target, "untouched\n")
+    planted = os.path.join(worktree, ".env")
+    if os.path.exists(planted) or os.path.islink(planted):
+        os.unlink(planted)
+    os.symlink(link_target, planted)
+    code, out, err = call(env_script, "sync", "--worktree", worktree)
+    check(code == 0, "sync failed on a planted symlink: %s%s" % (out, err))
+    with open(link_target, encoding="utf-8") as fh:
+        check(fh.read() == "untouched\n", "the copy was written through the symlink")
+    check(not os.path.islink(planted), "the planted symlink was not replaced by a regular file")
+    if os.path.isfile(planted) and not os.path.islink(planted):
+        mode = stat.S_IMODE(os.stat(planted).st_mode)
+        check(mode == 0o600, "the copy over a symlink has mode %o, expected 600" % mode)
 
     code, out, err = call(worktree_script, "resume", "--board", "BOARD-900")
     check(code == 0, "resume failed: %s%s" % (out, err))

@@ -987,8 +987,10 @@ worktree.
     `discard` remove the copies.
 12. **A live worktree for a board row is resumed or discarded, never duplicated.**
     `worktree.py create` refuses when the row already has a live worktree and prints the three
-    options: `resume`, `discard`, or a new `--slug`. `worktree.py resume --board <ID>` reuses the
-    worktree and puts the row back in `In Progress`.
+    options: `resume`, `discard`, or a new `--slug`. When the slug directory is taken by
+    *another* row's worktree, the refusal names that owning row and offers only the ways that
+    work: a new `--slug`, or `discard` for that owning row. `worktree.py resume --board <ID>`
+    reuses the worktree and puts the row back in `In Progress`.
 
 ### Board lanes
 

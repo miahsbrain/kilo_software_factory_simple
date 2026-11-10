@@ -493,11 +493,6 @@ def cmd_create(args, cwd):
     branch = "%s/%s" % (branch_type, slug)
     cell_text = cells[branch_index] if len(cells) > branch_index else ""
     live_path, live_branch = live_row_worktree(cell_text, root, target)
-    if not live_path:
-        existing = find_worktree(target, slug)
-        if existing:
-            live_path = existing["path"]
-            live_branch = existing["branch"]
     if live_path:
         print("row %s already has a live worktree: %s (branch %s)" %
               (args.board, live_path, live_branch), file=sys.stderr)
@@ -506,6 +501,29 @@ def cmd_create(args, cwd):
         print("  discard: worktree.py discard --board %s --apply" % args.board, file=sys.stderr)
         print("  new slug: worktree.py create --board %s --slug <other-slug>" % args.board,
               file=sys.stderr)
+        return REFUSED
+    existing = find_worktree(target, slug)
+    if existing:
+        base = os.path.realpath(os.path.join(target, WORKTREES_DIR)) + os.sep
+        if not os.path.realpath(existing["path"]).startswith(base):
+            existing = None
+    if existing:
+        other_path = existing["path"]
+        other_branch = existing["branch"]
+        owner_index, _ = row_of_worktree(board, root, table, other_path)
+        owner = board.cell_texts(table["lines"], owner_index)[0] if owner_index is not None else None
+        print("the slug directory %s is already used by another worktree (branch %s)" %
+              (other_path, other_branch), file=sys.stderr)
+        if owner:
+            print("that worktree belongs to row %s" % owner, file=sys.stderr)
+        else:
+            print("no board row records that worktree", file=sys.stderr)
+        print("pick one:", file=sys.stderr)
+        print("  new slug: worktree.py create --board %s --slug <other-slug>" % args.board,
+              file=sys.stderr)
+        if owner:
+            print("  discard that row's worktree: worktree.py discard --board %s --apply" % owner,
+                  file=sys.stderr)
         return REFUSED
     if git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
         print("branch %s already exists in %s; pick another slug or type" %
