@@ -11,14 +11,13 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **In flight:** two branches wait for the user to merge. `feat/compact-accordion-redesign-of-the-live`
-  (BOARD-102) turns the live board viewer into a vertical accordion of collapsible lanes with compact
-  cards and folds kept in the browser; `docs/add-the-no-production-build-rule` (BOARD-101) adds the
-  no-production-build rule. The split from the previous single-repository layout is committed on the
-  current branch and waiting for the user to merge.
-- **Next action:** the user reviews and merges the two branches. Then pick the first project row
-  from the project's board — `project/docs/RISKS.md` holds the ranked defect list, and the top one
-  is the cross-tenant credential bleed in `payment_gateway_ms`.
+- **In flight:** one branch waits for the user to merge. `feat/provision-env-files-into-worktrees`
+  (BOARD-103) adds the env provisioning script, which copies the local env files into a new
+  worktree without ever printing them, and the worktree reuse commands `resume` and `discard`, so
+  one board row never ends up with two worktrees.
+- **Next action:** the user reviews and merges `feat/provision-env-files-into-worktrees`. Then pick
+  the first project row from the project's board — `project/docs/RISKS.md` holds the ranked defect
+  list, and the top one is the cross-tenant credential bleed in `payment_gateway_ms`.
 
 ## Open questions
 
