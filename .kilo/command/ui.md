@@ -54,6 +54,9 @@ Spec: `docs/UI-UX.md` §3 and §5.
    user-centred (U1–U8) and modern (M1–M10) criteria in §3. Each finding names the rule, the
    screenshot or `file:line` that proves it, and the fix. A screen that passes §2 and fails §3
    is still a FAIL.
+   The critique also runs the unslop pass: every sign in `.kilo/skills/unslop/references/signs.md`
+   that the capture shows, with where it lives. The precedence rule for a disagreement is in
+   `AGENTS.md` §B4.3.
 7. **Validate each finding and take its fingerprint**:
 
        python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \

@@ -39,7 +39,7 @@
 | `.kilo/policies/` | The canonical guard-rail policy: `git-policy.json`. |
 | `.kilo/repos.json` | The repo map of this repository. The only way into a repository. |
 | `.kilo/scopes/` | The canonical scope rules, one file per scope. `guard.py sync` writes them into a project's app repositories as their `AGENTS.md`. |
-| `.kilo/skills/` | The three skills with their scripts: `board`, `git-worktree`, `qa-review`. |
+| `.kilo/skills/` | The four skills with their scripts: `board`, `git-worktree`, `qa-review`, `unslop`. |
 | `.kilo/worktrees/` | Agent worktrees, one per task. Git-ignored. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, the redaction script. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
@@ -62,6 +62,7 @@
 | `.kilo/skills/qa-review/scripts/browser-review.mjs` | The only UI evidence capture path. Drives Playwright. |
 | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a QA finding and prints its fingerprint. |
 | `.kilo/skills/qa-review/scripts/ledger.py` | Opens, closes and reports the QA↔fix rounds of a row. |
+| `.kilo/skills/unslop/scripts/snapshot.mjs` | Saves a page as a standalone HTML file with its assets inlined, plus a screenshot. The one capture path the QA script does not cover: a live URL, or a page with no local source. |
 
 ## 4. Modules and functions
 
@@ -76,6 +77,7 @@
 | `check-finding.py` | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a finding and derives its fingerprint. | pure |
 | `ledger.py` | `.kilo/skills/qa-review/scripts/ledger.py` | The round ledger of a row. | effectful (file I/O) |
 | `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs` | Captures screenshots, console, page errors and network for a route. | effectful (browser, filesystem) |
+| `snapshot.mjs` | `.kilo/skills/unslop/scripts/snapshot.mjs` | Saves a live page or a local file as one standalone HTML file with its assets inlined, and saves a screenshot next to it. Resolves Playwright and chromium the same way the QA script does. | effectful (browser, filesystem) |
 
 ## 5. Data
 
@@ -114,6 +116,7 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 | Python 3.9+ standard library | Every script. No third-party package. |
 | Playwright (global install in the dev container) | The QA capture path. |
 | Chromium (`/usr/bin/chromium`) | The QA capture path. |
+| The unslop skill | CC BY 4.0 — Damir Sokolovsky ([@heydamir](https://x.com/heydamir)). The credit line must survive in every copied file of `.kilo/skills/unslop/`. |
 | Git | Worktrees, branches, the guard rails. |
 
 ## 10. Testing
@@ -142,6 +145,7 @@ worktree reuse rules.
 
 - `AGENTS.md` — the rules.
 - `docs/PROJECT_STRUCTURE.md` — the layout.
+- `docs/UI-UX.md` — the visual language, the anti-slop rules and the QA evidence spec.
 - `docs/BOARD.md` — the factory's live board.
 - `docs/DECISIONS.md` — the factory's decisions.
 - `docs/STACK.md` — the tools and commands.
