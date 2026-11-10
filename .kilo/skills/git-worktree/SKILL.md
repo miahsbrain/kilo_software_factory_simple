@@ -19,7 +19,8 @@ the script can do it — the script is where the naming rules and the refusals l
 
 | Script | Does |
 |---|---|
-| `.kilo/skills/git-worktree/scripts/worktree.py` | create · list · verify · cleanup |
+| `.kilo/skills/git-worktree/scripts/worktree.py` | create · resume · discard · list · verify · cleanup |
+| `.kilo/skills/git-worktree/scripts/env.py` | sync · status · clean — the env files of a worktree |
 | `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · install-hooks · policy |
 
 Python 3.9+, standard library only.
@@ -50,11 +51,75 @@ The script refuses when the row does not exist, when the branch or directory alr
 when the row's type is unknown. It never deletes anything. It writes the board row in the **main
 checkout**, so the live board always points at the running worktree.
 
+**When the row already has a live worktree, `create` refuses** and prints the three ways
+forward: `resume` the worktree, `discard` it, or create with `--slug <other-slug>`. A second
+worktree for one row is never created.
+
 Before creating, check for an in-flight worktree on the same task:
 
 ```bash
 python3 .kilo/skills/git-worktree/scripts/worktree.py list
 ```
+
+---
+
+## 2b. Env files: provisioned, never committed
+
+A new worktree has no local env files, so the application cannot start there. `create` copies
+them from the repository's **main checkout** into the new worktree, and `cleanup` removes the
+copies again.
+
+| File | Behaviour |
+|---|---|
+| `.env` | copied when the main checkout has it |
+| `.env.local` | copied when the main checkout has it |
+
+Nothing else travels: not `.env.production`, not `.env.example`, not any other file.
+
+- The copy is written with mode `0600`.
+- The copy is listed in the repository's `.git/info/exclude`, under a marker comment, so it can
+  never be committed. The rule is written once and is idempotent.
+- A destination that does not resolve under `<repo>/.kilo/worktrees/` is refused.
+- **The contents are never printed.** The script reports the file name and the byte count, and
+  nothing else.
+- The agent's read policy on env files stays **denied**. The app reads the file; the agent runs
+  the app. The policy file and `kilo.jsonc` are unchanged.
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/env.py status --board <BOARD-ID>
+python3 .kilo/skills/git-worktree/scripts/env.py sync --board <BOARD-ID>
+python3 .kilo/skills/git-worktree/scripts/env.py clean --board <BOARD-ID>            # dry run
+python3 .kilo/skills/git-worktree/scripts/env.py clean --board <BOARD-ID> --apply
+```
+
+`env.py sync --worktree <path>` provisions one worktree directly, without a board row.
+A main checkout with no env file is not an error: the script says so and exits 0.
+
+---
+
+## 2c. Reuse a worktree: resume and discard
+
+A board row that already has a worktree is **resumed**, not duplicated.
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/worktree.py resume --board <BOARD-ID>
+```
+
+`resume` finds the row's live worktree, prints its path and branch, puts the row back in
+`In Progress`, and re-provisions the env files. It refuses when the row has no live worktree.
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board <BOARD-ID>           # dry run
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board <BOARD-ID> --apply
+```
+
+`discard` refuses when the worktree is dirty or when the branch holds commits the base does not
+have — the same checks `cleanup` uses. With `--apply` it removes the worktree, deletes the
+branch, removes the env copies, clears the row's `Branch/Worktree` cell, and writes a recovery
+TSV. **Unmerged work is never deleted.**
+
+`list` shows a `state` column: `active`, `merged`, `stale` or `unknown`. A worktree whose row
+says `Merged` or `Dropped` but that still exists is `stale` — a leftover to clean up.
 
 ---
 
@@ -326,7 +391,8 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply   #
 
 The script refuses when the branch has commits not reachable from the base, or when the worktree
 is dirty. It writes a recovery record to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before
-acting. **Never delete a worktree holding unmerged work.**
+acting. It removes the env copies from the worktree first. **Never delete a worktree holding
+unmerged work.**
 
 ---
 
@@ -337,6 +403,10 @@ acting. **Never delete a worktree holding unmerged work.**
 | `fatal: invalid reference: HEAD` | The repository has no commits | The base branch needs one commit before any worktree exists |
 | `branch ... is already checked out` | The branch already has a worktree | Use a new branch, or clean up the old worktree first |
 | `worktree.py create` refuses | The slug, branch, or directory already exists | Pick another slug, or clean up first |
+| `worktree.py create` refuses with resume / discard / new slug | The row already has a live worktree | `resume` it, `discard` it, or create with `--slug` — never a second worktree |
+| `worktree.py resume` refuses | The row has no live worktree | `create` one, or `discard` the stale entry first |
+| `worktree.py discard` refuses | The worktree is dirty or holds commits the base does not have | Commit or hand the work over first; unmerged work is never deleted |
+| The application does not start in a worktree | The env files were never provisioned | `env.py sync --board <BOARD-ID>` — never read the file yourself |
 | `guard.py check-delete` denies | The target is outside the worktree | Delete inside the worktree, use a temp dir, or ask the user |
 | Merge conflict at merge time | The base branch moved since the worktree started | Merge the base into the worktree, resolve there, re-verify, hand off again |
 | `git stash` conflicts across worktrees | Stashes are shared | Do not stash. Resolve conflicts inside the worktree |

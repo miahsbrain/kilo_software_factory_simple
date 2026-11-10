@@ -2,6 +2,8 @@
 """Deterministic git worktree lifecycle for this factory.
 
     worktree.py create --board BOARD-00X [--base main] [--slug <override>] [--repo <id>]
+    worktree.py resume --board BOARD-00X
+    worktree.py discard --board BOARD-00X [--apply]
     worktree.py list
     worktree.py verify <slug> [--base main]
     worktree.py cleanup <slug> [--apply]
@@ -9,7 +11,13 @@
 create reads the board row named by --board from docs/BOARD.md, derives the
 branch type from its Type column and the slug from its task title, then makes
 .kilo/worktrees/<slug> on branch <type>/<slug> and records the worktree on the
-row. It never overwrites: an existing branch or directory is a refusal.
+row. It never overwrites: an existing branch or directory is a refusal. When
+the row already has a live worktree, create refuses and names the three ways
+forward: resume, discard, or a new slug.
+
+resume reuses the live worktree of a row and puts the row back in progress.
+discard removes it, and refuses while it is dirty or holds commits that the
+base does not have. Both write a recovery TSV like cleanup does.
 
 --repo picks the repository the worktree is created in. The id comes from
 .kilo/repos.json in the control repo; the default is "control", the control
@@ -236,6 +244,42 @@ def branch_name(text):
     return name
 
 
+def row_worktrees(cell_text, root):
+    """[(absolute path, branch)] of the worktrees a Branch/Worktree cell records."""
+    entries = []
+    for path, branch in parse_worktree_entries(cell_text):
+        absolute = path if os.path.isabs(path) else os.path.join(root, path)
+        entries.append((absolute, branch_name(branch)))
+    return entries
+
+
+def live_row_worktree(cell_text, root, repo_root):
+    """(path, branch) of the row's live worktree inside a repository, or (None, None)."""
+    base = os.path.realpath(os.path.join(repo_root, WORKTREES_DIR))
+    for absolute, branch in row_worktrees(cell_text, root):
+        if not os.path.isdir(absolute):
+            continue
+        if not os.path.realpath(absolute).startswith(base + os.sep):
+            continue
+        return absolute, branch
+    return None, None
+
+
+def row_of_worktree(board, root, table, path):
+    """(row index, status) of the board row that records this worktree, or (None, None)."""
+    index = board.field_index(table, "branch-worktree")
+    if index is None:
+        return None, None
+    for i in table["rows"]:
+        cells = board.cell_texts(table["lines"], i)
+        if len(cells) <= index:
+            continue
+        for absolute, _ in row_worktrees(cells[index], root):
+            if os.path.realpath(absolute) == os.path.realpath(path):
+                return i, (cells[3] if len(cells) > 3 else "")
+    return None, None
+
+
 def load_board_module(root):
     """The sibling board.py, loaded by path so it works from anywhere."""
     path = os.path.join(root, ".kilo", "skills", "board", "scripts", "board.py")
@@ -254,6 +298,17 @@ def load_scope_module(root):
     if not os.path.exists(path):
         return None
     spec = importlib.util.spec_from_file_location("scope", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_env_module(root):
+    """The sibling env.py, loaded by path so it works from anywhere."""
+    path = os.path.join(root, ".kilo", "skills", "git-worktree", "scripts", "env.py")
+    if not os.path.exists(path):
+        return None
+    spec = importlib.util.spec_from_file_location("env", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -436,9 +491,27 @@ def cmd_create(args, cwd):
         print("derived slug: %s" % derived)
         print("used slug:    %s" % slug)
     branch = "%s/%s" % (branch_type, slug)
+    cell_text = cells[branch_index] if len(cells) > branch_index else ""
+    live_path, live_branch = live_row_worktree(cell_text, root, target)
+    if not live_path:
+        existing = find_worktree(target, slug)
+        if existing:
+            live_path = existing["path"]
+            live_branch = existing["branch"]
+    if live_path:
+        print("row %s already has a live worktree: %s (branch %s)" %
+              (args.board, live_path, live_branch), file=sys.stderr)
+        print("pick one:", file=sys.stderr)
+        print("  resume:  worktree.py resume --board %s" % args.board, file=sys.stderr)
+        print("  discard: worktree.py discard --board %s --apply" % args.board, file=sys.stderr)
+        print("  new slug: worktree.py create --board %s --slug <other-slug>" % args.board,
+              file=sys.stderr)
+        return REFUSED
     if git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
-        print("branch %s already exists in %s; pick another slug or type"
-              % (branch, target), file=sys.stderr)
+        print("branch %s already exists in %s; pick another slug or type" %
+              (branch, target), file=sys.stderr)
+        print("if the row already has a worktree for it, resume it with "
+              "'worktree.py resume --board %s'" % args.board, file=sys.stderr)
         return REFUSED
     path = worktree_path(target, slug)
     if os.path.exists(path):
@@ -499,6 +572,179 @@ def cmd_create(args, cwd):
     print("branch:   %s" % branch)
     print("worktree: %s" % os.path.abspath(path))
     print("base:     %s" % base)
+    provision_env(path, target)
+    return OK
+
+
+def provision_env(path, target):
+    """Copy the env files into a new worktree and report what was provisioned."""
+    env = load_env_module(script_root())
+    if env is None:
+        print("env: not provisioned; the env script is missing", file=sys.stderr)
+        return
+    lines, err = env.sync_into(path, target)
+    if err:
+        print("env: %s" % err, file=sys.stderr)
+        return
+    for line in lines:
+        print("env: %s" % line)
+
+
+def removal_refusal(path, branch, base):
+    """Why the worktree may not be removed, or None when it may.
+
+    The same checks for cleanup and for discard: a dirty tree and a branch with
+    commits the base does not have both hold work that would be lost.
+    """
+    dirty = git_out(path, "status", "--short") or ""
+    unmerged = git_out(path, "log", "--oneline", "%s..%s" % (base, branch)) if branch else None
+    if dirty:
+        return "worktree is dirty; uncommitted work would be lost"
+    if not branch:
+        return "worktree has a detached HEAD; no branch to delete"
+    if unmerged:
+        return "branch %s has %d commit(s) not reachable from %s" % (
+            branch, len(unmerged.splitlines()), base)
+    return None
+
+
+def cmd_resume(args, cwd):
+    root = control_root(cwd)
+    board = load_board_module(script_root())
+    if board is None:
+        return REFUSED
+    board_file = os.path.join(root, "docs", "BOARD.md")
+    table, index = board_row(board, board_file, args.board)
+    if table is None:
+        return REFUSED
+    cells = board.cell_texts(table["lines"], index)
+    branch_index = board.field_index(table, "branch-worktree")
+    cell_text = cells[branch_index] if branch_index is not None and len(cells) > branch_index else ""
+    repos, err = load_repos(root)
+    if repos is None:
+        print(err, file=sys.stderr)
+        return REFUSED
+    repo_id = args.repo or "control"
+    target, err = resolve_repo(root, repos, repo_id)
+    if err:
+        print(err, file=sys.stderr)
+        return REFUSED
+    path, branch = live_row_worktree(cell_text, root, target)
+    if not path:
+        print("row %s has no live worktree in %s; nothing to resume" % (args.board, target),
+              file=sys.stderr)
+        return REFUSED
+    print("worktree: %s" % path)
+    print("branch:   %s" % (branch or "(detached)"))
+    print("repo:     %s (%s)" % (repo_id, target))
+    try:
+        lines = list(table["lines"])
+        lines[index] = board.replace_cell(lines[index], STATUS_INDEX, "In Progress")
+        board.write_atomic(board_file, lines)
+    except Exception as exc:
+        print("warning: row %s was not updated (%s)" % (args.board, exc), file=sys.stderr)
+        return REFUSED
+    print("board:    %s is In Progress" % args.board)
+    provision_env(path, target)
+    return OK
+
+
+def cmd_discard(args, cwd):
+    root = control_root(cwd)
+    board = load_board_module(script_root())
+    if board is None:
+        return REFUSED
+    board_file = os.path.join(root, "docs", "BOARD.md")
+    table, index = board_row(board, board_file, args.board)
+    if table is None:
+        return REFUSED
+    cells = board.cell_texts(table["lines"], index)
+    branch_index = board.field_index(table, "branch-worktree")
+    cell_text = cells[branch_index] if branch_index is not None and len(cells) > branch_index else ""
+    repos, err = load_repos(root)
+    if repos is None:
+        print(err, file=sys.stderr)
+        return REFUSED
+    repo_id = args.repo or "control"
+    target, err = resolve_repo(root, repos, repo_id)
+    if err:
+        print(err, file=sys.stderr)
+        return REFUSED
+    path, branch = live_row_worktree(cell_text, root, target)
+    if not path:
+        print("row %s has no live worktree in %s; nothing to discard" % (args.board, target),
+              file=sys.stderr)
+        return REFUSED
+    sha = git_out(path, "rev-parse", "HEAD") or ""
+    repo = repo_of_path(path) or target
+    common = common_dir(repo)
+    base, base_err = resolve_base(repo, args.base)
+    if base_err:
+        print(base_err, file=sys.stderr)
+        return REFUSED
+    now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    reason = removal_refusal(path, branch, base)
+    actions = []
+    if reason is None:
+        actions = [("worktree", branch or "(detached)", sha, path, "remove-worktree",
+                    "merged into %s and clean" % base),
+                   ("branch", branch, sha, path, "delete-branch", "merged into %s" % base)]
+    rows = [{"when": now, "kind": k, "name": n, "sha": s, "path": p,
+             "action": (a if args.apply else "would-" + a), "reason": r}
+            for k, n, s, p, a, r in actions]
+    if reason is not None:
+        rows.append({"when": now, "kind": "worktree", "name": branch or "(detached)", "sha": sha,
+                     "path": path, "action": "keep", "reason": reason})
+    tsv = recovery_tsv(common, rows) if common else None
+
+    print("worktree: %s" % path)
+    print("branch:   %s" % (branch or "(detached)"))
+    if reason is not None:
+        print("refused: %s" % reason)
+        print("no work was deleted")
+        if tsv:
+            print("recovery TSV: %s" % tsv)
+        return REFUSED
+    print("plan:")
+    for k, n, s, p, a, r in actions:
+        print("  %s %s (%s) - %s" % (a, n, p, r))
+    if not args.apply:
+        print("dry run; re-run with --apply to act")
+        if tsv:
+            print("recovery TSV: %s" % tsv)
+        return OK
+
+    env = load_env_module(script_root())
+    if env is not None:
+        lines, err = env.clean_into(path, repo, True)
+        if err:
+            print("env: %s" % err, file=sys.stderr)
+        else:
+            for line in lines:
+                print("env: %s" % line)
+    code, _, err = git(repo, "worktree", "remove", path)
+    if code != 0:
+        print("worktree remove failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
+        print("recovery TSV: %s" % tsv)
+        return REFUSED
+    print("removed worktree " + path)
+    code, _, err = git(repo, "branch", "-D", branch)
+    if code == 0:
+        print("deleted branch " + branch)
+    else:
+        print("kept branch %s: %s" % (branch, (err.splitlines() or ["?"])[-1]))
+    try:
+        lines = list(table["lines"])
+        kept = [(p, b) for p, b in parse_worktree_entries(cell_text)
+                if os.path.realpath(p if os.path.isabs(p) else os.path.join(root, p))
+                != os.path.realpath(path)]
+        merged = ", ".join("%s · branch %s" % (p, branch_name(b)) for p, b in kept)
+        lines[index] = board.replace_cell(lines[index], branch_index, merged or "-")
+        board.write_atomic(board_file, lines)
+        print("board: %s no longer records the worktree" % args.board)
+    except Exception as exc:
+        print("warning: row %s was not updated (%s)" % (args.board, exc), file=sys.stderr)
+    print("recovery TSV: %s" % tsv)
     return OK
 
 
@@ -512,7 +758,11 @@ def cmd_list(args, cwd):
     if repos is None:
         print(err, file=sys.stderr)
         return REFUSED
-    print("repo | slug | path | branch | head | kind")
+    board = load_board_module(script_root())
+    table = None
+    if board is not None:
+        table, _ = board.read_table(os.path.join(control, "docs", "BOARD.md"))
+    print("repo | slug | path | branch | head | kind | state")
     for repo_id in sorted(repos):
         target, err = resolve_repo(control, repos, repo_id)
         if err:
@@ -523,12 +773,33 @@ def cmd_list(args, cwd):
             continue
         wts = list_worktrees(target)
         main = os.path.realpath(wts[0]["path"]) if wts else os.path.realpath(target)
+        base, _ = resolve_base(target, None)
         for wt in wts:
             path = os.path.abspath(wt["path"])
             kind = "main" if os.path.realpath(path) == main else "linked"
-            print("%s | %s | %s | %s | %s | %s" % (repo_id, slug_of(path, target), path,
-                                                  wt["branch"] or "(detached)", wt["head"], kind))
+            state = worktree_state(board, control, table, path, wt["branch"], base, target)
+            print("%s | %s | %s | %s | %s | %s | %s" % (repo_id, slug_of(path, target), path,
+                                                       wt["branch"] or "(detached)", wt["head"],
+                                                       kind, state))
     return OK
+
+
+def worktree_state(board, control, table, path, branch, base, repo_root):
+    """The state of a worktree: active, merged, stale or unknown."""
+    if board is None or table is None:
+        return "unknown"
+    index, status = row_of_worktree(board, control, table, path)
+    if index is None:
+        return "unknown"
+    if status in ("Merged", "Dropped"):
+        return "stale"
+    if branch and base:
+        tip = git_out(repo_root, "rev-parse", branch)
+        base_tip = git_out(repo_root, "rev-parse", base)
+        if tip and base_tip and tip != base_tip and \
+                git(repo_root, "merge-base", "--is-ancestor", branch, base)[0] == 0:
+            return "merged"
+    return "active"
 
 
 def cmd_verify(args, cwd):
@@ -605,16 +876,7 @@ def cmd_cleanup(args, cwd):
         return REFUSED
     now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
-    dirty = git_out(path, "status", "--short") or ""
-    unmerged = git_out(path, "log", "--oneline", "%s..%s" % (base, branch)) if branch else None
-    reason = None
-    if dirty:
-        reason = "worktree is dirty; uncommitted work would be lost"
-    elif not branch:
-        reason = "worktree has a detached HEAD; no branch to delete"
-    elif unmerged:
-        reason = "branch %s has %d commit(s) not reachable from %s" % (
-            branch, len(unmerged.splitlines()), base)
+    reason = removal_refusal(path, branch, base)
 
     actions = []
     if reason is None:
@@ -651,6 +913,14 @@ def cmd_cleanup(args, cwd):
         return OK
 
     done = []
+    env = load_env_module(script_root())
+    if env is not None:
+        env_lines, env_err = env.clean_into(path, repo, True)
+        if env_err:
+            print("env: %s" % env_err, file=sys.stderr)
+        else:
+            for line in env_lines:
+                print("env: %s" % line)
     code, _, err = git(repo, "worktree", "remove", path)
     if code != 0:
         print("worktree remove failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
@@ -679,6 +949,16 @@ def main(argv):
     p.add_argument("--slug", help="override the slug derived from the task title")
     p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
 
+    p = sub.add_parser("resume", help="reuse the live worktree of a board row")
+    p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
+    p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
+
+    p = sub.add_parser("discard", help="remove the live worktree of a board row")
+    p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
+    p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
+    p.add_argument("--apply", action="store_true", help="act; without it this is a dry run")
+    p.add_argument("--base", help="base branch (default: the repository's own default branch)")
+
     sub.add_parser("list", help="list worktrees")
 
     p = sub.add_parser("verify", help="check whether a worktree is ready to merge")
@@ -697,6 +977,10 @@ def main(argv):
     cwd = os.getcwd()
     if args.command == "create":
         return cmd_create(args, cwd)
+    if args.command == "resume":
+        return cmd_resume(args, cwd)
+    if args.command == "discard":
+        return cmd_discard(args, cwd)
     if args.command == "list":
         return cmd_list(args, cwd)
     if args.command == "verify":
