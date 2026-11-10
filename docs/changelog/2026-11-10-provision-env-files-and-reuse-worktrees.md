@@ -117,7 +117,7 @@ shows what is about to be merged — was usually forgotten, so the human had to 
 before reviewing the work.
 
 `worktree.py handoff --board <ID>` prints the block instead. It prints the worktree path, the
-branch, the base, the diff command, the log command, the merge command and the cleanup
+branch, the base, the diff command, the log command, the merge command and the teardown
 command. Commands and paths only: it never runs a git command that changes anything, never
 merges, never pushes and never deletes.
 
@@ -129,6 +129,36 @@ merge that would fail.
 `AGENTS.md` §B5 now says what every session report for work in a worktree ends with: this
 block, diff command first, then the merge command.
 
+## The teardown, named by the row (ADR-067)
+
+The block printed the cleanup command by slug and then listed the worktree removal and the
+branch deletion as loose lines under it. The human was handed a teardown spread over three
+lines, with no indication of which one was the step, and the slug had to be read back out of
+the path above.
+
+The teardown is now one named step. `worktree.py cleanup --board <ID> --apply` takes the
+worktree from the row's `Branch/Worktree` cell — the same cell `resume` and `discard` use —
+and runs the existing cleanup logic unchanged: it removes the worktree, deletes the branch,
+writes the recovery TSV, and refuses when the branch holds commits the base does not have or
+when the worktree is dirty. A successful teardown also clears the cell, so the row stops
+pointing at a worktree that is gone.
+
+The row is the thing the human already holds, so it is what names the worktree. Giving a slug
+and `--board` together, or neither, is a usage error; the slug form keeps working.
+
+The hand-off block ends with this section:
+
+```text
+after the merge, remove the worktree and delete the branch:
+  python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
+or, by hand:
+  git worktree remove <path>/.kilo/worktrees/<slug>
+  git branch -d <type>/<slug>
+```
+
+The manual pair stays, for the human who wants the plain git commands; the block no longer
+prints the cleanup twice.
+
 ## The verification
 
 `.kilo/skills/git-worktree/scripts/test_env.py` builds a throwaway git repository under a temp
@@ -136,14 +166,17 @@ directory, copies the scripts into it, and drives them as an agent would. It pro
 lands with mode `0600` and byte-identical content, that the copy is listed in the exclude
 file, that a destination outside `.kilo/worktrees/` is refused, that `status` and `clean`
 behave, that `create` refuses for a row that already has a live worktree, that `resume`
-reuses it, that `discard` refuses a dirty worktree and succeeds on a clean merged one, and
-that the secret value never appears in any script output. It never touches this repository's
-board, worktrees or branches.
+reuses it, that `discard` refuses a dirty worktree and succeeds on a clean merged one, that
+the hand-off block ends with the teardown section, that `cleanup --board` removes a merged,
+clean worktree and clears the row's cell, that it refuses a branch with an unmerged commit and
+leaves the worktree and the branch in place, and that the secret value never appears in any
+script output. It never touches this repository's board, worktrees or branches.
 
 ## What did not change
 
 - `.kilo/policies/git-policy.json` and `kilo.jsonc` are untouched. The agent's read policy on
   env files stays denied.
 - The existing `create`, `list`, `verify` and `cleanup` commands keep their behaviour, apart
-  from the new refusal with the three options and the env provisioning.
+  from the new refusal with the three options, the env provisioning, and the new
+  `cleanup --board` form.
 - The board is still written only by `board.py`, in the main checkout.

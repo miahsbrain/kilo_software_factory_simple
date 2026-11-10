@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-10] The teardown is named by the board row
+**Type:** Feature
+**Board:** BOARD-104 | **Branch:** feat/hand-off-names-the-teardown
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-provision-env-files-and-reuse-worktrees.md`
+**Why:** The hand-off block named the cleanup by slug and listed the worktree removal and the branch deletion as loose lines, so the human had to read the path back out of the block to run the teardown.
+**Impact:** `worktree.py cleanup` takes `--board <ID>` as an alternative to the slug: it resolves the row's `Branch/Worktree` cell, runs the same cleanup, and clears that cell when the worktree is gone. Giving a slug and `--board` together, or neither, is a usage error. The hand-off block now ends with a teardown section that names `cleanup --board <ID> --apply` and, below it, the manual `git worktree remove` and `git branch -d` pair; the old cleanup lines are gone from the block. `AGENTS.md` §B5 says the block ends with that command. The slug form of `cleanup` and every other command keep their behaviour.
+
 ## [2026-11-10] The hand-off block, printed by the script
 **Type:** Feature
 **Board:** BOARD-103 | **Branch:** feat/provision-env-files-into-worktrees

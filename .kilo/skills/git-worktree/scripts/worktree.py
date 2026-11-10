@@ -8,6 +8,7 @@
     worktree.py list
     worktree.py verify <slug> [--base main]
     worktree.py cleanup <slug> [--apply]
+    worktree.py cleanup --board BOARD-00X [--apply]
 
 create reads the board row named by --board from docs/BOARD.md, derives the
 branch type from its Type column and the slug from its task title, then makes
@@ -41,6 +42,10 @@ cleanup is a dry run by default. --apply removes the worktree and deletes the
 branch, but refuses when the branch has commits that are not reachable from the
 base or when the worktree is dirty. Unmerged work is never deleted. Every run
 writes a recovery TSV to <git-common-dir>/cleanup-wt/<timestamp>.tsv.
+
+cleanup takes the worktree either as a slug or as the board row that owns it:
+cleanup --board BOARD-00X resolves the row's Branch/Worktree cell. Exactly one
+of the two may be given.
 
 Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 """
@@ -864,17 +869,11 @@ def cmd_discard(args, cwd):
         print("deleted branch " + branch)
     else:
         print("kept branch %s: %s" % (branch, (err.splitlines() or ["?"])[-1]))
-    try:
-        lines = list(table["lines"])
-        kept = [(p, b) for p, b in parse_worktree_entries(cell_text)
-                if os.path.realpath(p if os.path.isabs(p) else os.path.join(root, p))
-                != os.path.realpath(path)]
-        merged = ", ".join("%s · branch %s" % (p, branch_name(b)) for p, b in kept)
-        lines[index] = board.replace_cell(lines[index], branch_index, merged or "-")
-        board.write_atomic(board_file, lines)
+    ok, message = clear_row_worktree(board, board_file, table, index, root, path)
+    if ok:
         print("board: %s no longer records the worktree" % args.board)
-    except Exception as exc:
-        print("warning: row %s was not updated (%s)" % (args.board, exc), file=sys.stderr)
+    else:
+        print("warning: row %s was not updated (%s)" % (args.board, message), file=sys.stderr)
     if forced:
         if patch:
             print("recovery patch: %s" % patch)
@@ -1004,8 +1003,10 @@ def cmd_handoff(args, cwd):
     else:
         print("merge (run by the human, in the main checkout):")
         print("  git merge --no-ff %s -m \"merge: %s\"" % (branch, slug))
-    print("cleanup (run by the human, after the merge):")
-    print("  python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup %s --apply" % slug)
+    print("after the merge, remove the worktree and delete the branch:")
+    print("  python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board %s --apply"
+          % args.board)
+    print("or, by hand:")
     print("  git worktree remove %s" % path)
     print("  git branch -d %s" % branch)
     return OK
@@ -1064,17 +1065,78 @@ def recovery_tsv(common, rows):
     return path
 
 
+def clear_row_worktree(board, board_file, table, index, root, path):
+    """(ok, message). Drops the worktree from the row's Branch/Worktree cell."""
+    branch_index = board.field_index(table, "branch-worktree")
+    if branch_index is None:
+        return False, "the board has no Branch/Worktree column"
+    cells = board.cell_texts(table["lines"], index)
+    cell_text = cells[branch_index] if len(cells) > branch_index else ""
+    try:
+        lines = list(table["lines"])
+        kept = [(p, b) for p, b in parse_worktree_entries(cell_text)
+                if os.path.realpath(p if os.path.isabs(p) else os.path.join(root, p))
+                != os.path.realpath(path)]
+        merged = ", ".join("%s · branch %s" % (p, branch_name(b)) for p, b in kept)
+        lines[index] = board.replace_cell(lines[index], branch_index, merged or "-")
+        board.write_atomic(board_file, lines)
+    except Exception as exc:
+        return False, str(exc)
+    return True, ""
+
+
+def row_worktree_for_board(board, control, board_id):
+    """(path, branch, table, index) of the row's live worktree in any mapped repo."""
+    if board is None:
+        return None, None, None, None
+    board_file = os.path.join(control, "docs", "BOARD.md")
+    table, index = board_row(board, board_file, board_id)
+    if table is None:
+        return None, None, None, None
+    cells = board.cell_texts(table["lines"], index)
+    branch_index = board.field_index(table, "branch-worktree")
+    cell_text = cells[branch_index] if branch_index is not None and len(cells) > branch_index else ""
+    repos, err = load_repos(control)
+    if repos is None:
+        return None, None, None, None
+    for repo_id in sorted(repos):
+        target, err = resolve_repo(control, repos, repo_id)
+        if err or not is_git_repo(target):
+            continue
+        path, branch = live_row_worktree(cell_text, control, target)
+        if path:
+            return path, branch, table, index
+    return None, None, None, None
+
+
 def cmd_cleanup(args, cwd):
+    if args.board and args.slug:
+        print("name the worktree with a slug or with --board, not both", file=sys.stderr)
+        return USAGE
+    if not args.board and not args.slug:
+        print("name the worktree: 'cleanup <slug>' or 'cleanup --board <BOARD-ID>'",
+              file=sys.stderr)
+        return USAGE
     root = repo_root(cwd)
     if not root:
         print("not inside a git repository", file=sys.stderr)
         return REFUSED
     board = load_board_module(script_root())
     control = control_root(cwd)
-    path, board_branch = find_worktree_for_slug(board, control, args.slug, cwd)
-    if not path:
-        print("no worktree with slug %s" % args.slug, file=sys.stderr)
-        return REFUSED
+    table = None
+    index = None
+    board_file = None
+    if args.board:
+        path, board_branch, table, index = row_worktree_for_board(board, control, args.board)
+        board_file = os.path.join(control, "docs", "BOARD.md")
+        if not path:
+            print("row %s has no live worktree; nothing to clean up" % args.board, file=sys.stderr)
+            return REFUSED
+    else:
+        path, board_branch = find_worktree_for_slug(board, control, args.slug, cwd)
+        if not path:
+            print("no worktree with slug %s" % args.slug, file=sys.stderr)
+            return REFUSED
     branch = board_branch or (git_out(path, "rev-parse", "--abbrev-ref", "HEAD") or "")
     sha = git_out(path, "rev-parse", "HEAD") or ""
     repo = repo_of_path(path) or root
@@ -1143,6 +1205,12 @@ def cmd_cleanup(args, cwd):
         done.append("kept branch %s: %s" % (branch, (err.splitlines() or ["?"])[-1]))
     for d in done:
         print(d)
+    if table is not None:
+        ok, message = clear_row_worktree(board, board_file, table, index, control, path)
+        if ok:
+            print("board: %s no longer records the worktree" % args.board)
+        else:
+            print("warning: row %s was not updated (%s)" % (args.board, message), file=sys.stderr)
     print("recovery TSV: %s" % tsv)
     return OK
 
@@ -1184,7 +1252,8 @@ def main(argv):
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
 
     p = sub.add_parser("cleanup", help="remove a merged worktree and its branch")
-    p.add_argument("slug")
+    p.add_argument("slug", nargs="?")
+    p.add_argument("--board", help="board row ID, e.g. BOARD-00X; an alternative to the slug")
     p.add_argument("--apply", action="store_true", help="act; without it this is a dry run")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
 

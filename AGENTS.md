@@ -1445,7 +1445,8 @@ At the end of every session, or when asked to hand over:
 7. **End the report with the hand-off block.** For work in a worktree, print the block from
    `python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <ID>` — the diff
    command first, then the merge command. The human gets both every session, without anyone
-   having to remember them.
+   having to remember them. The block ends with the command that removes the worktree and
+   deletes the branch.
 
 ## B6. Reuse before creation (hard rule)
 
