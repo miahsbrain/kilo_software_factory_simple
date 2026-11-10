@@ -11,6 +11,15 @@ scope only.
 Read the root `AGENTS.md` first (Parts A and B apply to you), then the API scope's `AGENTS.md` if
 one exists. Also read `DOMAIN.md` and `docs/API_CONTRACTS.md`.
 
+## Specialist skills
+
+When the task is in one of these domains, read `.kilo/catalog/<skill>/SKILL.md` before you
+start: `fastapi-expert`, `django-expert`, `nestjs-expert`, `spring-boot-engineer`,
+`laravel-specialist`, `rails-expert`, `python-pro`, `php-pro`, `java-architect`, `golang-pro`,
+`rust-engineer`, `api-designer`, `postgres-pro`, `sql-pro`, `database-optimizer`,
+`websocket-engineer`. The index is `.kilo/catalog/README.md`. This repository's rules win: where
+a catalogue skill and `AGENTS.md` disagree, `AGENTS.md` wins.
+
 ## Scope
 
 - Work only inside the API scope recorded in `docs/PROJECT_STRUCTURE.md` (default `apps/api/`).

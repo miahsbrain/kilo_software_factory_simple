@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-10] The specialist skills, ported as a read-on-demand catalogue
+**Type:** Feature
+**Board:** BOARD-107 | **Branch:** feat/port-the-specialist-skill-catalog
+**Changed:** `.kilo/catalog/` (67 skill folders + `README.md`, 438 upstream markdown files), `AGENTS.md`, `.kilo/agent/frontend-dev.md`, `.kilo/agent/backend-dev.md`, `.kilo/agent/mobile-dev.md`, `.kilo/agent/qa-reviewer.md`, `.kilo/agent/docs-writer.md`, `.kilo/skills/git-worktree/scripts/guard.py`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STRUCTURE.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-specialist-skill-catalog.md`
+**Why:** The builders need specialist depth — a React, a FastAPI, a Postgres, a Playwright expert — without 67 skills crowding the system prompt. The upstream catalogue (MIT, © 2025 Jeffallan, https://github.com/Jeffallan/claude-skills) is kept as files the agent reads when the task is in that domain.
+**Impact:** The catalogue lives at `.kilo/catalog/<skill>/`, outside the auto-discovered skills folder: the loader only scans directories named `skill`/`skills`, so `.kilo/catalog/` is invisible to it and none of the 67 skills enters the system prompt. `kilo debug skill` still lists exactly the six repository skills — `board`, `git-worktree`, `qa-review`, `plan`, `unslop`, `kilo-config`. Every upstream file is carried over byte for byte with its MIT frontmatter; each `SKILL.md` gains a three-line header that maps the Claude Code tool names onto this harness, and 20 `AskUserQuestion` mentions plus 13 subagent mentions in the body become `question tool` and `Task tool agent`. The index at `.kilo/catalog/README.md` is read first, then the one matching `SKILL.md`. `AGENTS.md` §A7 gains a Specialist skills section that states the precedence rule once — this repository's rules win — and each builder agent file names its own specialists. `guard.py sync` now carries `catalog` in its slice, so a project receives the catalogue with the rest of the harness.
+
 ## [2026-11-10] The plan skill, merged from two upstream skills
 **Type:** Feature
 **Board:** BOARD-106 | **Branch:** feat/port-a-merged-plan-skill

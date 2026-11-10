@@ -11,13 +11,16 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **In flight:** one branch waits for the user to merge. `feat/port-a-merged-plan-skill`
-  (BOARD-106) adds the merged plan skill at `.kilo/skills/plan/` — the upstream `feature-forge`
-  and `architecture-designer` skills merged into one procedure, their references carried over
-  intact, and every phase mapped onto a document this repository already has.
-- **Next action:** the user reviews and merges `feat/port-a-merged-plan-skill`. Then pick
-  the first project row from the project's board — `project/docs/RISKS.md` holds the ranked defect
-  list, and the top one is the cross-tenant credential bleed in `payment_gateway_ms`.
+- **In flight:** one branch waits for the user to merge. `feat/port-the-specialist-skill-catalog`
+  (BOARD-107) adds the specialist skill catalogue at `.kilo/catalog/` — the 67 upstream skills
+  (MIT, © 2025 Jeffallan) kept as files to read on demand, outside the auto-discovered skills
+  folder, with an index at `.kilo/catalog/README.md`, a Specialist skills section in `AGENTS.md`
+  §A7, the specialists named in each builder agent file, and `catalog` added to the `guard.py
+  sync` slice. The plan skill branch (`feat/port-a-merged-plan-skill`, BOARD-106) and the live
+  board viewer change (`feat/compact-accordion-redesign-of-the-live`, BOARD-102) also wait.
+- **Next action:** the user reviews and merges `feat/port-the-specialist-skill-catalog`. Then
+  pick the first project row from the project's board — `project/docs/RISKS.md` holds the ranked
+  defect list, and the top one is the cross-tenant credential bleed in `payment_gateway_ms`.
 
 ## Open questions
 

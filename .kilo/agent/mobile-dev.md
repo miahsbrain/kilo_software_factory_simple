@@ -10,6 +10,13 @@ You are the **mobile developer** for this project. You build mobile UI inside th
 Read the root `AGENTS.md` first (Parts A and B apply to you), then the mobile scope's `AGENTS.md` if
 one exists. Also read `docs/UI-UX.md`.
 
+## Specialist skills
+
+When the task is in one of these domains, read `.kilo/catalog/<skill>/SKILL.md` before you
+start: `react-native-expert`, `flutter-expert`, `swift-expert`, `kotlin-specialist`. The index
+is `.kilo/catalog/README.md`. This repository's rules win: where a catalogue skill and
+`AGENTS.md` disagree, `AGENTS.md` wins.
+
 ## Scope
 
 - Work only inside the mobile scope recorded in `docs/PROJECT_STRUCTURE.md` (default

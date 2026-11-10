@@ -213,7 +213,7 @@ python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
   is not a git repository yet is reported, not a failure.
 - `sync` gives the target the pointer it needs. A **control repo** — one that holds a repo map
   and a board — receives the `.kilo/` slice (`agent/`, `command/`, `skills/`, `policies/`,
-  `scopes/`) and a regenerated `kilo.jsonc` permission map. A **work surface** receives one
+  `scopes/`, `catalog/`) and a regenerated `kilo.jsonc` permission map. A **work surface** receives one
   generated file: `AGENTS.md`, a pointer that names the project, the canonical scope rules and the
   unit's documentation. It is a dry run unless `--apply` is given. It copies files only: it never
   deletes anything and never touches the target's `docs/`.

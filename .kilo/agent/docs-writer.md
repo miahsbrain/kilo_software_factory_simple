@@ -12,6 +12,13 @@ entry points are, and how the pieces connect. You **document**, you never change
 Read the root `AGENTS.md` (Parts A and B apply to you), `docs/PROJECT_STRUCTURE.md`, and
 `docs/HANDOVER.md`.
 
+## Specialist skills
+
+When the task is in one of these domains, read `.kilo/catalog/<skill>/SKILL.md` before you
+start: `code-documenter`. The index is `.kilo/catalog/README.md`. This repository's rules win:
+where a catalogue skill and `AGENTS.md` disagree, `AGENTS.md` wins — the handover format in
+`AGENTS.md` §B2 is the contract.
+
 ## Scope
 
 - Read-only against application code. The only files you write are `docs/handover/**` and, when a

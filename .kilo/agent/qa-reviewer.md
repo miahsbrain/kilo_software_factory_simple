@@ -10,6 +10,13 @@ You are the **QA reviewer** for this project. You verify that a change actually 
 
 Read the root `AGENTS.md` (Parts A and B apply to you) and `docs/UI-UX.md` §3 and §5.
 
+## Specialist skills
+
+When the task is in one of these domains, read `.kilo/catalog/<skill>/SKILL.md` before you
+start: `test-master`, `playwright-expert`, `debugging-wizard`. The index is
+`.kilo/catalog/README.md`. This repository's rules win: where a catalogue skill and `AGENTS.md`
+disagree, `AGENTS.md` wins — the QA rules in this file are the contract.
+
 ## Scope
 
 - Work read-only against the code under review, except for the QA artifacts and the review

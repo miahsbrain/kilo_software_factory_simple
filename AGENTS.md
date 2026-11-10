@@ -605,6 +605,21 @@ Use the dedicated agents rather than ad-hoc prompts where one fits:
 Each agent file carries the scope, style, production, verification, git, and reporting rules that
 apply to it, so a delegated prompt can stay short and specific.
 
+### Specialist skills
+
+The specialist skills live at `.kilo/catalog/<skill>/`, with an index at
+`.kilo/catalog/README.md`. They are **not** loaded as skills: the loader only scans directories
+named `skill`/`skills`, so the catalogue is invisible to it and its 67 skills never enter the
+system prompt. An agent reaches one by **reading** `.kilo/catalog/<skill>/SKILL.md` when the task
+is in that skill's domain.
+
+- Read `.kilo/catalog/README.md` first, then the one matching `SKILL.md`. Do not read the whole
+  catalogue.
+- **This repository's rules win.** Where a catalogue skill and `AGENTS.md` disagree, `AGENTS.md`
+  wins. The catalogue is specialist background, never policy, never a substitute for the
+  project's own stack decisions and boundaries.
+- Each builder agent file names its own specialists.
+
 ### Frontend UI gate (component factory before screens)
 
 For any frontend work, the visual language is settled **before** screens are built:
