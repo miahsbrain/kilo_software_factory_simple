@@ -1,7 +1,15 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** 2026-11-10 — the upstream `feature-forge` and `architecture-designer` skills
+> - **Last session:** 2026-11-10 — the 67 upstream specialist skills were ported as a
+>   read-on-demand catalogue at `.kilo/catalog/`, with an index at `.kilo/catalog/README.md`.
+>   The catalogue sits outside the auto-discovered skills folder, so the loader never sees it.
+>   BOARD-107, branch `feat/port-the-specialist-skill-catalog`.
+> - **In flight:** that branch waits for the user to merge it. The plan skill branch
+>   (2026-11-10, BOARD-106) also still waits for a merge, and so does the live board viewer
+>   change (2026-11-04, BOARD-102).
+> - **Next action:** the user reviews and merges `feat/port-the-specialist-skill-catalog`.
+> - **Before:** 2026-11-10 — the upstream `feature-forge` and `architecture-designer` skills
 >   were merged into one plan skill at `.kilo/skills/plan/`, with their references carried over
 >   intact and every phase mapped onto a document this repository already has. BOARD-106, branch
 >   `feat/port-a-merged-plan-skill`.
@@ -48,6 +56,8 @@
 | `.kilo/scopes/` | The canonical scope rules, one file per scope. `guard.py sync` writes them into a project's app repositories as their `AGENTS.md`. |
 | `.kilo/skills/` | The five skills with their scripts: `board`, `git-worktree`, `qa-review`, `unslop`, `plan`. |
 | `.kilo/skills/plan/` | The merged plan skill (MIT, © 2025 Jeffallan — upstream `feature-forge` and `architecture-designer`). `SKILL.md` plus `references/`: the interview bank, the specification template, EARS syntax, acceptance criteria, pre-discovery subagents, system design, architecture patterns, database selection, ADR template, NFR checklist, and the two superpowers research documents. |
+| `.kilo/catalog/` | The specialist skill catalogue: 67 upstream skills (MIT, © 2025 Jeffallan, from https://github.com/Jeffallan/claude-skills), each a `SKILL.md` plus `references/`, byte-for-byte upstream apart from a three-line header that maps the Claude Code tool names onto this harness. It lives outside `.kilo/skills/` on purpose — the loader only scans directories named `skill`/`skills`, so the catalogue is read as a file when the task needs it and never enters the system prompt. |
+| `.kilo/catalog/README.md` | The catalogue index: one row per skill — what it covers and when to read it — plus the path pattern and the MIT attribution. The agent reads this first, then one `SKILL.md`. |
 | `.kilo/worktrees/` | Agent worktrees, one per task. Git-ignored. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, the redaction script. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |

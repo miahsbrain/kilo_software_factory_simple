@@ -52,7 +52,7 @@ TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
 GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 ADD_VALUE_OPTS = {"-b", "-B", "--reason"}
 LINKED_MARKER = os.sep + ".kilo" + os.sep + "worktrees" + os.sep
-SYNC_SLICE = ["agent", "command", "skills", "policies", "scopes"]
+SYNC_SLICE = ["agent", "command", "skills", "policies", "scopes", "catalog"]
 DEFAULT_SCOPE = "service"
 SCHEMA_URL = "https://app.kilo.ai/config.json"
 
