@@ -114,7 +114,11 @@ to a different tool unless the user says so. A missing browser, package, or syst
    - slow, decorative motion
    - ad-hoc spacing numbers
    - contrast below 4.5:1, invisible focus ring, small tap targets
-4. **Critique the screen for the user, not only for the aesthetic.** Passing all 15 rules and
+4. **Run the unslop pass.** Go through the signs list in
+   `.kilo/skills/unslop/references/signs.md` against the capture and report every sign that is
+   present, with where it lives. One line per sign. The list is long, so work through it group by
+   group. The precedence rule for a disagreement is in `AGENTS.md` §B4.3.
+5. **Critique the screen for the user, not only for the aesthetic.** Passing all 15 rules and
    still being a bad product is a **FAIL**. Answer every question in `docs/UI-UX.md` §3.1
    (user-centred, U1–U8) and §3.2 (modern, M1–M10), and check the density rule in §3.3.
    - Who is this for, and what are they doing? Can you state it in one sentence?
@@ -131,7 +135,7 @@ to a different tool unless the user says so. A missing browser, package, or syst
      layout shift, 44×44 touch targets?
    - Does the density match the task — dense for scanning, spacious for reading, comfortable for
      data entry?
-5. **Judge the whole screen, not just the rules.** Does the hierarchy read? Does the layout work
+6. **Judge the whole screen, not just the rules.** Does the hierarchy read? Does the layout work
    at 320px? Does the page look like a real product or a template? Say what is weak even when no
    numbered rule is broken.
 
@@ -149,6 +153,10 @@ Write it to `docs/reviews/<task-id>-ui.md`:
     ## Anti-slop findings (§2)
     | # | Rule | Expected | Actual | Evidence | Fix |
     |---|---|---|---|---|---|
+
+    ## Unslop signs
+    | Sign | Where it lives | Evidence | Fix |
+    |---|---|---|---|
 
     ## User-centred findings (§3.1)
     | # | Rule | Expected | Actual | Evidence | Fix |

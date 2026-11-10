@@ -1429,6 +1429,11 @@ the UI/UX critique pass. Full list with examples in `docs/UI-UX.md` §2.
 14. Spacing from a scale: 4/8/12/16/24/32/48/64.
 15. Contrast ≥ 4.5:1, visible focus ring, targets ≥ 24×24 CSS px.
 
+**Extended checklist.** A screen is also judged against the unslop signs list in
+`.kilo/skills/unslop/references/signs.md`, reported sign by sign with where it lives.
+**Precedence.** Where the unslop skill and this file disagree, this file wins: the skill is
+guidance, these rules are the standard.
+
 ## B5. Session handover protocol
 
 At the end of every session, or when asked to hand over:

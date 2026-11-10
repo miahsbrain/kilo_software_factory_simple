@@ -21,7 +21,7 @@ and is never tracked here (ADR-053).
     │   ├── policies/git-policy.json  # canonical guard-rail policy
     │   ├── repos.json                # repo map of this repository: control only
     │   ├── scopes/<id>.md            # canonical scope rules, one per scope
-    │   ├── skills/                   # board, git-worktree, qa-review + their scripts
+    │   ├── skills/                   # board, git-worktree, qa-review, unslop + their scripts
     │   └── worktrees/                # one worktree per board row (git-ignored)
     ├── docs/
     │   ├── README.md                 # index of the factory documentation set
@@ -29,6 +29,7 @@ and is never tracked here (ADR-053).
     │   ├── HANDOVER.md               # living description of the factory as it is now
     │   ├── BOARD.md                  # factory work only; project work lives in the project repo
     │   ├── DECISIONS.md              # append-only factory decisions (ADR-001…)
+    │   ├── UI-UX.md                  # visual language, anti-slop rules, QA evidence spec
     │   ├── PROJECT_STATE.md          # current phase, progress, next step
     │   ├── STACK.md                  # the tools the factory needs, and the commands they run
     │   └── changelog/                # engineering log: CHANGELOG.md + one file per change
@@ -50,7 +51,8 @@ and is never tracked here (ADR-053).
 | `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
 | `.kilo/agent/` | Six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
 | `.kilo/command/` | Eight slash commands that package the workflow. Derived from `AGENTS.md`, never a source of rules. |
-| `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
+| `.kilo/skills/` | Four skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`, `unslop`. |
+| `.kilo/skills/unslop/` | The unslop skill (CC BY 4.0, Damir Sokolovsky) with its references, its snapshot script and its examples. Its signs list is the extended checklist of the QA lane. |
 | `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
 | `.kilo/repos.json` | The repo map of this repository. The only way into a repository. |
 | `.kilo/scopes/` | The canonical scope rules, one file per scope. `guard.py sync` writes them into a project's app repositories as their `AGENTS.md`. |
