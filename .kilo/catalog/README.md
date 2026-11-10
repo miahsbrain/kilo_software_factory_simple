@@ -11,6 +11,8 @@ skill's `SKILL.md`:
     .kilo/catalog/<skill>/SKILL.md        # the skill
     .kilo/catalog/<skill>/references/     # its reference material
 
+The MIT licence text of the upstream repository is in `LICENSE` next to this index.
+
 **Precedence.** Where a catalogue skill and `AGENTS.md` disagree, `AGENTS.md` wins. The
 repository's rules, its stack decisions and its boundaries come first; the catalogue is
 specialist background, not policy.
