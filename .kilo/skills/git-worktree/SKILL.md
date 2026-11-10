@@ -408,7 +408,7 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <BOARD-ID>
 ```
 
 That prints the block: the worktree path, the branch, the base, the diff command, the log
-command, the merge command and the cleanup command — commands and paths only. It never runs a
+command, the merge command and the teardown command — commands and paths only. It never runs a
 git command that changes anything. Every session that worked in a worktree ends with it, so the
 diff command and the merge command always reach the human together.
 
@@ -426,11 +426,15 @@ log:
   git -C <path>/.kilo/worktrees/<slug> log --oneline main..HEAD
 merge (run by the human, in the main checkout):
   git merge --no-ff <type>/<slug> -m "merge: <slug>"
-cleanup (run by the human, after the merge):
-  python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply
+after the merge, remove the worktree and delete the branch:
+  python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
+or, by hand:
   git worktree remove <path>/.kilo/worktrees/<slug>
   git branch -d <type>/<slug>
 ```
+
+The teardown is the last section: it names the row, so one command removes the worktree and
+deletes the branch.
 
 When the branch is already merged into the base, the block prints a `git show --stat` line
 instead of the merge command, so nobody is handed a merge that would fail.
@@ -447,7 +451,7 @@ git -C .kilo/worktrees/<slug> log --oneline main..HEAD
 git merge --no-ff <type>/<slug> -m "merge: <slug>"
 
 # cleanup — run by the human, after the merge
-python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply
+python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
 ```
 
 The merge target is the human's call: `main`, or a feature branch when the work is part of a
@@ -460,7 +464,14 @@ larger feature.
 ```bash
 python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug>           # dry run
 python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply   # act
+python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
 ```
+
+`--board` is the alternative to the slug: it takes the worktree from the row's
+`Branch/Worktree` cell, the same way `resume` and `discard` do, and it clears that cell when
+the worktree is gone. Give a slug or `--board`, never both and never neither — either mistake
+is a usage error. The teardown the hand-off block names is the `--board` form, because the row
+is what the human holds.
 
 The script refuses when the branch has commits not reachable from the base, or when the worktree
 is dirty. It writes a recovery record to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before

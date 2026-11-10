@@ -73,7 +73,9 @@ def make_repo(base):
         "| BOARD-903 | Force an unmerged branch away | Feature | Ready | P2 | "
         "test | None. | control | - | forced discard of an unmerged branch |\n"
         "| BOARD-904 | Hand off a worktree | Feature | Ready | P2 | "
-        "test | None. | control | - | the hand-off block |\n"))
+        "test | None. | control | - | the hand-off block |\n"
+        "| BOARD-905 | Clean up a worktree by board row | Feature | Ready | P2 | "
+        "test | None. | control | - | the teardown named by the row |\n"))
     write(os.path.join(repo, "README.md"), "scratch\n")
     git(repo, "init", "-b", "main")
     git(repo, "config", "user.email", "test@example.invalid")
@@ -217,6 +219,10 @@ def main():
 
     handoff(repo, worktree_script, call, check)
 
+    cleanup_merged(repo, worktree_script, call, check)
+
+    cleanup_by_board(repo, worktree_script, call, check)
+
     joined = "".join(outputs)
     check(MARKER not in joined, "the secret value appeared in the script output")
 
@@ -250,7 +256,13 @@ def handoff(repo, worktree_script, call, check):
     check(merge_at != -1, "the block has no merge command")
     check(diff_at < merge_at, "the merge command comes before the diff command")
     check("log --oneline main..HEAD" in out, "the block has no log command")
-    check("cleanup %s --apply" % slug in out, "the block has no cleanup command")
+    teardown_at = out.find("after the merge, remove the worktree and delete the branch:")
+    check(teardown_at != -1, "the block has no teardown section")
+    check("cleanup --board BOARD-904 --apply" in out,
+          "the block does not name the cleanup --board command")
+    check("git worktree remove %s" % worktree in out, "the block has no manual worktree remove")
+    check("git branch -d feat/hand-off-a-worktree" in out, "the block has no manual branch delete")
+    check(teardown_at > merge_at, "the teardown comes before the merge command")
 
     write(os.path.join(worktree, "kept.txt"), "committed on the branch\n")
     git(worktree, "add", "-A")
@@ -263,6 +275,47 @@ def handoff(repo, worktree_script, call, check):
     check("show --stat main..feat/hand-off-a-worktree" in out,
           "the block has no show --stat line for a merged branch")
     check("diff main" in out, "the block has no diff command for a merged branch")
+
+
+def cleanup_merged(repo, worktree_script, call, check):
+    """cleanup --board on a merged, clean worktree: the worktree, the branch and the cell go."""
+    slug = "hand-off-a-worktree"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-904 worktree is gone before the cleanup")
+
+    code, out, err = call(worktree_script, "cleanup", "--board", "BOARD-904", "--apply")
+    check(code == 0, "cleanup --board failed: %s%s" % (out, err))
+    check(not os.path.exists(worktree), "cleanup --board left the worktree behind")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug not in branches, "cleanup --board left the branch behind")
+    with open(os.path.join(repo, "docs", "BOARD.md"), encoding="utf-8") as fh:
+        check(".kilo/worktrees/%s" % slug not in fh.read(),
+              "cleanup --board did not clear the row's worktree cell")
+
+
+def cleanup_by_board(repo, worktree_script, call, check):
+    """cleanup --board on an unmerged branch: the refusal, and nothing destroyed."""
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-905")
+    check(code == 0, "create failed for BOARD-905: %s%s" % (out, err))
+    slug = "clean-up-a-worktree-by-board-row"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-905 worktree was not created")
+
+    code, out, err = call(worktree_script, "cleanup", slug, "--board", "BOARD-905")
+    check(code == 2, "cleanup with a slug and --board did not exit 2")
+
+    code, out, err = call(worktree_script, "cleanup")
+    check(code == 2, "cleanup with neither a slug nor --board did not exit 2")
+
+    write(os.path.join(worktree, "unmerged.txt"), "a commit the base does not have\n")
+    git(worktree, "add", "-A")
+    git(worktree, "commit", "-m", "a commit the base does not have")
+
+    code, out, err = call(worktree_script, "cleanup", "--board", "BOARD-905", "--apply")
+    check(code != 0, "cleanup --board accepted a branch with an unmerged commit: %s%s" % (out, err))
+    check(os.path.isdir(worktree), "the refused cleanup removed the worktree")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug in branches, "the refused cleanup deleted the branch")
 
 
 def force_dirty(repo, worktree_script, base, call, check):

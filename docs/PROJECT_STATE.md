@@ -11,11 +11,10 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **In flight:** one branch waits for the user to merge. `feat/provision-env-files-into-worktrees`
-  (BOARD-103) adds the env provisioning script, which copies the local env files into a new
-  worktree without ever printing them, and the worktree reuse commands `resume` and `discard`, so
-  one board row never ends up with two worktrees.
-- **Next action:** the user reviews and merges `feat/provision-env-files-into-worktrees`. Then pick
+- **In flight:** one branch waits for the user to merge. `feat/hand-off-names-the-teardown`
+  (BOARD-104) adds the `cleanup --board` form, which names the teardown by board row, and the
+  teardown section that ends the hand-off block.
+- **Next action:** the user reviews and merges `feat/hand-off-names-the-teardown`. Then pick
   the first project row from the project's board — `project/docs/RISKS.md` holds the ranked defect
   list, and the top one is the cross-tenant credential bleed in `payment_gateway_ms`.
 
