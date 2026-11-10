@@ -3,7 +3,7 @@
 - **Phase:** Setup — the factory holds the harness only. One project repository lives in
   `project/` in this workspace and owns all product documentation.
 - **Progress:** The harness is complete: the rules (`AGENTS.md`), the agent team
-  (`.kilo/agent/`), the command surface (`.kilo/command/`), the three skills with their scripts
+  (`.kilo/agent/`), the command surface (`.kilo/command/`), the skills with their scripts
   (`.kilo/skills/`), the guard-rail policy (`.kilo/policies/git-policy.json`) that feeds both the
   generated `permission` map in `kilo.jsonc` and `guard.py check-git`, the blank project skeleton
   (`templates/project/`), and the QA capture path that drives Playwright only.
@@ -11,10 +11,11 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **In flight:** one branch waits for the user to merge. `feat/hand-off-names-the-teardown`
-  (BOARD-104) adds the `cleanup --board` form, which names the teardown by board row, and the
-  teardown section that ends the hand-off block.
-- **Next action:** the user reviews and merges `feat/hand-off-names-the-teardown`. Then pick
+- **In flight:** one branch waits for the user to merge. `feat/port-a-merged-plan-skill`
+  (BOARD-106) adds the merged plan skill at `.kilo/skills/plan/` — the upstream `feature-forge`
+  and `architecture-designer` skills merged into one procedure, their references carried over
+  intact, and every phase mapped onto a document this repository already has.
+- **Next action:** the user reviews and merges `feat/port-a-merged-plan-skill`. Then pick
   the first project row from the project's board — `project/docs/RISKS.md` holds the ranked defect
   list, and the top one is the cross-tenant credential bleed in `payment_gateway_ms`.
 

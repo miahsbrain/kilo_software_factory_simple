@@ -159,8 +159,13 @@ If a value cannot be confidently determined, leave it `TBD` and ask the user.
 ### New project
 
 If the core project files do not exist, do Day 1 setup before any implementation delegation:
-create the folders and all governance files listed in A1 (with `TBD` where unknown), then run the
-discovery interview (A4) before writing code, scaffolding, or a final implementation plan.
+create the folders and all governance files listed in A1 (with `TBD` where unknown), then run
+the discovery interview (A4) before writing code, scaffolding, or a final implementation plan.
+
+The `plan` skill at `.kilo/skills/plan/` carries the planning procedure and its detail: the
+question banks, the specification template, the EARS syntax, the ADR template and the NFR
+checklist. It states its own precedence over this file in its `SKILL.md`; that rule decides when
+the two disagree.
 
 ---
 
@@ -215,6 +220,11 @@ write code or delegate while a decision is open.
 
 After approval, update the governance files (§A10). Preserve stack neutrality until the user
 approves stack choices.
+
+**The detail lives in the plan skill.** `.kilo/skills/plan/` carries the question banks
+(`references/interview-questions.md`), the specification template, the EARS syntax, the ADR
+template and the NFR checklist, and it names the document each phase writes into. This section
+remains the contract: a batched interview, a decision sheet, nothing assumed.
 
 ---
 
@@ -311,6 +321,9 @@ may choose, and you note the choice in the changelog.
 - **Allow a fast answer.** Offer "go with your recommendations" as an explicit option.
 - **Record.** Every approved decision goes into `docs/DECISIONS.md`; every unapproved guess is
   marked `ASSUMPTION` and listed in the handover's Open Questions.
+
+The `plan` skill at `.kilo/skills/plan/` assembles this sheet during its planning phase. This
+section owns the rule; the skill owns the mechanics of filling it in.
 
 ---
 

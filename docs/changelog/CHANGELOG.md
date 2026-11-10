@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-10] The plan skill, merged from two upstream skills
+**Type:** Feature
+**Board:** BOARD-106 | **Branch:** feat/port-a-merged-plan-skill
+**Changed:** `.kilo/skills/plan/` (SKILL.md, references/ ×12), `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STRUCTURE.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-plan-skill.md`
+**Why:** A new project or a large feature needs a planning procedure that writes into the documents this repository already has. The upstream `feature-forge` and `architecture-designer` skills carry the question banks, the specification template, the EARS syntax, the ADR template and the NFR checklist, and nothing of their own was kept.
+**Impact:** One merged skill at `.kilo/skills/plan/`, with all twelve upstream references carried over intact under their MIT credit lines. Each of the five phases names the document it writes into: `DOMAIN.md`, `docs/BUSINESS-LOGIC.md`, `docs/DECISIONS.md`, `docs/RISKS.md`, `docs/STACK.md`, `ROADMAP.md` and `docs/BOARD.md`. The upstream `AskUserQuestions` tool becomes the `question` tool, the upstream `Task` subagents become this harness's `Task` tool, and the upstream "write a spec document" step becomes "write into the mapped document". The precedence rule is stated once, in the skill, and referenced from `AGENTS.md` §A2, §A4 and §A6. Attribution: MIT, © 2025 Jeffallan for the two upstream skills; MIT, © Jesse Vincent for the two superpowers research documents.
+
 ## [2026-11-10] The unslop skill, adopted and merged into the QA lane
 **Type:** Feature
 **Board:** BOARD-105 | **Branch:** feat/add-the-unslop-skill-and-merge
