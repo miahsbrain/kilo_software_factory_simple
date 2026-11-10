@@ -1,7 +1,14 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** 2026-11-04 — the live board viewer became a vertical accordion: collapsible
+> - **Last session:** 2026-11-10 — the upstream `feature-forge` and `architecture-designer` skills
+>   were merged into one plan skill at `.kilo/skills/plan/`, with their references carried over
+>   intact and every phase mapped onto a document this repository already has. BOARD-106, branch
+>   `feat/port-a-merged-plan-skill`.
+> - **In flight:** that branch waits for the user to merge it. The live board viewer change
+>   (2026-11-04, BOARD-102) also still waits for a merge.
+> - **Next action:** the user reviews and merges `feat/port-a-merged-plan-skill`.
+> - **Before:** 2026-11-04 — the live board viewer became a vertical accordion: collapsible
 >   lanes, compact cards that expand to their detail, the last 10 merged rows with a "Show all"
 >   control, and folds kept in the browser. BOARD-102, branch
 >   `feat/compact-accordion-redesign-of-the-live`.
@@ -39,7 +46,8 @@
 | `.kilo/policies/` | The canonical guard-rail policy: `git-policy.json`. |
 | `.kilo/repos.json` | The repo map of this repository. The only way into a repository. |
 | `.kilo/scopes/` | The canonical scope rules, one file per scope. `guard.py sync` writes them into a project's app repositories as their `AGENTS.md`. |
-| `.kilo/skills/` | The four skills with their scripts: `board`, `git-worktree`, `qa-review`, `unslop`. |
+| `.kilo/skills/` | The five skills with their scripts: `board`, `git-worktree`, `qa-review`, `unslop`, `plan`. |
+| `.kilo/skills/plan/` | The merged plan skill (MIT, © 2025 Jeffallan — upstream `feature-forge` and `architecture-designer`). `SKILL.md` plus `references/`: the interview bank, the specification template, EARS syntax, acceptance criteria, pre-discovery subagents, system design, architecture patterns, database selection, ADR template, NFR checklist, and the two superpowers research documents. |
 | `.kilo/worktrees/` | Agent worktrees, one per task. Git-ignored. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, the redaction script. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
@@ -120,6 +128,8 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 | Playwright (global install in the dev container) | The QA capture path. |
 | Chromium (`/usr/bin/chromium`) | The QA capture path. |
 | The unslop skill | CC BY 4.0 — Damir Sokolovsky ([@heydamir](https://x.com/heydamir)). The credit line must survive in every copied file of `.kilo/skills/unslop/`. |
+| The plan skill | MIT — © 2025 Jeffallan (https://github.com/Jeffallan), upstream skills `feature-forge` and `architecture-designer`. The credit line must survive in every copied file of `.kilo/skills/plan/`. |
+| The superpowers research documents | MIT — © Jesse Vincent (obra/superpowers), copied into `.kilo/skills/plan/references/`. The credit line must survive in both files. |
 | Git | Worktrees, branches, the guard rails. |
 
 ## 10. Testing

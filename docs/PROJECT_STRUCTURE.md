@@ -21,7 +21,7 @@ and is never tracked here (ADR-053).
     │   ├── policies/git-policy.json  # canonical guard-rail policy
     │   ├── repos.json                # repo map of this repository: control only
     │   ├── scopes/<id>.md            # canonical scope rules, one per scope
-    │   ├── skills/                   # board, git-worktree, qa-review, unslop + their scripts
+    │   ├── skills/                   # board, git-worktree, qa-review, unslop, plan + their scripts
     │   └── worktrees/                # one worktree per board row (git-ignored)
     ├── docs/
     │   ├── README.md                 # index of the factory documentation set
@@ -51,8 +51,9 @@ and is never tracked here (ADR-053).
 | `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
 | `.kilo/agent/` | Six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
 | `.kilo/command/` | Eight slash commands that package the workflow. Derived from `AGENTS.md`, never a source of rules. |
-| `.kilo/skills/` | Four skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`, `unslop`. |
+| `.kilo/skills/` | Five skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`, `unslop`, `plan`. |
 | `.kilo/skills/unslop/` | The unslop skill (CC BY 4.0, Damir Sokolovsky) with its references, its snapshot script and its examples. Its signs list is the extended checklist of the QA lane. |
+| `.kilo/skills/plan/` | The merged plan skill (MIT, © 2025 Jeffallan — upstream `feature-forge` and `architecture-designer`). `SKILL.md` and `references/`: the interview bank, the specification template, EARS syntax, acceptance criteria, pre-discovery subagents, system design, architecture patterns, database selection, ADR template, NFR checklist, and two superpowers research documents (MIT, © Jesse Vincent). |
 | `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
 | `.kilo/repos.json` | The repo map of this repository. The only way into a repository. |
 | `.kilo/scopes/` | The canonical scope rules, one file per scope. `guard.py sync` writes them into a project's app repositories as their `AGENTS.md`. |
