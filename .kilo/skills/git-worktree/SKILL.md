@@ -124,6 +124,39 @@ have — the same checks `cleanup` uses. With `--apply` it removes the worktree,
 branch, removes the env copies, clears the row's `Branch/Worktree` cell, and writes a recovery
 TSV. **Unmerged work is never deleted.**
 
+### Forcing a discard: two steps
+
+`--force` lets a human destroy work that the normal path refuses. It acts in two steps, and
+the first step never touches anything.
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board <BOARD-ID> --force
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board <BOARD-ID> --force --yes
+```
+
+**Step one — `--force` alone** prints the destruction plan: the worktree path, the branch, how
+many commits the base does not have, how many files are dirty, and exactly what will be lost.
+It then refuses with the command that acts. No file is written and nothing is deleted.
+
+**Step two — `--force --yes`** acts: it removes the worktree and deletes the branch. Before it
+destroys anything it writes a recovery copy under `<git-common-dir>/cleanup-wt/`:
+
+| File | What it holds |
+|---|---|
+| `<timestamp>.patch` | The uncommitted changes, produced with `git diff HEAD`. Untracked files are added with intent-to-add first, so their content is in the same patch. No patch is written when the worktree is clean. |
+| `<timestamp>.tsv` | One row per action, plus the sha of every commit the base does not have, with the command that restores it. |
+
+Both paths are printed. To restore:
+
+```bash
+git apply <git-common-dir>/cleanup-wt/<timestamp>.patch     # the uncommitted changes
+git branch <branch> <sha>                                    # the commits, from the TSV
+```
+
+`--force` only relaxes the refusal. It never changes the dry-run default: `--apply` still
+governs acting on the normal path, and `--force` without `--yes` never acts. `--yes` without
+`--force` is a usage error. The row's lane is not touched — the orchestrator owns lanes.
+
 `list` shows a `state` column: `active`, `merged`, `stale` or `unknown`. A worktree whose row
 says `Merged` or `Dropped` but that still exists is `stale` — a leftover to clean up.
 
@@ -413,6 +446,7 @@ unmerged work.**
 | `worktree.py create` refuses with new slug / discard <other row> | The slug directory is taken by another row's worktree | Create with `--slug`, or discard that other row's worktree with its own row id |
 | `worktree.py resume` refuses | The row has no live worktree | `create` one, or `discard` the stale entry first |
 | `worktree.py discard` refuses | The worktree is dirty or holds commits the base does not have | Commit or hand the work over first; unmerged work is never deleted |
+| `worktree.py discard --force` refuses | `--force` alone never acts | Read the plan, then run the same command with `--force --yes` |
 | The application does not start in a worktree | The env files were never provisioned | `env.py sync --board <BOARD-ID>` — never read the file yourself |
 | `guard.py check-delete` denies | The target is outside the worktree | Delete inside the worktree, use a temp dir, or ask the user |
 | Merge conflict at merge time | The base branch moved since the worktree started | Merge the base into the worktree, resolve there, re-verify, hand off again |

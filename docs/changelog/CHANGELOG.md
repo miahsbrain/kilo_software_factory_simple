@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-10] Forced discard, confirmed in two steps
+**Type:** Feature
+**Board:** BOARD-103 | **Branch:** feat/provision-env-files-into-worktrees
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-provision-env-files-and-reuse-worktrees.md`
+**Why:** `discard` refused a dirty worktree or a branch with unmerged commits, so the only way to destroy that work was by hand, and a hand `git worktree remove --force` left nothing behind to recover from.
+**Impact:** `discard --force` alone prints the destruction plan — the path, the branch, the unmerged and dirty counts and exactly what is lost — and refuses without writing a file or deleting anything. `discard --force --yes` acts, and before it destroys anything it writes the uncommitted changes as a patch and the lost commit shas into the recovery files under the repository's `cleanup-wt/` folder, printing both paths. `--force` only relaxes the refusal: `--apply` still governs acting on the normal path, and `--yes` without `--force` is a usage error. The policy, the permission map and the board are unchanged.
+
 ## [2026-11-10] Corrective round: distinct create refusals, section order, symlink-safe env copy
 **Type:** Fix
 **Board:** BOARD-103 | **Branch:** feat/provision-env-files-into-worktrees
