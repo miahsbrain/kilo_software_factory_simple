@@ -75,7 +75,17 @@ def make_repo(base):
         "| BOARD-904 | Hand off a worktree | Feature | Ready | P2 | "
         "test | None. | control | - | the hand-off block |\n"
         "| BOARD-905 | Clean up a worktree by board row | Feature | Ready | P2 | "
-        "test | None. | control | - | the teardown named by the row |\n"))
+        "test | None. | control | - | the teardown named by the row |\n"
+        "| BOARD-906 | Clean up a worktree by slug | Feature | Ready | P2 | "
+        "test | None. | control | - | the teardown named by a slug |\n"
+        "| BOARD-907 | Set the lane after a merged cleanup | Feature | Ready | P2 | "
+        "test | None. | control | - | cleanup --board on a merged worktree |\n"
+        "| BOARD-908 | Refuse a cleanup that holds unmerged work | Feature | Ready | P2 | "
+        "test | None. | control | - | the refused cleanup |\n"
+        "| BOARD-909 | Set the lane after a discard | Feature | Ready | P2 | "
+        "test | None. | control | - | discard --board on a clean worktree |\n"
+        "| BOARD-910 | Refuse a discard of a dirty worktree | Feature | Ready | P2 | "
+        "test | None. | control | - | the refused discard |\n"))
     write(os.path.join(repo, "README.md"), "scratch\n")
     git(repo, "init", "-b", "main")
     git(repo, "config", "user.email", "test@example.invalid")
@@ -88,6 +98,25 @@ def make_repo(base):
 def env_names(repo):
     """The two env file names this factory provisions."""
     return [".env", ".env.local"]
+
+
+def row_cells(repo, board_id):
+    """The cells of one board row, as a list of strings."""
+    path = os.path.join(repo, "docs", "BOARD.md")
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            stripped = line.strip()
+            if stripped.startswith("| %s " % board_id):
+                return [cell.strip() for cell in stripped.strip("|").split("|")]
+    return []
+
+
+def row_state(repo, board_id):
+    """(status, branch/worktree cell) of one board row."""
+    cells = row_cells(repo, board_id)
+    if len(cells) < 9:
+        return None, None
+    return cells[3], cells[8]
 
 
 def main():
@@ -223,6 +252,8 @@ def main():
 
     cleanup_by_board(repo, worktree_script, call, check)
 
+    lanes(repo, worktree_script, call, check)
+
     joined = "".join(outputs)
     check(MARKER not in joined, "the secret value appeared in the script output")
 
@@ -316,6 +347,140 @@ def cleanup_by_board(repo, worktree_script, call, check):
     check(os.path.isdir(worktree), "the refused cleanup removed the worktree")
     _, branches, _ = git(repo, "branch", "--list")
     check(slug in branches, "the refused cleanup deleted the branch")
+
+
+def set_status(repo, board_id, status):
+    """Put a board row in a lane, through the board script."""
+    board_script = os.path.join(repo, ".kilo", "skills", "board", "scripts", "board.py")
+    code, out, err = run(repo, board_script, "set-status", board_id, status)
+    if code != 0:
+        print("set-status failed for %s: %s%s" % (board_id, out, err))
+
+
+def lanes(repo, worktree_script, call, check):
+    """The lane a teardown sets on the row it tears down."""
+    cleanup_sets_merged(repo, worktree_script, call, check)
+    cleanup_refusal_keeps_lane(repo, worktree_script, call, check)
+    discard_sets_ready(repo, worktree_script, call, check)
+    discard_refusal_keeps_lane(repo, worktree_script, call, check)
+    cleanup_by_slug_keeps_lane(repo, worktree_script, call, check)
+
+
+def cleanup_sets_merged(repo, worktree_script, call, check):
+    """cleanup --board on a merged, clean worktree: the row reads Merged."""
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-907")
+    check(code == 0, "create failed for BOARD-907: %s%s" % (out, err))
+    slug = "set-the-lane-after-a-merged-cleanup"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-907 worktree was not created")
+    write(os.path.join(worktree, "merged.txt"), "merged into main\n")
+    git(worktree, "add", "-A")
+    git(worktree, "commit", "-m", "a commit that gets merged")
+    git(repo, "merge", "--no-ff", "feat/%s" % slug, "-m", "merge: %s" % slug)
+    set_status(repo, "BOARD-907", "Pending Merge")
+
+    before_status, before_cell = row_state(repo, "BOARD-907")
+    check(before_status == "Pending Merge",
+          "BOARD-907 is not in Pending Merge before the cleanup, found %r" % before_status)
+    check(slug in (before_cell or ""), "BOARD-907 does not record the worktree before the cleanup")
+
+    code, out, err = call(worktree_script, "cleanup", "--board", "BOARD-907", "--apply")
+    check(code == 0, "cleanup --board failed for BOARD-907: %s%s" % (out, err))
+    check(not os.path.exists(worktree), "cleanup --board left the worktree behind")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug not in branches, "cleanup --board left the branch behind")
+    status, cell = row_state(repo, "BOARD-907")
+    check(status == "Merged", "cleanup --board left the row at %r, expected Merged" % status)
+    check(cell in ("-", ""), "cleanup --board left the worktree cell at %r" % cell)
+
+
+def cleanup_refusal_keeps_lane(repo, worktree_script, call, check):
+    """cleanup --board on an unmerged branch: the refusal leaves the row alone."""
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-908")
+    check(code == 0, "create failed for BOARD-908: %s%s" % (out, err))
+    slug = "refuse-a-cleanup-that-holds-unmerged-work"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-908 worktree was not created")
+    write(os.path.join(worktree, "unmerged.txt"), "a commit the base does not have\n")
+    git(worktree, "add", "-A")
+    git(worktree, "commit", "-m", "a commit the base does not have")
+    set_status(repo, "BOARD-908", "In Progress")
+
+    before_status, before_cell = row_state(repo, "BOARD-908")
+
+    code, out, err = call(worktree_script, "cleanup", "--board", "BOARD-908", "--apply")
+    check(code != 0, "cleanup --board accepted a branch with an unmerged commit: %s%s" % (out, err))
+    check(os.path.isdir(worktree), "the refused cleanup removed the worktree")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug in branches, "the refused cleanup deleted the branch")
+    status, cell = row_state(repo, "BOARD-908")
+    check(status == before_status,
+          "the refused cleanup moved the row from %r to %r" % (before_status, status))
+    check(cell == before_cell, "the refused cleanup changed the worktree cell")
+
+
+def discard_sets_ready(repo, worktree_script, call, check):
+    """discard --board on a clean, merged worktree: the row reads Ready."""
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-909")
+    check(code == 0, "create failed for BOARD-909: %s%s" % (out, err))
+    slug = "set-the-lane-after-a-discard"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-909 worktree was not created")
+    write(os.path.join(worktree, "merged.txt"), "merged into main\n")
+    git(worktree, "add", "-A")
+    git(worktree, "commit", "-m", "a commit that gets merged")
+    git(repo, "merge", "--no-ff", "feat/%s" % slug, "-m", "merge: %s" % slug)
+    set_status(repo, "BOARD-909", "In Progress")
+
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-909", "--apply")
+    check(code == 0, "discard --apply failed for BOARD-909: %s%s" % (out, err))
+    check(not os.path.exists(worktree), "discard --apply left the worktree behind")
+    status, cell = row_state(repo, "BOARD-909")
+    check(status == "Ready", "discard --apply left the row at %r, expected Ready" % status)
+    check(cell in ("-", ""), "discard --apply left the worktree cell at %r" % cell)
+
+
+def discard_refusal_keeps_lane(repo, worktree_script, call, check):
+    """discard --board on a dirty worktree: the refusal leaves the row alone."""
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-910")
+    check(code == 0, "create failed for BOARD-910: %s%s" % (out, err))
+    slug = "refuse-a-discard-of-a-dirty-worktree"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-910 worktree was not created")
+    write(os.path.join(worktree, "dirty.txt"), "uncommitted work\n")
+
+    before_status, before_cell = row_state(repo, "BOARD-910")
+
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-910", "--apply")
+    check(code != 0, "discard --apply accepted a dirty worktree: %s%s" % (out, err))
+    check(os.path.isdir(worktree), "the refused discard removed the worktree")
+    status, cell = row_state(repo, "BOARD-910")
+    check(status == before_status,
+          "the refused discard moved the row from %r to %r" % (before_status, status))
+    check(cell == before_cell, "the refused discard changed the worktree cell")
+
+
+def cleanup_by_slug_keeps_lane(repo, worktree_script, call, check):
+    """cleanup by slug: it cannot know the row, so it touches nothing on the board."""
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-906")
+    check(code == 0, "create failed for BOARD-906: %s%s" % (out, err))
+    slug = "clean-up-a-worktree-by-slug"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-906 worktree was not created")
+    write(os.path.join(worktree, "merged.txt"), "merged into main\n")
+    git(worktree, "add", "-A")
+    git(worktree, "commit", "-m", "a commit that gets merged")
+    git(repo, "merge", "--no-ff", "feat/%s" % slug, "-m", "merge: %s" % slug)
+
+    before_status, before_cell = row_state(repo, "BOARD-906")
+
+    code, out, err = call(worktree_script, "cleanup", slug, "--apply")
+    check(code == 0, "cleanup by slug failed: %s%s" % (out, err))
+    check(not os.path.exists(worktree), "cleanup by slug left the worktree behind")
+    status, cell = row_state(repo, "BOARD-906")
+    check(status == before_status,
+          "cleanup by slug moved the row from %r to %r" % (before_status, status))
+    check(cell == before_cell, "cleanup by slug changed the worktree cell")
 
 
 def force_dirty(repo, worktree_script, base, call, check):
