@@ -3,7 +3,7 @@
 
     worktree.py create --board BOARD-00X [--base main] [--slug <override>] [--repo <id>]
     worktree.py resume --board BOARD-00X
-    worktree.py discard --board BOARD-00X [--apply]
+    worktree.py discard --board BOARD-00X [--apply] [--force] [--yes]
     worktree.py list
     worktree.py verify <slug> [--base main]
     worktree.py cleanup <slug> [--apply]
@@ -18,6 +18,11 @@ forward: resume, discard, or a new slug.
 resume reuses the live worktree of a row and puts the row back in progress.
 discard removes it, and refuses while it is dirty or holds commits that the
 base does not have. Both write a recovery TSV like cleanup does.
+
+discard --force relaxes that refusal in two steps: --force alone prints the
+destruction plan and never acts, and --force --yes acts after writing a
+recovery copy — the uncommitted changes as a patch, and the lost commit shas
+in the recovery TSV, both under <git-common-dir>/cleanup-wt/.
 
 --repo picks the repository the worktree is created in. The id comes from
 .kilo/repos.json in the control repo; the default is "control", the control
@@ -73,6 +78,18 @@ def git(cwd, *args, timeout=60):
 def git_out(cwd, *args):
     code, out, _ = git(cwd, *args)
     return out if code == 0 else None
+
+
+def git_raw(cwd, *args, timeout=60):
+    """(code, stdout, stderr) with the output untouched, for content that must stay exact."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    try:
+        r = subprocess.run(["git", "-C", cwd] + list(args), capture_output=True, text=True,
+                           env=env, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return 1, "", str(e)
+    return r.returncode, r.stdout, r.stderr
 
 
 def repo_root(cwd):
@@ -608,22 +625,67 @@ def provision_env(path, target):
         print("env: %s" % line)
 
 
+def removal_state(path, branch, base):
+    """(dirty lines, unmerged shas). The state a removal would destroy."""
+    dirty = [line for line in (git_out(path, "status", "--short") or "").splitlines()
+             if line.strip()]
+    shas = []
+    if branch:
+        out = git_out(path, "log", "--format=%H", "%s..%s" % (base, branch)) or ""
+        shas = [line.strip() for line in out.splitlines() if line.strip()]
+    return dirty, shas
+
+
+def refusal_reason(dirty, shas, branch, base):
+    """Why the worktree may not be removed, or None when it may."""
+    if dirty:
+        return "worktree is dirty; uncommitted work would be lost"
+    if not branch:
+        return "worktree has a detached HEAD; no branch to delete"
+    if shas:
+        return "branch %s has %d commit(s) not reachable from %s" % (
+            branch, len(shas), base)
+    return None
+
+
 def removal_refusal(path, branch, base):
     """Why the worktree may not be removed, or None when it may.
 
     The same checks for cleanup and for discard: a dirty tree and a branch with
     commits the base does not have both hold work that would be lost.
     """
-    dirty = git_out(path, "status", "--short") or ""
-    unmerged = git_out(path, "log", "--oneline", "%s..%s" % (base, branch)) if branch else None
-    if dirty:
-        return "worktree is dirty; uncommitted work would be lost"
-    if not branch:
-        return "worktree has a detached HEAD; no branch to delete"
-    if unmerged:
-        return "branch %s has %d commit(s) not reachable from %s" % (
-            branch, len(unmerged.splitlines()), base)
-    return None
+    dirty, shas = removal_state(path, branch, base)
+    return refusal_reason(dirty, shas, branch, base)
+
+
+def recovery_patch(path, common, dirty, stamp):
+    """(patch path, error). The uncommitted changes as a patch, or None when clean.
+
+    Untracked files are added with intent-to-add, so `git diff HEAD` carries
+    their content in the same patch.
+    """
+    if not dirty:
+        return None, None
+    if not common:
+        return None, "cannot find the repository's common git directory"
+    target = os.path.join(common, "cleanup-wt", stamp + ".patch")
+    if not os.path.realpath(target).startswith(os.path.realpath(common) + os.sep):
+        return None, "refused: the patch path %s is outside %s" % (target, common)
+    _, untracked, _ = git_raw(path, "ls-files", "--others", "--exclude-standard")
+    for name in [line.strip() for line in untracked.splitlines() if line.strip()]:
+        git(path, "add", "-N", "--", name)
+    code, out, err = git_raw(path, "diff", "HEAD")
+    if code != 0:
+        return None, "cannot write the recovery patch: %s" % (err.splitlines() or ["?"])[-1]
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(out)
+            if out and not out.endswith("\n"):
+                fh.write("\n")
+    except OSError as e:
+        return None, "cannot write %s: %s" % (target, e.strerror)
+    return target, None
 
 
 def cmd_resume(args, cwd):
@@ -668,6 +730,10 @@ def cmd_resume(args, cwd):
 
 
 def cmd_discard(args, cwd):
+    if args.yes and not args.force:
+        print("--yes needs --force; --force alone only prints the destruction plan",
+              file=sys.stderr)
+        return USAGE
     root = control_root(cwd)
     board = load_board_module(script_root())
     if board is None:
@@ -701,23 +767,49 @@ def cmd_discard(args, cwd):
         print(base_err, file=sys.stderr)
         return REFUSED
     now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
-    reason = removal_refusal(path, branch, base)
+    dirty, unmerged = removal_state(path, branch, base)
+    reason = refusal_reason(dirty, unmerged, branch, base)
+    forced = args.force and args.yes
+    if args.force and not args.yes:
+        print("worktree: %s" % path)
+        print("branch:   %s" % (branch or "(detached)"))
+        print("base:     %s" % base)
+        print("commits the base does not have: %d" % len(unmerged))
+        print("dirty files: %d" % len(dirty))
+        print("what will be lost:")
+        print("  the worktree %s" % path)
+        print("  the branch %s" % (branch or "(detached)"))
+        for line in dirty:
+            print("  uncommitted change: %s" % line)
+        for sha in unmerged:
+            print("  commit %s" % sha)
+        print("refused: --force needs the second confirmation")
+        print("nothing was written and nothing was deleted")
+        print("to destroy it: worktree.py discard --board %s --force --yes" % args.board)
+        return REFUSED
     actions = []
-    if reason is None:
+    if reason is None or forced:
         actions = [("worktree", branch or "(detached)", sha, path, "remove-worktree",
-                    "merged into %s and clean" % base),
-                   ("branch", branch, sha, path, "delete-branch", "merged into %s" % base)]
+                    "forced; the work is saved in the recovery files" if forced
+                    else "merged into %s and clean" % base),
+                   ("branch", branch, sha, path, "delete-branch",
+                    "forced; the commits are listed in the recovery TSV" if forced
+                    else "merged into %s" % base)]
     rows = [{"when": now, "kind": k, "name": n, "sha": s, "path": p,
-             "action": (a if args.apply else "would-" + a), "reason": r}
+             "action": (a if (args.apply or forced) else "would-" + a), "reason": r}
             for k, n, s, p, a, r in actions]
-    if reason is not None:
+    for sha in unmerged:
+        rows.append({"when": now, "kind": "commit", "name": branch or "(detached)", "sha": sha,
+                     "path": path, "action": "restore-branch", "reason":
+                     "not reachable from %s; restore with: git branch %s %s" % (base, branch, sha)})
+    if reason is not None and not forced:
         rows.append({"when": now, "kind": "worktree", "name": branch or "(detached)", "sha": sha,
                      "path": path, "action": "keep", "reason": reason})
     tsv = recovery_tsv(common, rows) if common else None
 
     print("worktree: %s" % path)
     print("branch:   %s" % (branch or "(detached)"))
-    if reason is not None:
+    if reason is not None and not forced:
         print("refused: %s" % reason)
         print("no work was deleted")
         if tsv:
@@ -726,11 +818,23 @@ def cmd_discard(args, cwd):
     print("plan:")
     for k, n, s, p, a, r in actions:
         print("  %s %s (%s) - %s" % (a, n, p, r))
-    if not args.apply:
+    if forced:
+        print("forced: %d unmerged commit(s) and %d dirty file(s) will be destroyed" %
+              (len(unmerged), len(dirty)))
+    if not args.apply and not forced:
         print("dry run; re-run with --apply to act")
         if tsv:
             print("recovery TSV: %s" % tsv)
         return OK
+
+    patch = None
+    if forced:
+        stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        patch, err = recovery_patch(path, common, dirty, stamp)
+        if err:
+            print(err, file=sys.stderr)
+            print("refused: the recovery copy could not be written; nothing was deleted")
+            return REFUSED
 
     env = load_env_module(script_root())
     if env is not None:
@@ -740,7 +844,8 @@ def cmd_discard(args, cwd):
         else:
             for line in lines:
                 print("env: %s" % line)
-    code, _, err = git(repo, "worktree", "remove", path)
+    remove_args = ("worktree", "remove", "--force", path) if forced else ("worktree", "remove", path)
+    code, _, err = git(repo, *remove_args)
     if code != 0:
         print("worktree remove failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         print("recovery TSV: %s" % tsv)
@@ -762,6 +867,16 @@ def cmd_discard(args, cwd):
         print("board: %s no longer records the worktree" % args.board)
     except Exception as exc:
         print("warning: row %s was not updated (%s)" % (args.board, exc), file=sys.stderr)
+    if forced:
+        if patch:
+            print("recovery patch: %s" % patch)
+            print("restore the uncommitted changes with: git apply %s" % patch)
+        else:
+            print("recovery patch: none; the worktree was clean")
+        for sha in unmerged:
+            print("lost commit: %s" % sha)
+        if unmerged:
+            print("restore the branch with: git branch %s %s" % (branch, unmerged[0]))
     print("recovery TSV: %s" % tsv)
     return OK
 
@@ -975,6 +1090,10 @@ def main(argv):
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
     p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
     p.add_argument("--apply", action="store_true", help="act; without it this is a dry run")
+    p.add_argument("--force", action="store_true",
+                   help="allow destroying unmerged work; without --yes it only prints the plan")
+    p.add_argument("--yes", action="store_true",
+                   help="confirm the destruction; it needs --force")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
 
     sub.add_parser("list", help="list worktrees")

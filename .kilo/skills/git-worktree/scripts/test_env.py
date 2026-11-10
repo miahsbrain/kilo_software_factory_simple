@@ -67,7 +67,11 @@ def make_repo(base):
         "| BOARD-900 | Provision env files in the scratch repo | Feature | Ready | P2 | "
         "test | None. | control | - | test row |\n"
         "| BOARD-901 | Provision env files in the scratch repo | Feature | Ready | P2 | "
-        "test | None. | control | - | a second row with the same title |\n"))
+        "test | None. | control | - | a second row with the same title |\n"
+        "| BOARD-902 | Force a dirty worktree away | Feature | Ready | P2 | "
+        "test | None. | control | - | forced discard of a dirty worktree |\n"
+        "| BOARD-903 | Force an unmerged branch away | Feature | Ready | P2 | "
+        "test | None. | control | - | forced discard of an unmerged branch |\n"))
     write(os.path.join(repo, "README.md"), "scratch\n")
     git(repo, "init", "-b", "main")
     git(repo, "config", "user.email", "test@example.invalid")
@@ -207,6 +211,8 @@ def main():
     check(code == 0, "list failed: %s%s" % (out, err))
     check("state" in out, "list has no state column")
 
+    force_dirty(repo, worktree_script, base, call, check)
+
     joined = "".join(outputs)
     check(MARKER not in joined, "the secret value appeared in the script output")
 
@@ -216,6 +222,86 @@ def main():
         return 1
     print("all checks passed")
     return 0
+
+
+def force_dirty(repo, worktree_script, base, call, check):
+    """The forced discard of a dirty worktree: the plan, then the act."""
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-902")
+    check(code == 0, "create failed for BOARD-902: %s%s" % (out, err))
+    slug = "force-a-dirty-worktree-away"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-902 worktree was not created")
+    dirty_file = os.path.join(worktree, "uncommitted.txt")
+    write(dirty_file, "work that will be destroyed\n")
+
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-902", "--apply")
+    check(code != 0, "discard --apply accepted a dirty worktree without --force")
+
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-902", "--force")
+    check(code != 0, "--force alone did not refuse")
+    plan = out + err
+    check(worktree in plan, "the plan does not name the worktree path")
+    check("feat/force-a-dirty-worktree-away" in plan, "the plan does not name the branch")
+    check("dirty files: 1" in plan, "the plan does not report the dirty file count")
+    check("--force --yes" in plan, "the plan does not name the command that acts")
+    check(os.path.isdir(worktree), "--force alone removed the worktree")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug in branches, "--force alone deleted the branch")
+
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-902",
+                           "--force", "--yes")
+    check(code == 0, "--force --yes failed: %s%s" % (out, err))
+    check(not os.path.exists(worktree), "--force --yes left the worktree behind")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug not in branches, "--force --yes left the branch behind")
+
+    _, common, _ = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    patches = [name for name in os.listdir(os.path.join(common, "cleanup-wt"))
+               if name.endswith(".patch")]
+    check(len(patches) == 1, "expected one recovery patch, found %d" % len(patches))
+    if patches:
+        patch_path = os.path.join(common, "cleanup-wt", patches[0])
+        check(patch_path in out, "the output does not print the patch path")
+        with open(patch_path, encoding="utf-8") as fh:
+            patch = fh.read()
+        check("work that will be destroyed" in patch,
+              "the recovery patch does not hold the uncommitted content")
+
+    force_unmerged(repo, worktree_script, call, check)
+
+
+def force_unmerged(repo, worktree_script, call, check):
+    """The forced discard of a branch with a commit the base does not have."""
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-903")
+    check(code == 0, "create failed for BOARD-903: %s%s" % (out, err))
+    slug = "force-an-unmerged-branch-away"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-903 worktree was not created")
+    write(os.path.join(worktree, "kept.txt"), "committed on the branch\n")
+    git(worktree, "add", "-A")
+    git(worktree, "commit", "-m", "a commit the base does not have")
+    _, commit_sha, _ = git(worktree, "rev-parse", "HEAD")
+
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-903", "--apply")
+    check(code != 0, "discard --apply accepted a branch with an unmerged commit")
+
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-903", "--force", "--yes")
+    check(code == 0, "--force --yes failed: %s%s" % (out, err))
+    check(commit_sha in out, "the output does not print the commit sha")
+    check(not os.path.exists(worktree), "--force --yes left the worktree behind")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug not in branches, "--force --yes left the branch behind")
+
+    _, common, _ = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    tsvs = [name for name in os.listdir(os.path.join(common, "cleanup-wt"))
+            if name.endswith(".tsv")]
+    check(bool(tsvs), "no recovery TSV was written")
+    found = False
+    for name in tsvs:
+        with open(os.path.join(common, "cleanup-wt", name), encoding="utf-8") as fh:
+            if commit_sha in fh.read():
+                found = True
+    check(found, "the recovery TSV does not hold the commit sha")
 
 
 if __name__ == "__main__":

@@ -77,6 +77,39 @@ link target is never touched and the copy lands as a regular file with mode `060
 `list` gained a `state` column so a leftover is visible: `active`, `merged`, `stale` (the row
 says `Merged` or `Dropped` but the worktree is still there), or `unknown` (no row records it).
 
+## The forced discard (ADR-065)
+
+`discard` refuses a dirty worktree or a branch with commits the base does not have. That is
+the right default, but it left a human with no way to destroy that work through the tool: the
+only route was a hand `git worktree remove --force`, which leaves nothing behind to recover
+from.
+
+`--force` adds that route, in two confirmed steps.
+
+**`discard --force` alone never acts.** It prints the destruction plan — the worktree path, the
+branch, how many commits the base does not have, how many files are dirty, and exactly what
+will be lost — and then refuses with the command that acts. No file is written and nothing is
+deleted.
+
+**`discard --force --yes` acts.** Before it destroys anything it writes a recovery copy under
+the repository's common git dir, in the `cleanup-wt/` folder the recovery TSV already uses:
+
+- `<timestamp>.patch` — the uncommitted changes, produced with `git diff HEAD`. Untracked files
+  are added with intent-to-add first, so their content lands in the same patch. No patch is
+  written when the worktree is clean.
+- `<timestamp>.tsv` — one row per action, plus one row per commit the base does not have,
+  carrying its sha and the command that restores it.
+
+Both paths are printed, so the human knows where the recovery copy is. Restoring is:
+
+    git apply <git-common-dir>/cleanup-wt/<timestamp>.patch     # the uncommitted changes
+    git branch <branch> <sha>                                    # the commits, from the TSV
+
+`--force` only relaxes the refusal. It never changes the dry-run default: `--apply` still
+governs acting on the normal path, `--force` without `--yes` never acts, and `--yes` without
+`--force` is a usage error. The row's `Branch/Worktree` cell is cleared on a successful forced
+discard, exactly as on a normal one; the row's lane is not touched.
+
 ## The verification
 
 `.kilo/skills/git-worktree/scripts/test_env.py` builds a throwaway git repository under a temp

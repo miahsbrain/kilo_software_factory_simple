@@ -991,6 +991,9 @@ worktree.
     *another* row's worktree, the refusal names that owning row and offers only the ways that
     work: a new `--slug`, or `discard` for that owning row. `worktree.py resume --board <ID>`
     reuses the worktree and puts the row back in `In Progress`.
+    A human may destroy work that `discard` refuses, in two steps: `--force` alone prints the
+    destruction plan and never acts, and `--force --yes` acts after writing a recovery patch and
+    a recovery TSV under the repository's `cleanup-wt/` folder.
 
 ### Board lanes
 
