@@ -1442,6 +1442,10 @@ At the end of every session, or when asked to hand over:
 5. Update the **Session Notes** at the top of `docs/HANDOVER.md`.
 6. Make sure the next agent could start with **only** `AGENTS.md` + `DOMAIN.md` + `docs/` and
    no other context.
+7. **End the report with the hand-off block.** For work in a worktree, print the block from
+   `python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <ID>` — the diff
+   command first, then the merge command. The human gets both every session, without anyone
+   having to remember them.
 
 ## B6. Reuse before creation (hard rule)
 
