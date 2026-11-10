@@ -19,7 +19,7 @@ the script can do it — the script is where the naming rules and the refusals l
 
 | Script | Does |
 |---|---|
-| `.kilo/skills/git-worktree/scripts/worktree.py` | create · resume · discard · list · verify · cleanup |
+| `.kilo/skills/git-worktree/scripts/worktree.py` | create · resume · discard · handoff · list · verify · cleanup |
 | `.kilo/skills/git-worktree/scripts/env.py` | sync · status · clean — the env files of a worktree |
 | `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · install-hooks · policy |
 
@@ -401,13 +401,47 @@ The agent **never** merges.
 1. The orchestrator sets the board row to `Pending Merge` in the main checkout, with the
    worktree path and branch in the `Branch/Worktree` column.
 2. The agent reports: what was done, what is proven, what is not done and why, the next action.
-3. The agent prints the review and merge commands for the human.
+3. The agent prints the hand-off block for the human.
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <BOARD-ID>
+```
+
+That prints the block: the worktree path, the branch, the base, the diff command, the log
+command, the merge command and the cleanup command — commands and paths only. It never runs a
+git command that changes anything. Every session that worked in a worktree ends with it, so the
+diff command and the merge command always reach the human together.
+
+The block looks like this:
+
+```text
+board:    BOARD-00X
+worktree: <path>/.kilo/worktrees/<slug>
+branch:   <type>/<slug>
+base:     main
+
+diff:
+  git -C <path>/.kilo/worktrees/<slug> diff main
+log:
+  git -C <path>/.kilo/worktrees/<slug> log --oneline main..HEAD
+merge (run by the human, in the main checkout):
+  git merge --no-ff <type>/<slug> -m "merge: <slug>"
+cleanup (run by the human, after the merge):
+  python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply
+  git worktree remove <path>/.kilo/worktrees/<slug>
+  git branch -d <type>/<slug>
+```
+
+When the branch is already merged into the base, the block prints a `git show --stat` line
+instead of the merge command, so nobody is handed a merge that would fail.
+
+The same commands by hand, if the human prefers them:
 
 ```bash
 # review
 python3 .kilo/skills/git-worktree/scripts/worktree.py list
-git -C .kilo/worktrees/<slug> log --oneline main..HEAD
 git -C .kilo/worktrees/<slug> diff main
+git -C .kilo/worktrees/<slug> log --oneline main..HEAD
 
 # merge — run by the human, in the main checkout
 git merge --no-ff <type>/<slug> -m "merge: <slug>"

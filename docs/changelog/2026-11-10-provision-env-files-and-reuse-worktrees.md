@@ -110,6 +110,25 @@ governs acting on the normal path, `--force` without `--yes` never acts, and `--
 `--force` is a usage error. The row's `Branch/Worktree` cell is cleared on a successful forced
 discard, exactly as on a normal one; the row's lane is not touched.
 
+## The hand-off block (ADR-066)
+
+Every work session had to hand the human the merge command. The diff command — the one that
+shows what is about to be merged — was usually forgotten, so the human had to reconstruct it
+before reviewing the work.
+
+`worktree.py handoff --board <ID>` prints the block instead. It prints the worktree path, the
+branch, the base, the diff command, the log command, the merge command and the cleanup
+command. Commands and paths only: it never runs a git command that changes anything, never
+merges, never pushes and never deletes.
+
+The block always carries the diff command before the merge command, so the two always reach
+the human together. When the branch is already merged into the base, the block prints a
+`git show --stat <base>..<branch>` line instead of the merge command, so nobody is handed a
+merge that would fail.
+
+`AGENTS.md` §B5 now says what every session report for work in a worktree ends with: this
+block, diff command first, then the merge command.
+
 ## The verification
 
 `.kilo/skills/git-worktree/scripts/test_env.py` builds a throwaway git repository under a temp

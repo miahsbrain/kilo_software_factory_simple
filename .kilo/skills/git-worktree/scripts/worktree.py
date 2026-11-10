@@ -4,6 +4,7 @@
     worktree.py create --board BOARD-00X [--base main] [--slug <override>] [--repo <id>]
     worktree.py resume --board BOARD-00X
     worktree.py discard --board BOARD-00X [--apply] [--force] [--yes]
+    worktree.py handoff --board BOARD-00X
     worktree.py list
     worktree.py verify <slug> [--base main]
     worktree.py cleanup <slug> [--apply]
@@ -23,6 +24,9 @@ discard --force relaxes that refusal in two steps: --force alone prints the
 destruction plan and never acts, and --force --yes acts after writing a
 recovery copy — the uncommitted changes as a patch, and the lost commit shas
 in the recovery TSV, both under <git-common-dir>/cleanup-wt/.
+
+handoff prints the hand-off block for a row: the diff command first, then the
+merge command. It prints commands and paths only; it never changes anything.
 
 --repo picks the repository the worktree is created in. The id comes from
 .kilo/repos.json in the control repo; the default is "control", the control
@@ -625,15 +629,19 @@ def provision_env(path, target):
         print("env: %s" % line)
 
 
+def commits_ahead(cwd, branch, base):
+    """[sha] of the commits the base does not have."""
+    if not branch:
+        return []
+    out = git_out(cwd, "log", "--format=%H", "%s..%s" % (base, branch)) or ""
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
 def removal_state(path, branch, base):
     """(dirty lines, unmerged shas). The state a removal would destroy."""
     dirty = [line for line in (git_out(path, "status", "--short") or "").splitlines()
              if line.strip()]
-    shas = []
-    if branch:
-        out = git_out(path, "log", "--format=%H", "%s..%s" % (base, branch)) or ""
-        shas = [line.strip() for line in out.splitlines() if line.strip()]
-    return dirty, shas
+    return dirty, commits_ahead(path, branch, base)
 
 
 def refusal_reason(dirty, shas, branch, base):
@@ -917,6 +925,21 @@ def cmd_list(args, cwd):
     return OK
 
 
+def branch_already_merged(repo, branch, base):
+    """True when the base already holds the branch's commits.
+
+    A branch that still sits at the base's own tip has nothing to merge yet, so
+    it is not merged: only a branch the base has moved past counts.
+    """
+    if not branch or not base:
+        return False
+    tip = git_out(repo, "rev-parse", branch)
+    base_tip = git_out(repo, "rev-parse", base)
+    if not tip or not base_tip or tip == base_tip:
+        return False
+    return git(repo, "merge-base", "--is-ancestor", branch, base)[0] == 0
+
+
 def worktree_state(board, control, table, path, branch, base, repo_root):
     """The state of a worktree: active, merged, stale or unknown."""
     if board is None or table is None:
@@ -926,13 +949,66 @@ def worktree_state(board, control, table, path, branch, base, repo_root):
         return "unknown"
     if status in ("Merged", "Dropped"):
         return "stale"
-    if branch and base:
-        tip = git_out(repo_root, "rev-parse", branch)
-        base_tip = git_out(repo_root, "rev-parse", base)
-        if tip and base_tip and tip != base_tip and \
-                git(repo_root, "merge-base", "--is-ancestor", branch, base)[0] == 0:
-            return "merged"
+    if branch_already_merged(repo_root, branch, base):
+        return "merged"
     return "active"
+
+
+def cmd_handoff(args, cwd):
+    root = control_root(cwd)
+    board = load_board_module(script_root())
+    if board is None:
+        return REFUSED
+    board_file = os.path.join(root, "docs", "BOARD.md")
+    table, index = board_row(board, board_file, args.board)
+    if table is None:
+        return REFUSED
+    cells = board.cell_texts(table["lines"], index)
+    branch_index = board.field_index(table, "branch-worktree")
+    cell_text = cells[branch_index] if branch_index is not None and len(cells) > branch_index else ""
+    repos, err = load_repos(root)
+    if repos is None:
+        print(err, file=sys.stderr)
+        return REFUSED
+    repo_id = args.repo or "control"
+    target, err = resolve_repo(root, repos, repo_id)
+    if err:
+        print(err, file=sys.stderr)
+        return REFUSED
+    path, branch = live_row_worktree(cell_text, root, target)
+    if not path:
+        print("row %s has no live worktree in %s; nothing to hand off" % (args.board, target),
+              file=sys.stderr)
+        return REFUSED
+    branch = branch or (git_out(path, "rev-parse", "--abbrev-ref", "HEAD") or "")
+    repo = repo_of_path(path) or target
+    base, base_err = resolve_base(repo, args.base)
+    if base_err:
+        print(base_err, file=sys.stderr)
+        return REFUSED
+    slug = slug_of(path, target)
+
+    print("board:    %s" % args.board)
+    print("worktree: %s" % path)
+    print("branch:   %s" % branch)
+    print("base:     %s" % base)
+    print("")
+    print("diff:")
+    print("  git -C %s diff %s" % (path, base))
+    print("log:")
+    print("  git -C %s log --oneline %s..HEAD" % (path, base))
+    if branch_already_merged(repo, branch, base):
+        print("show:")
+        print("  git -C %s show --stat %s..%s" % (path, base, branch))
+        print("the branch is already merged into %s; there is nothing to merge" % base)
+    else:
+        print("merge (run by the human, in the main checkout):")
+        print("  git merge --no-ff %s -m \"merge: %s\"" % (branch, slug))
+    print("cleanup (run by the human, after the merge):")
+    print("  python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup %s --apply" % slug)
+    print("  git worktree remove %s" % path)
+    print("  git branch -d %s" % branch)
+    return OK
 
 
 def cmd_verify(args, cwd):
@@ -1098,6 +1174,11 @@ def main(argv):
 
     sub.add_parser("list", help="list worktrees")
 
+    p = sub.add_parser("handoff", help="print the hand-off block for a board row")
+    p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
+    p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
+    p.add_argument("--base", help="base branch (default: the repository's own default branch)")
+
     p = sub.add_parser("verify", help="check whether a worktree is ready to merge")
     p.add_argument("slug")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
@@ -1118,6 +1199,8 @@ def main(argv):
         return cmd_resume(args, cwd)
     if args.command == "discard":
         return cmd_discard(args, cwd)
+    if args.command == "handoff":
+        return cmd_handoff(args, cwd)
     if args.command == "list":
         return cmd_list(args, cwd)
     if args.command == "verify":

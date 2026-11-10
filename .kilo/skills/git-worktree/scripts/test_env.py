@@ -71,7 +71,9 @@ def make_repo(base):
         "| BOARD-902 | Force a dirty worktree away | Feature | Ready | P2 | "
         "test | None. | control | - | forced discard of a dirty worktree |\n"
         "| BOARD-903 | Force an unmerged branch away | Feature | Ready | P2 | "
-        "test | None. | control | - | forced discard of an unmerged branch |\n"))
+        "test | None. | control | - | forced discard of an unmerged branch |\n"
+        "| BOARD-904 | Hand off a worktree | Feature | Ready | P2 | "
+        "test | None. | control | - | the hand-off block |\n"))
     write(os.path.join(repo, "README.md"), "scratch\n")
     git(repo, "init", "-b", "main")
     git(repo, "config", "user.email", "test@example.invalid")
@@ -213,6 +215,8 @@ def main():
 
     force_dirty(repo, worktree_script, base, call, check)
 
+    handoff(repo, worktree_script, call, check)
+
     joined = "".join(outputs)
     check(MARKER not in joined, "the secret value appeared in the script output")
 
@@ -222,6 +226,43 @@ def main():
         return 1
     print("all checks passed")
     return 0
+
+
+def handoff(repo, worktree_script, call, check):
+    """The hand-off block: the diff command first, then the merge command."""
+    code, out, err = call(worktree_script, "handoff", "--board", "BOARD-901")
+    check(code != 0, "handoff did not refuse for a row with no worktree")
+    check("no live worktree" in out + err, "the refusal does not say what is missing")
+
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-904")
+    check(code == 0, "create failed for BOARD-904: %s%s" % (out, err))
+    slug = "hand-off-a-worktree"
+    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-904 worktree was not created")
+
+    code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")
+    check(code == 0, "handoff failed: %s%s" % (out, err))
+    check(worktree in out, "the block does not name the worktree path")
+    check("feat/hand-off-a-worktree" in out, "the block does not name the branch")
+    diff_at = out.find("diff %s" % "main")
+    merge_at = out.find("git merge --no-ff feat/hand-off-a-worktree")
+    check(diff_at != -1, "the block has no diff command")
+    check(merge_at != -1, "the block has no merge command")
+    check(diff_at < merge_at, "the merge command comes before the diff command")
+    check("log --oneline main..HEAD" in out, "the block has no log command")
+    check("cleanup %s --apply" % slug in out, "the block has no cleanup command")
+
+    write(os.path.join(worktree, "kept.txt"), "committed on the branch\n")
+    git(worktree, "add", "-A")
+    git(worktree, "commit", "-m", "a commit on the branch")
+    git(repo, "merge", "--no-ff", "feat/hand-off-a-worktree", "-m", "merge: hand-off-a-worktree")
+
+    code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")
+    check(code == 0, "handoff failed after the merge: %s%s" % (out, err))
+    check("git merge --no-ff" not in out, "the block offers a merge command for a merged branch")
+    check("show --stat main..feat/hand-off-a-worktree" in out,
+          "the block has no show --stat line for a merged branch")
+    check("diff main" in out, "the block has no diff command for a merged branch")
 
 
 def force_dirty(repo, worktree_script, base, call, check):
