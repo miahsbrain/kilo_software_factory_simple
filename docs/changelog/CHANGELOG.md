@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-10] The teardown command sets the board lane
+**Type:** Fix
+**Board:** BOARD-108 | **Branch:** fix/cleanup-and-discard-set-the-board
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-cleanup-and-discard-set-the-lane.md`
+**Why:** `worktree.py cleanup --board BOARD-107 --apply` removed the worktree, deleted the branch and cleared the row's `Branch/Worktree` cell, but left the row in `Pending Merge`. The lane is the source of truth for what is in flight, so a row whose branch is merged and whose worktree is gone must read `Merged`. A discard left the same confusion in `In Progress`.
+**Impact:** The teardown command owns the lane for the row it tears down (ADR-071). `cleanup --board <ID> --apply` puts the row in `Merged` and clears the cell; `discard --board <ID> --apply` puts the row back in `Ready` and clears it; the slug form of `cleanup` cannot know the row and touches nothing on the board. `clear_row_worktree` takes the lane as an argument and writes the lane cell and the worktree cell in the same atomic write, so they never drift. A refused cleanup or discard changes nothing on the board. The board write stays in the control repo's main checkout. `AGENTS.md` §B4 rule 12 and §B3 say the script is the board's writer for a teardown the human runs, so the orchestrator does not set the lane by hand afterwards.
+
 ## [2026-11-10] The specialist skills, ported as a read-on-demand catalogue
 **Type:** Feature
 **Board:** BOARD-107 | **Branch:** feat/port-the-specialist-skill-catalog

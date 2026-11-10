@@ -925,6 +925,13 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Bra
       python3 .kilo/skills/board/scripts/board.py set-status BOARD-00X "In Progress"
       python3 .kilo/skills/board/scripts/board.py set-field BOARD-00X --field notes --value "..."
 
+- **A teardown command owns the lane for the row it tears down.**
+  `worktree.py cleanup --board <ID> --apply` puts the row in `Merged` and clears its
+  `Branch/Worktree` cell; `worktree.py discard --board <ID> --apply` puts the row back in
+  `Ready` and clears it. The human runs these in the main checkout, so the script is the
+  board's writer for that change and the orchestrator does not repeat it by hand. A refused
+  teardown changes nothing on the board.
+
 - **Never silently drop a row.** A task that cannot proceed moves to `Blocked` with a one-line
   reason and what is needed to unblock it.
 - **`Merged` means the user merged it.** Never means "the agent finished".
@@ -1019,6 +1026,11 @@ worktree.
     *another* row's worktree, the refusal names that owning row and offers only the ways that
     work: a new `--slug`, or `discard` for that owning row. `worktree.py resume --board <ID>`
     reuses the worktree and puts the row back in `In Progress`.
+    The teardown command owns the lane for the row it tears down: `cleanup --board <ID> --apply`
+    puts the row in `Merged` and clears the `Branch/Worktree` cell, `discard --board <ID>
+    --apply` puts the row back in `Ready` and clears it. The script is the board's writer in
+    the main checkout when the human runs it, so the orchestrator does not set the lane by hand
+    afterwards. A refusal changes nothing on the board.
     A human may destroy work that `discard` refuses, in two steps: `--force` alone prints the
     destruction plan and never acts, and `--force --yes` acts after writing a recovery patch and
     a recovery TSV under the repository's `cleanup-wt/` folder.

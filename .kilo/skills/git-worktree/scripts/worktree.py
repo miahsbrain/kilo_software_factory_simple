@@ -21,6 +21,11 @@ resume reuses the live worktree of a row and puts the row back in progress.
 discard removes it, and refuses while it is dirty or holds commits that the
 base does not have. Both write a recovery TSV like cleanup does.
 
+discard --board puts the row back in Ready and clears its worktree cell once
+the worktree is gone; cleanup --board puts the row in Merged and clears the
+cell. A refusal changes nothing on the board, and the slug form of cleanup
+touches nothing there.
+
 discard --force relaxes that refusal in two steps: --force alone prints the
 destruction plan and never acts, and --force --yes acts after writing a
 recovery copy — the uncommitted changes as a patch, and the lost commit shas
@@ -869,9 +874,9 @@ def cmd_discard(args, cwd):
         print("deleted branch " + branch)
     else:
         print("kept branch %s: %s" % (branch, (err.splitlines() or ["?"])[-1]))
-    ok, message = clear_row_worktree(board, board_file, table, index, root, path)
+    ok, message = clear_row_worktree(board, board_file, table, index, root, path, "Ready")
     if ok:
-        print("board: %s no longer records the worktree" % args.board)
+        print("board: %s is Ready and no longer records the worktree" % args.board)
     else:
         print("warning: row %s was not updated (%s)" % (args.board, message), file=sys.stderr)
     if forced:
@@ -1065,8 +1070,12 @@ def recovery_tsv(common, rows):
     return path
 
 
-def clear_row_worktree(board, board_file, table, index, root, path):
-    """(ok, message). Drops the worktree from the row's Branch/Worktree cell."""
+def clear_row_worktree(board, board_file, table, index, root, path, status=None):
+    """(ok, message). Drops the worktree from the row's Branch/Worktree cell.
+
+    With a status, the row's lane moves to it in the same write, so the cell
+    and the lane never drift apart.
+    """
     branch_index = board.field_index(table, "branch-worktree")
     if branch_index is None:
         return False, "the board has no Branch/Worktree column"
@@ -1079,6 +1088,8 @@ def clear_row_worktree(board, board_file, table, index, root, path):
                 != os.path.realpath(path)]
         merged = ", ".join("%s · branch %s" % (p, branch_name(b)) for p, b in kept)
         lines[index] = board.replace_cell(lines[index], branch_index, merged or "-")
+        if status:
+            lines[index] = board.replace_cell(lines[index], STATUS_INDEX, status)
         board.write_atomic(board_file, lines)
     except Exception as exc:
         return False, str(exc)
@@ -1199,16 +1210,22 @@ def cmd_cleanup(args, cwd):
         return REFUSED
     done.append("removed worktree " + path)
     code, _, err = git(repo, "branch", "-D", branch)
-    if code == 0:
+    branch_deleted = code == 0
+    if branch_deleted:
         done.append("deleted branch " + branch)
     else:
         done.append("kept branch %s: %s" % (branch, (err.splitlines() or ["?"])[-1]))
     for d in done:
         print(d)
     if table is not None:
-        ok, message = clear_row_worktree(board, board_file, table, index, control, path)
+        lane = "Merged" if branch_deleted else None
+        ok, message = clear_row_worktree(board, board_file, table, index, control, path, lane)
         if ok:
-            print("board: %s no longer records the worktree" % args.board)
+            if lane:
+                print("board: %s is Merged and no longer records the worktree" % args.board)
+            else:
+                print("board: %s no longer records the worktree; the lane is unchanged "
+                      "because the branch was not deleted" % args.board)
         else:
             print("warning: row %s was not updated (%s)" % (args.board, message), file=sys.stderr)
     print("recovery TSV: %s" % tsv)

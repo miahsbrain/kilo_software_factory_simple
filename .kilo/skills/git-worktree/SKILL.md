@@ -121,8 +121,10 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board <BOARD-ID>
 
 `discard` refuses when the worktree is dirty or when the branch holds commits the base does not
 have — the same checks `cleanup` uses. With `--apply` it removes the worktree, deletes the
-branch, removes the env copies, clears the row's `Branch/Worktree` cell, and writes a recovery
-TSV. **Unmerged work is never deleted.**
+branch, removes the env copies, clears the row's `Branch/Worktree` cell, puts the row back in
+`Ready`, and writes a recovery TSV. **Unmerged work is never deleted.** A refusal changes
+nothing on the board: the lane stays as it was and the cell keeps pointing at the live
+worktree.
 
 ### Forcing a discard: two steps
 
@@ -155,7 +157,8 @@ git branch <branch> <sha>                                    # the commits, from
 
 `--force` only relaxes the refusal. It never changes the dry-run default: `--apply` still
 governs acting on the normal path, and `--force` without `--yes` never acts. `--yes` without
-`--force` is a usage error. The row's lane is not touched — the orchestrator owns lanes.
+`--force` is a usage error. A forced discard that acts puts the row back in `Ready`, like any
+other successful discard.
 
 `list` shows a `state` column: `active`, `merged`, `stale` or `unknown`. A worktree whose row
 says `Merged` or `Dropped` but that still exists is `stale` — a leftover to clean up.
@@ -472,6 +475,11 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X 
 the worktree is gone. Give a slug or `--board`, never both and never neither — either mistake
 is a usage error. The teardown the hand-off block names is the `--board` form, because the row
 is what the human holds.
+
+`cleanup --board` owns the lane for the row it tears down: a successful cleanup puts the row in
+`Merged` and clears the cell, in the same write. The slug form of `cleanup` cannot know the
+row, so it touches nothing on the board. A refused cleanup changes nothing on the board: the
+lane stays as it was and the cell keeps pointing at the live worktree.
 
 The script refuses when the branch has commits not reachable from the base, or when the worktree
 is dirty. It writes a recovery record to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before

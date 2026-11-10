@@ -11,16 +11,21 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **In flight:** one branch waits for the user to merge. `feat/port-the-specialist-skill-catalog`
-  (BOARD-107) adds the specialist skill catalogue at `.kilo/catalog/` — the 67 upstream skills
-  (MIT, © 2025 Jeffallan) kept as files to read on demand, outside the auto-discovered skills
+- **In flight:** one branch waits for the user to merge. `fix/cleanup-and-discard-set-the-board`
+  (BOARD-108) makes the teardown command own the lane for the row it tears down: `cleanup
+  --board` sets `Merged`, `discard --board` sets `Ready`, and both clear the row's
+  `Branch/Worktree` cell in the same atomic board write. The specialist skill catalogue branch
+  (`feat/port-the-specialist-skill-catalog`, BOARD-107) adds the specialist skill catalogue at
+  `.kilo/catalog/` — the 67 upstream skills
+  (MIT, © 2025 Jeffillan) kept as files to read on demand, outside the auto-discovered skills
   folder, with an index at `.kilo/catalog/README.md`, a Specialist skills section in `AGENTS.md`
   §A7, the specialists named in each builder agent file, and `catalog` added to the `guard.py
   sync` slice. The plan skill branch (`feat/port-a-merged-plan-skill`, BOARD-106) and the live
   board viewer change (`feat/compact-accordion-redesign-of-the-live`, BOARD-102) also wait.
-- **Next action:** the user reviews and merges `feat/port-the-specialist-skill-catalog`. Then
-  pick the first project row from the project's board — `project/docs/RISKS.md` holds the ranked
-  defect list, and the top one is the cross-tenant credential bleed in `payment_gateway_ms`.
+- **Next action:** the user reviews and merges `fix/cleanup-and-discard-set-the-board`. Then
+  merge the other waiting branches, and pick the first project row from the project's board —
+  `project/docs/RISKS.md` holds the ranked defect list, and the top one is the cross-tenant
+  credential bleed in `payment_gateway_ms`.
 
 ## Open questions
 
