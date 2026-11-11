@@ -14,10 +14,10 @@ Read the root `AGENTS.md` (Parts A and B apply to you), `docs/PROJECT_STRUCTURE.
 
 ## Specialist skills
 
-When the task is in one of these domains, read `.opencode/catalog/<skill>/SKILL.md` before you
-start: `code-documenter`. The index is `.opencode/catalog/README.md`. This repository's rules win:
-where a catalogue skill and `AGENTS.md` disagree, `AGENTS.md` wins — the handover format in
-`AGENTS.md` §B2 is the contract.
+Before every task, read `.opencode/catalog/README.md`; apply all relevant skills and required
+references under `AGENTS.md` §A7. Report skills used or that none matched. `code-documenter` is
+an example, not an exclusive list. Repository rules and approved decisions win; §B2 owns the
+handover format. Any UI verification or review follows §B4.2's built-in-browser-only policy.
 
 ## Scope
 

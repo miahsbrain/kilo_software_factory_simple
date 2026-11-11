@@ -1,43 +1,24 @@
 ---
-description: Run the QA and UI/UX review lane with Playwright and produce evidence
+description: Run the QA and UI/UX review lane with the built-in browser and produce evidence
 ---
 
 Run the QA lane and the UI/UX critique for a frontend row. Evidence, not assertions.
 Spec: `docs/UI-UX.md` §3 and §5.
 
-Use OpenCode's built-in browser for interactive UI checks when available; follow the interactive
-browser guidance in `.opencode/skills/qa-review/SKILL.md` (load `browser` before the first call).
-These checks supplement, not replace, the scripted evidence and QA/unslop gates. Report an
-unavailable browser; do not silently switch tools.
+Follow `AGENTS.md` §A7: read the catalogue index, apply all relevant skills and required references,
+and report skills used or that none matched. For UI verification/review, load `browser` first
+and use only OpenCode's built-in browser under §B4.2 and `.opencode/skills/qa-review/SKILL.md`.
+Do not use Playwright, browser MCP alternatives or `browser-review.mjs` for UI verification/review.
 
 1. **Confirm the app runs.** Use the dev command from `docs/STACK.md`. If it does not start,
    report the blocker; do not fake a review.
-2. **Capture with the script** — it drives the project's own Playwright and writes a full-page
-   screenshot, `console.log`, `page-errors.log`, and `network.json` per route per viewport, plus a
-   `summary.json` with the counts and the overflow result:
-
-       node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
-           --scope <scope> --task-id <task-id> --project apps/<scope>
-
-   The script computes the canonical artifact path itself — `artifacts/<scope>/qa/<date>/<task-id>/`
-   in the **main checkout** — so no agent has to remember it.
-
-   Viewports: 390×844 (mobile), 834×1112 (tablet), 1440×900 (desktop), 1920×1080 (wide), and
-   320×800 as the overflow floor.
-
-   **The script is the only way to capture canonical UI evidence.** Built-in browser screenshots
-   are for interactive inspection only, not substitutes for scripted evidence. Ad-hoc `chromium`, `npx playwright
-   screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
-   evidence for a UI review. The script never installs a browser and never falls back to another
-   driver. If the script cannot do something the review needs, say what is missing and propose
-   the change — a change to a project tool is a reviewed change, not a silent patch mid-review.
-   Do not work around it with another tool.
-
-   Extra flags: `--scheme light|dark|both`, `--component <css-selector>` (repeatable),
-   `--compare <dir>` (before | after sheet), `--label <slug>` (names the round's capture),
-   `--chromium <path>` (the path of a chromium binary handed to Playwright's launch; it
-   overrides `PLAYWRIGHT_CHROMIUM_PATH`). When no chromium is found at all, the script exits 2
-   with the list of places it searched.
+2. **Interact and capture with the built-in browser.** Collect screenshots, DOM measurements,
+   console and network observations per route and in-scope theme. Viewports: 390×844 (mobile),
+   834×1112 (tablet), 1440×900 (desktop), 1920×1080 (wide), and 320×800 as the overflow floor.
+   Record actual viewport and theme. If browser access or any required measurement is unavailable,
+   report the limitation and hold the affected criterion without fallback.
+   Transfer desktop-owned captures with the built-in browser; screenshot/`files.get` results
+   supply server-local paths. Never assume a shared desktop/server filesystem.
 3. **Check the round ledger** — a row goes through at most 3 QA↔fix rounds, and each round's
    review is done by a fresh reviewer who reads the ledger, not the previous reviewer's
    reasoning:
@@ -46,8 +27,8 @@ unavailable browser; do not silently switch tools.
 
    The ledger lives at `docs/reviews/<task-id>-ledger.md`.
 4. **Store artifacts** under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` with a
-   `notes.md` recording what was checked and expected vs actual. Commit `notes.md` and small
-   component shots only. Review reports stay in `docs/reviews/<task-id>-qa.md` and
+   `notes.md` recording route, viewport, theme, steps, expected and observed results. Commit
+   `notes.md` and small component shots only. Review reports stay in `docs/reviews/<task-id>-qa.md` and
    `docs/reviews/<task-id>-ui.md` — those are documents, not artifacts.
 5. **Check** and report findings as expected-vs-actual:
    - keyboard focus, visible focus ring, focus trapping in dialogs
@@ -70,8 +51,9 @@ unavailable browser; do not silently switch tools.
 
    Exit 0 prints the fingerprint on stdout. Pass it to `board.py add --fingerprint`; a repeat
    fingerprint is refused and the existing row is escalated to `Blocked` instead.
-8. **Verdict**: a frontend row cannot leave `In Review` until both QA and the critique are
-   green. Any finding returns the row to `In Progress` with the finding restated. The round cap
+8. **Verdict**: a frontend row cannot leave `In Review` until QA and independent critique are
+   green and the unslop audit is recorded. Gallery approval and accessibility gates remain
+   mandatory. Any finding returns the row to `In Progress` with the finding restated. The round cap
    is 3 — when it is reached and the row still fails, the row moves to `Blocked` with a summary
    of what was tried and the question the human must answer.
 

@@ -12,11 +12,12 @@ one exists. Also read `docs/UI-UX.md`.
 
 ## Specialist skills
 
-When the task is in one of these domains, read `.opencode/catalog/<skill>/SKILL.md` before you
-start: `react-expert`, `vue-expert`, `vue-expert-js`, `nextjs-developer`, `angular-architect`,
-`javascript-pro`, `typescript-pro`, `graphql-architect`. The index is
-`.opencode/catalog/README.md`. This repository's rules win: where a catalogue skill and `AGENTS.md`
-disagree, `AGENTS.md` wins.
+Before every task, read `.opencode/catalog/README.md`; apply all relevant skills and required
+references under `AGENTS.md` §A7. Report skills used or that none matched. Repository rules and
+approved decisions win. Shared skill reads do not permit cross-scope application reads or edits.
+
+Examples, not an exclusive list: `react-expert`, `vue-expert`, `vue-expert-js`, `nextjs-developer`,
+`angular-architect`, `javascript-pro`, `typescript-pro`, `graphql-architect`.
 
 ## Scope
 
@@ -144,14 +145,16 @@ checked. Do not pick an option and continue. Do not change an approved decision.
 ## Verification
 
 Run the smallest relevant verification command from `docs/STACK.md`. For tiny copy, styling,
-className, spacing, or static UI changes, skip command verification and say: "Verification
-limited to file review because this was a low-risk visual/static change." Never run lint and build
-together unless the first fails.
+className, spacing, or static UI changes, skip command verification only; UI browser evidence and
+review gates below still apply. For non-UI static changes with no checks run, say: "Verification
+limited to file review because this was a low-risk visual/static change."
 **Never run a production build.** `npm run build`, `buildProd`, `buildProd2`, `buildDev` and
 `npx react-scripts build` are not verification steps. Read the run command in `docs/RUNNING.md` and
 `docs/STACK.md` first, start the app with it, and verify against the running development server.
-For UI work, prove the result in a browser with the QA capture script. A production build runs
-only when the user asks for one by name.
+For UI work, load `browser` and prove the result only with OpenCode's built-in browser under
+`AGENTS.md` §B4.2 and `.opencode/skills/qa-review/SKILL.md`. Hold unavailable measurements without
+fallback; gallery approval, independent review, accessibility and unslop gates remain.
+A production build runs only when the user asks for one by name.
 
 ## Git
 

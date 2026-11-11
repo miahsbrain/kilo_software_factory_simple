@@ -332,16 +332,17 @@ report changed files, verification, assumptions, blockers, and limitations.
 ### The division of labour: scripts own the mechanics, agents own the judgment
 
 **A rule that can be a script must be a script.** When a rule involves a mechanical operation —
-creating a worktree, editing a board row, capturing screenshots, validating a finding body, or
+creating a worktree, editing a board row, validating a finding body, or
 checking whether a destructive command is allowed — the script performs it and the agent supplies
 the intent. Never have an agent hand-run the underlying command when a script covers it.
+
+UI evidence is the exception: OpenCode's built-in browser owns capture and review (§B4.2).
 
 | Rule | Script that owns it |
 |---|---|
 | Every change gets a worktree with a feature-named path and branch | `.opencode/skills/git-worktree/scripts/worktree.py` |
 | Deletion only inside the worktree; worktree paths confined to `.opencode/worktrees/` | `.opencode/skills/git-worktree/scripts/guard.py` |
 | The board is edited by lane and cell, never hand-written | `.opencode/skills/board/scripts/board.py` |
-| QA evidence capture: screenshots, console, page errors, network, overflow | `.opencode/skills/qa-review/scripts/browser-review.mjs` |
 | A finding is actionable before it becomes a board row | `.opencode/skills/qa-review/scripts/check-finding.py` |
 | Git commands that change history or the remote are classified before they run | `.opencode/skills/git-worktree/scripts/guard.py check-git` |
 | The permission map and the policy file cannot drift apart | `.opencode/skills/git-worktree/scripts/guard.py check-policy` |
@@ -579,12 +580,21 @@ Use the dedicated agents rather than ad-hoc prompts where one fits:
 | `frontend-dev` | Web UI work — component factory, screens, styling, accessibility |
 | `backend-dev` | API and service work — routes, domain logic, persistence, integrations |
 | `mobile-dev` | Mobile UI and platform work |
-| `qa-reviewer` | Verification lane — Playwright evidence against acceptance criteria |
+| `qa-reviewer` | Verification lane — built-in browser UI evidence against acceptance criteria |
 | `ui-critic` | Visual critique lane — anti-slop rules and gallery conformance |
 | `docs-writer` | The application memory map — one handover per application plus the global index |
 
 Each agent file carries the scope, style, production, verification, git, and reporting rules that
 apply to it, so a delegated prompt can stay short and specific.
+
+### Specialist skills
+
+Before starting any task, read `.opencode/catalog/README.md`. Read and apply each skill relevant to the assigned task, including its required references. Report which skills were used, or state that none matched. Do not limit selection to an agent’s example list. Repository rules and approved decisions take precedence.
+
+The catalogue is read as files, outside native skill discovery. Read the relevant skills, not the
+whole catalogue. This applies to the architect and all specialists. Shared catalogue rules,
+skills and required references may be read even when application source reads are scope-confined;
+this does not permit other cross-scope reads or edits. Agent specialist lists are examples.
 
 ### Frontend UI gate (component factory before screens)
 
@@ -736,7 +746,7 @@ each file genuinely needs its own short reference. Do not turn them into impleme
 | `docs/handover/` | The application memory map: one handover per application plus the global index |
 | `docs/ARCHITECTURE.md` | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap |
 | `docs/BUSINESS-LOGIC.md` | Every business rule as question → answer (see B2) |
-| `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, Playwright QA spec |
+| `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, built-in browser QA spec |
 | `docs/reviews/*.md` | QA and UI/UX review reports — one per task, produced by the reviewer agents |
 | `docs/BOARD.md` | Work tracking board (see B3) |
 | `docs/STACK.md` | Stack, package managers, dev/verification commands, ports, database, auth |
@@ -963,7 +973,8 @@ worktree.
      If evidence is missing, bounce back to Build rather than declaring success.
    - **Review** — review the diff against the acceptance criteria and the production/modularity
      standards in §A8.
-   Trivial changes (copy, styling, comments, docs-only) may skip QA and go straight to Review.
+   Trivial non-UI changes (comments, docs-only) may skip QA and go straight to Review.
+   UI changes still require the browser, accessibility and unslop gates in §B4.2.
 8. **Merge gate.** A worktree is only offered for merge when: the verification command passed,
    QA produced evidence, the review found no blocking issue, and the documentation is updated.
 9. **Pending merge means human approval is required.** When the work is ready, the orchestrator
@@ -1011,7 +1022,7 @@ met**, proven by evidence. The lanes repeat until then.
         ┌──────────────────────────────────────────────┐
         │                                              │
    decision sheet  →  build  →  QA  →  critique  →  review
-   (human approves)  (worktree)  (Playwright) (UI/UX)   │
+   (human approves)  (worktree)  (browser)   (UI/UX)   │
         │                              │                 │
         │                        findings                │
         │                              ▼                 │
@@ -1266,18 +1277,17 @@ Keep all written output in the same plain, verifiable style:
 
 ## B4.2 QA and UI/UX review
 
-The QA lane for frontend work uses **Playwright** and produces evidence, not assertions.
+All UI verification and UI/UX review must use OpenCode’s built-in browser. Load the browser skill first. Use actual interactions, screenshots, DOM measurements, console and network observations as evidence. Do not use Playwright, browser MCP alternatives, or `browser-review.mjs` for UI verification or review.
 
-Use OpenCode’s built-in browser for interactive UI checks when available. Keep `browser-review.mjs` as the required source of repeatable screenshot, viewport, console, and network evidence. Built-in browser checks supplement—not replace—the existing QA and unslop gates. If the browser is unavailable, report it; do not silently switch tools.
+Store browser evidence under `artifacts/<scope>/qa/<date>/<task-id>/` and record the route, viewport, theme, steps, expected result and observed result. Never claim an unchecked criterion passed. If browser access or a required measurement is unavailable, report the limitation and hold the affected criterion. Gallery approval, independent review, accessibility and unslop gates remain mandatory.
 
-- **Capture:** the QA script drives the project's own Playwright:
+This replaces earlier scripted UI capture directions, including scope-level directions. Existing
+capture scripts and Playwright test tools remain historical/not UI QA; do not delete them or
+historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser workflow.
 
-      node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
-          --scope <scope> --task-id <task-id> --project apps/<scope>
-
-  It writes a full-page screenshot, `console.log`, `page-errors.log`, and `network.json` per route
-  per viewport (390×844, 834×1112, 1440×900, 1920×1080, plus 320×800 as the overflow floor), and
-  a `summary.json` with the counts and the overflow result.
+- **Capture:** interact with the running development app and collect browser evidence per route,
+  viewport (390×844, 834×1112, 1440×900, 1920×1080, plus 320×800 as the overflow floor) and
+  in-scope theme. Record actual dimensions and theme; an unavailable measurement stays unchecked.
 - **One canonical artifacts folder.** Every UI artifact lives under the repository root:
 
       artifacts/
@@ -1295,34 +1305,13 @@ Use OpenCode’s built-in browser for interactive UI checks when available. Keep
                       compare.png
                 notes.md            # what was checked, expected vs actual
 
-  The script builds that path itself, so no agent has to remember it. `--scope` (default
-  `factory`), `--task-id` (default `adhoc`) and `--date` (default today) name the folders;
-  `--artifact-dir` is an optional override. The artifacts folder belongs to the **main checkout**,
-  so a capture taken from a worktree still lands in one place.
+  The artifacts folder belongs to the **main checkout**, so worktree captures land in one place.
+  Screenshot and `files.get` results provide server-local paths; desktop file IDs are not paths.
+  Transfer desktop-owned captures with the built-in browser, then store the returned bytes under
+  the canonical path. Never assume desktop and server filesystems are shared.
   **Review reports and the ledger are documents, not artifacts.** They stay where documents live:
   `docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
   `docs/reviews/<task-id>-ledger.md`.
-- **The script is the only way to capture canonical UI evidence.** The QA reviewer and the UI critic capture
-  canonical screenshots **only** through `browser-review.mjs`. This does not forbid built-in
-  interactive investigation; built-in screenshots are for inspection, not substitutes for scripted
-  evidence. Follow `.opencode/skills/qa-review/SKILL.md` for built-in browser usage. Ad-hoc `chromium`, `npx playwright
-  screenshot`, `curl`-and-guess, or any other browser command run from bash is **not acceptable
-  evidence** for a UI review. The script never installs a browser and never falls back to another
-  driver. If the script cannot do something the review needs, **say what is missing and propose
-  the change** — a change to a project tool is a reviewed change, not a silent patch mid-review.
-  Do not work around it with another tool.
-  - `--scheme light|dark|both` — capture in one colour scheme or both; `both` names the files
-    `<viewport>-light.png` / `<viewport>-dark.png`.
-  - `--component <css-selector>` (repeatable) — capture a cropped screenshot of each matched
-    element, at `<task-dir>/<route-slug>/<viewport>/<scheme>/component-<n>.png`.
-  - `--compare <dir>` — write a **before | after** sheet to
-    `<task-dir>/<route-slug>/<viewport>/<scheme>/compare.png` when that directory holds a previous
-    capture with the same route-slug and viewport names.
-  - `--label <slug>` — name the capture, so round 0, round 1 and round 2 can be compared.
-  - `--chromium <path>` — the path of a chromium binary handed to Playwright's launch. It
-    overrides `PLAYWRIGHT_CHROMIUM_PATH`. When no chromium is found at all — neither the flag,
-    nor the env var, nor the browser Playwright downloaded, nor the system chromium — the script
-    exits 2 with the list of places it searched and what to do about it.
 - **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
   recording what was checked and expected vs actual. Commit `notes.md` and small component shots;
   leave full-page captures out of git.
@@ -1331,8 +1320,11 @@ Use OpenCode’s built-in browser for interactive UI checks when available. Keep
   and whether the screen matches the approved gallery (tokens, states, density).
 - **Review:** a UI/UX critique pass runs alongside QA. Findings are stated as
   expected-vs-actual with the screenshot or `file:line` that proves them.
-- **Verdict:** a frontend row cannot leave `In Review` until both QA and the UI/UX critique are
-  green. Any finding returns the row to `In Progress` with the finding restated.
+- **The unslop pass is mandatory on every UI change, alongside QA.** Follow
+  `.opencode/skills/unslop/SKILL.md`: record the five-line direction, full sign audit,
+  nine passes and checklist against the same browser evidence. A missing audit holds review.
+- **Verdict:** a frontend row cannot leave `In Review` until QA and the independent UI/UX critique
+  are green and the unslop audit is recorded. Any finding returns the row to `In Progress`.
 - The spec is in `docs/UI-UX.md` §5. Keep it lean: one spec file per feature lane, no extra test
   framework.
 
@@ -1343,7 +1335,7 @@ independent of the builder's claims:
 
 | Agent | Role | Output |
 |---|---|---|
-| `qa-reviewer` | Verifies behavior against the acceptance criteria; drives Playwright | `docs/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
+| `qa-reviewer` | Verifies behavior against the acceptance criteria; uses the built-in browser for UI | `docs/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
 | `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `docs/reviews/<task-id>-ui.md` |
 
 Both are read-only against application code. They report; they do not fix.

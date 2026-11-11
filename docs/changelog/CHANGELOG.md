@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Require catalogue skills and built-in browser UI reviews
+**Type:** Docs
+**Board:** BOARD-120 | **Branch:** docs/require-catalog-skills-and-browser-ui-reviews
+**Changed:** root/template `AGENTS.md` §A7/§B4.2 and related references; all seven agent definitions; catalogue index; QA, unslop and board workflow skills; `/ui`, `/run`, `/unslop`, `/components`, `/board-view`; root/template UI-UX and STACK docs; README, HANDOVER, PROJECT_STATE, DECISIONS (ADR-079), this log. Extended existing documents; no new file or tool.
+**Why:** Approved exact blocks require catalogue selection/application/reporting for every task and built-in-browser-only UI verification/review, replacing mandatory scripted capture rather than supplementing it.
+**Impact:** Canonical artifact paths and gallery, independent review, accessibility, unslop, bounded ledger/fingerprint and finding-validation gates remain. Missing browser access/measurements hold criteria without fallback; transfer guidance distinguishes desktop file IDs from server-local screenshot/files.get paths. Read-only scope files' old capture directions are explicitly superseded by canonical §B4.2. Historical ADRs/logs/evidence and test/capture source remain unchanged; no guard/security policy, dependency, board, project-copy, merge or push changes.
+**Verification:** File review completed. The single inline `python3` consistency command exited 1 (`AssertionError: .opencode/skills/board/SKILL.md`): the overbroad `script is the only` pattern matched the board-editing rule, not UI capture. Six root/template exact-block checks and all seven agent selection/report checks passed; later assertions did not run. No retry, build, runtime, browser or model-behavior tests; WIP checkpoint awaits architect authorization for a browser-specific check or file review of remaining criteria. Applied catalogue `code-documenter` (user-guides reference), `prompt-engineer` (system-prompts reference), and native OpenCode/browser guidance; reused existing documents. Initial shell `rg` search exited 127 (executable unavailable); architect authorized the existing dedicated grep tool, with no installation or retry.
+
 ## [2026-11-11] Use OpenCode browser for interactive UI reviews
 **Type:** Docs
 **Board:** BOARD-116 | **Branch:** docs/use-opencode-browser-for-interactive-ui-reviews

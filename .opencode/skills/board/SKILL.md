@@ -167,6 +167,14 @@ npm --prefix .opencode/skills/board/ui run build   # -> .opencode/skills/board/s
 `/gallery` renders the same `wb_` components the board uses; approve it before a screen changes.
 The runtime serves the CSS and the two self-hosted Geist fonts from `.opencode/skills/board/static/`.
 
+Before a task, apply `AGENTS.md` §A7's catalogue selection/reporting rule. UI verification/review
+of the board and gallery follows §B4.2 and the QA skill: load `browser` first, use only OpenCode's
+built-in browser interactions, screenshots, DOM measurements, console and network observations.
+Store evidence under `artifacts/factory/qa/<date>/<task-id>/` with route, viewport, theme, steps,
+expected and observed results. Transfer captures using returned server-local paths; do not assume
+a shared desktop/server disk. Hold unavailable access/measurements without fallback. Gallery
+approval, independent review, accessibility and unslop gates remain mandatory.
+
 - An **app bar** carries the wordmark, the live refresh clock, Pause, Refresh now, and the
   system/light/dark theme and comfortable/compact density toggles.
 - A **pipeline** strip counts the active lanes; each lane button filters the cards and is the

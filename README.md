@@ -146,7 +146,7 @@ work from inside a work surface as well as from the control repo.
    application plus the global index in `docs/handover/`.
 4. `/decide` — the discovery interview. It fills `DOMAIN.md` and produces the first decisions.
 5. `/run BOARD-001` — build the row in a worktree.
-6. `/ui` — the QA and UI/UX lane, with Playwright evidence.
+6. `/ui` — the QA and UI/UX lane, with OpenCode built-in browser evidence.
 7. Inspect the branch and merge it yourself. The agent never merges, never pushes, and never
    opens a pull request.
 
@@ -156,9 +156,9 @@ work from inside a work surface as well as from the control repo.
 |---|---|---|
 | OpenCode | V2 | architect primary, six specialist subagents, commands and five discoverable skills |
 | git | 2.30+ | worktrees, branches, commits |
-| Node.js | 18+ | the Playwright capture script |
+| Node.js | 18+ | retained historical/test tooling; board stylesheet authoring uses the version in `docs/STACK.md` |
 | Python | 3.9+ | the board, worktree, and finding scripts |
-| chromium | any | the QA capture lane only |
+| chromium | any | retained historical/test tooling, not UI QA |
 
 The devcontainer image carries all of them, including chromium at `/usr/bin/chromium`.
 
@@ -182,7 +182,7 @@ python3 .opencode/skills/board/scripts/board_serve.py --port 15180
 | Every change happens in a worktree named after the board row | `.opencode/skills/git-worktree/scripts/worktree.py` |
 | Deletes stay inside the worktree | `.opencode/skills/git-worktree/scripts/guard.py` |
 | Every board row is edited through the script | `.opencode/skills/board/scripts/board.py` |
-| UI evidence comes from one capture script | `.opencode/skills/qa-review/scripts/browser-review.mjs` |
+| UI evidence uses only OpenCode's built-in browser | `AGENTS.md` §B4.2 and the QA skill; load `browser` first |
 | A finding becomes a row only if it names expected, actual, and evidence | `.opencode/skills/qa-review/scripts/check-finding.py` |
 | The QA↔fix loop stops after three rounds | `.opencode/skills/qa-review/scripts/ledger.py` |
 | Git commands that change history or the remote are classified before they run | `.opencode/skills/git-worktree/scripts/guard.py check-git` |
@@ -205,7 +205,11 @@ around with a new tool.
 
 - **Commits** — `<emoji> [<type>] <scope>: <subject>`, with one bullet on what changed and why.
 - **Branches** — `feat|fix|chore|docs/<slug>`, derived from the board row's type and title.
-- **Artifacts** — `artifacts/<scope>/qa/<date>/<task-id>/`; the capture script computes the path.
+- **Artifacts** — store browser evidence under `artifacts/<scope>/qa/<date>/<task-id>/` with
+  route, viewport, theme, steps, expected and observed results. Hold unavailable measurements;
+  never assume desktop and server filesystems are shared.
+- **Skills** — before every task, read `.opencode/catalog/README.md`, apply all relevant skills
+  and required references, and report skills used or that none matched (§A7). Example lists are not limits.
 - **Review reports and ledgers** are documents, not artifacts: `docs/reviews/<task-id>-{qa,ui,ledger}.md`.
 
 ## Status
