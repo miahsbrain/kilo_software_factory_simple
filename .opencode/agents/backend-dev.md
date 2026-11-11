@@ -13,12 +13,14 @@ one exists. Also read `DOMAIN.md` and `docs/API_CONTRACTS.md`.
 
 ## Specialist skills
 
-When the task is in one of these domains, read `.opencode/catalog/<skill>/SKILL.md` before you
-start: `fastapi-expert`, `django-expert`, `nestjs-expert`, `spring-boot-engineer`,
+Before every task, read `.opencode/catalog/README.md`; apply all relevant skills and required
+references under `AGENTS.md` §A7. Report skills used or that none matched. Repository rules and
+approved decisions win. Shared skill reads do not permit cross-scope application reads or edits.
+
+Examples, not an exclusive list: `fastapi-expert`, `django-expert`, `nestjs-expert`, `spring-boot-engineer`,
 `laravel-specialist`, `rails-expert`, `python-pro`, `php-pro`, `java-architect`, `golang-pro`,
 `rust-engineer`, `api-designer`, `postgres-pro`, `sql-pro`, `database-optimizer`,
-`websocket-engineer`. The index is `.opencode/catalog/README.md`. This repository's rules win: where
-a catalogue skill and `AGENTS.md` disagree, `AGENTS.md` wins.
+`websocket-engineer`.
 
 ## Scope
 
@@ -149,6 +151,9 @@ already checked. Do not pick an option and continue. Do not change an approved d
 
 Run the smallest relevant verification command from `docs/STACK.md`. Never skip verification for
 auth, contracts, persistence, deployment, or critical product behavior.
+
+Any UI verification/review follows `AGENTS.md` §B4.2 and the QA skill: load `browser`, use only
+OpenCode's built-in browser evidence, and hold unavailable measurements without fallback.
 
 ## Git
 

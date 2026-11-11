@@ -5,6 +5,9 @@ description: Run the Build → QA → Review loop for one board row and leave it
 You are the **orchestrator** for a single board row. The work happens in the worktree; the board
 stays in the main checkout and only you write it.
 
+Before the task, read `.opencode/catalog/README.md`, apply all relevant skills and required
+references under `AGENTS.md` §A7, and report skills used or that none matched.
+
 1. **Pick** the row: highest-priority `Ready`, not blocked by another row. Grade it
    low/medium/high (§B4 "Task grading") to set the rigor of review.
 2. **Build** in the worktree named after the feature. Create it from the board row if it does not
@@ -21,15 +24,14 @@ stays in the main checkout and only you write it.
      approval waits for the user.
 3. **QA** — produce evidence, not assertion. One observable check per acceptance criterion,
    with the command and result and `file:line`. For UI work, capture screenshots.
-   - The capture script is the only way to capture UI evidence. Ad-hoc `chromium`, `npx playwright
-     screenshot`, `curl`-and-guess, or any other browser command from bash is not acceptable
-     evidence. The script never installs a browser and never falls back to another driver. If
-     the script cannot do something the review needs, say what is missing and propose the change
-     — a change to a project tool is a reviewed change, not a silent patch mid-review. Do not
-     work around it with another tool.
+   - Load `browser` first and use only OpenCode's built-in browser for UI verification/review
+     (§B4.2, QA skill). Use interactions, screenshots, DOM measurements, console and network
+     observations. No Playwright, browser MCP alternatives or `browser-review.mjs`. Hold an
+     unavailable browser/measurement criterion and report the limitation without fallback.
    - UI artifacts land in the one canonical folder at the repository root:
-     `artifacts/<scope>/qa/<date>/<task-id>/`. The script computes that path itself. Review reports
-     and the ledger stay in `docs/reviews/` — those are documents, not artifacts.
+     `artifacts/<scope>/qa/<date>/<task-id>/`. Record route, viewport, theme, steps, expected and
+     observed results; transfer browser captures using server-local paths, not desktop paths.
+     Review reports and the ledger stay in `docs/reviews/` — those are documents, not artifacts.
    - A row goes through at most **3** QA↔fix rounds. Round 3 is the last. Each round's review is
      done by a fresh reviewer that reads `docs/reviews/<task-id>-ledger.md` and the current
      screenshots, not the previous reviewer's reasoning. The ledger script opens and closes rounds:
@@ -46,7 +48,8 @@ stays in the main checkout and only you write it.
 4. **Review** — read the diff and the acceptance criteria first, form your own hypotheses, then
    compare against the builder's summary (§A8). Re-run the exact verification command the QA
    lane used. Any blocking finding → row back to `In Progress` with the finding restated.
-   For frontend work, also run the UI/UX critique lane (`/ui`) — both must be green.
+   For frontend work, also run the independent UI/UX critique lane (`/ui`) — both must be green,
+   the unslop audit recorded, and gallery approval and accessibility gates satisfied.
 5. **Merge gate** (§B4): all criteria verified, verification passed, QA evidence present, review
    clean, docs updated, and `worktree.py verify <slug>` printing `READY FOR MERGE` → set the row
    to `Pending Merge` with `board.py set-status`.

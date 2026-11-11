@@ -12,10 +12,11 @@ one exists. Also read `docs/UI-UX.md`.
 
 ## Specialist skills
 
-When the task is in one of these domains, read `.opencode/catalog/<skill>/SKILL.md` before you
-start: `react-native-expert`, `flutter-expert`, `swift-expert`, `kotlin-specialist`. The index
-is `.opencode/catalog/README.md`. This repository's rules win: where a catalogue skill and
-`AGENTS.md` disagree, `AGENTS.md` wins.
+Before every task, read `.opencode/catalog/README.md`; apply all relevant skills and required
+references under `AGENTS.md` §A7. Report skills used or that none matched. Repository rules and
+approved decisions win. Shared skill reads do not permit cross-scope application reads or edits.
+
+Examples, not an exclusive list: `react-native-expert`, `flutter-expert`, `swift-expert`, `kotlin-specialist`.
 
 ## Scope
 
@@ -136,9 +137,15 @@ what you already checked. Do not pick an option and continue. Do not change an a
 
 ## Verification
 
-Run the smallest relevant verification command from `docs/STACK.md`. Skip command verification for
-tiny copy, styling, className, spacing, or static UI changes and say: "Verification limited to
-file review because this was a low-risk visual/static change."
+Run the smallest relevant verification command from `docs/STACK.md`. For tiny copy, styling,
+className, spacing, or static UI changes, skip command verification only; UI browser evidence and
+review gates below still apply. For non-UI static changes with no checks run, say: "Verification
+limited to file review because this was a low-risk visual/static change."
+
+For UI verification or review, load `browser` and use only OpenCode's built-in browser under
+`AGENTS.md` §B4.2 and `.opencode/skills/qa-review/SKILL.md`. If a native UI or measurement is not
+accessible there, hold the criterion and report the limitation; do not switch tools. Gallery
+approval, independent review, accessibility and unslop gates remain mandatory.
 
 ## Git
 

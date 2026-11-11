@@ -4,6 +4,9 @@ description: Serve the live board dashboard in a browser — lanes, cards, and r
 
 Start the read-only board viewer and hand the user the URL.
 
+For UI verification/review of the viewer or `/gallery`, follow `AGENTS.md` §B4.2 and the QA skill:
+load `browser`, use only OpenCode's built-in browser, and hold unavailable criteria without fallback.
+
 ```bash
 python3 .opencode/skills/board/scripts/board_serve.py --port 15180
 ```

@@ -159,6 +159,23 @@ Failed capture command (exit 2; recorded, not rerun):
 ```sh
 node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127.0.0.1:15181 --route / --scope factory --task-id BOARD-117 --project . --scheme both --date 2026-11-11
 ```
+> **Session Notes — BOARD-120 governance update, 2026-11-11**
+> Branch: `docs/require-catalog-skills-and-browser-ui-reviews`; worktree:
+> `.opencode/worktrees/require-catalog-skills-and-browser-ui-reviews`, based on `opencode`.
+> Root/template §A7 now requires catalogue selection, relevant skills/references and reporting
+> for every task. §B4.2 now requires built-in-browser-only UI verification/review, replacing
+> scripted captures, not supplementing them. Agents, derived commands, workflow skills and
+> current UI/stack guidance align. ADR-079 records the approved policy.
+> Gallery approval, independent review, accessibility, unslop, bounded ledger/fingerprint and
+> finding-validation gates remain. Tools and historical evidence are unchanged; scope files
+> remain read-only and their old capture directions are superseded by canonical §B4.2.
+> File review completed. The architect-authorized corrected consistency command exited 0:
+> six exact-block checks, seven agent checks, 23 active documents, nonbrowser script ownership,
+> bounded finding gates, 27-file Markdown-only scope and whitespace checks passed.
+> The first check's overbroad pattern falsely matched the board-editing rule; that rule remains
+> unchanged. No build, runtime, browser or model-behavior checks. Next: architect completes review
+> and decides whether to offer the local documentation commits for human merge.
+> No board edits, project sync, guard/security changes, merge or push. Earlier notes are historical.
 
 > **Session Notes — BOARD-116 documentation review passed, 2026-11-11**
 > Added the approved built-in interactive browser policy to root/template §B4.2 and aligned the
@@ -260,7 +277,7 @@ node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127
 | `.opencode/skills/` | The five skills with their scripts: `board`, `git-worktree`, `qa-review`, `unslop`, `plan`. |
 | `.opencode/skills/plan/` | The merged plan skill (MIT, © 2025 Jeffallan — upstream `feature-forge` and `architecture-designer`). `SKILL.md` plus `references/`: the interview bank, the specification template, EARS syntax, acceptance criteria, pre-discovery subagents, system design, architecture patterns, database selection, ADR template, NFR checklist, and the two superpowers research documents. |
 | `.opencode/catalog/` | 67 upstream specialists (MIT, © 2025 Jeffallan, https://github.com/Jeffallan/claude-skills), with preserved upstream content/licences and OpenCode tool adaptation headers. Outside `.opencode/skills/` discovery; not configured as an extra skill source, so read only on demand. |
-| `.opencode/catalog/README.md` | The catalogue index: one row per skill — what it covers and when to read it — plus the path pattern and the MIT attribution. The agent reads this first, then one `SKILL.md`. |
+| `.opencode/catalog/README.md` | The catalogue index: read before every task, then apply each relevant skill and required reference; report skills used or that none matched. Example lists do not limit selection (§A7). |
 | `.opencode/worktrees/` | Agent worktrees, one per task. Git-ignored. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, the redaction script. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
@@ -282,10 +299,10 @@ node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127
 | `.opencode/skills/git-worktree/scripts/env.py` | Provisions the local env files of a worktree. `sync`, `status`, `clean`. |
 | `.opencode/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.opencode/skills/git-worktree/scripts/scope.py` | The generated pointer a work surface carries, and the local exclude rule that keeps it out of every commit. |
-| `.opencode/skills/qa-review/scripts/browser-review.mjs` | The only UI evidence capture path. Drives Playwright. |
+| `.opencode/skills/qa-review/scripts/browser-review.mjs` | Historical Playwright capture tool, retained unchanged; not UI verification/review evidence. Built-in browser workflow: QA skill and §B4.2. |
 | `.opencode/skills/qa-review/scripts/check-finding.py` | Validates a QA finding and prints its fingerprint. |
 | `.opencode/skills/qa-review/scripts/ledger.py` | Opens, closes and reports the QA↔fix rounds of a row. |
-| `.opencode/skills/unslop/scripts/snapshot.mjs` | Saves a page as a standalone HTML file with its assets inlined, plus a screenshot. The one capture path the QA script does not cover: a live URL, or a page with no local source. |
+| `.opencode/skills/unslop/scripts/snapshot.mjs` | Retained historical page snapshot tool, not UI QA or a built-in browser fallback. Live URLs follow the same §B4.2 browser policy. |
 
 ## 4. Modules and functions
 
@@ -319,7 +336,7 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 | `guard.py` | `.opencode/skills/git-worktree/scripts/guard.py` | The guard rails and the sync that carries them into an app repository. | effectful (git, filesystem) |
 | `check-finding.py` | `.opencode/skills/qa-review/scripts/check-finding.py` | Validates a finding and derives its fingerprint. | pure |
 | `ledger.py` | `.opencode/skills/qa-review/scripts/ledger.py` | The round ledger of a row. | effectful (file I/O) |
-| `browser-review.mjs` | `.opencode/skills/qa-review/scripts/browser-review.mjs` | Captures screenshots, console, page errors and network for a route. | effectful (browser, filesystem) |
+| `browser-review.mjs` | `.opencode/skills/qa-review/scripts/browser-review.mjs` | Historical capture tool; not UI verification/review. Source unchanged. | effectful (browser, filesystem) |
 | `snapshot.mjs` | `.opencode/skills/unslop/scripts/snapshot.mjs` | Saves a live page or a local file as one standalone HTML file with its assets inlined, and saves a screenshot next to it. Resolves Playwright and chromium the same way the QA script does. | effectful (browser, filesystem) |
 
 ## 5. Data
@@ -362,8 +379,8 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 | Dependency | Why |
 |---|---|
 | Python 3.9+ standard library | Every script. No third-party package. |
-| Playwright (global install in the dev container) | The QA capture path. |
-| Chromium (`/usr/bin/chromium`) | The QA capture path. |
+| Playwright (global install in the dev container) | Retained historical/test tooling; not UI QA. |
+| Chromium (`/usr/bin/chromium`) | Retained historical/test tooling; not UI QA. |
 | The unslop skill | CC BY 4.0 — Damir Sokolovsky ([@heydamir](https://x.com/heydamir)). The credit line must survive in every copied file of `.opencode/skills/unslop/`. |
 | The plan skill | MIT — © 2025 Jeffallan (https://github.com/Jeffallan), upstream skills `feature-forge` and `architecture-designer`. The credit line must survive in every copied file of `.opencode/skills/plan/`. |
 | The superpowers research documents | MIT — © Jesse Vincent (obra/superpowers), copied into `.opencode/skills/plan/references/`. The credit line must survive in both files. |
@@ -371,7 +388,16 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 
 ## 10. Testing
 
+<<<<<<< HEAD
 Verification uses focused script tests. The verification of a change is the smallest relevant script run, recorded with
+=======
+UI verification/review uses only OpenCode's built-in browser (§B4.2, QA skill). Browser evidence
+stays under `artifacts/<scope>/qa/<date>/<task-id>/` with route, viewport, theme, steps, expected
+and observed results. Screenshot/`files.get` paths are server-local; desktop file IDs require
+transfer. Unavailable browser access or measurements hold criteria, with no fallback or pass claim.
+
+No test suite. The verification of a change is the smallest relevant script run, recorded with
+>>>>>>> docs/require-catalog-skills-and-browser-ui-reviews
 its result and a `file:line` proof (AGENTS.md §B4 "Verification cost rule"). The dev container
 ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup file.
 

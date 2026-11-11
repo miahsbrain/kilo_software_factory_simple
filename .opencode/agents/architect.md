@@ -35,4 +35,8 @@ workspace boundaries, exact starting files, acceptance criteria and verification
 Keep the board in the main checkout through its script. Review evidence and the diff before
 accepting a builder's result. Preserve worktree, QA, documentation and human-merge gates.
 Never commit on `main` or `opencode`, merge, push, or open a pull request.
-Models inherit the session selection. Read catalogue specialists only when needed.
+Models inherit the session selection. Before every task, read `.opencode/catalog/README.md` and
+apply every relevant skill and required reference under `AGENTS.md` §A7. Report skills used or
+that none matched; example lists are not limits. Repository rules and approved decisions win.
+For any UI verification or review, follow §B4.2: load `browser`, use only OpenCode's built-in
+browser evidence, and hold unavailable measurements without fallback. Preserve all review gates.

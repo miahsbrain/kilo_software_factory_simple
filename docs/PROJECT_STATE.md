@@ -138,7 +138,21 @@
   session to this worktree, and the authorized relative-path retry succeeded without guard changes.
 
 ## Earlier session context (historical)
+- **Phase:** BOARD-120 governance-only implementation; corrected consistency check passed, awaiting architect review.
+- **Active task:** `docs/require-catalog-skills-and-browser-ui-reviews` in
+  `.opencode/worktrees/require-catalog-skills-and-browser-ui-reviews`, based on `opencode`.
+- **Change:** mandatory catalogue selection/application/reporting for every task; UI verification
+  and review use only OpenCode's built-in browser. ADR-079 supersedes script-only capture policy.
+  Gallery approval, independent review, accessibility, unslop and bounded findings gates remain.
+- **Verification:** file review completed. Architect authorized one corrected browser-specific
+  consistency check after the first check's board-editing false positive. Corrected command exited 0:
+  six exact-block checks, seven agent checks, 23 active documents, preserved nonbrowser script
+  ownership/finding gates, 27 Markdown-only files and clean whitespace. No build/runtime/browser/model tests.
+  No board, tool-source, dependency, guard/security or project-copy edits.
+- **Next action:** architect completes review and decides whether to offer the local documentation
+  commits for human merge. Existing migration limitations remain unresolved.
 
+## Historical state (before BOARD-120)
 - **Phase:** BOARD-116, parent docs review passed; reviewed change prepared for human review/local commit.
 - **Active task:** `docs/use-opencode-browser-for-interactive-ui-reviews` in
   `.kilo/worktrees/use-opencode-browser-for-interactive-ui-reviews`, based on migration checkpoint

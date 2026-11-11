@@ -34,11 +34,25 @@ Which visual styles tend to work, and which fail, is in [references/visuals.md](
 
 ## Run it
 
-1. **Look at the screen.** Find the files that render it. If you can run the app or open the file in a browser and take a screenshot, do it, so you judge what people see and not only the code.
-   - The evidence comes from this repo's capture script: `node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path --scope <scope> --task-id <task-id>`, which writes into `artifacts/<scope>/qa/<date>/<task-id>/`. It needs a running app and a route.
-   - Only a link to a live site, no code? That is the one case the capture script does not cover, so save the page with `node <skill folder>/scripts/snapshot.mjs <url> unslop/original.html` and work on a copy of that file. A local HTML file works in place of the URL. Add `--dark` or `--light` to match the theme the user sees. It also saves `original.live.png`, a screenshot of the live page, so render the saved copy and compare the two before you start. The script scrolls through the page first, so lazy-loaded sections and images are captured. Animated backgrounds drawn by scripts do not survive, so describe them in the audit from the live page.
-   - Only a screenshot? Rebuild the screen as one static HTML file first, matching it closely, and treat that as the original.
-   - In both cases the result is a redesigned page in code that the user can hand to whoever owns the real site, so say that in the report.
+Before the task, read `.opencode/catalog/README.md`, apply all relevant skills and required
+references, and report skills used or that none matched (`AGENTS.md` §A7). Repository rules and
+approved decisions take precedence.
+
+1. **Look at the screen.** Find the assigned files that render it. Load `browser` first and use
+   only OpenCode's built-in browser for UI verification/review under `AGENTS.md` §B4.2 and the QA
+   skill. Use actual interactions, screenshots, DOM measurements, console and network observations.
+   - Store browser evidence under `artifacts/<scope>/qa/<date>/<task-id>/`; record route, viewport,
+     theme, steps, expected and observed results. Transfer desktop-owned files with the browser;
+     screenshot/`files.get` results are server-local paths, not a shared desktop filesystem.
+   - A live URL uses the same built-in browser workflow, not an alternate capture driver. The
+     retained `snapshot.mjs` is historical/not UI QA; do not use it, Playwright, browser MCP
+     alternatives or `browser-review.mjs` for UI verification/review.
+   - Only a screenshot? Audit the supplied reference, but hold interaction and measurement
+     criteria until the running UI is available in the built-in browser. Do not reconstruct a
+     page and present it as verified original behavior. Any reconstruction needs an approved scope.
+   - If browser access or a required measurement is unavailable, report the limitation and hold
+     the affected criterion without fallback. Gallery approval, independent review, accessibility
+     and unslop gates remain mandatory. Reviewers report; only assigned builders change UI code.
 2. **Audit.** Go through [references/signs.md](references/signs.md) and list every sign you find, one line each with where it lives.
 3. **Decide how much to change.** Read the audit honestly before planning anything.
    - **Heavy slop**, many signs across color, type, icons and copy. Run the full process below.

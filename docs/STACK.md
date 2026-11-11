@@ -14,12 +14,15 @@ Tailwind stylesheet, and it produces a committed file — the viewer itself need
 | Python | 3.9+ | every script under `.opencode/skills/*/scripts/` |
 | OpenCode | V2 | `opencode.jsonc`, `.opencode/agents/`, `.opencode/commands/`, five discoverable skills |
 | Node.js | 22 | the dev container, the Playwright MCP, the Tailwind build |
-| Playwright | the global install in the dev container | the QA capture script |
-| Chromium | `/usr/bin/chromium` in the dev container | the QA capture script |
+| Playwright | the global install in the dev container | retained historical/test tooling, not UI QA |
+| Chromium | `/usr/bin/chromium` in the dev container | retained historical/test tooling, not UI QA |
 | Tailwind CSS | 4.3.5 (`@tailwindcss/cli`) | `.opencode/skills/board/ui/`, builds the board stylesheet |
 | Geist Sans / Geist Mono | variable woff2, SIL OFL | `.opencode/skills/board/static/fonts/` |
 
 ## Commands
+
+UI verification/review uses only OpenCode's built-in browser (`AGENTS.md` §B4.2, QA skill).
+Load `browser` first. An unavailable browser or measurement holds the criterion; no fallback.
 
 ```bash
 # Board viewer (read-only dashboard on port 15180)

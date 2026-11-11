@@ -5,8 +5,9 @@ picks up. OpenCode discovers `.opencode/skills/`, not this catalogue, so
 `.opencode/catalog/` is invisible to the skill loader: none of these 67 skills enters the system
 prompt, and none of them costs context until an agent opens it.
 
-**How to use it.** Read this index first, find the row that matches the task, then read that
-skill's `SKILL.md`:
+**How to use it.** Before every task, read this index, then read and apply every relevant skill's
+`SKILL.md` and its required references. Report skills used or that none matched. Agent lists are
+examples, not limits; `AGENTS.md` §A7 owns this rule:
 
     .opencode/catalog/<skill>/SKILL.md        # the skill
     .opencode/catalog/<skill>/references/     # its reference material
@@ -66,7 +67,7 @@ that maps the Claude Code tool names onto this harness.
 | `nextjs-developer` | Next.js 14+ App Router, server components, server actions | the task is Next.js |
 | `pandas-pro` | DataFrame operations, analysis, manipulation, transformation | the task is pandas |
 | `php-pro` | PHP 8.3+, Laravel, Symfony | the task is PHP |
-| `playwright-expert` | Playwright E2E tests, test infrastructure, flaky-test debugging | the task is browser testing |
+| `playwright-expert` | Playwright E2E tests, test infrastructure, flaky-test debugging | separately assigned test-tool work, not UI verification/review (§B4.2) |
 | `postgres-pro` | PostgreSQL query tuning, replication, advanced database features | the task is PostgreSQL |
 | `prompt-engineer` | prompt templates, structured output schemas, evaluation rubrics | the task is prompt engineering |
 | `python-pro` | Python 3.11+ with type safety, async programming, error handling | the task is Python |

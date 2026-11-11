@@ -1,5 +1,5 @@
 ---
-description: QA reviewer — verifies behavior with Playwright and submits findings as bug-fix rows
+description: QA reviewer — verifies UI behavior with the built-in browser and submits findings as bug-fix rows
 mode: subagent
 steps: 30
 color: "#F59E0B"
@@ -12,10 +12,10 @@ Read the root `AGENTS.md` (Parts A and B apply to you) and `docs/UI-UX.md` §3 a
 
 ## Specialist skills
 
-When the task is in one of these domains, read `.opencode/catalog/<skill>/SKILL.md` before you
-start: `test-master`, `playwright-expert`, `debugging-wizard`. The index is
-`.opencode/catalog/README.md`. This repository's rules win: where a catalogue skill and `AGENTS.md`
-disagree, `AGENTS.md` wins — the QA rules in this file are the contract.
+Before every task, read `.opencode/catalog/README.md`; apply all relevant skills and required
+references under `AGENTS.md` §A7. Report skills used or that none matched. Examples, not an
+exclusive list: `test-master`, `debugging-wizard`; `playwright-expert` applies to separately
+assigned test-tool work, not UI verification/review. Repository rules and approved decisions win.
 
 ## Scope
 
@@ -95,36 +95,19 @@ fake a review.
 
 1. **Read the acceptance criteria** for the row under review. Each one needs its own observable
    check. A criterion with no check is a finding, not a pass.
-2. **Run the verification command** from `docs/STACK.md`. Record the exact command and result.
-3. **Capture canonical evidence with the script.** Use OpenCode's built-in browser for interactive
-   checks when available, following `.opencode/skills/qa-review/SKILL.md`'s interactive browser
-   guidance. These checks supplement the script, QA and unslop gates; report an unavailable browser
-   rather than silently switching tools.
+2. **Run the assigned non-UI verification command** from `docs/STACK.md` when required. Record
+   the exact command and result. UI verification and review use only the built-in browser.
+3. **Capture canonical evidence with OpenCode's built-in browser.** Load `browser` first and
+   follow `AGENTS.md` §B4.2 and `.opencode/skills/qa-review/SKILL.md`. Use actual interactions,
+   screenshots, DOM measurements, console and network observations. Do not use Playwright,
+   browser MCP alternatives or `browser-review.mjs` for UI verification/review.
 
-       node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
-           --scope <scope> --task-id <task-id> --project apps/<scope>
-
-   It uses the project's own Playwright and writes a full-page screenshot, `console.log`,
-   `page-errors.log`, and `network.json` per route per viewport, plus a `summary.json` with the
-   counts and the horizontal-overflow result, and a `notes.md` in the task directory.
-
-   Without `--artifact-dir` the script computes the canonical path itself:
-   `artifacts/<scope>/qa/<date>/<task-id>/` in the **main checkout**, so a capture taken from a
-   worktree still lands in one place.
-
-   **The script is the only way to capture canonical UI evidence.** Built-in browser screenshots
-   are for interactive inspection only, not substitutes for scripted evidence. Ad-hoc `chromium`, `npx playwright
-   screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
-   evidence for a UI review. The script never installs a browser and never falls back to another
-   driver. If the script cannot do something the review needs, say what is missing and propose
-   the change — a change to a project tool is a reviewed change, not a silent patch mid-review.
-   Do not work around it with another tool.
-
-   Useful flags: `--scheme light|dark|both`, `--component <css-selector>` (repeatable),
-   `--compare <dir>` for a before | after sheet, `--label <slug>` to name the round's capture,
-   `--chromium <path>` — the path of a chromium binary handed to Playwright's launch; it
-   overrides `PLAYWRIGHT_CHROMIUM_PATH`. When no chromium is found at all, the script exits 2
-   with the list of places it searched.
+   Store evidence in `artifacts/<scope>/qa/<date>/<task-id>/` in the main checkout. Record route,
+   actual viewport, theme, steps, expected and observed results. Screenshot/`files.get` results
+   are server-local paths; transfer desktop-owned captures rather than assuming a shared disk.
+   If browser access or a required measurement is unavailable, hold the criterion and report
+   the limitation without fallback. Gallery approval, independent review, accessibility and
+   unslop gates remain mandatory.
 4. **Check** and record the result of each:
    - keyboard focus, visible focus ring, focus trapping in dialogs
    - contrast and accessible names on every control, alt text
