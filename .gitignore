@@ -2,6 +2,9 @@
 # The factory never tracks it. See AGENTS.md §"The factory and the project".
 /project/
 
+# Live board is local workspace state; the template starter remains tracked.
+/docs/BOARD.md
+
 # Agent worktrees: one per board row, created by .opencode/skills/git-worktree/scripts/worktree.py
 .opencode/worktrees/
 # BOARD-114 bootstrap only: never move or add new worktrees here.

@@ -5,8 +5,8 @@
                    [--file PATH] [--refresh 60]
 
 Serves a single-page HTML dashboard of docs/BOARD.md plus the live git
-worktrees. Everything is read fresh on every request and nothing is ever
-written: the board file and the repository are only read.
+worktrees. Startup creates only the current control board when absent.
+Every request reads fresh data and never writes files.
 
 Endpoints:
     GET /                     the HTML dashboard
@@ -109,7 +109,7 @@ def git_out(worktree, path, *args):
 
 
 def repo_root(worktree, cwd):
-    root = worktree.main_checkout_root(cwd)
+    root = worktree.control_root(cwd)
     if root and os.path.isdir(root):
         return root
     return worktree.script_root()
@@ -1634,6 +1634,11 @@ def main(argv):
     if args.file:
         paths = [("board", board_file(args.file, root))]
     else:
+        try:
+            board.initialize_board(root)
+        except OSError as exc:
+            print("cannot initialize board: %s" % exc, file=sys.stderr)
+            return 1
         paths = None
 
     board_payload, worktree_payload, html_page = build_payloads(board, worktree, paths, root)

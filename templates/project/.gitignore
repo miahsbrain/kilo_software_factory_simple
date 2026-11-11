@@ -9,6 +9,9 @@ apps/*/
 # Agent worktrees: one per board row, created by .opencode/skills/git-worktree/scripts/worktree.py
 .opencode/worktrees/
 
+# Runtime board is local workspace state, created by board tooling when absent.
+/docs/BOARD.md
+
 # QA evidence. The notes and the summaries are tracked; the captures are not.
 artifacts/**/*.png
 artifacts/**/*.log
