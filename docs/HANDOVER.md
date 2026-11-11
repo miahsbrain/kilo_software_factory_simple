@@ -1,5 +1,165 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-121 parent preview screenshot hold, 2026-11-11**
+> Parent inspected implementation `fd89d5b` and started main preview http://127.0.0.1:15183/.
+> Parent snapshot/DOM: Project selected, 14 tasks/result 14 of 14/three project worktrees;
+> Harness hidden, 21 tasks/eight control worktrees. At 1000×700 CSS, no horizontal overflow;
+> 60s refresh, 17px/600 section heading, no fixture notice. These are parent observations,
+> not independent QA. Evidence and project branch names: `docs/reviews/BOARD-121-qa.md`.
+> After tabs.focus, screenshot returned browser.operation_failed: “Screenshot needs a visible tab.
+> Call browser.tabs.focus and keep its desktop window visible.” No retry/fallback or screenshot.
+> Next: keep desktop window visible so parent can resume built-in screenshot/QA/critique.
+> Independent visual/unslop, keyboard and full responsive checks remain held; not merge-ready.
+> Existing 15-test/0.048s pass preserved. This checkpoint changes docs only: no source, browser,
+> tests/builds, rules/board or artifacts workaround. Live 15180 unchanged.
+
+> **Earlier Session Notes — BOARD-121 main workbench implementation, 2026-11-11**
+> User approved the latest hierarchy gallery: “fantastic, now build main dashboard”. Assigned
+> branch `feat/apply-approved-workbench-to-main-dashboard`, worktree of the same slug, based on
+> approved gallery `da864ef`. Main `/` now composes the same workbench tabs, toolbar, scoped board,
+> meter, cards and rail with real data; gallery fixtures remain isolated at `/gallery`.
+> Pure `build_html` (`board_serve.py:1209`) replaces the old sidebar/KPI shell; extended pure
+> `wb_scope_content` scopes explicit `board` labels by the longest containing main repository path
+> (control root fallback supplied explicitly), not by assuming an unknown label means project.
+> New pure `wb_workbench_header` extracts the gallery header for actual reuse by both pages,
+> with real generated timestamp/freshness on `/` and an honest labelled preview on `/gallery`.
+> Existing JS/filter/fold/storage/keyboard/refresh logic and effectful payload boundaries retained;
+> `html_page` supplies root as an explicit presentation input. No endpoint/JSON changes.
+> Single documented regression run exited 0: 15 tests in 0.048s. Temporary fixture trees/mocked Git,
+> no live server. CSS source/generated asset unchanged, no installs/builds or new files.
+> Source unslop passes preserve approved hierarchy/tokens; rendered QA/unslop not claimed.
+> Parent has since started preview 15183; current screenshot hold is recorded above.
+> Live 15180 untouched. Not merge-ready. No board, rule, dependency or real project edits.
+
+> **Session Notes — BOARD-118 hierarchy correction, 2026-11-11**
+> User accepted the workbench direction but found section titles and task boundaries too weak.
+> CSS-only correction: 17px/600 section headings, 13px/500 lane labels, 15px/600 task titles,
+> 12px metadata, bounded 8px task/worktree surfaces with theme-relative 1px borders and 12px gaps.
+> Sections have 24px separation; shared presenters/behavior and live `/` remain unchanged.
+> Required stylesheet authoring exited 0 (Tailwind 4.3.5, 59ms); no tests or browser calls.
+> Verification limited to file review because this was a low-risk visual/static change.
+> Earlier c77a72a captures/critique are historical, not proof for these changed styles.
+> Next: parent captures light/dark hierarchy in built-in browser and requests user approval.
+> Still HOLD, not merge-ready. No server, board, rule or dependency edits.
+
+> **Earlier Session Notes — BOARD-118 corrected preview checkpoint, 2026-11-11**
+> Reworked the rejected gallery composition on the same branch/worktree. Scoped `.wb-workbench`
+> styles now use a 20px utility heading, compact lane navigation, continuous populated task groups,
+> dominant 15px task titles/quiet metadata and an adjacent 288px worktree rail from 820px upward.
+> Extended pure `render_board_panel(..., populated_only=False)` near `board_serve.py:1158`;
+> `wb_scope_content` opts in, live `/` keeps all lanes and original styles. Existing wb_ presenters,
+> filters, tabs, fold/storage state and refresh handlers reused; no new function or state source.
+> CSS authoring exited 0 (59ms); one regression run passed 12 tests (0.031s). Built-in browser
+> tabs.list returned browser.disconnected; no retry, fallback, installs, server or board edits.
+> Parent subsequently opened fresh corrected c77a72a preview at 15182/gallery: light/system-dark
+> captures at 1104×877 CSS, 20px heading, no desktop overflow, scoped Project/Harness contents,
+> actual tab clicks, Harness persistence through reload and System→Light change observed.
+> Bounded current-document console: zero errors/no dropped data; four network requests all 200.
+> Independent round-1 screenshot critique/unslop: HOLD, no blocking visual findings in those views.
+> Evidence and remaining criteria: docs/reviews/BOARD-118-ui.md (parent addendum); ledger retained.
+> Narrow matrix unsupported by built-in resize tools; keyboard/focus/contrast and other unchecked
+> behavior remain open. Canonical artifacts notes.md write was guard-refused; no retry/bypass.
+> Docs-only checkpoint; no source/browser/test/build actions. BOARD-120 policy commit 800cb3b
+> stays separate Pending Merge. Next: parent resolves evidence gaps and obtains gallery approval.
+> Live 15180 unchanged; no live rollout or merge readiness claimed.
+
+> **Earlier Session Notes — BOARD-118 browser checkpoint blocked, 2026-11-11**
+> Parent reviewed gallery diff and started http://127.0.0.1:15182/gallery from this worktree;
+> live 15180 and earlier preview 15181 untouched. Parent built-in browser snapshot generation 2,
+> tab `5007dd99-7e7a-47c0-b5d6-3c060c359dd7`, showed Project selected by default, Project 2 /
+> Harness 1 task tabs, Project summary 2 in flight / 1 blocked / 2 tasks, Project 1 worktree,
+> and labelled fixture empty/error states. Parent observations, not an independent QA pass.
+> Harness click ref `e46` failed: `[browser.operation_failed] browser.click failed. UnknownVizError`
+> (no exit code). Following tabs.list confirmed same gallery generation 2; no retry.
+> Row Blocked on browser error and gallery approval. User will review gallery directly.
+> Interactions, themes, responsive/canonical evidence and independent unslop remain incomplete;
+> no merge readiness. Existing 11-test pass and user install/build proof below remain unchanged.
+> This checkpoint is docs-only: no further tests, browser checks, source edits or installs.
+> Next: user reviews preview; parent resolves review/tooling gates before any live screen rollout.
+
+> **Session Notes — BOARD-118 gallery ready for browser preview, 2026-11-11**
+> Same branch/worktree: `feat/redesign-board-console-component-gallery`,
+> `.opencode/worktrees/redesign-board-console-component-gallery`, stacked over BOARD-119.
+> Preserved the user's generated CSS, then regenerated it after a small gallery-only mobile grid
+> correction. Shared idle-refresh guard now also protects focus within the gallery workbench;
+> fixture Notes name actual review tasks, and obsolete gallery count constants were removed.
+> User-supplied proof: `npm ci` added 56 packages, audited 63 in 18s, zero vulnerabilities;
+> `npm run build` used Tailwind 4.3.5, done in 61ms. No installs by this resumed builder.
+> Builder asset authoring: documented stylesheet build exited 0, Tailwind 4.3.5, 62ms.
+> Builder verification: `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0,
+> 11 tests passed (six existing plus five gallery regressions). Pure rendering/HTML/CSS and JS
+> contract assertions only; no browser execution, screenshots or unslop pass claimed.
+> Live `/` markup/layout retained; no server, port, dependency/lockfile, project or board changes.
+> Next: parent arranges gallery browser preview/review and user approval. Not merge-ready;
+> canonical capture tooling blocker and independent UI/unslop review remain open.
+>
+> Earlier blocked notes below are historical, superseded by the user-supplied install/build proof.
+
+> **Session Notes — BOARD-118 approved install timed out, 2026-11-11**
+> Confirmed session remains in `.opencode/worktrees/redesign-board-console-component-gallery`.
+> User explicitly approved installing existing lockfile-declared UI dependencies only.
+> `npm --prefix .opencode/skills/board/ui ci` produced no output and exceeded the shell's
+> 120000ms timeout; no process exit code was returned. Installation completion is unknown.
+> Stopped without retry, alternate command, build, tests, browser work or source edits.
+> Gallery remains the partial checkpoint below, not ready for preview or merge.
+> Next: parent reports the timeout and obtains a decision on an explicitly longer install attempt.
+
+> **Session Notes — BOARD-118 gallery checkpoint blocked, 2026-11-11**
+> Branch `feat/redesign-board-console-component-gallery`, worktree
+> `.opencode/worktrees/redesign-board-console-component-gallery`, stacked over BOARD-119.
+> Partial gallery-only source previews Project/Harness tabs, scoped summaries/tasks/worktrees,
+> keyboard tab selection, remembered scope and shared filter/refresh/theme/density handlers.
+> Live `/` markup remains unchanged; new layout CSS is scoped to `.wb-workbench`.
+> Asset generation `npm --prefix .opencode/skills/board/ui run build` exited 127:
+> `sh: 1: tailwindcss: not found`. Stopped without installs, retries or alternative generation.
+> Committed `static/board.css` is unchanged and does NOT contain the new styles. Regression
+> extension/run and browser/unslop review remain incomplete. No server or board edits.
+> Next: parent requests approval to provision the existing pinned Tailwind dependencies, then
+> resumes asset authoring and the one regression command. Gallery and screen approval remain open.
+
+> **Session Notes — BOARD-119 data slice, 2026-11-11**
+> Branch: `fix/include-project-repository-worktrees-in-console`; worktree:
+> `.opencode/worktrees/include-project-repository-worktrees-in-console`, based on BOARD-117's
+> `fix/refresh-project-board-discovery-every-minute`. Extended `worktree_state()` to read the
+> registry on every request and enumerate control plus initialized registered project worktrees.
+> Existing entry keys remain; additive `repo` (stable control/project id) and `base` metadata
+> preserve repository-specific main, dirty and ahead/behind state even with identical branches.
+> Six tests passed (exit 0), using temporary fixtures and mocked Git/server only.
+> No UI changes, browser checks, builds, installs, server restarts, live project or board edits.
+> Approved tabs/default/remembered selection are recorded in ADR-077, not implemented here;
+> gallery approval is still required before redesigned screen rollout. BOARD-117 QA remains blocked.
+> Next: parent reviews this data-only diff before the gallery/tab implementation slice.
+
+> **Session Notes — BOARD-117 QA blocked, 2026-11-11**
+> Branch: `fix/refresh-project-board-discovery-every-minute`; worktree:
+> `.opencode/worktrees/refresh-project-board-discovery-every-minute`.
+> JSON and HTML rediscover boards on every request; ignored projects can appear or disappear
+> without restarting. Default refresh is 60 seconds; explicit `--file`, `--refresh`, Pause and
+> Refresh now remain. Four temporary-fixture regression tests passed (exit 0).
+> The first patch was refused while session context was the factory root; after the orchestrator
+> moved the session into this worktree, the authorized relative-path retry succeeded. No guard changed.
+> Parent code review found no blocker. Independent regression rerun: four tests, exit 0.
+> Canonical capture exited 2: Playwright was not found locally or globally (exact command below).
+> Report: `docs/reviews/BOARD-117-qa.md`; no product defect was demonstrated.
+> Main server 15180 is unchanged; preview 15181 was launched from this worktree. No restarts or
+> dependency installation. User approved built-in QA; reviewer child disconnected, but attached
+> parent observed separate harness/project panels (18/14 cards, total 32), configured 60s refresh,
+> and actual Refresh now reload while paused (changed timeOrigin). Pause resets after reload.
+> These are parent observations, not an independent reviewer pass; details in the QA addendum.
+> Later click failed `[browser.operation_failed] browser.click failed. UnknownVizError` (no exit
+> code); no retry. Search input/URL observed, filtering not proven with unreliable `.card` selector.
+> Filter retention, elapsed timer, keyboard, themes, responsiveness and visual/unslop/gallery review
+> remain unchecked. This is a wip checkpoint, not merge-ready; no product defect proven.
+> Next: user decides whether to retry built-in checks after desktop error resolution; canonical
+> capture separately needs approved Playwright provisioning or its installed location.
+> BOARD-118 approved redesign gallery is queued behind BOARD-117, not implemented.
+
+Failed capture command (exit 2; recorded, not rerun):
+
+```sh
+node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127.0.0.1:15181 --route / --scope factory --task-id BOARD-117 --project . --scheme both --date 2026-11-11
+```
+
 > **Session Notes — BOARD-116 documentation review passed, 2026-11-11**
 > Added the approved built-in interactive browser policy to root/template §B4.2 and aligned the
 > reviewer agents, QA skill, `/ui` and UI-UX guidance. Canonical captures remain script-only;
@@ -115,7 +275,7 @@
 | `AGENTS.md` | The rule set, read by every agent at the start of a task. |
 | `.opencode/commands/*.md` | Slash commands that package the workflow. |
 | `.opencode/skills/board/scripts/board.py` | The board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`. |
-| `.opencode/skills/board/scripts/board_serve.py` | The read-only factory board console on port 15180. Server-rendered, offline, standard library at runtime: a three-column dashboard shell (lane/filter sidebar, KPI strip, segmented flow meter, dense lane panel, sticky worktrees rail), search and status/type/priority filters with URL state, parsed Notes checklists, branch copy, and `j`/`k`/`/`/`Enter`/`Esc` keyboard control. Serves `/static/board.css` and the two self-hosted Geist fonts. `/api/board` and `/api/worktrees` are unchanged JSON. |
+| `.opencode/skills/board/scripts/board_serve.py` | The read-only factory board console on port 15180. Server-rendered, offline, standard library at runtime: a three-column dashboard shell (lane/filter sidebar, KPI strip, segmented flow meter, dense lane panel, sticky worktrees rail), search and status/type/priority filters with URL state, parsed Notes checklists, branch copy, and `j`/`k`/`/`/`Enter`/`Esc` keyboard control. Serves `/static/board.css` and the two self-hosted Geist fonts. `/api/board` retains its shape; `/api/worktrees` retains its array/fields and adds `repo` and `base` metadata. |
 | `.opencode/skills/board/ui/` | The Tailwind v4 source for the console (`package.json`, `src/app.css`); `npm --prefix .opencode/skills/board/ui run build` writes the committed `static/board.css`. |
 | `.opencode/skills/board/static/` | The committed stylesheet and the Geist Sans/Mono variable fonts with their SIL OFL licence. |
 | `.opencode/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, `discard` (`--force`, `--yes`), `handoff`, `list`, `verify`, `cleanup` (by slug or by `--board`). The teardown commands set the row's lane: `cleanup --board` sets `Merged`, `discard --board` sets `Ready`. |
@@ -134,7 +294,8 @@ Chunk 1 reuses these existing boundaries:
   `write_permission_map()` (effectful) preserves unrelated config keys while replacing that array.
 - `worktree.default_base()` (effectful git inspection) prefers `opencode` only for a factory;
   project/app defaults stay unchanged. `repo_root()` (effectful) uses Git's main checkout.
-- `board_serve.worktree_state()` (effectful git inspection) uses the existing base selector for ahead/behind counts.
+- `board_serve.worktree_state()` (effectful filesystem/Git inspection) reuses registry resolution,
+  repository validation, worktree parsing and base selection for per-repository state.
 - Native read/edit path rules remain; grep/glob target-path and automatic context enforcement
   are pending the limited guard plugin. Legacy bootstrap is not accepted by steady-state guards.
 
@@ -142,6 +303,16 @@ Chunk 1 reuses these existing boundaries:
 |---|---|---|---|
 | `board.py` | `.opencode/skills/board/scripts/board.py` | Deterministic manipulation of the markdown board. Never writes prose. | effectful (file I/O) |
 | `board_serve.py` | `.opencode/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
+| `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1704` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
+| `worktree_state()` | `.opencode/skills/board/scripts/board_serve.py:171` | Reloads the existing registry and enumerates control/project via `load_repos`, `resolve_repo`, `is_git_repo`, `list_worktrees`, `default_base` and `git_out`. Omits absent/uninitialized projects. Each entry adds `repo` and `base`; existing array and fields stay intact. Main detection and counts use only that repository. Invalid maps flow through existing payload exception handling. | effectful (filesystem, Git); entry construction is deterministic from results |
+| `wb_scope_default()` / `wb_scope_tabs()` / `wb_scope_content()` | `.opencode/skills/board/scripts/board_serve.py:1449`, `:1456`, `:1470` | Pure reusable selection fallback, tablist and scoped content presenters; map harness to control worktrees and reuse existing counts/panels/lanes/cards/rail. Gallery only; asset authored, browser review pending. | pure |
+| `gallery_scope_fixtures()` / `build_gallery_html()` | `.opencode/skills/board/scripts/board_serve.py:1494`, `:1519` | Pure labelled fixtures and gallery composition; identical BOARD-001 IDs are separated by board keys. No live data or second task store. | pure |
+| `selectScope()` / `wb_wt_row(show_base=True)` | `.opencode/skills/board/scripts/board_serve.py:242`, `:1061` | JS tab DOM/storage effects reuse dashboard state and existing handlers; pure worktree row optionally adds base/reference labels, preserving default live output. | effectful JS; pure Python presenter |
+
+Gallery regression inventory: `test_board_serve.py:211` adds five tests for default/missing scope,
+unique DOM IDs and tab/panel links, duplicate task IDs across boards, isolated counts/worktrees,
+error/empty/escaped output, default worktree markup compatibility, shared handler contracts and
+gallery-only layout/CSS themes. These do not execute JS or prove browser behavior.
 | `worktree.py` | `.opencode/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, `discard` removes one, `discard --force --yes` destroys one after writing a recovery copy, `handoff` prints the hand-off block, `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, `discard` sets `Ready`. | effectful (git, filesystem) |
 | `env.py` | `.opencode/skills/git-worktree/scripts/env.py` | Copies the two local env files from a repository's main checkout into a worktree, excludes them from git, and removes them again. Never prints a value. | effectful (filesystem, git exclude) |
 | `test_env.py` | `.opencode/skills/git-worktree/scripts/test_env.py` | Self-test for the env provisioning and the worktree reuse rules, in a throwaway repository under a temp directory. | effectful (filesystem, git) |
@@ -200,13 +371,23 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 
 ## 10. Testing
 
-No test suite. The verification of a change is the smallest relevant script run, recorded with
+Verification uses focused script tests. The verification of a change is the smallest relevant script run, recorded with
 its result and a `file:line` proof (AGENTS.md §B4 "Verification cost rule"). The dev container
 ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup file.
 
-`python3 .opencode/skills/git-worktree/scripts/test_env.py` is the one script-level test: it builds
+`python3 .opencode/skills/git-worktree/scripts/test_env.py` builds
 a throwaway git repository under a temp directory and proves the env provisioning, the
 worktree reuse rules, the hand-off block and the teardown named by a board row.
+
+`python3 .opencode/skills/board/scripts/test_board_serve.py` uses standard-library unittest,
+temporary fixture boards and a mocked server. Six tests pass for BOARD-117/119: new/removed project
+discovery in HTML and JSON, separate tasks even with identical IDs, fixed explicit file selection
+with fresh reads, default 60 seconds, CLI override and existing control source. No sockets, live
+project reads, server restarts or external dependencies. Control-source assertions are not browser
+interaction or timer evidence. BOARD-119 reuses actual registry, Git parsing and base helpers with
+mocked Git results; covers changed registry paths, same-name branches across repositories,
+per-repo main/base/counts/dirty state, missing/uninitialized project, SHA/count fallback, additive
+endpoint keys and existing malformed/invalid registry handling. No live Git calls.
 
 ## 11. Known issues and risks
 

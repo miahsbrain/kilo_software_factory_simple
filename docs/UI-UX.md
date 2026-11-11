@@ -454,3 +454,121 @@ and 40px card rows. The shared components are `wb_meter`, `wb_lane`, `wb_card`, 
 Build after any class change: `npm --prefix .opencode/skills/board/ui run build`. The runtime is still
 Python standard library only, and the page still works offline because the CSS and fonts are
 served locally.
+
+### 6.3 Repository workbench (BOARD-118 gallery approved; BOARD-121 main implemented)
+
+**Current approval and rollout (2026-11-11):** User approved the latest hierarchy gallery with
+“fantastic, now build main dashboard”. BOARD-121 applies the same `.wb-workbench` components and
+existing generated stylesheet to `/` with actual read-only data. `wb_scope_tabs`, `wb_toolbar`,
+`wb_scope_content`, cards/lanes/meter/rail are reused, not copied. Shared `wb_workbench_header`
+extracts the existing gallery header for both pages; main includes the generated timestamp and
+existing live/stale/paused behavior instead of a fixture notice. Explicit `--file` keeps a single
+Board tab and associates worktrees by containing repository main path/control root, not a guessed
+project label. Project/Harness counts, tasks and worktrees remain separate, including duplicate IDs.
+
+No CSS selectors, tokens, fonts or authored/generated assets changed; no stylesheet generation or
+dependency installation needed. The approved 17px/600 section headings, 15px/600 task titles over
+12px metadata, bounded individual surfaces, compact lane controls, integrated rail and light/dark
+palette apply directly. Existing keyboard/filter/URL/preference/refresh handlers remain shared.
+Regression proof: documented Python command exited 0, 15 tests in 0.048s. This is presenter/contract
+evidence, not browser execution. Parent must verify fresh `/` at preview 15183 using only the
+built-in browser under the user-approved session override; no Playwright/MCP/capture-script use.
+Live 15180 untouched. Main browser QA and rendered unslop/critique remain open; not merge-ready.
+
+Source craft passes for main: (1) existing 4px spacing/24px grouping reused; (2) same neutral/orange
+themes; (3) functional disclosure carets only; (4) real board paths/timestamp instead of fixture copy;
+(5) approved 17/15/13/12px hierarchy unchanged; (6) shared scope grid/rail replaces sidebar/KPIs;
+(7) existing focus/disclosure/control details; (8) actual branch/base/ahead/behind data, no images;
+(9) existing 150ms/reduced-motion behavior. No decorative styles added. Full signs checklist read;
+source review adds no gradients/glows/glass, heavy/uppercase/italic type, emoji decoration, mixed
+icons, arbitrary spacing, hype/fake data, pill chrome, decorative charts, hero, imagery or looping
+motion. This does not substitute for a rendered sign-by-sign audit.
+
+The records below describe the earlier gallery implementation and historical evidence/holds;
+their “gallery pending” and “live unchanged” statements predate the approval and main work above.
+
+Project/Harness tabs replace the sidebar proposal. Each tab owns its tasks, lane counts and
+worktrees. Default to Project when present; remember selection and fall back to the available tab.
+Keep 60-second auto-refresh and manual Refresh now. Preview before live console rollout (ADR-078).
+
+Product: factory operator reviews project/harness work.
+Character: precise, quiet, practical.
+World: working desk.
+Moments: task and branch information.
+Signature: repository context always visible.
+
+Keep §6.2 Geist, paper/graphite, signal orange and 4px grid. New layout styles live
+under `.wb-workbench`; `/` retains its current markup and layout. Shared `wb_scope_tabs` and
+`wb_scope_content` compose existing meter, cards, lanes and rail, not gallery forks. Shared JS
+adds tablist/tabpanel arrow/Home/End selection and reuses storage, filters, theme, density, refresh.
+Fixture boards intentionally share BOARD-001; board-scoped fold keys keep them separate.
+
+**Corrective gallery source (2026-11-11):** Replaces rejected navigation-only restyle. Title is
+20px, utility header 56px minimum, refresh line separated by only 4/12px. No hero or stat strip.
+In-flight summary uses 15px inline figures. Lane navigation wraps content-width 32px controls,
+not five equal metric boxes. Task surface has no enclosing radius/shadow; only populated lane
+groups render here. Zero-count controls remain reachable; empty/error examples stay below the
+populated composition. After user hierarchy feedback, task titles occupy the first line at
+15px/600 in both densities; 12px IDs/type/priority/risk sit below without pill borders, including
+on mobile. Compact rows retain reduced padding. Expandable criteria use 13px text.
+Section headings (`wb-panel-title`, `wb-rail-title`, `wb-section-title`) use 17px/600 with 24px
+line-height. Lane labels are secondary status-role text at 13px/500, separated from their cards
+by 8px. Sections/lane groups have deliberate 24px separation. Individual task and worktree rows
+use the theme surface, an 8px radius and a 1px border mixed from existing faint-ink/line tokens
+(30%/70%) for a perceptible boundary in both themes. Cards have 12px gaps; panel/rail containers
+remain unframed/transparent, avoiding nested thick panels. Hover/focus strengthens card edges;
+existing visible focus ring and 150ms feedback remain. Rail is separated by a 24px gutter;
+at ≥820px it occupies
+288px alongside tasks (including the rejected 1104px desktop width). Below 820px it stacks.
+Controls use 4px corners, surfaces at most 8px, 32px targets and existing 2px focus rings.
+Gallery tokens reflect these scoped values; the live `/` retains its defaults.
+
+Nine craft passes applied to source, in order:
+1. Spacing: 24px shell, 12px toolbar, 4/8/12px internal rhythm; removed header dead band.
+2. Color: retained neutral ramp; orange selection/focus, semantics on risk/state only.
+3. Icons: retained functional disclosure caret; no new icons or decorative marks.
+4. Copy: labelled fixture preview; repository-specific tasks/worktrees; explicit refresh interval.
+5. Type: 20px utility heading, dominant 15px task title, quiet 12px metadata, 400/500/600 only.
+6. Layout: grouped task cards and adjacent 288px rail, rather than nested rounded panels.
+7. Details: borderless metadata, compact rectangular controls, readable expanded criteria.
+8. Visuals: branch/base/ahead/behind/dirty information is the visual detail; no pictures or charts.
+9. Motion: inherited 150ms color/disclosure feedback and reduced-motion override; no entrances.
+
+Source signs audit: removed equal metric-box composition, oversized heading, empty-heading wall,
+repeated framed badges and oversized header gap. No gradients, gradient text, glows, blobs, glass,
+neon borders, heavy/uppercase/italic type, emoji decoration, mixed icon sets, hype, testimonials,
+synthetic images, pill controls, sparklines, landing hero, parallax or looping/layout animation added.
+This is a source audit, **not** a rendered sign-by-sign review or contrast/overflow pass.
+
+**Current hierarchy correction:** CSS-only; catalogue index has no relevant pure-CSS specialist.
+Applied native unslop spacing/type/layout passes: 24px group separation, 12px card gaps,
+17/15/13/12px hierarchy and individually bounded surfaces. No new presenter, state, dependency,
+decoration or layout fork. Required stylesheet authoring exited 0 (Tailwind 4.3.5, 59ms).
+Verification limited to file review because this was a low-risk visual/static change.
+No Python semantics changed, tests or browser calls; parent must inspect fresh light/dark
+screenshots for section/card distinction. Previous captures/critique below do not validate
+these changed styles. Gallery approval and full QA remain open, not merge-ready.
+
+**Earlier evidence/hold (before hierarchy correction):** CSS authoring command exited 0 (Tailwind 4.3.5, 59ms); documented Python
+regression command exited 0, 12 tests passed. Existing tests extended for populated-lane mode and
+unchanged live defaults. No dependencies, installs or lockfile edits. Child built-in
+`browser.tabs.list()` returned `[browser.disconnected] No desktop browser is connected to this
+session` (no process exit code); no retry/fallback. User's session override requires built-in
+browser only, superseding older capture instructions for this task; permanent policy stays in
+BOARD-120 (separate commit `800cb3b`, Pending Merge, not copied/merged here).
+
+Parent subsequently reviewed fresh corrected `c77a72a` at 15182/gallery using built-in browser:
+light/system-dark screenshots at 1104×877 CSS (2000×1589 raster), 20px heading and no horizontal
+overflow at that width. Actual tab clicks showed Project two tasks/project-search worktree versus
+Harness one task/two control worktrees; Harness scope persisted through reload. Actual System→Light
+change produced canvas `rgb(245, 246, 248)`. Current-document bounded console had zero errors and
+no truncation/drop; four document/CSS/font requests all 200. These are parent observations, not
+independent QA interactions. Screenshot paths and exact steps are in the parent addendum to
+`docs/reviews/BOARD-118-ui.md`. Independent round-1 screenshot critique includes sign-by-sign
+unslop audit: HOLD, no blocking visual findings in the supplied views, not whole-task PASS.
+
+Built-in catalogue has no viewport resize; narrow/matrix captures are not claimed. Keyboard/focus,
+contrast/targets, expanded criteria, full states, filters/density and elapsed refresh remain open,
+as does user gallery approval. Parent canonical artifact notes.md patch was guard-refused; no
+retry or alternate write bypass. That earlier checkpoint made no source/browser/test/build
+changes. Live 15180 unchanged; not merge-ready and no live screen rollout.

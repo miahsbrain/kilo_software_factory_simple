@@ -3,6 +3,112 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Checkpoint main preview and screenshot hold
+**Type:** Docs
+**Board:** BOARD-121 | **Branch:** feat/apply-approved-workbench-to-main-dashboard
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/STACK.md`, this log; new `docs/reviews/BOARD-121-qa.md` stores this task's attributed parent observations and hold, not an independent verdict.
+**Why:** Parent inspected `fd89d5b` and started main preview 15183; preserve observed initial scope/DOM state and exact screenshot blocker for resumption.
+**Impact:** Parent observed Project default 14 tasks/result 14 of 14/three project worktrees; hidden Harness 21 tasks/eight control worktrees, proper isolation. At 1000×700 CSS no horizontal overflow, 60s refresh, 17px/600 heading and no fixture notice. Built-in screenshot after tabs.focus returned browser.operation_failed: “Screenshot needs a visible tab. Call browser.tabs.focus and keep its desktop window visible.” No retry/fallback or screenshot; independent visual/unslop, keyboard/full responsive QA remain held. Visible desktop window needed; not merge-ready. Live 15180 unchanged. Reversible docs-only checkpoint; no source, board, rules or artifacts workaround.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. No browser calls, tests or builds in this checkpoint. Prior implementation proof retained: documented Python regression command exited 0, 15 tests in 0.048s.
+
+## [2026-11-11] Apply approved workbench to the main dashboard
+**Type:** Feature
+**Board:** BOARD-121 | **Branch:** feat/apply-approved-workbench-to-main-dashboard
+**Changed:** `board_serve.py`, adjacent `test_board_serve.py`; `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, `docs/DECISIONS.md`, `docs/PROJECT_STRUCTURE.md`, this log. No new files.
+**Why:** User approved the latest hierarchy gallery and requested main dashboard implementation. Reuse `wb_scope_tabs`, `wb_scope_content`, `wb_toolbar`, lane/card/meter/rail and existing JS; extract only `wb_workbench_header` because main and gallery now share that composition. Extend existing scope presenter for path-based explicit-board association instead of a second repository model. Correct stale control-only repository-map documentation.
+**Impact:** Real repository-scoped main tabs/counts/tasks/worktrees, Project default with remembered fallback, approved typography/card boundaries and integrated rail. Preserve actual refresh timestamp, live/stale/Pause/manual/60s behavior, URL filters, criteria, storage and keyboard selection. JSON/endpoints and offline read-only standard-library runtime unchanged; fixtures remain gallery-only. Reversible presentation change; blast radius is dashboard users. No CSS, asset, dependency, server, board, rule or project changes.
+**Verification:** `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0, 15 tests in 0.048s; temporary fixtures/mocked Git, no live server. Cases cover scoping, duplicate IDs, explicit paths, escaping, empty/error fallback, fixture exclusion, shared classes and refresh contracts. No browser execution or build. Parent fresh 15183 built-in-browser-only QA/critique/unslop pending; live 15180 untouched, not merge-ready. Skills: catalogue python-pro (standard-library), javascript-pro (browser APIs), test-master (unit testing), native unslop/signs and built-in browser guidance; surrounding Python 3.9/unittest/JS conventions retained over catalogue defaults.
+
+## [2026-11-11] Strengthen gallery section and card hierarchy
+**Type:** Fix
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `.opencode/skills/board/ui/src/app.css`, generated `static/board.css`; `docs/UI-UX.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log. No new files.
+**Why:** User found section headings and individual task boundaries hard to distinguish. Extend existing workbench-scoped selectors instead of forking presenters or duplicating layout/state.
+**Impact:** 17px/600 section headings, quiet 13px/500 lane labels, 15px/600 task titles above 12px metadata; 1px theme-relative card edges, 8px corners, 12px gaps and 24px group separation. Comparable worktree surfaces; no shadows, gradients or heavy outer panels. CSS-only, reversible; live `/`, Python/JS behavior, rules, dependencies, servers and board unchanged.
+**Verification:** Required stylesheet authoring exited 0 (Tailwind 4.3.5, 59ms). Verification limited to file review because this was a low-risk visual/static change. No tests or browser calls; prior screenshots/critique are historical, not proof for changed CSS. Parent built-in light/dark inspection and user approval pending; not merge-ready. Catalogue index reviewed: no relevant CSS-only specialist; native unslop spacing/type/layout passes applied.
+
+## [2026-11-11] Checkpoint corrected gallery preview and independent critique
+**Type:** Docs
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, this log; checkpoint existing new `docs/reviews/BOARD-118-ui.md` and `BOARD-118-ledger.md`. Extend critic report with attributed parent preview steps instead of creating a duplicate preview report. New review/ledger files preserve independent round-1 evidence/state.
+**Why:** Replace stale preview-refresh instructions with observed corrected c77a72a preview and bounded review coverage.
+**Impact:** Parent light/system-dark 1104×877 CSS captures, 20px heading/no desktop overflow, scoped tabs, actual tab/reload/theme behavior and current-document diagnostics recorded. Independent screenshot critique/unslop HOLD, no blocking visible findings; narrow matrix/keyboard/focus/contrast and remaining behavior/user approval open. Built-in catalogue lacks resize. Canonical artifacts notes.md patch guard-refused, no retry/bypass. Policy BOARD-120 commit 800cb3b remains separate Pending Merge. Live 15180 unchanged; not merge-ready.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. No source edits, browser calls, tests or builds in this checkpoint; previous test/build results retained as historical evidence.
+
+## [2026-11-11] Rework gallery into a compact repository workbench
+**Type:** Fix
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `board_serve.py`, adjacent `test_board_serve.py`, `ui/src/app.css`, generated `static/board.css`; `docs/UI-UX.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log. No new files.
+**Why:** User rejected old chunky components with tabs. Extend existing board presenter with optional populated-only lanes; reuse wb_ task, meter, toolbar and rail renderers and existing JS state/handlers. Scope new appearance to workbench, preserve live defaults.
+**Impact:** Tight 20px header, content-width lane navigation, continuous task surface with title above quiet metadata, borderless status markers and adjacent repository rail at ordinary desktop width; empty examples below populated tasks. Gallery-only, reversible; no live rollout, rule, dependency, board or server changes.
+**Evidence:** CSS authoring command exited 0 (Tailwind 4.3.5, 59ms). `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0: 12 tests in 0.031s. Source nine-pass craft record in UI-UX §6.3. Built-in tabs.list returned browser.disconnected, no exit code; no retry/fallback. Rendered QA/unslop and user gallery approval pending. Parent must refresh preview Python process for new markup; not merge-ready.
+
+## [2026-11-11] Checkpoint parent gallery preview and browser error
+**Type:** Docs
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, this log.
+**Why:** Preserve parent preview observations and stop reason without claiming completed QA or approval.
+**Impact:** Parent reviewed diff and started http://127.0.0.1:15182/gallery from BOARD-118; live 15180 and prior 15181 unchanged. Built-in tab `5007dd99-7e7a-47c0-b5d6-3c060c359dd7`, snapshot generation 2 showed Project default, Project 2 / Harness 1 tabs, Project 2 in flight / 1 blocked / 2 tasks / 1 worktree, labelled fixture empty/error states. Harness click ref `e46` failed `[browser.operation_failed] browser.click failed. UnknownVizError` (no exit code); following tabs.list confirmed same gallery generation 2; no retry. Parent observations only, not independent QA. Blocked on browser error and gallery approval; user reviews directly. Interactions/themes/responsive/canonical evidence and independent unslop remain incomplete. Not merge-ready; no live screen rollout.
+**Verification:** Docs-only checkpoint, no further checks/source edits/installs. Existing 11-test pass and user-supplied install/build evidence preserved unchanged. Verification limited to file review because this was a low-risk visual/static change.
+
+## [2026-11-11] Complete repository workbench gallery for preview
+**Type:** Feature
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `.opencode/skills/board/scripts/board_serve.py`, adjacent `test_board_serve.py`, `ui/src/app.css`, generated `static/board.css`; `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, this log. No new files.
+**Why:** Resume after user-provisioned locked UI dependencies. Reuse shared wb_ presenters and dashboard handlers; remove unused count constants, align fixture Notes with review tasks, protect gallery keyboard focus from idle refresh, and allow compact rows to wrap safely at the mobile floor. Existing tests extended instead of adding a test tool or dependency.
+**Impact:** Gallery-only tab/content composition and scoped styling now have generated assets. User-generated CSS was inspected/preserved before regeneration; live `/` markup/layout remains unchanged. No installs by this builder, no package/lockfile changes, server/port changes, real project or board edits. Reversible; ready for browser preview, not gallery-approved or merge-ready.
+**User-supplied evidence:** `npm ci` added 56 packages, audited 63 in 18s, zero vulnerabilities; `npm run build` Tailwind 4.3.5 completed in 61ms. Not represented as builder-run commands.
+**Builder evidence:** `npm --prefix .opencode/skills/board/ui run build` exited 0, Tailwind 4.3.5, 62ms (required CSS authoring, not an application production build). One verification command: `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0, 11 tests passed in 0.033s. Five new tests at lines 212–317 cover rendering/default fallback/isolation/semantics/escaping/handler contracts and gallery CSS; six inherited refresh/data tests stay green. Browser keyboard/storage/timer execution, responsive/contrast/theme inspection, canonical captures, independent review and unslop remain open; no browser attempt or installation.
+
+## [2026-11-11] Record approved gallery dependency install timeout
+**Type:** Docs
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, this log.
+**Why:** User explicitly approved installing existing locked UI dependencies to unblock gallery asset authoring; record the environmental stop without implying completion.
+**Impact:** `npm --prefix .opencode/skills/board/ui ci` produced no output and exceeded 120000ms shell timeout; no exit code returned, completion unknown. Stopped without retry/workaround, build, tests, browser work or source changes. Gallery remains incomplete, not preview-ready or merge-ready. Parent requests a decision on a longer install attempt. No new dependencies or lockfile changes requested.
+**Verification:** No verification command run; installation timed out before source review/verification resumed. No browser/canonical/unslop pass claimed.
+
+## [2026-11-11] Checkpoint repository workbench gallery source
+**Type:** Feature
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `board_serve.py`, `ui/src/app.css` under `.opencode/skills/board/`; `docs/UI-UX.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, ADR-078 and this log. No new files.
+**Why:** Preview approved Project/Harness tabs before screen rollout. Reuse existing wb_ cards/lanes/panels/meter/rail, row adapter, count helpers and dashboard JS rather than duplicate gallery handlers. New pure scope presenters provide missing tablist/default/content composition; fixture adapter reuses existing fixtures, deliberately sharing task IDs across scopes. Optional base rendering preserves default worktree row output.
+**Impact:** Partial gallery-only source; live board markup unchanged, new layout styles scoped. Shared JS adds remembered scope, tab keyboard handling and selected-scope result totals while retaining no-tab behavior. No API changes, installs, server changes, board edits or project reads. Reversible. NOT merge-ready: generated stylesheet remains unchanged.
+**Verification:** Asset authoring `npm --prefix .opencode/skills/board/ui run build` exited 127, `sh: 1: tailwindcss: not found`. Stopped per delegated instructions; regression extension/run and browser/canonical/unslop review incomplete. Parent must obtain approval to provision pinned existing dependencies before resuming.
+
+## [2026-11-11] Include registered project worktrees in console data
+**Type:** Fix
+**Board:** BOARD-119 | **Branch:** fix/include-project-repository-worktrees-in-console
+**Changed:** `.opencode/skills/board/scripts/board_serve.py`, adjacent `test_board_serve.py`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md` (ADR-077), this log. No new files.
+**Why:** Existing `worktree_state()` listed only the control repository. Extend it with existing `load_repos`, `resolve_repo`, `is_git_repo`, `list_worktrees`, `default_base` and `git_out`, without duplicating map/Git parsing. New test fixture method supplies repository-scoped mocked Git output so existing helpers can be exercised without live repositories.
+**Impact:** Every worktree request reloads control/project registry entries, omits absent/uninitialized project, and adds stable `repo` plus `base` metadata without removing existing fields or changing the JSON array. Main markers, dirty state and counts stay repository-specific, including identical branch names. Existing malformed-map exception handling remains. Read-only/offline standard-library runtime; no real board/project edits, UI changes, installs, restarts or builds. Reversible data-only change; approved tabs/default/selection await gallery and later implementation.
+**Verification:** `python3 .opencode/skills/board/scripts/test_board_serve.py` → exit 0, six tests passed. Temporary fixtures/mocked Git/server prove registry refresh, registered nonconventional path, main/base/count isolation, dirty state, missing/uninitialized project, fallback values, additive endpoint compatibility and invalid maps. No browser QA; BOARD-117's existing QA blockers remain.
+
+## [2026-11-11] Checkpoint partial parent browser observations
+**Type:** Docs
+**Board:** BOARD-117 | **Branch:** fix/refresh-project-board-discovery-every-minute
+**Changed:** `docs/reviews/BOARD-117-qa.md` (preserved disconnected reviewer addendum; separate parent addendum), `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** Record user-approved parent interactive evidence without representing it as an independent reviewer pass or complete QA.
+**Impact:** Parent saw harness/project panels 18/14 (32 total), configured 60s, Pause state and actual manual reload while paused (changed timeOrigin); Pause resets after reload. Search input/URL observed, filtering not proven with unreliable `.card` selector; `/` left BODY active, shortcut not proven. Later Refresh now click returned `[browser.operation_failed] browser.click failed. UnknownVizError` (no exit code); tabs.list stayed at generation 4, loading false, same URL. No retry; filter retention, elapsed scheduling, keyboard, themes, responsiveness and visual/unslop/gallery gates remain unchecked. No product defect proven. Canonical capture still lacks Playwright; no installs. Main15180 unchanged, preview15181 only; BOARD-118 queued, not implemented. User decides whether to retry after desktop error resolution. Wip, not merge-ready.
+**Verification:** Documentation only, no browser/test/build/source changes. Verification limited to file review because this was a low-risk visual/static change. Previous independent regression remains four tests, exit 0.
+
+## [2026-11-11] Checkpoint blocked BOARD-117 QA
+**Type:** Docs
+**Board:** BOARD-117 | **Branch:** fix/refresh-project-board-discovery-every-minute
+**Changed:** Reviewer report `docs/reviews/BOARD-117-qa.md`, current session notes in `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log. No source or permanent-rule edits.
+**Why:** Preserve independent QA evidence and the environment blocker in a clearly labelled wip local checkpoint, not a merge-ready handoff.
+**Impact:** Parent code review found no blocker; independent regression rerun passed four tests (exit 0). Browser interactions, 60-second elapsed scheduling, visual/unslop and gallery review remain unverified. Main server 15180 unchanged; preview 15181 launched from the worktree. No restarts or dependency installation. User must approve provisioning Playwright or provide its installed location before QA resumes. BOARD-118 approved redesign gallery remains queued behind BOARD-117, not implemented.
+**Capture:** `node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127.0.0.1:15181 --route / --scope factory --task-id BOARD-117 --project . --scheme both --date 2026-11-11` → exit 2: Playwright not found in the project or global npm install (exact error: reviewer report lines 33–35). No canonical evidence produced; no application defect demonstrated.
+**Verification:** Existing reviewer evidence recorded only; no additional test/build/capture commands. Verification limited to file review because this was a low-risk visual/static change.
+
+## [2026-11-11] Refresh board discovery on every request
+**Type:** Fix
+**Board:** BOARD-117 | **Branch:** fix/refresh-project-board-discovery-every-minute
+**Changed:** `.opencode/skills/board/scripts/board_serve.py`, new adjacent `test_board_serve.py`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/STACK.md`, `docs/DECISIONS.md` (ADR-076), this log.
+**Why:** `main()` captured discovered paths once, hiding projects created after server initialization. Existing `discover_boards`, payload callbacks, parser and renderer are reused; HTML now uses the same board-payload path as JSON. New test file is needed because board/scripts had no regression tests; standard-library unittest adds no dependency or custom tooling.
+**Impact:** Rediscover filesystem boards per request, including ignored project paths; keep tasks separated and explicit `--file` fixed. Set default/JavaScript fallback to 60 seconds. Existing controls, filters/state, payload shapes and read-only/offline runtime remain; no redesign, live project edits or server restart. Reversible code-only behavior change; parent review and browser QA/critique remain open.
+**Verification:** `python3 .opencode/skills/board/scripts/test_board_serve.py` → exit 0, four tests passed. Temporary fixtures and mocked request handling prove HTML/JSON appearance/removal, isolation, fixed file/fresh reads and refresh defaults/override. Manual controls checked in source only; no browser interaction/timer evidence. Initial patch refusal occurred with factory-root session context; authorized worktree-relative retry succeeded after session move, without guard changes.
+
 ## [2026-11-11] Use OpenCode browser for interactive UI reviews
 **Type:** Docs
 **Board:** BOARD-116 | **Branch:** docs/use-opencode-browser-for-interactive-ui-reviews
