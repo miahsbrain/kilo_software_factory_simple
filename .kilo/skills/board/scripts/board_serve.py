@@ -60,6 +60,8 @@ GIT_TIMEOUT = 5
 DEFAULT_PORT = 15180
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_REFRESH = 10
+BOARD_READ_HINT = (" Check that the board path (--file or docs/BOARD.md) "
+                   "exists and is a valid board table.")
 # Inline favicon: the page stays offline and makes no favicon request.
 FAVICON = ("data:image/svg+xml,"
            "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E"
@@ -135,7 +137,7 @@ def read_rows(board, path):
     """(rows, error). The board is read fresh; nothing is cached."""
     table, err = board.read_table(path)
     if table is None:
-        return [], err
+        return [], (err or "cannot read the board") + BOARD_READ_HINT
     rows = []
     for i in table["rows"]:
         cells = board.cell_texts(table["lines"], i)
@@ -190,8 +192,9 @@ CSS = """
   --line-soft: #eceef1;
   --ink: #14171a;
   --ink-soft: #4d545c;
-  --ink-faint: #767e87;
+  --ink-faint: #646c75;
   --accent: #2f6feb;
+  --accent-ink: #1f5fd6;
   --accent-soft: #e7efff;
   --ok: #1f7a45;
   --warn: #8a5a00;
@@ -216,8 +219,9 @@ CSS = """
     --line-soft: #23282d;
     --ink: #e9ebee;
     --ink-soft: #a7aeb6;
-    --ink-faint: #7c848d;
+    --ink-faint: #8b939c;
     --accent: #6f9dff;
+    --accent-ink: #6f9dff;
     --accent-soft: #1a2740;
     --ok: #56c58a;
     --warn: #e0ac4c;
@@ -233,8 +237,9 @@ CSS = """
   --line-soft: #23282d;
   --ink: #e9ebee;
   --ink-soft: #a7aeb6;
-  --ink-faint: #7c848d;
+  --ink-faint: #8b939c;
   --accent: #6f9dff;
+  --accent-ink: #6f9dff;
   --accent-soft: #1a2740;
   --ok: #56c58a;
   --warn: #e0ac4c;
@@ -253,7 +258,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 button, input, select { font: inherit; color: inherit; }
-a { color: var(--accent); }
+a { color: var(--accent-ink); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .shell {
@@ -265,7 +270,7 @@ a { color: var(--accent); }
   position: sticky; top: 0; z-index: 30;
   background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
 }
-.appbar-inner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); min-height: var(--appbar-h); }
+.appbar-inner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); min-height: 60px; }
 .brand { display: flex; align-items: center; gap: var(--s3); min-width: 0; flex: 1 1 260px; }
 .mark { width: 28px; height: 28px; flex: none; color: var(--accent); }
 .brand-text { min-width: 0; }
@@ -280,7 +285,7 @@ a { color: var(--accent); }
   font-size: var(--t-xs); cursor: pointer; white-space: nowrap;
 }
 .btn:hover { border-color: var(--ink-faint); }
-.btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
 .btn .caret-sm { font-size: 10px; color: var(--ink-faint); }
 
 .live { display: inline-flex; align-items: center; gap: 6px; font: var(--t-xs) var(--mono); color: var(--ink-soft); }
@@ -423,7 +428,7 @@ details.panel > summary:hover { background: var(--line-soft); }
 .card[open] > summary .card-caret { transform: rotate(90deg); }
 .card.selected { border-color: var(--accent); }
 .card.selected > summary { background: var(--accent-soft); outline: 2px solid var(--accent); outline-offset: -2px; }
-.card-id { font-family: var(--mono); font-size: var(--t-xs); font-weight: 700; color: var(--accent); }
+.card-id { font-family: var(--mono); font-size: var(--t-xs); font-weight: 700; color: var(--accent-ink); }
 .card-task { font-size: var(--t-sm); line-height: 1.35; margin: 0; font-weight: 600; flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
 .chip {
   font-size: var(--t-xs); font-family: var(--mono); border-radius: 4px;
@@ -447,7 +452,7 @@ details.panel > summary:hover { background: var(--line-soft); }
   font: var(--t-xs) var(--mono); min-height: 24px; padding: 0 var(--s2); cursor: pointer;
   border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); border-radius: 4px;
 }
-.copy:hover { border-color: var(--accent); color: var(--accent); }
+.copy:hover { border-color: var(--accent); color: var(--accent-ink); }
 .notes { list-style: none; margin: var(--s2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); }
 .note { display: flex; align-items: flex-start; gap: var(--s2); font-size: var(--t-xs); color: var(--ink-soft); line-height: 1.45; }
 .note-box {
@@ -461,7 +466,7 @@ details.panel > summary:hover { background: var(--line-soft); }
 .note-proof { font-family: var(--mono); color: var(--ink-faint); }
 .note-free { color: var(--ink-soft); }
 .more {
-  align-self: flex-start; font: var(--t-xs)/1.4 var(--mono); color: var(--accent);
+  align-self: flex-start; font: var(--t-xs)/1.4 var(--mono); color: var(--accent-ink);
   background: transparent; border: 1px solid var(--line); border-radius: var(--radius);
   padding: var(--s1) var(--s3); min-height: 28px; cursor: pointer;
 }
@@ -492,6 +497,10 @@ body.compact .note { line-height: 1.35; }
 }
 @media (max-width: 480px) {
   :root { --appbar-h: 56px; }
+  .appbar { position: static; }
+  .lane > summary { top: 0; }
+  .btn, .search-clear, .copy, .more, .card > summary, .lane > summary { min-height: 44px; }
+  .search-clear { width: 44px; }
   .shell { padding-left: var(--s3); padding-right: var(--s3); }
   .overview { padding-top: var(--s4); padding-bottom: var(--s3); }
   .headline { font-size: var(--t-lg); }
@@ -599,6 +608,17 @@ JS = """
   var liveText = document.querySelector(".live-text");
   var statusFilter = "";
   var selected = null;
+
+  var appbar = document.querySelector(".appbar");
+  function measureAppbar() {
+    if (!appbar) { return; }
+    document.documentElement.style.setProperty("--appbar-h", appbar.offsetHeight + "px");
+  }
+  measureAppbar();
+  window.addEventListener("resize", measureAppbar);
+  if (window.ResizeObserver && appbar) {
+    try { new ResizeObserver(measureAppbar).observe(appbar); } catch (e) { /* observer unavailable */ }
+  }
 
   function applyTheme(theme) {
     document.documentElement.setAttribute("data-theme", theme);
@@ -860,8 +880,22 @@ JS = """
   if (refreshBtn) {
     refreshBtn.addEventListener("click", function () { window.location.reload(); });
   }
+  function boardIdle() {
+    if (paused) { return false; }
+    if (document.visibilityState !== "visible") { return false; }
+    if (document.querySelector(".card[open]")) { return false; }
+    if (search && search.value.trim()) { return false; }
+    if (typeSel && typeSel.value) { return false; }
+    if (prioSel && prioSel.value) { return false; }
+    if (all(".lane-body.searching").length) { return false; }
+    var active = document.activeElement;
+    if (active && active !== document.body && active.closest && active.closest(".shell")) {
+      return false;
+    }
+    return true;
+  }
   window.setInterval(function () {
-    if (!paused) { window.location.reload(); }
+    if (boardIdle()) { window.location.reload(); }
   }, refreshSeconds * 1000);
 
   document.addEventListener("keydown", function (event) {
@@ -1456,7 +1490,7 @@ def build_payloads(board, worktree, paths, root):
             error = None
         except Exception as exc:
             states, state = [], []
-            error = "could not read the board: %s" % exc
+            error = "could not read the board: %s%s" % (exc, BOARD_READ_HINT)
         return build_html(states, state, now(), error, Handler.state["refresh"])
 
     return board_payload, worktree_payload, html_page
