@@ -374,6 +374,29 @@ Exit 0 → accepted. Exit 66 → the finding is too weak to act on; fix the body
 
 ## 6. Open design decisions
 
+The approved assumptions below apply to the application UI a project builds, not to the factory
+harness. The factory's own surfaces use the approved record that follows.
+
+### 6.1 Factory board console (approved)
+
+The board console at `.kilo/skills/board/scripts/board_serve.py` (BOARD-109) is read-only,
+server-rendered and offline. Its visual language is settled and reused by any future console page:
+
+| Token | Approved value |
+|---|---|
+| Accent | `#2f6feb` light, `#6f9dff` dark. One accent, used for primary action and focus only. |
+| Ink | Monochrome ink (`#14171a` light, `#e9ebee` dark) with soft and faint steps; no decorative color. |
+| Status | Semantic colors only: ok green, warning amber, bad red. Never used for emphasis. |
+| Type | System sans for prose and controls; mono for ids, branches, paths and counts. Scale 11 / 13 / 15 / 20 / 28px. |
+| Spacing | 4 / 8 / 12 / 16 / 24 / 32 / 48px. |
+| Radius | 6px controls, 10px panels. One subtle shadow. |
+| Motion | 120–180ms for state changes only. |
+| Density | Comfortable by default, compact toggle; the same tokens drive both. |
+
+The layout is an app bar, an active-lane pipeline, a filter toolbar, lane boards with parsed
+Notes checklists, and a live worktrees table. Keyboard and URL state are part of the design, not
+an addition.
+
 | Decision | Status | Notes |
 |---|---|---|
 | Font family | ASSUMPTION | Geist Sans + Geist Mono, unless the user picks another |
