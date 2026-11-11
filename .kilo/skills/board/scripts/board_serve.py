@@ -493,8 +493,9 @@ body.compact .note { line-height: 1.35; }
   .lane-desc { display: none; }
 }
 @media (max-width: 640px) {
-  .flow { display: flex; overflow-x: auto; }
-  .flow-stop { flex: 1 0 104px; }
+  .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: hidden; }
+  .flow-stop { padding: var(--s2) var(--s1); }
+  .flow-name { line-height: 1.2; }
   .wt-table thead { display: none; }
   .wt-table, .wt-table tbody, .wt-table tr, .wt-table td { display: block; width: 100%; }
   .wt-table tr { border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: var(--s2); background: var(--surface); }
@@ -1287,7 +1288,7 @@ def last_merged_id(boards):
 
 def render_pipeline(counts):
     peak = max(counts.values()) or 1
-    active = next((lane for lane in ACTIVE_LANES if counts.get(lane, 0) == peak), None)
+    active = {lane for lane in ACTIVE_LANES if peak > 0 and counts.get(lane, 0) == peak}
     parts = []
     for lane in ACTIVE_LANES:
         count = counts.get(lane, 0)
@@ -1301,7 +1302,7 @@ def render_pipeline(counts):
             '</button>'
         ) % (
             esc(lane),
-            ' data-active="true"' if lane == active and count else "",
+            ' data-active="true"' if lane in active and count else "",
             esc(lane),
             count,
             width,
