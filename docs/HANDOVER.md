@@ -1,5 +1,17 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-116 documentation review passed, 2026-11-11**
+> Added the approved built-in interactive browser policy to root/template §B4.2 and aligned the
+> reviewer agents, QA skill, `/ui` and UI-UX guidance. Canonical captures remain script-only;
+> QA and unslop gates are unchanged. Branch: `docs/use-opencode-browser-for-interactive-ui-reviews`;
+> worktree: `.kilo/worktrees/use-opencode-browser-for-interactive-ui-reviews`, based on migration
+> checkpoint `ec7501f` on `feat/port-factory-harness-to-opencode-v2`.
+> Parent reviewed all 12 file diffs: PASS. Reviewed docs change prepared for human review;
+> local task commit authorized through the existing Kilo bootstrap guard. Next: human reviews the task commit.
+> Verification limited to file review because this was a low-risk visual/static change.
+> No browser/runtime checks, builds or tests ran. BOARD-114 remains blocked on the security fixture
+> `EACCES`; migration work was not resumed and is not merge-ready. Earlier notes are historical.
+
 > **Session Notes — BOARD-115 documentation review, 2026-11-11**
 > Added the approved §B11 committed-handoff policy to root/template rules and aligned B5,
 > closeout, handover and git-worktree instructions. Branch:

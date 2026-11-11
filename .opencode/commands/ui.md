@@ -5,6 +5,11 @@ description: Run the QA and UI/UX review lane with Playwright and produce eviden
 Run the QA lane and the UI/UX critique for a frontend row. Evidence, not assertions.
 Spec: `docs/UI-UX.md` §3 and §5.
 
+Use OpenCode's built-in browser for interactive UI checks when available; follow the interactive
+browser guidance in `.opencode/skills/qa-review/SKILL.md` (load `browser` before the first call).
+These checks supplement, not replace, the scripted evidence and QA/unslop gates. Report an
+unavailable browser; do not silently switch tools.
+
 1. **Confirm the app runs.** Use the dev command from `docs/STACK.md`. If it does not start,
    report the blocker; do not fake a review.
 2. **Capture with the script** — it drives the project's own Playwright and writes a full-page
@@ -20,7 +25,8 @@ Spec: `docs/UI-UX.md` §3 and §5.
    Viewports: 390×844 (mobile), 834×1112 (tablet), 1440×900 (desktop), 1920×1080 (wide), and
    320×800 as the overflow floor.
 
-   **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
+   **The script is the only way to capture canonical UI evidence.** Built-in browser screenshots
+   are for interactive inspection only, not substitutes for scripted evidence. Ad-hoc `chromium`, `npx playwright
    screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
    evidence for a UI review. The script never installs a browser and never falls back to another
    driver. If the script cannot do something the review needs, say what is missing and propose

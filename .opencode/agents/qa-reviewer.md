@@ -96,7 +96,10 @@ fake a review.
 1. **Read the acceptance criteria** for the row under review. Each one needs its own observable
    check. A criterion with no check is a finding, not a pass.
 2. **Run the verification command** from `docs/STACK.md`. Record the exact command and result.
-3. **Capture the evidence with the script** — do not hand-drive the browser:
+3. **Capture canonical evidence with the script.** Use OpenCode's built-in browser for interactive
+   checks when available, following `.opencode/skills/qa-review/SKILL.md`'s interactive browser
+   guidance. These checks supplement the script, QA and unslop gates; report an unavailable browser
+   rather than silently switching tools.
 
        node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
            --scope <scope> --task-id <task-id> --project apps/<scope>
@@ -109,7 +112,8 @@ fake a review.
    `artifacts/<scope>/qa/<date>/<task-id>/` in the **main checkout**, so a capture taken from a
    worktree still lands in one place.
 
-   **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
+   **The script is the only way to capture canonical UI evidence.** Built-in browser screenshots
+   are for interactive inspection only, not substitutes for scripted evidence. Ad-hoc `chromium`, `npx playwright
    screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
    evidence for a UI review. The script never installs a browser and never falls back to another
    driver. If the script cannot do something the review needs, say what is missing and propose

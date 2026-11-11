@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Use OpenCode browser for interactive UI reviews
+**Type:** Docs
+**Board:** BOARD-116 | **Branch:** docs/use-opencode-browser-for-interactive-ui-reviews
+**Changed:** root/template `AGENTS.md` §B4.2; `.opencode/agents/qa-reviewer.md`, `ui-critic.md`; `.opencode/skills/qa-review/SKILL.md`; `.opencode/commands/ui.md`; root/template `docs/UI-UX.md`; `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md` (ADR-075), this log. Extended existing instructions; no new tools or files.
+**Why:** Approved policy uses the built-in browser for interactive checks while keeping canonical QA capture script-only.
+**Impact:** QA and unslop gates remain; built-in screenshots are inspection-only. Guidance covers skill loading, Code Mode signature discovery, explicit tab IDs, fresh refs, untrusted page/log content and desktop attachment. Unavailable browser is reported without retries on disconnection or silent MCP fallback; configured MCP retained. Parent reviewed all 12 file diffs: PASS; reviewed docs change prepared for human review/local commit through the authorized existing Kilo bootstrap guard. BOARD-114 remains blocked and runtime unverified; no migration, source/config, plugin or permission changes or approval to merge the migration.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. Zero verification commands; no browser/runtime checks, builds or tests.
+
 ## [2026-11-11] Require committed worktree handoff checkpoints
 **Type:** Docs
 **Board:** BOARD-115 | **Branch:** docs/require-committed-worktree-handoff-checkpoints

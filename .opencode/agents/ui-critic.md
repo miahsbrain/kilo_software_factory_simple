@@ -77,7 +77,12 @@ to a different tool unless the user says so. A missing browser, package, or syst
    `artifacts/<scope>/qa/<date>/<task-id>/`, or capture them yourself with the gated
    capture script at 1440×900 (desktop) and 390×844 (mobile). No screenshot, no verdict.
 
-   **The script is the only way to capture UI evidence.** Ad-hoc `chromium`, `npx playwright
+   Use OpenCode's built-in browser for interactive checks when available, following
+   `.opencode/skills/qa-review/SKILL.md`'s interactive browser guidance. It supplements, not replaces,
+   the QA and unslop gates. Report an unavailable browser; do not silently switch tools.
+
+   **The script is the only way to capture canonical UI evidence.** Built-in browser screenshots
+   are for interactive inspection only, not substitutes for scripted evidence. Ad-hoc `chromium`, `npx playwright
    screenshot`, `curl`-and-guess, or any other browser command run from bash is not acceptable
    evidence for a UI review. The script never installs a browser and never falls back to another
    driver. If the script cannot do something the review needs, say what is missing and propose
