@@ -1,5 +1,65 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-122 builder verification complete, 2026-11-11**
+> Branch `feat/keep-live-board-local-and-untracked`, worktree of the same slug. Shared bootstrap
+> and marker-based control-root lookup implemented; approved root/template rules and derived
+> guidance updated. First rules/docs patch was guard-refused; one authorized narrower retry
+> excluding every BOARD.md target passed. Authorized corrections changed only two test fixtures:
+> assert the existing missing-board error payload and recreate scratch docs before restoration.
+> Second verification attempt passed: 24 tests in 0.222s, exit 0. Production behavior unchanged.
+> Guard check-git returned 3 (needs approval); existing explicit authorization covered the exact
+> `git rm --cached -- docs/BOARD.md`, performed only in this task worktree. Disk bytes retained:
+> SHA-256 before/after `c2c5da6f78fc5e8ba6c2ad4cb16f150235dee4ee03937cd0d8bb2fdc22cee91e`.
+> Index shows `D docs/BOARD.md`; runtime path is ignored, template starter still tracked/unchanged.
+> No main-board/backup access, merge or separate-project edits. Next: parent review; not a merge claim.
+
+## BOARD-122 bootstrap and migration contract
+
+- Pure `empty_board()` in `.opencode/skills/board/scripts/board.py` derives the blank table from
+  existing `COLUMNS`. Effectful `initialize_board(root)` publishes a fully written temporary
+  file by exclusive hard link, preserving existing bytes and refusing symlink docs/board paths.
+- CLI `main()` and viewer `main()` initialize only the missing default board at startup.
+  `read_table()` and request payload callbacks remain read-only; explicit `--file` is untouched.
+- `board.control_root()` reuses `worktree.control_root()`, which finds the nearest repo-map
+  marker without requiring a board, then resolves Git's main checkout. Nested projects retain
+  their own ownership. No board copy belongs in future task worktrees.
+- Regression additions live in existing `test_board_serve.py`; no new tool or dependency.
+  Verification: `python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'`
+  second attempt exited 0, 24 tests in 0.222s. Existing/malformed byte preservation, exclusive
+  concurrent publication, symlink refusal, canonical linked/main/nested ownership, startup-only
+  writes and scratch Git backup/merge/restore all pass. Prior attempt failed only the two
+  corrected fixtures. No new abstraction or production behavior was introduced by the correction.
+
+### Human migration, only after review and passing verification
+
+The task branch removes only the board's index entry, retaining the on-disk task copy. Before
+the eventual human merge, stop board
+writers/tools and refresh the backup to include the latest row updates. The earlier BOARD-122
+backup is not a substitute for this final refresh. Run in the control main checkout:
+
+```bash
+mkdir -p .git/board-backups
+cp docs/BOARD.md .git/board-backups/BOARD-122-before-local-migration.md
+cmp docs/BOARD.md .git/board-backups/BOARD-122-before-local-migration.md
+```
+
+Do not proceed unless the comparison passes. Git may refuse to delete a locally modified
+tracked board during merge. After verifying the refreshed backup, the human must resolve that
+tracked-file state without losing the backup. The merge removes the old tracked board. Before
+starting any board tooling, restore local state (including its directory if Git removed it):
+
+```bash
+mkdir -p docs
+cp .git/board-backups/BOARD-122-before-local-migration.md docs/BOARD.md
+cmp .git/board-backups/BOARD-122-before-local-migration.md docs/BOARD.md
+```
+
+Otherwise startup could initialize a blank board. The restored runtime board is ignored;
+cleanup's final row update needs no commit. The template starter remains tracked and unchanged;
+future copied projects ignore their own runtime board. Existing separate project repos are
+outside this migration. History is not rewritten. Reversal needs an explicit tracking decision;
+preserve the local backup throughout.
+
 > **Session Notes — BOARD-121 parent preview screenshot hold, 2026-11-11**
 > Parent inspected implementation `fd89d5b` and started main preview http://127.0.0.1:15183/.
 > Parent snapshot/DOM: Project selected, 14 tasks/result 14 of 14/three project worktrees;

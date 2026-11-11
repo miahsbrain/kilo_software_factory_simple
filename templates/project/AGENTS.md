@@ -849,8 +849,7 @@ effects, integrations, failure/retry behaviour.
 
 ## B3. `docs/BOARD.md` — the board is the only state
 
-**The board is live and lives in the main checkout.** It is the single place to see everything
-going on, including work that has not been merged yet.
+The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
 
 **The board is the CLI's view of the worktrees.** `git worktree list` shows the worktrees;
 `docs/BOARD.md` shows what each one is doing and who owns it. The board row's
@@ -863,8 +862,8 @@ going on, including work that has not been merged yet.
   `changelog/`) and reports its status; the orchestrator writes the board.
 - **Why:** the main checkout's board stays current during in-flight work, and parallel
   worktrees can never conflict on the board file.
-- **After the user merges a branch**, the orchestrator marks the row `Merged` on `main`. That
-  board edit is the only uncommitted change the user has to commit after a merge.
+- **After the user merges a branch**, the orchestrator marks the local row `Merged`.
+  Board changes never need a Git commit.
 - **If a worktree needs to record its own lane transition**, it does so in the changelog entry
   and in its report — not in the board file.
 

@@ -30,7 +30,7 @@ it does not impose it.
         ├── ARCHITECTURE.md
         ├── BUSINESS-LOGIC.md
         ├── UI-UX.md
-        ├── BOARD.md
+        ├── BOARD.md           # local Git-ignored state, main checkout only; not in task worktrees
         ├── STACK.md
         ├── PROJECT_STATE.md
         ├── DECISIONS.md

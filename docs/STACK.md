@@ -41,6 +41,9 @@ python3 .opencode/skills/board/scripts/board.py show
 # Board refresh regressions (temporary fixture trees, no live server)
 python3 .opencode/skills/board/scripts/test_board_serve.py
 
+# Board bootstrap/migration and viewer regressions (temporary repositories only)
+python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'
+
 # Create the worktree for a board row
 python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X
 

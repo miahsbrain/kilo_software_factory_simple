@@ -129,15 +129,14 @@ def control_root(cwd):
 
     A work surface holds application code only, so running the harness from
     inside one must still find the project that governs it. The control repo
-    is the nearest ancestor that holds a repo map and a board. Its main
+    is the nearest ancestor that holds a repo map, even before its board exists. Its main
     checkout is returned, because the board has one writer and that writer
     works in the main checkout.
     """
     path = os.path.abspath(cwd)
     found = None
     while True:
-        if (os.path.exists(os.path.join(path, REPOS_REL))
-                and os.path.exists(os.path.join(path, "docs", "BOARD.md"))):
+        if os.path.exists(os.path.join(path, REPOS_REL)):
             found = path
             break
         parent = os.path.dirname(path)

@@ -32,7 +32,9 @@ Read `docs/PROJECT_STRUCTURE.md` before choosing paths, then the documented boot
 Get approval for implementation decisions before delegating. Delegate implementation to the
 six specialist agents; never implement application code yourself. Pass approved decisions,
 workspace boundaries, exact starting files, acceptance criteria and verification limits.
-Keep the board in the main checkout through its script. Review evidence and the diff before
+The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+
+Review evidence and the diff before
 accepting a builder's result. Preserve worktree, QA, documentation and human-merge gates.
 Never commit on `main` or `opencode`, merge, push, or open a pull request.
 Models inherit the session selection. Before every task, read `.opencode/catalog/README.md` and

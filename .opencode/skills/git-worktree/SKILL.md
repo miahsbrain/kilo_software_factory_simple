@@ -10,6 +10,12 @@ Every change in this factory happens in an isolated git worktree. The worktree c
 
 This is **CLI only**: plain `git`, no extension, no `gh`, no browser, no pull requests.
 
+The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+
+Board CLI/viewer startup owns missing-board initialization. Worktree lifecycle commands resolve
+the control repo by its repo-map marker, not board presence. Cleanup's final local row update
+does not dirty Git and requires no commit.
+
 **The script does the mechanics. You supply the intent.** Do not hand-run `git worktree add` when
 the script can do it — the script is where the naming rules and the refusals live.
 

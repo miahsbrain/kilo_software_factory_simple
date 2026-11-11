@@ -34,11 +34,14 @@ existing row with `board.py note`.
 Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 """
 import argparse
+import importlib.util
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
+import uuid
 
 BOARD_PATH = os.path.join("docs", "BOARD.md")
 TYPES = ["Feature", "Fix", "Chore", "Docs", "Research"]
@@ -60,39 +63,65 @@ INVALID = 66
 
 
 def control_root(cwd):
-    """The control repo's main checkout: the repository that owns the board.
-
-    A work surface holds application code only, so the board is not in the
-    directory the shell sits in. The control repo is the nearest ancestor
-    that holds a board, and its main checkout is used: the board has one
-    writer, and that writer works in the main checkout.
-    """
-    path = os.path.abspath(cwd)
-    found = None
-    while True:
-        if os.path.exists(os.path.join(path, BOARD_PATH)):
-            found = path
-            break
-        parent = os.path.dirname(path)
-        if parent == path:
-            break
-        path = parent
-    if found is None:
-        return os.path.abspath(cwd)
-    try:
-        out = subprocess.run(["git", "-C", found, "worktree", "list", "--porcelain"],
-                             capture_output=True, text=True, timeout=30).stdout
-    except (OSError, subprocess.SubprocessError):
-        return found
-    for line in out.splitlines():
-        key, _, value = line.partition(" ")
-        if key == "worktree" and value:
-            return os.path.abspath(value)
-    return found
+    path = os.path.join(os.path.dirname(__file__), "..", "..", "git-worktree", "scripts", "worktree.py")
+    spec = importlib.util.spec_from_file_location("board_worktree", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.control_root(cwd)
 
 
 def board_path(explicit):
     return explicit or os.path.join(control_root(os.getcwd()), BOARD_PATH)
+
+
+def empty_board() -> str:
+    return ("# BOARD\n\n"
+            "Local workspace state. Only the orchestrator edits rows through board.py.\n\n"
+            "| " + " | ".join(COLUMNS) + " |\n"
+            "|" + "|".join("---" for _ in COLUMNS) + "|\n")
+
+
+def initialize_board(root: str) -> str:
+    """Publish a complete missing board exclusively; existing bytes are never changed."""
+    path = os.path.join(root, BOARD_PATH)
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    with_fd = os.open(root, flags)
+    try:
+        try:
+            os.mkdir("docs", dir_fd=with_fd)
+        except FileExistsError:
+            pass
+        directory = os.open("docs", flags, dir_fd=with_fd)
+    finally:
+        os.close(with_fd)
+    try:
+        try:
+            existing = os.stat("BOARD.md", dir_fd=directory, follow_symlinks=False)
+        except FileNotFoundError:
+            existing = None
+        if existing is not None:
+            if not stat.S_ISREG(existing.st_mode):
+                raise OSError("refusing non-regular board: %s" % path)
+            return path
+        name = ".board.%s.tmp" % uuid.uuid4().hex
+        fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                stream.write(empty_board())
+                stream.flush()
+                os.fsync(stream.fileno())
+            try:
+                os.link(name, "BOARD.md", src_dir_fd=directory, dst_dir_fd=directory,
+                        follow_symlinks=False)
+            except FileExistsError:
+                existing = os.stat("BOARD.md", dir_fd=directory, follow_symlinks=False)
+                if not stat.S_ISREG(existing.st_mode):
+                    raise OSError("refusing non-regular board: %s" % path)
+        finally:
+            os.unlink(name, dir_fd=directory)
+    finally:
+        os.close(directory)
+    return path
 
 
 def read_table(path):
@@ -542,7 +571,7 @@ def cmd_lanes(args, path):
 def main(argv):
     parser = argparse.ArgumentParser(
         prog="board.py", description="Manipulate the markdown board at docs/BOARD.md.")
-    parser.add_argument("--file", help="board file (default: docs/BOARD.md in the current directory)")
+    parser.add_argument("--file", help="board file (default: local docs/BOARD.md in the control main checkout)")
     sub = parser.add_subparsers(dest="command")
 
     p = sub.add_parser("show", help="print board rows")
@@ -589,7 +618,11 @@ def main(argv):
     if not args.command:
         parser.print_help()
         return USAGE
-    path = board_path(args.file)
+    try:
+        path = args.file if args.file else initialize_board(control_root(os.getcwd()))
+    except OSError as exc:
+        print("cannot initialize board: %s" % exc, file=sys.stderr)
+        return REFUSED
 
     if args.command == "add":
         if args.type not in TYPES:
