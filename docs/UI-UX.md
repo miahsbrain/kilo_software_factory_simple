@@ -116,7 +116,9 @@ lives there, once.
 
 **It is mandatory.** Every UI change runs the unslop procedure — direction, full sign audit,
 nine passes and checklist — in the same review round as the QA capture. The report records the
-direction and one line per sign. It is not a second opinion to skip when time is short.
+direction and one line per sign. It is not a second opinion to skip when time is short. The
+`/unslop` command runs the whole procedure and writes the audit to
+`docs/reviews/<task-id>-unslop.md`.
 
 ---
 
