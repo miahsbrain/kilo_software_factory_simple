@@ -22,7 +22,7 @@ and is never tracked here (ADR-053).
     │   │   └── <skill>/SKILL.md      # one folder per upstream skill, references/ inside
     │   ├── commands/                 # slash commands, derived from AGENTS.md
     │   ├── policies/git-policy.json  # canonical guard-rail policy
-    │   ├── repos.json                # repo map of this repository: control only
+    │   ├── repos.json                # repo map: control '.', project 'project'
     │   ├── scopes/<id>.md            # canonical scope rules, one per scope
     │   ├── skills/                   # board, git-worktree, qa-review, unslop, plan + their scripts
     │   └── worktrees/                # one worktree per board row (git-ignored)

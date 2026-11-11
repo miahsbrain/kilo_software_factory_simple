@@ -94,7 +94,9 @@ class BoardRefreshTests(unittest.TestCase):
         self.assertEqual([entry["label"] for entry in entries], ["board"])
         self.assertEqual(entries[0]["path"], str(self.factory))
         self.assertEqual(entries[0]["rows"][0]["Task"], "Edited factory task")
-        self.assertNotIn("Project task", self.request("/"))
+        page = self.request("/")
+        self.assertNotIn("Project task", page)
+        self.assertIn('data-wb-scope-tab="board"', page)
 
     def test_default_refresh_and_existing_controls(self):
         self.initialize()
@@ -111,6 +113,10 @@ class BoardRefreshTests(unittest.TestCase):
         self.assertIn('pauseBtn.textContent = paused ? "Resume" : "Pause";', page)
         self.assertIn('if (boardIdle()) { window.location.reload(); }', page)
         self.assertIn('}, refreshSeconds * 1000);', page)
+        self.assertIn('class="wb-live" data-ms="', page)
+        self.assertIn('class="wb-live-text">updated ', page)
+        self.assertIn('liveText.textContent = "updated " + time', page)
+        self.assertIn('var stale = paused || age > refreshSeconds * 1500;', page)
 
     def test_refresh_override(self):
         self.initialize("--refresh", "17")
@@ -172,8 +178,10 @@ class BoardRefreshTests(unittest.TestCase):
             self.assertEqual(group[1]["branch"], "fix/shared")
             self.assertEqual(group[1]["sha"], "fedcba9")
             self.assertEqual((group[1]["ahead"], group[1]["behind"], group[1]["dirty"]), expected)
+        self.write_board(self.project, "Project task")
         page = self.request("/")
-        self.assertIn("4 worktrees · 2 non-main", page)
+        self.assertEqual(page.count('2 worktrees</span>'), 2)
+        self.assertEqual(page.count('class="wb-wt"'), 4)
         self.assertIn(str(project / ".opencode/worktrees/shared"), page)
 
         linked = str(project / ".opencode/worktrees/shared")
@@ -194,7 +202,120 @@ class BoardRefreshTests(unittest.TestCase):
                 results[(str(uninitialized), "rev-parse", "--show-toplevel")] = str(self.root)
                 self.registry.write_text(json.dumps(registry), encoding="utf-8")
                 self.assertEqual(self.request("/api/worktrees"), control)
-                self.assertIn("2 worktrees · 1 non-main", self.request("/"))
+                page = self.request("/")
+                self.assertIn('2 worktrees</span>', page)
+                self.assertIn('0 worktrees</span>', page)
+                self.assertEqual(page.count('class="wb-wt"'), 2)
+
+    def test_main_uses_real_scoped_data_and_shared_workbench(self):
+        self.write_board(self.project, "Actual project task")
+        self.initialize()
+        with patch.object(viewer, "gallery_scope_fixtures", side_effect=AssertionError("fixture on main")):
+            page = self.request("/")
+        self.assertIn('<main class="wb-workbench">', page)
+        self.assertNotIn('class="wb-layout"', page)
+        self.assertNotIn('class="wb-sidebar"', page)
+        self.assertNotIn('class="wb-kpi"', page)
+        self.assertNotIn("labelled fixture data", page)
+        self.assertNotIn("Empty and unavailable states", page)
+        self.assertNotIn("/fixtures/", page)
+        self.assertIn('href="/gallery"', page)
+        tags = []
+        parser = HTMLParser()
+        parser.handle_starttag = lambda tag, attrs: tags.append((tag, dict(attrs)))
+        parser.feed(page)
+        ids = [attrs["id"] for _, attrs in tags if "id" in attrs]
+        self.assertEqual(len(ids), len(set(ids)))
+        tabs = [attrs for _, attrs in tags if attrs.get("role") == "tab"]
+        panels = [attrs for _, attrs in tags if attrs.get("role") == "tabpanel"]
+        self.assertEqual([tab["data-wb-scope-tab"] for tab in tabs], ["harness", "project"])
+        for tab, panel in zip(tabs, panels):
+            active = tab["data-wb-scope-tab"] == "project"
+            self.assertEqual(tab["aria-controls"], panel["id"])
+            self.assertEqual(panel["aria-labelledby"], tab["id"])
+            self.assertEqual(tab["aria-selected"], "true" if active else "false")
+            self.assertEqual("hidden" in panel, not active)
+        cards = [attrs for _, attrs in tags if "data-card" in attrs]
+        self.assertEqual([(card["data-board"], card["data-card"]) for card in cards],
+                         [("harness", "BOARD-001"), ("project", "BOARD-001")])
+        self.assertIn('getAttribute("data-board") + "::"', page)
+        self.assertIn('class="notes"', page)
+        self.assertIn('class="wb-card-task"', page)
+        self.assertIn('class="wb-rail"', page)
+        self.assertIn('id="main-type-filter"', page)
+        self.assertIn('id="main-priority-filter"', page)
+        self.assertIn('params.get("status")', page)
+        self.assertIn('event.key === "j" || event.key === "k"', page)
+        self.assertIn("labelled fixture data", self.request("/gallery"))
+
+    def test_explicit_board_worktrees_follow_root_paths_not_label_guesses(self):
+        self.initialize("--file", str(self.factory))
+        worktrees = [
+            {"main": True, "branch": "control-base", "path": str(self.root),
+             "repo": "control", "base": "opencode", "ahead": 0, "behind": 0, "dirty": False},
+            {"main": True, "branch": "project-base", "path": str(self.root / "project"),
+             "repo": "project", "base": "main", "ahead": 0, "behind": 0, "dirty": False},
+        ]
+        with patch.object(viewer, "worktree_state", return_value=worktrees):
+            page = self.request("/")
+        self.assertIn("control-base", page)
+        self.assertNotIn("project-base", page)
+        self.write_board(self.project, "Explicit project task")
+        self.initialize("--file", str(self.project))
+        with patch.object(viewer, "worktree_state", return_value=worktrees):
+            page = self.request("/")
+        self.assertIn("project-base", page)
+        self.assertNotIn("control-base", page)
+        entry = viewer.board_states(self.board, [("board", str(self.root / "project-other/BOARD.md"))])[0]
+        page = viewer.wb_scope_content(entry, worktrees, "board", root=str(self.root))
+        self.assertIn("control-base", page)
+        self.assertNotIn("project-base", page)
+        entry = dict(entry, path="/unrelated/BOARD.md")
+        page = viewer.wb_scope_content(entry, worktrees, "board", root=str(self.root))
+        self.assertNotIn("control-base", page)
+        self.assertNotIn("project-base", page)
+
+    def test_main_counts_empty_fallback_and_hostile_paths(self):
+        self.write_board(self.project, "Actual project task")
+        self.initialize()
+        entries = self.request("/api/board")["boards"]
+        entries[1]["rows"][0]["Status"] = "Blocked"
+        entries[1]["counts"] = {"Blocked": 1}
+        entries[1]["path"] = '/project/<script>alert("board")</script>/BOARD.md'
+        worktrees = [
+            {"main": False, "branch": '<script>alert("branch")</script>',
+             "path": '/project/" onmouseover="bad', "repo": "project",
+             "base": '<img src=x onerror="bad">', "ahead": None, "behind": None, "dirty": True},
+            {"main": False, "branch": "harness-only-branch", "path": "/harness/tree",
+             "repo": "control", "base": "opencode", "ahead": 2, "behind": 1, "dirty": False},
+        ]
+        page = viewer.build_html(entries, worktrees, "2026-11-11T12:00:00+00:00", None, 60)
+        harness, project = page.split('data-wb-scope-panel="harness"', 1)[1].split(
+            'data-wb-scope-panel="project"', 1)
+        self.assertIn("Factory task", harness)
+        self.assertNotIn("Actual project task", harness)
+        self.assertIn("0 pending merge · 0 blocked · 1 tasks total", harness)
+        self.assertIn("harness-only-branch", harness)
+        self.assertIn("Actual project task", project)
+        self.assertNotIn("Factory task", project)
+        self.assertNotIn("harness-only-branch", project)
+        self.assertIn("0 pending merge · 1 blocked · 1 tasks total", project)
+        self.assertIn('data-status-filter="Blocked" aria-pressed="false" data-peak="true"', project)
+        self.assertIn('&lt;script&gt;alert(&quot;branch&quot;)&lt;/script&gt;', project)
+        self.assertNotIn('<script>alert', page)
+        self.assertNotIn('<img src=x', page)
+        self.assertNotIn('" onmouseover="bad', page)
+        entries[0] = dict(entries[0], rows=[], counts={})
+        page = viewer.build_html(entries[:1], [], "2026-11-11T12:00:00+00:00", None, 60)
+        self.assertIn('data-wb-scope-tab="harness">Harness <span>0 tasks', page)
+        self.assertIn('aria-selected="true" tabindex="0"', page)
+        self.assertNotIn('data-wb-scope-panel="project"', page)
+        self.assertIn("No harness worktrees.", page)
+        self.assertIn("Nothing ready. Add a row with board.py add.", page)
+        empty = viewer.build_html([], [], "invalid-time", "Cannot read <board>", 60)
+        self.assertIn("No board file found.", empty)
+        self.assertIn('role="alert">Cannot read &lt;board&gt;', empty)
+        self.assertIn('data-ms="0"', empty)
 
     def test_invalid_registry_uses_existing_payload_error_handling(self):
         self.initialize()
@@ -315,7 +436,7 @@ class GalleryTests(unittest.TestCase):
         self.assertIn('class="notes"', page)
         self.assertIn('class="wb-rail"', page)
 
-    def test_shared_handlers_and_gallery_only_layout_contract(self):
+    def test_shared_handlers_and_workbench_layout_contract(self):
         page = viewer.build_gallery_html()
         for key in ("ArrowLeft", "ArrowRight", "Home", "End"):
             self.assertIn("event.key === '%s'" % key, page)
@@ -327,8 +448,8 @@ class GalleryTests(unittest.TestCase):
                          'refreshBtn.addEventListener("click", function () { window.location.reload(); });'):
             self.assertIn(contract, page)
         live = viewer.build_html([], [], "2026-11-11T12:00:00+00:00", None, 60)
-        self.assertIn('<div class="wb-layout">', live)
-        self.assertNotIn('class="wb-workbench"', live)
+        self.assertIn('class="wb-workbench"', live)
+        self.assertNotIn('<div class="wb-layout">', live)
         self.assertNotIn('role="tablist"', live)
         self.assertNotIn('data-wb-scope-panel="', live)
         css = (Path(__file__).parents[1] / "static/board.css").read_text(encoding="utf-8")

@@ -1,5 +1,23 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-121 main workbench implementation, 2026-11-11**
+> User approved the latest hierarchy gallery: “fantastic, now build main dashboard”. Assigned
+> branch `feat/apply-approved-workbench-to-main-dashboard`, worktree of the same slug, based on
+> approved gallery `da864ef`. Main `/` now composes the same workbench tabs, toolbar, scoped board,
+> meter, cards and rail with real data; gallery fixtures remain isolated at `/gallery`.
+> Pure `build_html` (`board_serve.py:1209`) replaces the old sidebar/KPI shell; extended pure
+> `wb_scope_content` scopes explicit `board` labels by the longest containing main repository path
+> (control root fallback supplied explicitly), not by assuming an unknown label means project.
+> New pure `wb_workbench_header` extracts the gallery header for actual reuse by both pages,
+> with real generated timestamp/freshness on `/` and an honest labelled preview on `/gallery`.
+> Existing JS/filter/fold/storage/keyboard/refresh logic and effectful payload boundaries retained;
+> `html_page` supplies root as an explicit presentation input. No endpoint/JSON changes.
+> Single documented regression run exited 0: 15 tests in 0.048s. Temporary fixture trees/mocked Git,
+> no live server. CSS source/generated asset unchanged, no installs/builds or new files.
+> Source unslop passes preserve approved hierarchy/tokens; rendered QA/unslop not claimed.
+> Next: parent starts fresh preview 15183 and runs built-in-browser-only QA and critique; live
+> 15180 untouched. Not merge-ready. No board, rule, dependency or real project edits.
+
 > **Session Notes — BOARD-118 hierarchy correction, 2026-11-11**
 > User accepted the workbench direction but found section titles and task boundaries too weak.
 > CSS-only correction: 17px/600 section headings, 13px/500 lane labels, 15px/600 task titles,

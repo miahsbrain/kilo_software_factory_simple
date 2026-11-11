@@ -1,6 +1,18 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-118 hierarchy correction (2026-11-11)
+## Current session — BOARD-121 main workbench (2026-11-11)
+
+- Gallery approval granted by user: “fantastic, now build main dashboard”. Main `/` now uses the
+  approved shared workbench composition with real repository-scoped tasks/counts/worktrees.
+- Project default/remembered-scope fallback, criteria, filters/URL, keyboard selection, theme,
+  density, 60s/Pause/manual refresh retained. Real timestamp/live/stale status shown; no fixture
+  notice or fixture rendering on main. Explicit `--file` stays fixed and associates by repo path.
+- Single regression run: `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0,
+  15 tests in 0.048s. No CSS change/regeneration, dependencies, server/port, board or rule changes.
+- Next: parent starts fresh preview 15183 for built-in-browser-only QA/critique/unslop. No rendered
+  result claimed; not merge-ready. Production 15180 untouched; BOARD-120 policy stays separate.
+
+## Earlier session — BOARD-118 hierarchy correction (2026-11-11)
 
 - User found section/task boundaries too weak. CSS-only change strengthens 17px/600 section
   headings, differentiates 13px lane labels, and bounds task/worktree surfaces with 1px borders,

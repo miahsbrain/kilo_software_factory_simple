@@ -1206,64 +1206,17 @@ def render_board_toolbar(total, board_count):
     )
 
 
-def build_html(boards, worktrees, generated_at, error, refresh):
-    total = sum(len(entry["rows"]) for entry in boards)
-    counts = active_counts(boards)
-    active_total = sum(counts.values())
-    if active_total == 0:
-        merged = last_merged_id(boards)
-        subtitle_bits = ["Nothing in flight"]
-        if merged:
-            subtitle_bits.append("last merged %s" % merged)
-        subtitle_bits.append("as of %s" % generated_at.split("T")[0])
-        subtitle = " · ".join(subtitle_bits)
-    else:
-        subtitle = ("Lanes, cards and live worktrees — what is in flight right now. "
-                    "Read fresh on every request.")
-
-    if len(boards) == 1:
-        panels_html = render_board_panel(boards[0], wb_toolbar(total))
-    elif boards:
-        panels_html = render_board_toolbar(total, len(boards))
-        panels_html += "".join(render_board_panel(entry) for entry in boards)
-    else:
+def build_html(boards, worktrees, generated_at, error, refresh, root=None):
+    selected = wb_scope_default(boards)
+    selected_total = next((len(entry["rows"]) for entry in boards
+                           if entry["label"] == selected), 0)
+    panels_html = "".join(wb_scope_content(entry, worktrees, selected, root=root)
+                          for entry in boards)
+    if not boards:
         panels_html = wb_panel(
             "Board", "0 cards",
             '<p class="wb-empty">No board file found. Point the server at one with --file.</p>')
-
-    banner = ""
-    if error:
-        banner = '<p class="wb-banner" role="alert">%s</p>' % esc(error)
-
-    kpi_facts = "".join(
-        '<div class="wb-kpi-fact"><span class="wb-kpi-num-sm">%d</span>'
-        '<span class="wb-kpi-label">%s</span></div>' % (value, esc(label))
-        for value, label in (
-            (counts.get("Pending Merge", 0), "pending merge"),
-            (counts.get("Blocked", 0), "blocked"),
-            (total, "total"),
-        )
-    )
-
-    active = sum(1 for wt in worktrees if not wt["main"])
-    wt_meta = "%d worktrees · %d non-main" % (len(worktrees), active)
-    ordered_worktrees = sorted(worktrees, key=lambda wt: 1 if wt["main"] else 0)
-    rail_body = "".join(wb_wt_row(wt) for wt in ordered_worktrees)
-    if not rail_body:
-        rail_body = ('<p class="wb-empty">No git worktrees found. '
-                     'Start one with worktree.py create.</p>')
-    rail = wb_rail("Worktrees", wt_meta, rail_body)
-
-    try:
-        epoch_ms = int(datetime.datetime.fromisoformat(generated_at).timestamp() * 1000)
-    except (TypeError, ValueError):
-        epoch_ms = 0
-    mark = (
-        '<svg class="wb-mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" '
-        'stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
-        '<path d="M3 20V9l6 3V9l6 3V4h6v16z"/>'
-        '<path d="M6 16h3M12 16h3"/></svg>'
-    )
+    banner = '<p class="wb-banner" role="alert">%s</p>' % esc(error) if error else ""
     theme_boot = (
         'try{var s=JSON.parse(localStorage.getItem("board-dashboard-state")||"{}");'
         'if(s&&s.theme){document.documentElement.setAttribute("data-theme",s.theme);}}'
@@ -1278,49 +1231,15 @@ def build_html(boards, worktrees, generated_at, error, refresh):
         '<link rel="stylesheet" href="/static/board.css">',
         "<title>Factory board</title><script>", theme_boot, "</script></head><body",
         ' data-refresh="', str(refresh), '">\n',
-        '<div class="wb-layout">',
-        '<aside class="wb-sidebar">',
-        '<div class="wb-side-brand">', mark,
-        '<div class="min-w-0"><span class="wb-wordmark">Factory board</span>',
-        '<span class="wb-brand-meta">Read-only · live</span></div></div>',
-        '<nav class="wb-side-nav" aria-label="Lane filters">',
-        '<p class="wb-side-label">Lanes</p>',
-        '<div class="wb-lane-filters">', wb_lane_filters(counts), '</div></nav>',
-        '<div class="wb-side-filters">',
-        '<p class="wb-side-label">Filters</p>',
-        wb_filter_selects("", visible_labels=True),
-        '</div>',
-        '<div class="wb-side-footer">',
-        '<p class="wb-live" data-ms="', str(epoch_ms), '">',
-        '<span class="wb-live-dot" aria-hidden="true"></span>',
-        '<span class="wb-live-text">updated ', esc(generated_at[11:19]), '</span></p>',
-        '<div class="wb-side-actions">',
-        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button>',
-        '<button type="button" class="wb-btn" id="theme-toggle" aria-label="Colour theme">System</button>',
-        '<button type="button" class="wb-btn" id="density-toggle" aria-pressed="false"',
-        ' aria-label="Density">Comfortable</button>',
-        '</div></div></aside>',
-        '<main class="wb-main">',
-        '<header class="wb-page-head">',
-        '<div class="min-w-0"><h1 class="wb-title">Factory board</h1>',
-        '<p class="wb-sub">', esc(subtitle), '</p></div>',
-        '<button type="button" class="wb-btn" id="refresh">Refresh now</button>',
-        '</header>',
-        '<section class="wb-kpi" aria-label="Board summary">',
-        '<div class="wb-kpi-primary"><span class="wb-kpi-num">%d</span>' % active_total,
-        '<span class="wb-kpi-label">in flight</span></div>',
-        kpi_facts,
-        '</section>',
-        wb_panel("Flow", "%d lanes" % len(ACTIVE_LANES), wb_meter(counts)),
+        '<main class="wb-workbench">',
+        wb_workbench_header(refresh, generated_at),
         banner,
+        wb_scope_tabs(boards, selected) if boards else "",
+        wb_toolbar(selected_total),
         panels_html,
-        '<footer class="wb-footer">', str(total), ' card' + ('' if total == 1 else 's'),
-        ' across ', str(len(boards)), ' board' + ('' if len(boards) == 1 else 's'),
-        ' · refresh every ', str(refresh), 's, pausable',
+        '<footer class="wb-footer">Read-only · refresh every ', str(refresh), 's, pausable',
         ' · <a href="/gallery">Components</a></footer>',
         '</main>',
-        rail,
-        '</div>',
         "<script>", JS, "</script>\n",
         "</body></html>",
     ]
@@ -1470,9 +1389,17 @@ def wb_scope_tabs(boards, selected=None):
     return '<div class="wb-scope-tabs" role="tablist" aria-label="Repository boards">%s</div>' % buttons
 
 
-def wb_scope_content(entry, worktrees, selected):
+def wb_scope_content(entry, worktrees, selected, root=None):
     label = entry["label"]
-    repo = "control" if label == "harness" else label
+    repo = {"harness": "control", "project": "project"}.get(label)
+    if repo is None:
+        board_path = Path(entry["path"])
+        candidates = [(Path(wt["path"]), wt.get("repo")) for wt in worktrees if wt["main"]]
+        if root is not None:
+            candidates.append((Path(root), "control"))
+        matches = [(path, repo_id) for path, repo_id in candidates
+                   if repo_id and (board_path == path or path in board_path.parents)]
+        repo = max(matches, key=lambda match: len(match[0].parts))[1] if matches else None
     scoped = [wt for wt in worktrees if wt.get("repo") == repo]
     ordered = sorted(scoped, key=lambda wt: wt["main"])
     rail_body = "".join(wb_wt_row(wt, show_base=True) for wt in ordered)
@@ -1486,10 +1413,10 @@ def wb_scope_content(entry, worktrees, selected):
     return (
         '<section class="wb-scope-content" role="tabpanel" id="scope-panel-%s"'
         ' aria-labelledby="scope-tab-%s" tabindex="0" data-wb-scope-panel="%s"%s>'
-        '<div class="wb-scope-context">%s / docs/BOARD.md</div>%s'
+        '<div class="wb-scope-context">%s</div>%s'
         '<div class="wb-scope-grid"><div class="wb-scope-board">%s%s</div>%s</div></section>'
     ) % (esc(label), esc(label), esc(label), "" if selected == label else " hidden",
-         esc(label.capitalize()), summary, wb_meter(counts),
+         esc_path(entry["path"]), summary, wb_meter(counts),
          render_board_panel(entry, populated_only=True), wb_rail("%s worktrees" % label.capitalize(),
                                           "%d worktrees" % len(scoped), rail_body))
 
@@ -1519,6 +1446,32 @@ def gallery_scope_fixtures():
     return boards, scoped_worktrees
 
 
+def wb_workbench_header(refresh, generated_at=None):
+    preview = generated_at is None
+    subtitle = ("Preview only · labelled fixture data · approved component gallery" if preview
+                else "Read-only · board and worktree state read fresh on every request")
+    freshness = ""
+    if not preview:
+        try:
+            epoch_ms = int(datetime.datetime.fromisoformat(generated_at).timestamp() * 1000)
+        except (TypeError, ValueError):
+            epoch_ms = 0
+        freshness = (
+            '<p class="wb-live" data-ms="%d"><span class="wb-live-dot" aria-hidden="true"></span>'
+            '<span class="wb-live-text">updated %s</span></p>'
+        ) % (epoch_ms, esc(generated_at))
+    return "".join([
+        '<header class="wb-page-head"><div><h1 class="wb-title">Repository workbench</h1>',
+        '<p class="wb-sub">', esc(subtitle), '</p></div><div class="wb-workbench-actions">',
+        '<span class="wb-preview-label">Component gallery</span>' if preview else "",
+        '<button type="button" class="wb-btn" id="theme-toggle">System</button>',
+        '<button type="button" class="wb-btn" id="density-toggle" aria-pressed="false">Comfortable</button>',
+        '<button type="button" class="wb-btn" id="refresh">Refresh now</button></div></header>',
+        '<div class="wb-refresh-line">', freshness, '<span>Auto-refresh every ', str(refresh), 's</span>',
+        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button></div>',
+    ])
+
+
 def build_gallery_html():
     boards, worktrees = gallery_scope_fixtures()
     selected = wb_scope_default(boards)
@@ -1532,16 +1485,7 @@ def build_gallery_html():
         '<meta name="color-scheme" content="light dark"><link rel="icon" href="', FAVICON, '">',
         '<link rel="stylesheet" href="/static/board.css"><title>Factory component gallery</title>',
         '</head><body data-refresh="60"><main class="wb-workbench">',
-        '<header class="wb-page-head"><div>',
-        '<h1 class="wb-title">Repository workbench</h1>',
-        '<p class="wb-sub">Preview only · labelled fixture data · awaiting gallery approval</p></div>',
-        '<div class="wb-workbench-actions">',
-        '<span class="wb-preview-label">Component gallery</span>',
-        '<button type="button" class="wb-btn" id="theme-toggle">System</button>',
-        '<button type="button" class="wb-btn" id="density-toggle" aria-pressed="false">Comfortable</button>',
-        '<button type="button" class="wb-btn" id="refresh">Refresh now</button></div></header>',
-        '<div class="wb-refresh-line"><span>Auto-refresh every 60s</span>',
-        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button></div>',
+        wb_workbench_header(DEFAULT_REFRESH),
         wb_scope_tabs(boards, selected), wb_toolbar(len(boards[0]["rows"])),
         "".join(wb_scope_content(entry, worktrees, selected) for entry in boards),
         '<section class="wb-section"><h2 class="wb-section-title">Empty and unavailable states</h2>',
@@ -1552,7 +1496,7 @@ def build_gallery_html():
         '</section><section class="wb-section"><h2 class="wb-section-title">Chips</h2>',
         '<div class="wb-workbench-actions">', chips, '</div></section>',
         '<section class="wb-section"><h2 class="wb-section-title">Tokens</h2>', gallery_tokens_html(),
-        '</section><footer class="wb-footer"><a href="/">Back to the unchanged live board</a></footer>',
+        '</section><footer class="wb-footer"><a href="/">Back to the live board</a></footer>',
         '</main><script>', JS, '</script></body></html>',
     ])
 
@@ -1660,7 +1604,7 @@ def build_payloads(board, worktree, paths, root):
         except Exception as exc:
             states, state = [], []
             error = "could not read the board: %s%s" % (exc, BOARD_READ_HINT)
-        return build_html(states, state, now(), error, Handler.state["refresh"])
+        return build_html(states, state, now(), error, Handler.state["refresh"], root=root)
 
     return board_payload, worktree_payload, html_page
 

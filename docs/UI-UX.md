@@ -455,7 +455,37 @@ Build after any class change: `npm --prefix .opencode/skills/board/ui run build`
 Python standard library only, and the page still works offline because the CSS and fonts are
 served locally.
 
-### 6.3 Repository workbench gallery (BOARD-118, direction approved; gallery pending)
+### 6.3 Repository workbench (BOARD-118 gallery approved; BOARD-121 main implemented)
+
+**Current approval and rollout (2026-11-11):** User approved the latest hierarchy gallery with
+“fantastic, now build main dashboard”. BOARD-121 applies the same `.wb-workbench` components and
+existing generated stylesheet to `/` with actual read-only data. `wb_scope_tabs`, `wb_toolbar`,
+`wb_scope_content`, cards/lanes/meter/rail are reused, not copied. Shared `wb_workbench_header`
+extracts the existing gallery header for both pages; main includes the generated timestamp and
+existing live/stale/paused behavior instead of a fixture notice. Explicit `--file` keeps a single
+Board tab and associates worktrees by containing repository main path/control root, not a guessed
+project label. Project/Harness counts, tasks and worktrees remain separate, including duplicate IDs.
+
+No CSS selectors, tokens, fonts or authored/generated assets changed; no stylesheet generation or
+dependency installation needed. The approved 17px/600 section headings, 15px/600 task titles over
+12px metadata, bounded individual surfaces, compact lane controls, integrated rail and light/dark
+palette apply directly. Existing keyboard/filter/URL/preference/refresh handlers remain shared.
+Regression proof: documented Python command exited 0, 15 tests in 0.048s. This is presenter/contract
+evidence, not browser execution. Parent must verify fresh `/` at preview 15183 using only the
+built-in browser under the user-approved session override; no Playwright/MCP/capture-script use.
+Live 15180 untouched. Main browser QA and rendered unslop/critique remain open; not merge-ready.
+
+Source craft passes for main: (1) existing 4px spacing/24px grouping reused; (2) same neutral/orange
+themes; (3) functional disclosure carets only; (4) real board paths/timestamp instead of fixture copy;
+(5) approved 17/15/13/12px hierarchy unchanged; (6) shared scope grid/rail replaces sidebar/KPIs;
+(7) existing focus/disclosure/control details; (8) actual branch/base/ahead/behind data, no images;
+(9) existing 150ms/reduced-motion behavior. No decorative styles added. Full signs checklist read;
+source review adds no gradients/glows/glass, heavy/uppercase/italic type, emoji decoration, mixed
+icons, arbitrary spacing, hype/fake data, pill chrome, decorative charts, hero, imagery or looping
+motion. This does not substitute for a rendered sign-by-sign audit.
+
+The records below describe the earlier gallery implementation and historical evidence/holds;
+their “gallery pending” and “live unchanged” statements predate the approval and main work above.
 
 Project/Harness tabs replace the sidebar proposal. Each tab owns its tasks, lane counts and
 worktrees. Default to Project when present; remember selection and fall back to the available tab.

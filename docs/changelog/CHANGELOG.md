@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Apply approved workbench to the main dashboard
+**Type:** Feature
+**Board:** BOARD-121 | **Branch:** feat/apply-approved-workbench-to-main-dashboard
+**Changed:** `board_serve.py`, adjacent `test_board_serve.py`; `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, `docs/DECISIONS.md`, `docs/PROJECT_STRUCTURE.md`, this log. No new files.
+**Why:** User approved the latest hierarchy gallery and requested main dashboard implementation. Reuse `wb_scope_tabs`, `wb_scope_content`, `wb_toolbar`, lane/card/meter/rail and existing JS; extract only `wb_workbench_header` because main and gallery now share that composition. Extend existing scope presenter for path-based explicit-board association instead of a second repository model. Correct stale control-only repository-map documentation.
+**Impact:** Real repository-scoped main tabs/counts/tasks/worktrees, Project default with remembered fallback, approved typography/card boundaries and integrated rail. Preserve actual refresh timestamp, live/stale/Pause/manual/60s behavior, URL filters, criteria, storage and keyboard selection. JSON/endpoints and offline read-only standard-library runtime unchanged; fixtures remain gallery-only. Reversible presentation change; blast radius is dashboard users. No CSS, asset, dependency, server, board, rule or project changes.
+**Verification:** `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0, 15 tests in 0.048s; temporary fixtures/mocked Git, no live server. Cases cover scoping, duplicate IDs, explicit paths, escaping, empty/error fallback, fixture exclusion, shared classes and refresh contracts. No browser execution or build. Parent fresh 15183 built-in-browser-only QA/critique/unslop pending; live 15180 untouched, not merge-ready. Skills: catalogue python-pro (standard-library), javascript-pro (browser APIs), test-master (unit testing), native unslop/signs and built-in browser guidance; surrounding Python 3.9/unittest/JS conventions retained over catalogue defaults.
+
 ## [2026-11-11] Strengthen gallery section and card hierarchy
 **Type:** Fix
 **Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
