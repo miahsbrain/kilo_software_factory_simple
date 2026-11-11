@@ -177,10 +177,10 @@ Then look at the screenshots and answer:
   spacing, states?
 - Does it read as designed by a person, or generated? Check the 15 anti-slop rules in
   `docs/UI-UX.md` §2.
-- **Unslop pass.** Go through the signs list in `.kilo/skills/unslop/references/signs.md`
-  against the capture and report every sign that is present, with where it lives. One line per
-  sign, the same way the audit reads. The list is long, so work through it group by group; do
-  not paste it into the report.
+- **Unslop pass (mandatory).** Open `.kilo/skills/unslop/SKILL.md` and run its procedure — the
+  five-line direction, the full audit against `references/signs.md`, the nine passes and the
+  checklist — on the same capture. Report every sign present with where it lives, one line each.
+  A UI review without this is incomplete and cannot pass.
 - Do the empty, loading, and error states say something specific and name the next action?
 - Is the primary action obvious? Does the hierarchy read at 320px?
 

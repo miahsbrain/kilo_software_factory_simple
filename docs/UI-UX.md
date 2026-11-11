@@ -114,6 +114,10 @@ The list lives in `.kilo/skills/unslop/references/signs.md`. Read it there; do n
 Where the unslop skill and `AGENTS.md` §B4.3 disagree, `AGENTS.md` wins — the precedence rule
 lives there, once.
 
+**It is mandatory.** Every UI change runs the unslop procedure — direction, full sign audit,
+nine passes and checklist — in the same review round as the QA capture. The report records the
+direction and one line per sign. It is not a second opinion to skip when time is short.
+
 ---
 
 ## 3. User-centred and modern — the standard the critique enforces

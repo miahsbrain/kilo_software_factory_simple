@@ -69,6 +69,11 @@ three radius steps and one elevation scale, asymmetry over centered symmetry, re
 specific empty/loading/error copy, functional icons only, motion 120–200ms, spacing from a scale,
 and contrast ≥ 4.5:1 with a visible focus ring.
 
+Before building or changing any UI, open `.kilo/skills/unslop/SKILL.md` by path and apply its nine
+passes in order plus its checklist. The build is not ready for review while a sign from
+`references/signs.md` is present without a recorded reason. The review lane re-runs it; a build
+that skipped it comes back.
+
 ## Code style
 
 - **Reuse before creation.** Before writing a new function, component, or file, check whether an

@@ -114,10 +114,13 @@ to a different tool unless the user says so. A missing browser, package, or syst
    - slow, decorative motion
    - ad-hoc spacing numbers
    - contrast below 4.5:1, invisible focus ring, small tap targets
-4. **Run the unslop pass.** Go through the signs list in
-   `.kilo/skills/unslop/references/signs.md` against the capture and report every sign that is
-   present, with where it lives. One line per sign. The list is long, so work through it group by
-   group. The precedence rule for a disagreement is in `AGENTS.md` §B4.3.
+4. **Run the unslop procedure — mandatory.** Open `.kilo/skills/unslop/SKILL.md` by path (the
+   loader does not expose it) and follow its Run steps: write the five-line direction (product,
+   character, world, moments, signature), audit every sign in `references/signs.md` group by
+   group with where it lives, then walk the nine passes in order (spacing, color, icons, copy,
+   type, layout, details, visuals, motion) and the final checklist. Record the direction and
+   every pass result in the report. Where it disagrees with `AGENTS.md` §B4.3, report the
+   conflict; never skip the sign. A UI verdict without this recorded is not a verdict.
 5. **Critique the screen for the user, not only for the aesthetic.** Passing all 15 rules and
    still being a bad product is a **FAIL**. Answer every question in `docs/UI-UX.md` §3.1
    (user-centred, U1–U8) and §3.2 (modern, M1–M10), and check the density rule in §3.3.
@@ -149,6 +152,20 @@ Write it to `docs/reviews/<task-id>-ui.md`:
 
     ## Gallery conformance
     - <deviation, or "matches the approved gallery">
+
+    ## Unslop
+    **Direction:** <product · character · world · moments · signature>
+    | Pass | Result |
+    |---|---|
+    | Spacing | <pass or finding> |
+    | Color | |
+    | Icons | |
+    | Copy | |
+    | Type | |
+    | Layout | |
+    | Details | |
+    | Visuals | |
+    | Motion | |
 
     ## Anti-slop findings (§2)
     | # | Rule | Expected | Actual | Evidence | Fix |
