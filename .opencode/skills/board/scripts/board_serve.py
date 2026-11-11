@@ -1155,19 +1155,22 @@ def board_signal_lane(counts):
     return None
 
 
-def render_board_panel(entry, toolbar_html=""):
-    """A board panel: its toolbar, path, banner and every lane."""
+def render_board_panel(entry, toolbar_html="", populated_only=False):
+    """A board panel, optionally limited to populated lanes for the workbench."""
     rows = entry["rows"]
     signal = board_signal_lane(entry["counts"])
     lanes_html = "".join(
         render_board_lane(lane, rows, entry["label"], signal=(lane == signal))
         for lane in LANE_ORDER
+        if not populated_only or any(row["Status"] == lane for row in rows)
     )
     path = '<p class="wb-board-path" title="%s">%s</p>' % (
         esc(entry["path"]), esc_path(entry["path"]))
     banner = ""
     if entry.get("error"):
         banner = '<p class="wb-banner" role="alert">%s</p>' % esc(entry["error"])
+    if populated_only and not rows:
+        lanes_html = wb_empty("Ready")
     body = toolbar_html + path + banner + '<div class="wb-lanes">%s</div>' % lanes_html
     return wb_panel(
         "%s board" % entry["label"],
@@ -1345,7 +1348,7 @@ WB_TYPE_STEPS = (
     ("--text-meta", "13px", "Body and rows"),
     ("--text-body", "15px", "Lead paragraphs"),
     ("--text-lead", "20px", "Section and figures"),
-    ("--text-display", "32px", "Page title"),
+    ("--text-display", "20px", "Workbench title"),
 )
 WB_SPACE_STEPS = (
     ("4px", 4),
@@ -1357,7 +1360,7 @@ WB_SPACE_STEPS = (
     ("48px", 48),
     ("64px", 64),
 )
-WB_RADII = (("6px", "chip"), ("8px", "control"), ("12px", "panel"))
+WB_RADII = (("4px", "control"), ("8px", "surface"))
 
 
 def gallery_tokens_html():
@@ -1486,8 +1489,8 @@ def wb_scope_content(entry, worktrees, selected):
         '<div class="wb-scope-context">%s / docs/BOARD.md</div>%s'
         '<div class="wb-scope-grid"><div class="wb-scope-board">%s%s</div>%s</div></section>'
     ) % (esc(label), esc(label), esc(label), "" if selected == label else " hidden",
-         esc(label.capitalize()), summary, wb_panel("Lanes", "Selected repository only", wb_meter(counts)),
-         render_board_panel(entry), wb_rail("%s worktrees" % label.capitalize(),
+         esc(label.capitalize()), summary, wb_meter(counts),
+         render_board_panel(entry, populated_only=True), wb_rail("%s worktrees" % label.capitalize(),
                                           "%d worktrees" % len(scoped), rail_body))
 
 
@@ -1529,14 +1532,15 @@ def build_gallery_html():
         '<meta name="color-scheme" content="light dark"><link rel="icon" href="', FAVICON, '">',
         '<link rel="stylesheet" href="/static/board.css"><title>Factory component gallery</title>',
         '</head><body data-refresh="60"><main class="wb-workbench">',
-        '<header class="wb-page-head"><div><p class="wb-scope-context">Factory / Component gallery</p>',
+        '<header class="wb-page-head"><div>',
         '<h1 class="wb-title">Repository workbench</h1>',
         '<p class="wb-sub">Preview only · labelled fixture data · awaiting gallery approval</p></div>',
         '<div class="wb-workbench-actions">',
+        '<span class="wb-preview-label">Component gallery</span>',
         '<button type="button" class="wb-btn" id="theme-toggle">System</button>',
         '<button type="button" class="wb-btn" id="density-toggle" aria-pressed="false">Comfortable</button>',
         '<button type="button" class="wb-btn" id="refresh">Refresh now</button></div></header>',
-        '<div class="wb-refresh-line"><span>Auto-refresh every 60s · fixture preview</span>',
+        '<div class="wb-refresh-line"><span>Auto-refresh every 60s</span>',
         '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button></div>',
         wb_scope_tabs(boards, selected), wb_toolbar(len(boards[0]["rows"])),
         "".join(wb_scope_content(entry, worktrees, selected) for entry in boards),

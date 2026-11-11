@@ -291,6 +291,30 @@ class GalleryTests(unittest.TestCase):
         self.assertIn("Base: &lt;script&gt;bad&lt;/script&gt;", viewer.wb_wt_row(wt, show_base=True))
         self.assertIn("ahead +? · behind −?", viewer.wb_wt_row(wt, show_base=True))
 
+    def test_workbench_uses_populated_lanes_and_preserves_live_defaults(self):
+        boards, worktrees = viewer.gallery_scope_fixtures()
+        entry = boards[0]
+        page = viewer.wb_scope_content(entry, worktrees, "project")
+        tags = []
+        parser = HTMLParser()
+        parser.handle_starttag = lambda tag, attrs: tags.append((tag, dict(attrs)))
+        parser.feed(page)
+        lane_groups = [attrs for tag, attrs in tags
+                       if tag == "details" and "data-card" not in attrs]
+        self.assertEqual([attrs["data-lane"] for attrs in lane_groups], ["In Review", "Blocked"])
+        for lane in ("Ready", "In Progress", "Pending Merge", "Backlog", "Merged", "Dropped"):
+            self.assertNotIn('data-lane="%s"' % lane, page)
+        self.assertIn('data-status-filter="Ready"', page)
+        self.assertIn('data-status-filter="Pending Merge"', page)
+        self.assertNotIn('wb-meter-track', page.split('data-board-panel=')[1])
+        live_panel = viewer.render_board_panel(entry)
+        for lane in viewer.LANE_ORDER:
+            self.assertIn('data-lane="%s"' % lane, live_panel)
+        self.assertIn('class="wb-card-task"', page)
+        self.assertIn('class="wb-card-detail"', page)
+        self.assertIn('class="notes"', page)
+        self.assertIn('class="wb-rail"', page)
+
     def test_shared_handlers_and_gallery_only_layout_contract(self):
         page = viewer.build_gallery_html()
         for key in ("ArrowLeft", "ArrowRight", "Home", "End"):

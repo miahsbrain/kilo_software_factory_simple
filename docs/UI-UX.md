@@ -457,35 +457,58 @@ served locally.
 
 ### 6.3 Repository workbench gallery (BOARD-118, direction approved; gallery pending)
 
-Harness/Project tabs replace the sidebar proposal. Each tab owns its tasks, lane counts and
+Project/Harness tabs replace the sidebar proposal. Each tab owns its tasks, lane counts and
 worktrees. Default to Project when present; remember selection and fall back to the available tab.
 Keep 60-second auto-refresh and manual Refresh now. Preview before live console rollout (ADR-078).
 
-Direction: factory operator reviews project/harness work; precise, quiet, practical; workbench;
-real task/branch information carries detail; repository context stays visible. Keep §6.2 Geist,
-paper/graphite, signal orange, 4px grid, modest corners and existing scale. New layout styles live
+Product: factory operator reviews project/harness work.
+Character: precise, quiet, practical.
+World: working desk.
+Moments: task and branch information.
+Signature: repository context always visible.
+
+Keep §6.2 Geist, paper/graphite, signal orange and 4px grid. New layout styles live
 under `.wb-workbench`; `/` retains its current markup and layout. Shared `wb_scope_tabs` and
 `wb_scope_content` compose existing meter, cards, lanes and rail, not gallery forks. Shared JS
 adds tablist/tabpanel arrow/Home/End selection and reuses storage, filters, theme, density, refresh.
 Fixture boards intentionally share BOARD-001; board-scoped fold keys keep them separate.
 
-**Current preview:** http://127.0.0.1:15182/gallery, started by parent after diff review;
-live 15180 and prior 15181 untouched. Parent built-in snapshot generation 2 (tab
-`5007dd99-7e7a-47c0-b5d6-3c060c359dd7`) observed Project default selected, Project 2 / Harness 1
-task tabs, scoped Project 2 in flight / 1 blocked / 2 tasks / 1 worktree, labelled empty/error
-fixtures. Harness click ref `e46` failed `[browser.operation_failed] browser.click failed. UnknownVizError`
-(no exit code); tabs.list confirmed same generation 2, no retry. These are parent observations,
-not an independent pass. Blocked on browser error and gallery approval; user reviews directly.
-Interactions, themes, responsive/canonical evidence and independent unslop remain incomplete.
+**Corrective gallery source (2026-11-11):** Replaces rejected navigation-only restyle. Title is
+20px, utility header 56px minimum, refresh line separated by only 4/12px. No hero or stat strip.
+In-flight summary uses 15px inline figures. Lane navigation wraps content-width 32px controls,
+not five equal metric boxes. Task surface has no enclosing radius/shadow; only populated lane
+groups render here. Zero-count controls remain reachable; empty/error examples stay below the
+populated composition. Task titles occupy the first line at 15px/500; 12px IDs/type/priority/risk
+sit below without pill borders. Compact mode uses 13px titles and 56px rows. Expandable criteria
+use 13px text. Rail shares the task surface, divided by one vertical line; at ≥820px it occupies
+288px alongside tasks (including the rejected 1104px desktop width). Below 820px it stacks.
+Controls use 4px corners, surfaces at most 8px, 32px targets and existing 2px focus rings.
+Gallery tokens reflect these scoped values; the live `/` retains its defaults.
 
-**Ready for browser preview, not approved or merge-ready.** User supplied successful locked
-dependency install/build evidence: 56 packages added, 63 audited in 18s, zero vulnerabilities;
-Tailwind 4.3.5 build 61ms. Builder preserved that output and regenerated after correcting the
-gallery mobile grid (62ms, exit 0). No dependency or lockfile changes. The documented Python
-regression command passed 11 tests, covering rendered tab semantics/default fallback, scoped
-tasks/counts/worktrees, errors, escaping, shared handler contracts and stylesheet presence.
-These assertions do not execute browser keyboard/focus/storage/timer behavior. The live board
-markup/layout stays unchanged, and gallery approval must precede rollout. Prior missing-CLI
-and install-timeout checkpoints are historical; canonical browser tooling remains a separate blocker.
-Nine-pass direction informed source layout, but rendered sign audit/checklist and contrast,
-keyboard, responsive, themes and elapsed refresh proof remain unchecked for the reviewer.
+Nine craft passes applied to source, in order:
+1. Spacing: 24px shell, 12px toolbar, 4/8/12px internal rhythm; removed header dead band.
+2. Color: retained neutral ramp; orange selection/focus, semantics on risk/state only.
+3. Icons: retained functional disclosure caret; no new icons or decorative marks.
+4. Copy: labelled fixture preview; repository-specific tasks/worktrees; explicit refresh interval.
+5. Type: 20px utility heading, dominant 15px task title, quiet 12px metadata, 400/500/600 only.
+6. Layout: continuous task list and adjacent 288px rail, rather than nested rounded panels.
+7. Details: borderless metadata, compact rectangular controls, readable expanded criteria.
+8. Visuals: branch/base/ahead/behind/dirty information is the visual detail; no pictures or charts.
+9. Motion: inherited 150ms color/disclosure feedback and reduced-motion override; no entrances.
+
+Source signs audit: removed equal metric-box composition, oversized heading, empty-heading wall,
+repeated framed badges and oversized header gap. No gradients, gradient text, glows, blobs, glass,
+neon borders, heavy/uppercase/italic type, emoji decoration, mixed icon sets, hype, testimonials,
+synthetic images, pill controls, sparklines, landing hero, parallax or looping/layout animation added.
+This is a source audit, **not** a rendered sign-by-sign review or contrast/overflow pass.
+
+**Evidence/hold:** CSS authoring command exited 0 (Tailwind 4.3.5, 59ms); documented Python
+regression command exited 0, 12 tests passed. Existing tests extended for populated-lane mode and
+unchanged live defaults. No dependencies, installs or lockfile edits. Child built-in
+`browser.tabs.list()` returned `[browser.disconnected] No desktop browser is connected to this
+session` (no process exit code); no retry/fallback. User's session override requires built-in
+browser only, superseding older capture instructions for this task; permanent policy stays in
+BOARD-120. No server restart performed. Parent must reload the Python preview process from this
+worktree before reviewing new markup; existing 15182 process may still serve earlier markup.
+Rendered desktop/mobile/light/dark, keyboard/storage/filter/timer checks, independent unslop and
+gallery approval remain pending. Not merge-ready; no live screen rollout.

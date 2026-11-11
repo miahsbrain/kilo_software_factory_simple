@@ -1,6 +1,18 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-118 browser checkpoint blocked (2026-11-11)
+## Current session — BOARD-118 corrective gallery source (2026-11-11)
+
+- Replaced rejected meter/card composition with compact utility header, inline lane navigation,
+  populated task groups, two-line task hierarchy and desktop-adjacent worktree rail (≥820px).
+- Shared renderers/styles retained; optional populated-only board mode leaves live `/` unchanged.
+  No duplicated filter/storage state. Preview fixtures only; no live redesign authorized yet.
+- CSS generation: exit 0, 59ms. Single Python regression run: exit 0, 12 tests in 0.031s.
+- Built-in browser unavailable in child: `browser.disconnected` from tabs.list, no retry/fallback.
+  No preview process restart. User override is built-in browser only; BOARD-120 owns rule edits.
+- Next: parent refreshes Python preview process, verifies rendered desktop/mobile/themes and
+  interactions, then requests gallery approval. Independent review pending; not merge-ready.
+
+## Earlier session — BOARD-118 browser checkpoint blocked (2026-11-11)
 
 - **Preview:** Parent reviewed diff and started http://127.0.0.1:15182/gallery from BOARD-118
   worktree. Live 15180 and prior preview 15181 unchanged. User will review gallery directly.

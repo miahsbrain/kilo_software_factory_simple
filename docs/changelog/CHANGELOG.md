@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Rework gallery into a compact repository workbench
+**Type:** Fix
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `board_serve.py`, adjacent `test_board_serve.py`, `ui/src/app.css`, generated `static/board.css`; `docs/UI-UX.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log. No new files.
+**Why:** User rejected old chunky components with tabs. Extend existing board presenter with optional populated-only lanes; reuse wb_ task, meter, toolbar and rail renderers and existing JS state/handlers. Scope new appearance to workbench, preserve live defaults.
+**Impact:** Tight 20px header, content-width lane navigation, continuous task surface with title above quiet metadata, borderless status markers and adjacent repository rail at ordinary desktop width; empty examples below populated tasks. Gallery-only, reversible; no live rollout, rule, dependency, board or server changes.
+**Evidence:** CSS authoring command exited 0 (Tailwind 4.3.5, 59ms). `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0: 12 tests in 0.031s. Source nine-pass craft record in UI-UX §6.3. Built-in tabs.list returned browser.disconnected, no exit code; no retry/fallback. Rendered QA/unslop and user gallery approval pending. Parent must refresh preview Python process for new markup; not merge-ready.
+
 ## [2026-11-11] Checkpoint parent gallery preview and browser error
 **Type:** Docs
 **Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery

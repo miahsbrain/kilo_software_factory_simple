@@ -1,6 +1,19 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-118 browser checkpoint blocked, 2026-11-11**
+> **Session Notes — BOARD-118 corrective workbench source, 2026-11-11**
+> Reworked the rejected gallery composition on the same branch/worktree. Scoped `.wb-workbench`
+> styles now use a 20px utility heading, compact lane navigation, continuous populated task groups,
+> dominant 15px task titles/quiet metadata and an adjacent 288px worktree rail from 820px upward.
+> Extended pure `render_board_panel(..., populated_only=False)` near `board_serve.py:1158`;
+> `wb_scope_content` opts in, live `/` keeps all lanes and original styles. Existing wb_ presenters,
+> filters, tabs, fold/storage state and refresh handlers reused; no new function or state source.
+> CSS authoring exited 0 (59ms); one regression run passed 12 tests (0.031s). Built-in browser
+> tabs.list returned browser.disconnected; no retry, fallback, installs, server or board edits.
+> Source nine-pass craft notes in UI-UX §6.3; rendered QA/unslop and user approval remain pending.
+> Next: parent refreshes the preview Python process from this worktree and reviews using built-in
+> browser only under the user's session override. No live rollout or merge readiness claimed.
+
+> **Earlier Session Notes — BOARD-118 browser checkpoint blocked, 2026-11-11**
 > Parent reviewed gallery diff and started http://127.0.0.1:15182/gallery from this worktree;
 > live 15180 and earlier preview 15181 untouched. Parent built-in browser snapshot generation 2,
 > tab `5007dd99-7e7a-47c0-b5d6-3c060c359dd7`, showed Project selected by default, Project 2 /
