@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Verify local-board migration and untrack runtime state
+**Type:** Feature
+**Board:** BOARD-122 | **Branch:** feat/keep-live-board-local-and-untracked
+**Changed:** Existing `test_board_serve.py`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log; remove only the task index entry for `docs/BOARD.md`, retaining its disk bytes. Template starter unchanged and tracked. No new files or production-code changes in this resumption.
+**Why:** Architect approved correcting two fixtures rather than changing valid production behavior: assert the established missing-board error entry while retaining no-recreation assertions; recreate the scratch docs directory before restoring the backup after Git deletion. Reuse existing tests and fixtures; no abstraction/dependency. Previously selected python-pro, cli-developer, test-master, code-documenter references and git-worktree procedure remain applicable.
+**Impact:** Runtime factory board is ignored and absent from the task index. Guard check-git returned 3, needs approval; the user's existing exact-command authorization covered `git rm --cached -- docs/BOARD.md`, run only in the task worktree. Before/after task-file SHA-256 matches: `c2c5da6f78fc5e8ba6c2ad4cb16f150235dee4ee03937cd0d8bb2fdc22cee91e`. Cached name/status is `D docs/BOARD.md`; ls-files lists only the template starter and check-ignore lists the runtime board. No main-board/backup access, project edits, history rewrite, merge, push, UI/server changes or installs. Parent review still required; human refresh-backup/merge/restore sequence retained in HANDOVER.
+**Verification:** Second and final authorized attempt: `python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'` exited 0, 24 tests in 0.222s, OK. Covers main/linked/nested ownership with missing boards, CLI/viewer startup, existing/malformed byte preservation, concurrent exclusive complete publication, symlink refusal, read-only requests, ignores and scratch Git backup/merge/restore. Real data never used as test fixtures; real main board and backup untouched. No merge readiness claim before parent review.
+
 ## [2026-11-11] Checkpoint local-board bootstrap and migration rules
 **Type:** Feature
 **Board:** BOARD-122 | **Branch:** feat/keep-live-board-local-and-untracked

@@ -1,15 +1,17 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-122 local board migration held (2026-11-11)
+## Current session — BOARD-122 builder verification complete (2026-11-11)
 
 - Bootstrap and marker-based main-checkout resolution implemented; exact approved local-board
   rules applied. One authorized narrowed retry passed after the original guard refusal.
-- Single regression command exited 1: 24 tests in 0.235s, one failure/one error. Read-only test
-  expects the wrong missing-board payload; scratch migration restore lacks `mkdir -p docs`.
-- Verification budget exhausted; no test correction/rerun or runtime board untracking performed.
-  Main board/backup and tracked template starter unchanged; no project repo edits.
-- Next: parent approves focused test corrections and another verification run. Migration remains
-  blocked and not merge-ready. Human backup/restore sequence is in `docs/HANDOVER.md`.
+- Authorized correction touched only the two wrong test fixtures; production behavior unchanged.
+  Second regression attempt exited 0: 24 tests in 0.222s. No further verification run.
+- Guard requested approval (exit 3); existing exact-command authorization covered task-worktree
+  `git rm --cached -- docs/BOARD.md`. Index deletion staged, disk file retained with matching
+  before/after SHA-256; ignored runtime path, tracked unchanged template starter confirmed.
+- Main board/backup untouched; no project repo edits. Next: parent review, not merge readiness.
+  Human must refresh backup immediately before merge and restore before tools restart;
+  see `docs/HANDOVER.md`. Initial fixture failure and guard refusal remain historical in the log.
 
 ## Current session — BOARD-121 main workbench (2026-11-11)
 
