@@ -30,7 +30,7 @@ and is never tracked here (ADR-053).
     │   ├── README.md                 # index of the factory documentation set
     │   ├── PROJECT_STRUCTURE.md      # this file
     │   ├── HANDOVER.md               # living description of the factory as it is now
-    │   ├── BOARD.md                  # factory work only; project work lives in the project repo
+    │   ├── BOARD.md                  # local Git-ignored factory state, absent from task worktrees
     │   ├── DECISIONS.md              # append-only factory decisions (ADR-001…)
     │   ├── UI-UX.md                  # visual language, anti-slop rules, QA evidence spec
     │   ├── PROJECT_STATE.md          # current phase, progress, next step
@@ -62,6 +62,8 @@ and is never tracked here (ADR-053).
 | `.opencode/repos.json` | The repo map of this repository. The only way into a repository. |
 | `.opencode/scopes/` | The canonical scope rules, one file per scope. `guard.py sync` writes them into a project's app repositories as their `AGENTS.md`. |
 | `templates/project/` | The blank project skeleton. A new project copies it, then fills it in. |
+| `docs/BOARD.md` | Local, untracked board in the control main checkout. CLI/viewer startup creates it only when absent. |
+| `templates/project/docs/BOARD.md` | Tracked blank starter; the copied template ignores its own runtime board. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
 | `opencode.jsonc` | OpenCode V2 settings: default architect, Playwright MCP and generated permissions. |
 | `.devcontainer/` | The container the factory runs in: Node, Python, Rust, chromium, Kilo Code. |

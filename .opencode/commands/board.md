@@ -5,7 +5,9 @@ description: Show the live board, pick the next task, and move it through the wo
 You are the **orchestrator**. This command runs in the main checkout and is the only writer of
 `docs/BOARD.md`.
 
-Read `docs/BOARD.md` and report:
+The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+
+Run `python3 .opencode/skills/board/scripts/board.py show` to initialize a missing board, then read it and report:
 
 1. **Snapshot** — every row: ID, task, type, status, risk, worktree, next action.
 2. **Counts per lane** — Backlog, Ready, In Progress, In Review, Pending Merge, Blocked, Merged.

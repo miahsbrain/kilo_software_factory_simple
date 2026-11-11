@@ -1,5 +1,16 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-122 local board migration held (2026-11-11)
+
+- Bootstrap and marker-based main-checkout resolution implemented; exact approved local-board
+  rules applied. One authorized narrowed retry passed after the original guard refusal.
+- Single regression command exited 1: 24 tests in 0.235s, one failure/one error. Read-only test
+  expects the wrong missing-board payload; scratch migration restore lacks `mkdir -p docs`.
+- Verification budget exhausted; no test correction/rerun or runtime board untracking performed.
+  Main board/backup and tracked template starter unchanged; no project repo edits.
+- Next: parent approves focused test corrections and another verification run. Migration remains
+  blocked and not merge-ready. Human backup/restore sequence is in `docs/HANDOVER.md`.
+
 ## Current session — BOARD-121 main workbench (2026-11-11)
 
 - Gallery approval granted by user: “fantastic, now build main dashboard”. Main `/` now uses the

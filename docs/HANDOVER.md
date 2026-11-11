@@ -1,5 +1,59 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-122 local-board migration held, 2026-11-11**
+> Branch `feat/keep-live-board-local-and-untracked`, worktree of the same slug. Shared bootstrap
+> and marker-based control-root lookup implemented; approved root/template rules and derived
+> guidance updated. First rules/docs patch was guard-refused; one authorized narrower retry
+> excluding every BOARD.md target passed. Runtime board and tracked template starter untouched.
+> Single verification command exited 1: 24 tests, one failure and one error. Request-read-only
+> test incorrectly expects no boards instead of the existing missing-board error payload;
+> scratch migration restore needs `docs/` recreated after Git removes its last tracked file.
+> No rerun, real board untracking, main-board/backup access, merge or separate-project edits.
+> Next: parent authorizes focused test corrections and another verification run; do not merge.
+
+## BOARD-122 bootstrap and migration contract
+
+- Pure `empty_board()` in `.opencode/skills/board/scripts/board.py` derives the blank table from
+  existing `COLUMNS`. Effectful `initialize_board(root)` publishes a fully written temporary
+  file by exclusive hard link, preserving existing bytes and refusing symlink docs/board paths.
+- CLI `main()` and viewer `main()` initialize only the missing default board at startup.
+  `read_table()` and request payload callbacks remain read-only; explicit `--file` is untouched.
+- `board.control_root()` reuses `worktree.control_root()`, which finds the nearest repo-map
+  marker without requiring a board, then resolves Git's main checkout. Nested projects retain
+  their own ownership. No board copy belongs in future task worktrees.
+- Regression additions live in existing `test_board_serve.py`; no new tool or dependency.
+  Verification: `python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'`
+  exited 1, 24 tests in 0.235s, with the two test-fixture issues above. No full pass claimed.
+
+### Human migration, only after review and passing verification
+
+The board index removal is not yet performed. Before the eventual human merge, stop board
+writers/tools and refresh the backup to include the latest row updates. The earlier BOARD-122
+backup is not a substitute for this final refresh. Run in the control main checkout:
+
+```bash
+mkdir -p .git/board-backups
+cp docs/BOARD.md .git/board-backups/BOARD-122-before-local-migration.md
+cmp docs/BOARD.md .git/board-backups/BOARD-122-before-local-migration.md
+```
+
+Do not proceed unless the comparison passes. Git may refuse to delete a locally modified
+tracked board during merge. After verifying the refreshed backup, the human must resolve that
+tracked-file state without losing the backup. The merge removes the old tracked board. Before
+starting any board tooling, restore local state (including its directory if Git removed it):
+
+```bash
+mkdir -p docs
+cp .git/board-backups/BOARD-122-before-local-migration.md docs/BOARD.md
+cmp .git/board-backups/BOARD-122-before-local-migration.md docs/BOARD.md
+```
+
+Otherwise startup could initialize a blank board. The restored runtime board is ignored;
+cleanup's final row update needs no commit. The template starter remains tracked and unchanged;
+future copied projects ignore their own runtime board. Existing separate project repos are
+outside this migration. History is not rewritten. Reversal needs an explicit tracking decision;
+preserve the local backup throughout.
+
 > **Session Notes — BOARD-121 parent preview screenshot hold, 2026-11-11**
 > Parent inspected implementation `fd89d5b` and started main preview http://127.0.0.1:15183/.
 > Parent snapshot/DOM: Project selected, 14 tasks/result 14 of 14/three project worktrees;

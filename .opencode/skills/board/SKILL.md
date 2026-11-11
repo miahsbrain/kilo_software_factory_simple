@@ -5,8 +5,13 @@ description: Read and update the live work board at docs/BOARD.md — add rows, 
 
 # Board
 
-`docs/BOARD.md` is the single source of truth for what is going on. It lives in the **main
-checkout**, and the orchestrator is its **only writer**.
+The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+
+The CLI and viewer share missing-board startup initialization, using the nearest repo-map
+marker and Git's main-checkout mapping. Existing boards, including malformed boards, are never
+replaced. Explicit `--file` paths are not initialized. Bootstrap refuses symlink docs/board paths
+and publishes a complete empty table exclusively, so concurrent startups cannot overwrite rows.
+Viewer requests stay read-only and never initialize another registered project's board.
 
 - **Worktree branches never edit the board.** A builder reports its lane status; the orchestrator
   writes the board.
@@ -189,8 +194,8 @@ approval, independent review, accessibility and unslop gates remain mandatory.
 - Keyboard: `/` focuses search, `j`/`k` move between cards, `Enter` opens one, `Esc` closes or
   clears. Focus rings and accessible names are present throughout.
 - The board is re-read on **every request** and the page auto-refreshes. Nothing is cached.
-- The server is **read-only and offline**: standard library only, no external assets, no
-  writes to the board or the repository.
+- Requests are **read-only and offline**: standard library only, no external assets. Startup
+  alone may initialize the current control board when absent; it never changes existing bytes.
 - `/api/board` and `/api/worktrees` serve the same data as JSON, unchanged.
 
 The port is forwarded by the devcontainer as **Factory Board (15180)**.

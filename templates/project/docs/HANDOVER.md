@@ -29,6 +29,12 @@
 
 ## 5. Data
 
+The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+
+The factory's `templates/project/docs/BOARD.md` is a tracked, non-runtime starter. Its bytes are
+retained for historical context; root `AGENTS.md` owns the current board rules. After copying the
+skeleton, the project's `.gitignore` excludes its runtime board from the initial Git add.
+
 | Model or table | Where | Fields and validation |
 |---|---|
 

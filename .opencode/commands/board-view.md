@@ -12,7 +12,8 @@ python3 .opencode/skills/board/scripts/board_serve.py --port 15180
 ```
 
 - It serves `docs/BOARD.md` and the live `git worktree list` state, re-read on every request.
-- It writes nothing. The board stays owned by the orchestrator.
+- Startup creates the current control board only when absent; every request is read-only.
+- The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
 - `--host 0.0.0.0` binds wider when the port must be reached from outside the container.
 - `--open` opens the URL in the default browser when that is available.
 - `--refresh N` changes the page auto-refresh interval in seconds (default 10).
