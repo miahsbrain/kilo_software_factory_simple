@@ -10,6 +10,13 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Why:** The BOARD-109 review read the unslop signs list but never ran the unslop procedure, and the loader does not expose the `unslop` skill, so nothing forced an agent to open it. A real audit of the merged console then found uppercase tracked labels, negative tracking on small text, redundant 650/700 weights and five equal stat cards — signs the QA and UI pass had let through.
 **Impact:** Every UI change now runs the full unslop procedure — five-line direction, full `references/signs.md` audit, nine passes, checklist — in the same review round as the QA capture, recorded in the UI report. A UI row with no recorded unslop audit cannot leave `In Review`. The skill is opened by path because the loader does not expose it. Precedence is unchanged: where the skill and `AGENTS.md` disagree, `AGENTS.md` wins, and the conflict is reported.
 
+## [2026-11-11] The board console passes the unslop audit
+**Type:** Fix
+**Board:** BOARD-110 | **Branch:** fix/fix-the-unslop-signs-in-the-board-console
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/UI-UX.md` §6.1, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-11-unslop-board-console.md`
+**Why:** The merged console (BOARD-109) tripped four sign groups in `.kilo/skills/unslop/references/signs.md`: five equal stat cards for the lane counts, uppercase tracked labels, negative tracking on small text, and weights of 650 and 700. The palette, type scale, layout and controls were already right, so this is a polish pass only.
+**Impact:** The five lane counts are one framed flow instrument of five hairline-separated stops; only the stop with the highest non-zero count carries the accent, and on mobile the instrument scrolls rather than stacking. Lane names and table headers are sentence case with normal tracking, small-text tracking is zero, and every weight is 400, 500 or 600. Counts, click-to-filter, aria-pressed sync and the all-clear headline are unchanged; the viewer stays read-only, server-rendered and offline.
+
 ## [2026-11-10] The live board becomes a factory console
 **Type:** Feature
 **Board:** BOARD-109 | **Branch:** feat/elevate-the-live-board-ui-into-a-factory-console

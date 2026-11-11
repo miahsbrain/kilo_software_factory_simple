@@ -388,26 +388,18 @@ server-rendered and offline. Its visual language is settled and reused by any fu
 
 | Token | Approved value |
 |---|---|
-| Accent | `#2f6feb` light, `#6f9dff` dark. One accent, used for primary action and focus only. |
+| Type | System sans stack (`system-ui`, `-apple-system`, `Segoe UI`, `Roboto`, `Helvetica Neue`, `Arial`); no webfont, so the page stays offline. Mono (`ui-monospace`, `SFMono-Regular`, `SF Mono`, `Menlo`, `Consolas`) for ids, branches, paths and counts. Scale 11 / 13 / 15 / 20 / 28px. Weights 400 / 500 / 600 only. |
+| Accent | `#2f6feb` light, `#6f9dff` dark. One accent, used for primary action, focus and the one flow stop with work. |
 | Ink | Monochrome ink (`#14171a` light, `#e9ebee` dark) with soft and faint steps; no decorative color. |
 | Status | Semantic colors only: ok green, warning amber, bad red. Never used for emphasis. |
-| Type | System sans for prose and controls; mono for ids, branches, paths and counts. Scale 11 / 13 / 15 / 20 / 28px. |
 | Spacing | 4 / 8 / 12 / 16 / 24 / 32 / 48px. |
-| Radius | 6px controls, 10px panels. One subtle shadow. |
+| Radius | 6px controls, 10px panels. |
 | Motion | 120–180ms for state changes only. |
 | Density | Comfortable by default, compact toggle; the same tokens drive both. |
 
-The layout is an app bar, an active-lane pipeline, a filter toolbar, lane boards with parsed
-Notes checklists, and a live worktrees table. Keyboard and URL state are part of the design, not
-an addition.
+The layout is an app bar, a filter toolbar, lane boards with parsed Notes checklists, and a live
+worktrees table. The five lane counts are one flow instrument — a single framed panel of five
+hairline-separated stops, not five cards — and only the stop with the highest non-zero count
+carries the accent. Keyboard and URL state are part of the design, not an addition.
 
-| Decision | Status | Notes |
-|---|---|---|
-| Font family | ASSUMPTION | Geist Sans + Geist Mono, unless the user picks another |
-| Accent color | ASSUMPTION | One accent, defined as a token, chosen with the user |
-| Radius steps | ASSUMPTION | 4px and 8px only |
-| Type scale ratio | ASSUMPTION | 1.25 |
-| Dark mode | ASSUMPTION | In scope unless the user says otherwise |
-
-Every assumption here is confirmed with the user during the decision gate (`AGENTS.md` §A6) and
-then replaced with the approved value.
+All values above are the values in the CSS. No console token is an open assumption.
