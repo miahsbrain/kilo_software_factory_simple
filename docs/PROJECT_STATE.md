@@ -1,6 +1,21 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-117 (2026-11-11)
+## Current session — BOARD-119 data slice (2026-11-11)
+
+- **Phase:** Build complete; parent review pending for the data-only slice.
+- **Active task:** `fix/include-project-repository-worktrees-in-console` in
+  `.opencode/worktrees/include-project-repository-worktrees-in-console`, based on BOARD-117.
+- **Changed:** Request-time registry-driven control/project worktree enumeration; additive `repo`
+  and `base` metadata. Existing Git/map helpers and endpoint array/entry fields are reused.
+- **Verification:** `python3 .opencode/skills/board/scripts/test_board_serve.py` → exit 0,
+  six tests passed; temporary fixtures, mocked Git/server, no real project reads or mutations.
+- **Scope:** No tabs/screens, browser checks, installs, builds, restarts or board edits. Tabs,
+  Project default when present, remembered selection and gallery-before-rollout approval are
+  recorded in ADR-077 for later slices. Existing 60-second/manual refresh is unchanged.
+- **Next action:** Parent reviews this diff, then sequences gallery/tab work. BOARD-117's QA
+  blockers below are not resolved by these tests; this slice does not claim browser QA completion.
+
+## Earlier session — BOARD-117 (2026-11-11)
 
 - **Phase:** QA blocked on canonical tooling and later desktop click error; wip, not merge-ready.
 - **Active task:** `fix/refresh-project-board-discovery-every-minute` in

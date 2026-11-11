@@ -169,29 +169,42 @@ def lane_map(rows):
 
 
 def worktree_state(worktree, root):
-    """One entry per git worktree, including the main checkout."""
+    """Fresh worktrees for control and registered project, with stable repo ids."""
+    repos, error = worktree.load_repos(root)
+    if error:
+        raise ValueError(error)
     entries = []
-    listed = worktree.list_worktrees(root)
-    main_path = os.path.realpath(listed[0]["path"]) if listed else None
-    for wt in listed:
-        path = os.path.abspath(wt["path"])
-        branch = wt["branch"]
-        short_sha = git_out(worktree, path, "rev-parse", "--short", "HEAD")
-        if short_sha is None:
-            short_sha = (wt["head"] or "")[:7] or None
-        base = worktree.default_base(path)
-        ahead = git_out(worktree, path, "rev-list", "--count", "%s..HEAD" % base)
-        behind = git_out(worktree, path, "rev-list", "--count", "HEAD..%s" % base)
-        dirty = git_out(worktree, path, "status", "--porcelain")
-        entries.append({
-            "path": path,
-            "branch": branch or "(detached)",
-            "sha": short_sha,
-            "ahead": int(ahead) if ahead and ahead.isdigit() else None,
-            "behind": int(behind) if behind and behind.isdigit() else None,
-            "dirty": bool(dirty),
-            "main": os.path.realpath(path) == main_path,
-        })
+    for repo_id in ("control", "project"):
+        if repo_id not in repos:
+            continue
+        target, error = worktree.resolve_repo(root, repos, repo_id)
+        if error:
+            raise ValueError(error)
+        if repo_id != "control" and not worktree.is_git_repo(target):
+            continue
+        listed = worktree.list_worktrees(target)
+        main_path = os.path.realpath(listed[0]["path"]) if listed else None
+        base = worktree.default_base(target) if listed else None
+        for wt in listed:
+            path = os.path.abspath(wt["path"])
+            branch = wt["branch"]
+            short_sha = git_out(worktree, path, "rev-parse", "--short", "HEAD")
+            if short_sha is None:
+                short_sha = (wt["head"] or "")[:7] or None
+            ahead = git_out(worktree, path, "rev-list", "--count", "%s..HEAD" % base)
+            behind = git_out(worktree, path, "rev-list", "--count", "HEAD..%s" % base)
+            dirty = git_out(worktree, path, "status", "--porcelain")
+            entries.append({
+                "path": path,
+                "branch": branch or "(detached)",
+                "sha": short_sha,
+                "ahead": int(ahead) if ahead and ahead.isdigit() else None,
+                "behind": int(behind) if behind and behind.isdigit() else None,
+                "dirty": bool(dirty),
+                "main": os.path.realpath(path) == main_path,
+                "repo": repo_id,
+                "base": base,
+            })
     return entries
 
 

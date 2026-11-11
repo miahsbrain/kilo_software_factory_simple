@@ -20,7 +20,13 @@ class BoardRefreshTests(unittest.TestCase):
         self.factory = self.root / "docs" / "BOARD.md"
         self.project = self.root / "project" / "docs" / "BOARD.md"
         self.board = viewer.load_module("board_fixture_parser", Path(__file__).with_name("board.py"))
-        self.worktree = SimpleNamespace(list_worktrees=lambda root: [])
+        self.worktree = viewer.load_module(
+            "worktree_fixture_helpers", Path(__file__).parents[2] / "git-worktree/scripts/worktree.py")
+        self.worktree.list_worktrees = Mock(return_value=[])
+        self.worktree.is_git_repo = Mock(return_value=False)
+        self.registry = self.root / ".opencode" / "repos.json"
+        self.registry.parent.mkdir()
+        self.registry.write_text(json.dumps({"control": ".", "project": "project"}), encoding="utf-8")
         previous_state = viewer.Handler.state
         self.addCleanup(setattr, viewer.Handler, "state", previous_state)
         self.write_board(self.factory, "Factory task")
@@ -109,6 +115,96 @@ class BoardRefreshTests(unittest.TestCase):
         self.initialize("--refresh", "17")
         self.assertEqual(viewer.Handler.state["refresh"], 17)
         self.assertIn('data-refresh="17"', self.request("/"))
+
+    def mock_repository_git(self):
+        self.worktree = viewer.load_module(
+            "worktree_registry_helpers", Path(__file__).parents[2] / "git-worktree/scripts/worktree.py")
+        results = {}
+        project = self.root / "registered-product"
+        marker = self.root / "templates/project/AGENTS.md"
+        marker.parent.mkdir(parents=True)
+        marker.write_text("fixture", encoding="utf-8")
+        project.mkdir()
+        (project / "DOMAIN.md").write_text("fixture", encoding="utf-8")
+        for target, base, counts in ((self.root, "opencode", (2, 1)),
+                                     (project, "main", (5, 3))):
+            linked = target / ".opencode/worktrees/shared"
+            results[(str(target), "rev-parse", "--show-toplevel")] = str(target)
+            results[(str(target), "rev-parse", "-q", "--verify", "refs/heads/" + base)] = "base-sha"
+            results[(str(target), "worktree", "list", "--porcelain")] = (
+                "worktree %s\nHEAD abcdef012345\nbranch refs/heads/%s\n\n"
+                "worktree %s\nHEAD fedcba987654\nbranch refs/heads/fix/shared\n\n"
+                % (target, base, linked))
+            for path, main in ((target, True), (linked, False)):
+                results[(str(path), "rev-parse", "--short", "HEAD")] = "abcdef0" if main else "fedcba9"
+                results[(str(path), "rev-list", "--count", base + "..HEAD")] = "0" if main else str(counts[0])
+                results[(str(path), "rev-list", "--count", "HEAD.." + base)] = "0" if main else str(counts[1])
+                results[(str(path), "status", "--porcelain")] = (
+                    " M fixture" if target == project and not main else "")
+
+        def git(path, *args, **kwargs):
+            value = results.get((str(path), *args))
+            return (0, value, "") if value is not None else (1, "", "fixture: unavailable")
+
+        self.worktree.git = Mock(side_effect=git)
+        return project, results
+
+    def test_registered_worktrees_are_fresh_and_isolated_by_repository(self):
+        project, results = self.mock_repository_git()
+        self.initialize()
+        control = self.request("/api/worktrees")
+        self.assertEqual([entry["repo"] for entry in control], ["control", "control"])
+
+        self.registry.write_text(json.dumps({"control": ".", "project": project.name}), encoding="utf-8")
+        entries = self.request("/api/worktrees")
+        self.assertEqual(len(entries), 4)
+        old_keys = {"path", "branch", "sha", "ahead", "behind", "dirty", "main"}
+        for entry in entries:
+            self.assertEqual(set(entry), old_keys | {"repo", "base"})
+        for repo_id, base, expected in (("control", "opencode", (2, 1, False)),
+                                         ("project", "main", (5, 3, True))):
+            group = [entry for entry in entries if entry["repo"] == repo_id]
+            self.assertEqual([entry["main"] for entry in group], [True, False])
+            self.assertEqual([entry["base"] for entry in group], [base, base])
+            self.assertEqual(group[0]["branch"], base)
+            self.assertEqual((group[0]["ahead"], group[0]["behind"]), (0, 0))
+            self.assertEqual(group[1]["branch"], "fix/shared")
+            self.assertEqual(group[1]["sha"], "fedcba9")
+            self.assertEqual((group[1]["ahead"], group[1]["behind"], group[1]["dirty"]), expected)
+        page = self.request("/")
+        self.assertIn("4 worktrees · 2 non-main", page)
+        self.assertIn(str(project / ".opencode/worktrees/shared"), page)
+
+        linked = str(project / ".opencode/worktrees/shared")
+        results.pop((linked, "rev-parse", "--short", "HEAD"))
+        results.pop((linked, "rev-list", "--count", "main..HEAD"))
+        fresh = self.request("/api/worktrees")
+        self.assertEqual(fresh[-1]["sha"], "fedcba9")
+        self.assertIsNone(fresh[-1]["ahead"])
+        self.assertEqual(fresh[:2], control)
+
+        for registry in ({"control": ".", "project": "missing"},
+                         {"control": ".", "project": "uninitialized"},
+                         {"control": "."}):
+            with self.subTest(registry=registry):
+                uninitialized = self.root / "uninitialized"
+                uninitialized.mkdir(exist_ok=True)
+                # Git in an uninitialized child can report the enclosing control repo.
+                results[(str(uninitialized), "rev-parse", "--show-toplevel")] = str(self.root)
+                self.registry.write_text(json.dumps(registry), encoding="utf-8")
+                self.assertEqual(self.request("/api/worktrees"), control)
+                self.assertIn("2 worktrees · 1 non-main", self.request("/"))
+
+    def test_invalid_registry_uses_existing_payload_error_handling(self):
+        self.initialize()
+        for content in ("{", json.dumps({"control": ".", "project": "../outside"})):
+            with self.subTest(content=content):
+                self.worktree.list_worktrees.reset_mock()
+                self.registry.write_text(content, encoding="utf-8")
+                self.assertEqual(self.request("/api/worktrees"), [])
+                self.assertIn("could not read the board:", self.request("/"))
+                self.assertTrue(all(call.args == (str(self.root),)
+                                    for call in self.worktree.list_worktrees.call_args_list))
 
 
 if __name__ == "__main__":

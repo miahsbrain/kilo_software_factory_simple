@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Include registered project worktrees in console data
+**Type:** Fix
+**Board:** BOARD-119 | **Branch:** fix/include-project-repository-worktrees-in-console
+**Changed:** `.opencode/skills/board/scripts/board_serve.py`, adjacent `test_board_serve.py`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md` (ADR-077), this log. No new files.
+**Why:** Existing `worktree_state()` listed only the control repository. Extend it with existing `load_repos`, `resolve_repo`, `is_git_repo`, `list_worktrees`, `default_base` and `git_out`, without duplicating map/Git parsing. New test fixture method supplies repository-scoped mocked Git output so existing helpers can be exercised without live repositories.
+**Impact:** Every worktree request reloads control/project registry entries, omits absent/uninitialized project, and adds stable `repo` plus `base` metadata without removing existing fields or changing the JSON array. Main markers, dirty state and counts stay repository-specific, including identical branch names. Existing malformed-map exception handling remains. Read-only/offline standard-library runtime; no real board/project edits, UI changes, installs, restarts or builds. Reversible data-only change; approved tabs/default/selection await gallery and later implementation.
+**Verification:** `python3 .opencode/skills/board/scripts/test_board_serve.py` → exit 0, six tests passed. Temporary fixtures/mocked Git/server prove registry refresh, registered nonconventional path, main/base/count isolation, dirty state, missing/uninitialized project, fallback values, additive endpoint compatibility and invalid maps. No browser QA; BOARD-117's existing QA blockers remain.
+
 ## [2026-11-11] Checkpoint partial parent browser observations
 **Type:** Docs
 **Board:** BOARD-117 | **Branch:** fix/refresh-project-board-discovery-every-minute

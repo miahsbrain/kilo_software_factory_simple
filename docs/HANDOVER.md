@@ -1,5 +1,18 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-119 data slice, 2026-11-11**
+> Branch: `fix/include-project-repository-worktrees-in-console`; worktree:
+> `.opencode/worktrees/include-project-repository-worktrees-in-console`, based on BOARD-117's
+> `fix/refresh-project-board-discovery-every-minute`. Extended `worktree_state()` to read the
+> registry on every request and enumerate control plus initialized registered project worktrees.
+> Existing entry keys remain; additive `repo` (stable control/project id) and `base` metadata
+> preserve repository-specific main, dirty and ahead/behind state even with identical branches.
+> Six tests passed (exit 0), using temporary fixtures and mocked Git/server only.
+> No UI changes, browser checks, builds, installs, server restarts, live project or board edits.
+> Approved tabs/default/remembered selection are recorded in ADR-077, not implemented here;
+> gallery approval is still required before redesigned screen rollout. BOARD-117 QA remains blocked.
+> Next: parent reviews this data-only diff before the gallery/tab implementation slice.
+
 > **Session Notes — BOARD-117 QA blocked, 2026-11-11**
 > Branch: `fix/refresh-project-board-discovery-every-minute`; worktree:
 > `.opencode/worktrees/refresh-project-board-discovery-every-minute`.
@@ -145,7 +158,7 @@ node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127
 | `AGENTS.md` | The rule set, read by every agent at the start of a task. |
 | `.opencode/commands/*.md` | Slash commands that package the workflow. |
 | `.opencode/skills/board/scripts/board.py` | The board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`. |
-| `.opencode/skills/board/scripts/board_serve.py` | The read-only factory board console on port 15180. Server-rendered, offline, standard library at runtime: a three-column dashboard shell (lane/filter sidebar, KPI strip, segmented flow meter, dense lane panel, sticky worktrees rail), search and status/type/priority filters with URL state, parsed Notes checklists, branch copy, and `j`/`k`/`/`/`Enter`/`Esc` keyboard control. Serves `/static/board.css` and the two self-hosted Geist fonts. `/api/board` and `/api/worktrees` are unchanged JSON. |
+| `.opencode/skills/board/scripts/board_serve.py` | The read-only factory board console on port 15180. Server-rendered, offline, standard library at runtime: a three-column dashboard shell (lane/filter sidebar, KPI strip, segmented flow meter, dense lane panel, sticky worktrees rail), search and status/type/priority filters with URL state, parsed Notes checklists, branch copy, and `j`/`k`/`/`/`Enter`/`Esc` keyboard control. Serves `/static/board.css` and the two self-hosted Geist fonts. `/api/board` retains its shape; `/api/worktrees` retains its array/fields and adds `repo` and `base` metadata. |
 | `.opencode/skills/board/ui/` | The Tailwind v4 source for the console (`package.json`, `src/app.css`); `npm --prefix .opencode/skills/board/ui run build` writes the committed `static/board.css`. |
 | `.opencode/skills/board/static/` | The committed stylesheet and the Geist Sans/Mono variable fonts with their SIL OFL licence. |
 | `.opencode/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, `discard` (`--force`, `--yes`), `handoff`, `list`, `verify`, `cleanup` (by slug or by `--board`). The teardown commands set the row's lane: `cleanup --board` sets `Merged`, `discard --board` sets `Ready`. |
@@ -164,7 +177,8 @@ Chunk 1 reuses these existing boundaries:
   `write_permission_map()` (effectful) preserves unrelated config keys while replacing that array.
 - `worktree.default_base()` (effectful git inspection) prefers `opencode` only for a factory;
   project/app defaults stay unchanged. `repo_root()` (effectful) uses Git's main checkout.
-- `board_serve.worktree_state()` (effectful git inspection) uses the existing base selector for ahead/behind counts.
+- `board_serve.worktree_state()` (effectful filesystem/Git inspection) reuses registry resolution,
+  repository validation, worktree parsing and base selection for per-repository state.
 - Native read/edit path rules remain; grep/glob target-path and automatic context enforcement
   are pending the limited guard plugin. Legacy bootstrap is not accepted by steady-state guards.
 
@@ -172,7 +186,8 @@ Chunk 1 reuses these existing boundaries:
 |---|---|---|---|
 | `board.py` | `.opencode/skills/board/scripts/board.py` | Deterministic manipulation of the markdown board. Never writes prose. | effectful (file I/O) |
 | `board_serve.py` | `.opencode/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
-| `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1691` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
+| `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1704` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
+| `worktree_state()` | `.opencode/skills/board/scripts/board_serve.py:171` | Reloads the existing registry and enumerates control/project via `load_repos`, `resolve_repo`, `is_git_repo`, `list_worktrees`, `default_base` and `git_out`. Omits absent/uninitialized projects. Each entry adds `repo` and `base`; existing array and fields stay intact. Main detection and counts use only that repository. Invalid maps flow through existing payload exception handling. | effectful (filesystem, Git); entry construction is deterministic from results |
 | `worktree.py` | `.opencode/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, `discard` removes one, `discard --force --yes` destroys one after writing a recovery copy, `handoff` prints the hand-off block, `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, `discard` sets `Ready`. | effectful (git, filesystem) |
 | `env.py` | `.opencode/skills/git-worktree/scripts/env.py` | Copies the two local env files from a repository's main checkout into a worktree, excludes them from git, and removes them again. Never prints a value. | effectful (filesystem, git exclude) |
 | `test_env.py` | `.opencode/skills/git-worktree/scripts/test_env.py` | Self-test for the env provisioning and the worktree reuse rules, in a throwaway repository under a temp directory. | effectful (filesystem, git) |
@@ -240,11 +255,14 @@ a throwaway git repository under a temp directory and proves the env provisionin
 worktree reuse rules, the hand-off block and the teardown named by a board row.
 
 `python3 .opencode/skills/board/scripts/test_board_serve.py` uses standard-library unittest,
-temporary fixture boards and a mocked server. Four tests pass for BOARD-117: new/removed project
+temporary fixture boards and a mocked server. Six tests pass for BOARD-117/119: new/removed project
 discovery in HTML and JSON, separate tasks even with identical IDs, fixed explicit file selection
 with fresh reads, default 60 seconds, CLI override and existing control source. No sockets, live
 project reads, server restarts or external dependencies. Control-source assertions are not browser
-interaction or timer evidence.
+interaction or timer evidence. BOARD-119 reuses actual registry, Git parsing and base helpers with
+mocked Git results; covers changed registry paths, same-name branches across repositories,
+per-repo main/base/counts/dirty state, missing/uninitialized project, SHA/count fallback, additive
+endpoint keys and existing malformed/invalid registry handling. No live Git calls.
 
 ## 11. Known issues and risks
 
