@@ -9,13 +9,16 @@ worktrees. Everything is read fresh on every request and nothing is ever
 written: the board file and the repository are only read.
 
 Endpoints:
-    GET /                the HTML dashboard
-    GET /gallery         the component gallery (read-only)
-    GET /api/board       JSON: rows, lanes, generated_at
-    GET /api/worktrees   JSON: the list of worktrees
-    GET /health          JSON: {"ok": true}
+    GET /                     the HTML dashboard
+    GET /gallery              the component gallery (read-only)
+    GET /static/board.css     the prebuilt Tailwind stylesheet
+    GET /static/fonts/<file>  the two self-hosted Geist fonts and the licence
+    GET /api/board            JSON: rows, lanes, generated_at
+    GET /api/worktrees        JSON: the list of worktrees
+    GET /health               JSON: {"ok": true}
 
-Standard library only. Python 3.9+.
+Standard library only. Python 3.9+. The static CSS is built ahead of time by
+`.kilo/skills/board/ui`; the server only reads it.
 """
 import argparse
 import datetime
@@ -27,6 +30,7 @@ import re
 import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 LANES = ["Backlog", "Ready", "In Progress", "In Review", "Pending Merge",
          "Merged", "Blocked", "Dropped"]
@@ -67,6 +71,12 @@ BOARD_READ_HINT = (" Check that the board path (--file or docs/BOARD.md) "
 FAVICON = ("data:image/svg+xml,"
            "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E"
            "%3Crect width='16' height='16' rx='3' fill='%23c2410c'/%3E%3C/svg%3E")
+STATIC_ROOT = Path(__file__).resolve().parent.parent / "static"
+STATIC_FONT_TYPES = {
+    "geist-sans-variable.woff2": "font/woff2",
+    "geist-mono-variable.woff2": "font/woff2",
+    "OFL.txt": "text/plain; charset=utf-8",
+}
 
 
 def load_module(name, path):
@@ -1352,7 +1362,7 @@ def wb_meter(counts):
     values = {lane: int(counts.get(lane, 0) or 0) for lane in ACTIVE_LANES}
     peak = max(values.values()) if values else 0
     segments = "".join(
-        '<span class="wb-meter-seg" style="flex-grow: %d" data-peak="%s" aria-hidden="true"></span>'
+        '<span class="wb-meter-seg" style="flex-grow: %d" data-peak="%s"></span>'
         % (count, "true" if peak and count == peak else "false")
         for count in values.values() if count > 0
     )
@@ -1366,13 +1376,13 @@ def wb_meter(counts):
     )
     return (
         '<div class="wb-meter" role="group" aria-label="Work in flight by lane">'
-        '<div class="wb-meter-track">%s</div>'
+        '<div class="wb-meter-track" aria-hidden="true">%s</div>'
         '<div class="wb-meter-stops">%s</div></div>'
     ) % (segments, stops)
 
 
 def wb_lane(lane, count, description, cards_html, open=False):
-    """A lane row on the continuous board surface; no per-lane card border."""
+    """A rule-separated lane row on the continuous board surface."""
     return (
         '<details class="wb-lane wb-lane--%s" data-lane="%s"%s>'
         '<summary>'
@@ -1405,7 +1415,7 @@ def wb_empty(lane):
 
 
 def wb_card(card):
-    """A compact card row; the expanded body reuses render_notes and row_fingerprint."""
+    """A 44px card row; the expanded body reuses render_notes and row_fingerprint."""
     card_id = clean_text(card.get("ID"))
     task = clean_text(card.get("Task"))
     kind = clean_text(card.get("Type"))
@@ -1420,7 +1430,7 @@ def wb_card(card):
     if branch in ("-", ""):
         branch = ""
     fingerprint = row_fingerprint(card.get("Notes") or "")
-    kv = ["<dt>blocked</dt><dd>%s</dd>" % esc(blocked)]
+    kv = ["<dt>blocked by</dt><dd>%s</dd>" % esc(blocked)]
     if branch:
         kv.append("<dt>branch</dt><dd>%s</dd>" % esc(branch))
     if fingerprint:
@@ -1448,7 +1458,7 @@ def wb_card(card):
 
 
 def wb_rail(title, meta, body_html):
-    """A flat worktrees rail: title, meta and hairline-separated rows."""
+    """A flat sticky worktrees rail: top rule, no radius, no shadow."""
     return (
         '<aside class="wb-rail">'
         '<div class="wb-rail-head"><h2 class="wb-rail-title">%s</h2>'
@@ -1824,39 +1834,37 @@ GALLERY_COUNTS = {
     "Blocked": 1,
 }
 WB_SWATCHES = (
-    ("--bg", "paper"),
-    ("--surface", "surface"),
-    ("--surface-2", "surface 2"),
-    ("--ink", "ink"),
-    ("--ink-soft", "ink soft"),
-    ("--ink-faint", "ink faint"),
-    ("--line", "line"),
-    ("--line-soft", "line soft"),
-    ("--accent", "signal orange"),
-    ("--accent-ink", "orange ink"),
-    ("--accent-soft", "orange wash"),
-    ("--ok", "ok"),
-    ("--warn", "warn"),
-    ("--bad", "bad"),
+    ("--color-paper", "paper"),
+    ("--color-surface", "surface"),
+    ("--color-ink", "ink"),
+    ("--color-ink-soft", "ink soft"),
+    ("--color-ink-faint", "ink faint"),
+    ("--color-line", "line"),
+    ("--color-line-soft", "line soft"),
+    ("--color-signal", "signal"),
+    ("--color-signal-soft", "signal soft"),
+    ("--color-ok", "ok"),
+    ("--color-warn", "warn"),
+    ("--color-bad", "bad"),
 )
 WB_TYPE_STEPS = (
-    ("--t-xs", "11px", "Caption and chips"),
-    ("--t-sm", "13px", "Meta and card rows"),
-    ("--t-md", "15px", "Body and controls"),
-    ("--t-lg", "20px", "Section figures"),
-    ("--t-display", "34px", "Page display"),
+    ("--text-micro", "11px", "Caption and chips"),
+    ("--text-meta", "13px", "Meta and card rows"),
+    ("--text-body", "15px", "Body and controls"),
+    ("--text-lead", "20px", "Lane labels"),
+    ("--text-display", "44px", "Page display"),
 )
 WB_SPACE_STEPS = (
-    ("--s1", 4),
-    ("--s2", 8),
-    ("--s3", 12),
-    ("--s4", 16),
-    ("--s6", 24),
-    ("--s8", 32),
-    ("--s12", 48),
-    ("--s16", 64),
+    ("4px", 4),
+    ("8px", 8),
+    ("12px", 12),
+    ("16px", 16),
+    ("24px", 24),
+    ("32px", 32),
+    ("48px", 48),
+    ("64px", 64),
 )
-WB_RADII = (("--radius-sm", 4), ("--radius", 6), ("--radius-lg", 10))
+WB_RADII = (("0", "0"), ("2px", "2px"), ("4px", "4px"))
 
 
 def gallery_tokens_html():
@@ -1873,13 +1881,13 @@ def gallery_tokens_html():
     )
     space_rows = "".join(
         '<div class="wb-space-row"><span class="wb-space-bar" style="width: %dpx"></span>'
-        '<span>%s · %dpx</span></div>' % (px, esc(name), px)
+        '<span>%s</span></div>' % (px, esc(name))
         for name, px in WB_SPACE_STEPS
     )
     radius_boxes = "".join(
-        '<div class="wb-radius-box" style="border-radius: var(%s)">%dpx</div>'
-        % (esc(name), px)
-        for name, px in WB_RADII
+        '<div class="wb-radius-box" style="border-radius: %s">%s</div>'
+        % (esc(value), esc(label))
+        for value, label in WB_RADII
     )
     return (
         '<div class="wb-tokens">'
@@ -1896,22 +1904,22 @@ def gallery_tokens_html():
 def gallery_fixtures():
     open_card = {
         "ID": "BOARD-112",
-        "Task": "Rebuild the factory pages as a split workbench",
+        "Task": "Rebuild the factory gallery in Tailwind",
         "Type": "Feature",
         "Priority": "P2",
-        "Risk": "🟡 medium — console is read-only, the change is visual",
+        "Risk": "🟡 medium — visual only, the console is read-only",
         "Blocked by": "- None.",
         "Branch/Worktree": ("branch feat/rebuild-factory-pages-as-a-split · "
                             ".kilo/worktrees/rebuild-factory-pages-as-a-split"),
-        "Notes": "fp=feat|visual|/gallery|peak-lane",
-        "Notes raw": ("- [x] /gallery returns 200 proof: HTTP 200 · "
-                      "- [ ] Peak lane is the only orange segment proof: capture 1440 · "
-                      "- [ ] Board page keeps its filters, keyboard and URL state"),
+        "Notes": "fp=feat|visual|/gallery|swiss",
+        "Notes raw": ("- [x] /gallery serves the prebuilt stylesheet proof: HTTP 200 text/css · "
+                      "- [ ] Peak lane is the only signal segment proof: capture 1440 · "
+                      "- [ ] Board page keeps its inline CSS until the next chunk"),
         "open": True,
     }
     second_card = {
         "ID": "BOARD-113",
-        "Task": "Wire the lane filters to the workbench rail",
+        "Task": "Wire the lane filters to the worktree rail",
         "Type": "Fix",
         "Priority": "P1",
         "Risk": "🟢 low — fixture only",
@@ -1965,8 +1973,8 @@ def build_gallery_html():
         )
     )
     mark = (
-        '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" '
-        'stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
+        '<svg class="h-7 w-7 flex-none text-signal" viewBox="0 0 24 24" aria-hidden="true" '
+        'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
         '<path d="M3 20V9l6 3V9l6 3V4h6v16z"/>'
         '<path d="M6 16h3M12 16h3"/></svg>'
     )
@@ -1976,39 +1984,40 @@ def build_gallery_html():
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         '<meta name="color-scheme" content="light dark">',
         '<link rel="icon" href="', FAVICON, '">',
-        "<title>Factory components</title><style>", CSS, "</style></head><body>\n",
-        '<header class="appbar">',
-        '<div class="shell appbar-inner">',
-        '<div class="brand">', mark,
-        '<div class="brand-text">',
-        '<span class="wordmark">Factory components</span>',
-        '<span class="sublabel">One architect sees work in flight, decisions waiting, '
-        'and where the worktrees are</span>',
+        '<link rel="stylesheet" href="/static/board.css">',
+        "<title>Factory components</title></head><body>\n",
+        '<header class="border-b border-line bg-surface">',
+        '<div class="mx-auto flex w-full max-w-[1360px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6">',
+        '<div class="flex min-w-0 flex-1 items-center gap-3">', mark,
+        '<div class="min-w-0">',
+        '<span class="block text-body font-semibold leading-tight">Factory components</span>',
+        '<span class="block text-micro text-ink-soft hidden min-[420px]:block">One architect sees work in flight, '
+        'decisions waiting, and where the worktrees are</span>',
         '</div></div>',
-        '<div class="appbar-actions">',
-        '<button type="button" class="btn" data-wb-theme aria-label="Colour theme">System</button>',
-        '<button type="button" class="btn" data-wb-density aria-pressed="false" aria-label="Density">'
-        'Comfortable</button>',
+        '<div class="flex items-center gap-2">',
+        '<button type="button" class="wb-btn" data-wb-theme aria-label="Colour theme">System</button>',
+        '<button type="button" class="wb-btn" data-wb-density aria-pressed="false" '
+        'aria-label="Density">Comfortable</button>',
         '</div></div></header>\n',
-        '<main>',
-        '<section class="shell wb-gallery-head">',
+        '<main class="mx-auto w-full max-w-[1360px] px-4 pb-16 sm:px-6">',
+        '<section class="wb-gallery-head">',
         '<h1 class="wb-display">Components</h1>',
-        '<p class="wb-intro">The pieces the factory console is built from — flow meter, lanes, '
-        'cards, worktree rail and toolbar.</p>',
+        '<p class="wb-intro">The pieces the factory console is built from: flow meter, lanes, '
+        'cards, worktree rail and toolbar. Tokens below drive both themes.</p>',
         '</section>',
-        '<section class="shell">',
-        '<div class="wb-split">',
-        '<div class="wb-board-surface">',
+        '<div class="mt-6 grid gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_360px] '
+        'min-[1100px]:items-start">',
+        '<div class="wb-board-surface min-w-0">',
         wb_meter(GALLERY_COUNTS),
         wb_toolbar(3),
         '<div class="wb-lanes">', lanes, '</div>',
         '</div>',
-        '<div>', rail, '</div>',
+        '<div class="min-w-0">', rail, '</div>',
         '</div>',
         '<section class="wb-section">',
         '<h2 class="wb-section-title">Chips and empty state</h2>',
-        '<p class="wb-section-meta">Semantic chips stay quiet; the empty state names the next action.</p>',
-        '<div class="wb-specimen-row">', chips, '</div>',
+        '<p class="wb-section-meta">Chips stay quiet. The empty state names the next action.</p>',
+        '<div class="flex flex-wrap items-center gap-2 py-3">', chips, '</div>',
         wb_empty("Ready"),
         '</section>',
         '<section class="wb-section">',
@@ -2017,9 +2026,9 @@ def build_gallery_html():
         'Swatches follow the active theme.</p>',
         gallery_tokens_html(),
         '</section>',
-        '</section>',
         '</main>',
-        '<footer class="shell"><a href="/">Back to the board</a></footer>\n',
+        '<footer class="mx-auto w-full max-w-[1360px] px-4 pb-16 font-mono text-micro '
+        'text-ink-faint sm:px-6"><a href="/">Back to the board</a></footer>\n',
         "<script>", GALLERY_JS, "</script>\n",
         "</body></html>",
     ])
@@ -2045,6 +2054,14 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_bytes(code, body, "application/json; charset=utf-8")
 
+    def send_file(self, path, content_type):
+        try:
+            body = Path(path).read_bytes()
+        except OSError:
+            self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
+            return
+        self.send_bytes(200, body, content_type)
+
     def do_HEAD(self):
         self.do_GET()
 
@@ -2058,6 +2075,17 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/worktrees":
             self.send_json(200, self.state["worktree_payload"]())
+            return
+        if path == "/static/board.css":
+            self.send_file(STATIC_ROOT / "board.css", "text/css; charset=utf-8")
+            return
+        if path.startswith("/static/fonts/"):
+            name = path[len("/static/fonts/"):]
+            content_type = STATIC_FONT_TYPES.get(name)
+            if not content_type:
+                self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
+                return
+            self.send_file(STATIC_ROOT / "fonts" / name, content_type)
             return
         if path == "/":
             html_body = self.state["html"]()

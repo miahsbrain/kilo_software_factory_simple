@@ -404,30 +404,35 @@ carries the accent. Keyboard and URL state are part of the design, not an additi
 
 All values above are the values in the CSS. No console token is an open assumption.
 
-### 6.2 Factory page language (proposed, pending gallery approval)
+### 6.2 Factory page language (approved — BOARD-112)
 
-BOARD-112 rebuilds the factory pages as a split workbench. The direction is approved and the
-component gallery at `/gallery` is the approval artefact. The board screen is rebuilt in the next
-chunk; `GET /` keeps its current structure until then.
+Every factory page uses this language. It is built with Tailwind CSS v4 from
+`.kilo/skills/board/ui/src/app.css`; the built stylesheet is
+`.kilo/skills/board/static/board.css` and is committed. The component gallery at `/gallery`
+renders the same `wb_` components the board uses.
 
 Direction: a factory console for one architect to see work in flight, what waits for a decision,
-and where the worktrees are. Character: precise, industrial, quiet. World: a machine-shop
-workbench — paper schematic in daylight, graphite instrument at night, one safety-orange signal.
-Moments: the segmented flow meter and the parsed acceptance checklist. Signature: the single
-orange segment on the meter and the orange status rail on the active lane; nothing else is
-saturated.
+and where the worktrees are. Character: precise, editorial, industrial. World: a well-set machine
+spec sheet — paper, ink, hairlines, one signal red-orange. Moments: the segmented flow meter and
+the parsed acceptance checklist. Signature: the single signal segment on the meter and the 3px
+signal rail on the lane that carries the most work; nothing else is saturated.
 
 | Group | Values |
 |---|---|
-| Light | `--bg #f7f7f5` · `--surface #ffffff` · `--surface-2 #f1f0ec` · `--ink #16181b` · `--ink-soft #4b5259` · `--ink-faint #5f666e` · `--line #e2e0da` · `--line-soft #ecebe7` · `--accent #c2410c` · `--accent-ink #b93a0a` · `--accent-soft #fdece3` · `--ok #2f7d4f` · `--warn #a16207` · `--bad #b42318` |
-| Dark | `--bg #0e1012` · `--surface #15181b` · `--surface-2 #1b1f23` · `--ink #e8e6e1` · `--ink-soft #a8b0b8` · `--ink-faint #8b939c` · `--line #2a2e33` · `--line-soft #23272b` · `--accent #fb923c` · `--accent-ink #fb923c` · `--accent-soft #2a1c12` · `--ok #5fbf84` · `--warn #e0b252` · `--bad #ef8078` |
-| Type | System sans for the interface. Mono `ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, monospace` with tabular figures for ids, branches, paths and counts. Scale 11 / 13 / 15 / 20 / 34px (`--t-display`). Weights 400 / 500 / 600; display headings 600 at `-0.03em`. |
+| Light | paper `#f4f2ec` · surface `#faf9f6` · ink `#111214` · ink-soft `#4b5058` · ink-faint `#666b73` · line `#d8d5cd` · line-soft `#e7e4dc` · signal `#c2410c` · signal-soft `#f6e3d8` · ok `#2f7d4f` · warn `#a16207` · bad `#b42318` |
+| Dark | paper `#0c0e10` · surface `#121517` · ink `#ecebe7` · ink-soft `#a3a8ae` · ink-faint `#8a9097` · line `#262a2e` · line-soft `#1d2124` · signal `#ff7a45` · signal-soft `#2b1a12` · ok `#5fbf84` · warn `#e0b252` · bad `#ef8078` |
+| Type | Self-hosted Geist Sans for prose and UI; Geist Mono for ids, branches, paths and counts with tabular figures. Scale 11 / 13 / 15 / 20 / 44px (display 32px at ≤640). Weights 400 / 500 / 600; display 600 at `-0.035em`; no uppercase tracking, no negative tracking below 20px. |
 | Spacing | 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64px. |
-| Radius | 4px micro chip, 6px control, 10px panel. |
-| Motion | 150ms, reduced-motion aware. No gradients, glass or shadow except the app bar. |
+| Radius | 2px micro chip, 4px control; panels are square and hairline-bounded. |
+| Surface | Flat; hairline rules instead of cards. No gradients, glass, blobs, or shadow. |
+| Motion | 150ms, reduced-motion aware. |
 
-The layout is a `wb-split` grid: at 1100px and above the continuous board takes
-`minmax(0, 1fr)` with a 360px worktree rail; below 1100px the rail stacks under the board. The
-shared `wb-` components are `wb_meter`, `wb_lane`, `wb_card`, `wb_rail`, `wb_toolbar`, `wb_chip`,
-`wb_empty` and `wb_wt_row`; the same functions render `/gallery` now and the board in the next
-chunk.
+The layout is a 12-column grid. At 1100px and above the continuous board surface spans 8 columns
+(or `minmax(0, 1fr)`) and the worktree rail spans 4 (360px); below 1100px the rail stacks under
+the board. The flow meter is one segmented instrument with five stops, not five stat cards; at
+≤520px the stops wrap to 3 + 2 and stay all visible. The shared components are `wb_meter`,
+`wb_lane`, `wb_card`, `wb_rail`, `wb_toolbar`, `wb_chip`, `wb_empty` and `wb_wt_row`.
+
+Build after any class change: `npm --prefix .kilo/skills/board/ui run build`. The runtime is still
+Python standard library only, and the page still works offline because the CSS and fonts are
+served locally.
