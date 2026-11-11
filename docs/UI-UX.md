@@ -403,3 +403,31 @@ hairline-separated stops, not five cards — and only the stop with the highest 
 carries the accent. Keyboard and URL state are part of the design, not an addition.
 
 All values above are the values in the CSS. No console token is an open assumption.
+
+### 6.2 Factory page language (proposed, pending gallery approval)
+
+BOARD-112 rebuilds the factory pages as a split workbench. The direction is approved and the
+component gallery at `/gallery` is the approval artefact. The board screen is rebuilt in the next
+chunk; `GET /` keeps its current structure until then.
+
+Direction: a factory console for one architect to see work in flight, what waits for a decision,
+and where the worktrees are. Character: precise, industrial, quiet. World: a machine-shop
+workbench — paper schematic in daylight, graphite instrument at night, one safety-orange signal.
+Moments: the segmented flow meter and the parsed acceptance checklist. Signature: the single
+orange segment on the meter and the orange status rail on the active lane; nothing else is
+saturated.
+
+| Group | Values |
+|---|---|
+| Light | `--bg #f7f7f5` · `--surface #ffffff` · `--surface-2 #f1f0ec` · `--ink #16181b` · `--ink-soft #4b5259` · `--ink-faint #5f666e` · `--line #e2e0da` · `--line-soft #ecebe7` · `--accent #c2410c` · `--accent-ink #b93a0a` · `--accent-soft #fdece3` · `--ok #2f7d4f` · `--warn #a16207` · `--bad #b42318` |
+| Dark | `--bg #0e1012` · `--surface #15181b` · `--surface-2 #1b1f23` · `--ink #e8e6e1` · `--ink-soft #a8b0b8` · `--ink-faint #8b939c` · `--line #2a2e33` · `--line-soft #23272b` · `--accent #fb923c` · `--accent-ink #fb923c` · `--accent-soft #2a1c12` · `--ok #5fbf84` · `--warn #e0b252` · `--bad #ef8078` |
+| Type | System sans for the interface. Mono `ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, monospace` with tabular figures for ids, branches, paths and counts. Scale 11 / 13 / 15 / 20 / 34px (`--t-display`). Weights 400 / 500 / 600; display headings 600 at `-0.03em`. |
+| Spacing | 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64px. |
+| Radius | 4px micro chip, 6px control, 10px panel. |
+| Motion | 150ms, reduced-motion aware. No gradients, glass or shadow except the app bar. |
+
+The layout is a `wb-split` grid: at 1100px and above the continuous board takes
+`minmax(0, 1fr)` with a 360px worktree rail; below 1100px the rail stacks under the board. The
+shared `wb-` components are `wb_meter`, `wb_lane`, `wb_card`, `wb_rail`, `wb_toolbar`, `wb_chip`,
+`wb_empty` and `wb_wt_row`; the same functions render `/gallery` now and the board in the next
+chunk.

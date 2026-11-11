@@ -10,6 +10,7 @@ written: the board file and the repository are only read.
 
 Endpoints:
     GET /                the HTML dashboard
+    GET /gallery         the component gallery (read-only)
     GET /api/board       JSON: rows, lanes, generated_at
     GET /api/worktrees   JSON: the list of worktrees
     GET /health          JSON: {"ok": true}
@@ -65,7 +66,7 @@ BOARD_READ_HINT = (" Check that the board path (--file or docs/BOARD.md) "
 # Inline favicon: the page stays offline and makes no favicon request.
 FAVICON = ("data:image/svg+xml,"
            "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E"
-           "%3Crect width='16' height='16' rx='3' fill='%232f6feb'/%3E%3C/svg%3E")
+           "%3Crect width='16' height='16' rx='3' fill='%23c2410c'/%3E%3C/svg%3E")
 
 
 def load_module(name, path):
@@ -185,64 +186,65 @@ def worktree_state(worktree, root):
 
 CSS = """
 :root {
-  --bg: #f5f6f7;
+  --bg: #f7f7f5;
   --surface: #ffffff;
-  --surface-2: #fbfbfc;
-  --line: #d9dde2;
-  --line-soft: #eceef1;
-  --ink: #14171a;
-  --ink-soft: #4d545c;
-  --ink-faint: #646c75;
-  --accent: #2f6feb;
-  --accent-ink: #1f5fd6;
-  --accent-soft: #e7efff;
-  --ok: #1f7a45;
-  --warn: #8a5a00;
-  --bad: #b3261e;
+  --surface-2: #f1f0ec;
+  --line: #e2e0da;
+  --line-soft: #ecebe7;
+  --ink: #16181b;
+  --ink-soft: #4b5259;
+  --ink-faint: #5f666e;
+  --accent: #c2410c;
+  --accent-ink: #b93a0a;
+  --accent-soft: #fdece3;
+  --ok: #2f7d4f;
+  --warn: #a16207;
+  --bad: #b42318;
+  --radius-sm: 4px;
   --radius: 6px;
   --radius-lg: 10px;
-  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px; --s12: 48px;
-  --t-xs: 11px; --t-sm: 13px; --t-md: 15px; --t-lg: 20px; --t-xl: 28px;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px; --s12: 48px; --s16: 64px;
+  --t-xs: 11px; --t-sm: 13px; --t-md: 15px; --t-lg: 20px; --t-xl: 28px; --t-display: 34px;
   --appbar-h: 60px;
   --shell: 1360px;
   --measure: 65ch;
   --shadow: 0 1px 2px rgba(20, 23, 26, 0.06);
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --mono: ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1113;
-    --surface: #171a1d;
-    --surface-2: #1c2024;
-    --line: #2b3036;
-    --line-soft: #23282d;
-    --ink: #e9ebee;
-    --ink-soft: #a7aeb6;
+    --bg: #0e1012;
+    --surface: #15181b;
+    --surface-2: #1b1f23;
+    --line: #2a2e33;
+    --line-soft: #23272b;
+    --ink: #e8e6e1;
+    --ink-soft: #a8b0b8;
     --ink-faint: #8b939c;
-    --accent: #6f9dff;
-    --accent-ink: #6f9dff;
-    --accent-soft: #1a2740;
-    --ok: #56c58a;
-    --warn: #e0ac4c;
+    --accent: #fb923c;
+    --accent-ink: #fb923c;
+    --accent-soft: #2a1c12;
+    --ok: #5fbf84;
+    --warn: #e0b252;
     --bad: #ef8078;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f1113;
-  --surface: #171a1d;
-  --surface-2: #1c2024;
-  --line: #2b3036;
-  --line-soft: #23282d;
-  --ink: #e9ebee;
-  --ink-soft: #a7aeb6;
+  --bg: #0e1012;
+  --surface: #15181b;
+  --surface-2: #1b1f23;
+  --line: #2a2e33;
+  --line-soft: #23272b;
+  --ink: #e8e6e1;
+  --ink-soft: #a8b0b8;
   --ink-faint: #8b939c;
-  --accent: #6f9dff;
-  --accent-ink: #6f9dff;
-  --accent-soft: #1a2740;
-  --ok: #56c58a;
-  --warn: #e0ac4c;
+  --accent: #fb923c;
+  --accent-ink: #fb923c;
+  --accent-soft: #2a1c12;
+  --ok: #5fbf84;
+  --warn: #e0b252;
   --bad: #ef8078;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
@@ -519,6 +521,160 @@ body.compact .note { line-height: 1.35; }
   footer { padding-top: var(--s6); padding-bottom: var(--s6); }
   .result-count { margin-left: 0; }
 }
+/* Factory workbench components (wb-). Shared by /gallery and the board screen. */
+.wb-gallery-head { padding-top: var(--s6); padding-bottom: var(--s4); border-bottom: 1px solid var(--line); }
+.wb-display { font-size: var(--t-display); line-height: 1.1; letter-spacing: -0.03em; font-weight: 600; margin: 0; max-width: 68ch; }
+.wb-intro { color: var(--ink-soft); font-size: var(--t-md); margin: var(--s2) 0 0; max-width: 64ch; }
+.wb-section { margin-top: var(--s8); }
+.wb-section-title { font-size: var(--t-md); font-weight: 600; margin: 0; }
+.wb-section-meta { color: var(--ink-faint); font-size: var(--t-xs); font-family: var(--mono); margin: var(--s1) 0 var(--s3); }
+.wb-split { display: grid; gap: var(--s6); margin-top: var(--s6); }
+@media (min-width: 1100px) {
+  .wb-split { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
+}
+.wb-board-surface { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+
+.wb-meter { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
+.wb-board-surface .wb-meter { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
+.wb-meter-track { display: flex; height: 4px; background: var(--line-soft); }
+.wb-meter-seg { display: block; height: 100%; background: var(--ink-faint); }
+.wb-meter-seg[data-peak="true"] { background: var(--accent); }
+.wb-meter-stops { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.wb-meter-stop {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer;
+  padding: var(--s2) var(--s3); border: 0; border-left: 1px solid var(--line);
+  background: transparent; border-radius: 0; min-height: 44px;
+}
+.wb-meter-stop:first-child { border-left: 0; }
+.wb-meter-stop:hover { background: var(--surface-2); }
+.wb-meter-stop[aria-pressed="true"] { background: var(--accent-soft); }
+.wb-meter-name { font-size: var(--t-xs); color: var(--ink-soft); }
+.wb-meter-count { font: 600 var(--t-md)/1.1 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-faint); }
+.wb-meter-stop[data-peak="true"] .wb-meter-count { color: var(--accent-ink); }
+
+.wb-lane { border-top: 1px solid var(--line-soft); background: var(--surface); }
+.wb-lanes .wb-lane:first-child { border-top: 0; }
+.wb-lane > summary {
+  position: relative; display: flex; align-items: center; gap: var(--s2);
+  min-height: 48px; padding: var(--s2) var(--s4) var(--s2) var(--s3);
+  cursor: pointer; list-style: none;
+}
+.wb-lane > summary::-webkit-details-marker { display: none; }
+.wb-lane > summary::marker { content: ""; }
+.wb-lane > summary:hover { background: var(--surface-2); }
+.wb-lane-rail { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ink-faint); }
+.wb-lane--active .wb-lane-rail { background: var(--accent); }
+.wb-lane-name { font-size: var(--t-md); font-weight: 600; }
+.wb-lane-count { font: 600 var(--t-xs) var(--mono); color: var(--ink-soft); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 var(--s2); }
+.wb-lane-desc { font-size: var(--t-xs); color: var(--ink-faint); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-caret { margin-left: auto; color: var(--ink-faint); font-size: var(--t-xs); transition: transform 150ms ease; flex: none; }
+.wb-lane[open] > summary .wb-caret, .wb-card[open] > summary .wb-caret { transform: rotate(90deg); }
+.wb-lane-body { padding: 0 var(--s4) var(--s3) var(--s3); }
+.wb-lane-body .wb-card { border: 0; border-top: 1px solid var(--line-soft); border-radius: 0; background: transparent; }
+.wb-lane-body .wb-card:first-child { border-top: 0; }
+
+.wb-card { background: transparent; }
+.wb-card > summary {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
+  min-height: 40px; padding: var(--s2) 0; cursor: pointer; list-style: none;
+}
+.wb-card > summary::-webkit-details-marker { display: none; }
+.wb-card > summary::marker { content: ""; }
+.wb-card > summary:hover { background: var(--surface-2); }
+.wb-card-id { font: 600 var(--t-xs) var(--mono); color: var(--accent-ink); }
+.wb-card-task { font-size: var(--t-sm); line-height: 1.35; font-weight: 500; flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
+.wb-card-detail { padding: 0 0 var(--s3); }
+.wb-card-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--s1) var(--s3); font-size: var(--t-xs); margin: 0 0 var(--s2); }
+.wb-card-kv dt { color: var(--ink-faint); font-family: var(--mono); }
+.wb-card-kv dd { margin: 0; color: var(--ink-soft); font-family: var(--mono); overflow-wrap: anywhere; min-width: 0; }
+
+.wb-chip {
+  display: inline-flex; align-items: center; gap: 6px; font: var(--t-xs) var(--mono);
+  color: var(--ink-soft); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 1px var(--s2); white-space: nowrap;
+}
+.wb-chip--prio { color: var(--ink); border-color: var(--ink-faint); }
+.wb-chip--risk-low { border-color: var(--ok); }
+.wb-chip--risk-medium { border-color: var(--warn); }
+.wb-chip--risk-high { border-color: var(--bad); }
+.wb-chip--main { color: var(--ink); border-color: var(--ink-faint); }
+.wb-chip--dirty { color: var(--bad); border-color: var(--bad); }
+.wb-chip--clean { color: var(--ok); border-color: var(--ok); }
+.wb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex: none; }
+.wb-chip--risk-low .wb-dot { background: var(--ok); }
+.wb-chip--risk-medium .wb-dot { background: var(--warn); }
+.wb-chip--risk-high .wb-dot { background: var(--bad); }
+
+.wb-rail { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.wb-rail-head { padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
+.wb-rail-title { font-size: var(--t-md); font-weight: 600; margin: 0; }
+.wb-rail-meta { display: block; margin-top: var(--s1); font: var(--t-xs) var(--mono); color: var(--ink-faint); }
+.wb-rail-body { padding: 0 var(--s4); }
+.wb-wt { padding: var(--s3) 0; border-bottom: 1px solid var(--line-soft); }
+.wb-wt:last-child { border-bottom: 0; }
+.wb-wt-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.wb-wt-branch { font: 500 var(--t-sm) var(--mono); overflow-wrap: anywhere; }
+.wb-wt-figs { display: flex; gap: var(--s2); margin-left: auto; font: var(--t-xs) var(--mono); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.wb-wt-path { display: block; margin-top: var(--s1); font: var(--t-xs) var(--mono); color: var(--ink-faint); overflow-wrap: anywhere; }
+
+.wb-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
+.wb-search { position: relative; display: flex; align-items: center; flex: 1 1 220px; max-width: 340px; }
+.wb-search input {
+  width: 100%; min-height: 32px; background: transparent; border: 0;
+  border-bottom: 1px solid var(--line); border-radius: 0;
+  padding: var(--s1) 32px var(--s1) 0; font-size: var(--t-sm); color: var(--ink);
+}
+.wb-search input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wb-kbd { position: absolute; right: 0; font: var(--t-xs) var(--mono); color: var(--ink-faint); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 6px; pointer-events: none; }
+.wb-select-wrap { position: relative; display: inline-flex; align-items: center; }
+.wb-select-wrap::after {
+  content: ""; position: absolute; right: 4px; width: 6px; height: 6px;
+  border-right: 1px solid var(--ink-faint); border-bottom: 1px solid var(--ink-faint);
+  transform: rotate(45deg) translateY(-2px); pointer-events: none;
+}
+.wb-select {
+  appearance: none; -webkit-appearance: none; background: transparent; border: 0;
+  border-bottom: 1px solid var(--line); border-radius: 0;
+  padding: var(--s1) 20px var(--s1) 0; font-size: var(--t-sm); color: var(--ink); cursor: pointer;
+}
+.wb-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wb-btn {
+  display: inline-flex; align-items: center; min-height: 28px; padding: 0 var(--s2);
+  background: transparent; border: 1px solid var(--line); border-radius: var(--radius);
+  font-size: var(--t-xs); color: var(--ink-soft); cursor: pointer; white-space: nowrap;
+}
+.wb-btn:hover { border-color: var(--ink-faint); }
+.wb-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-ink); }
+.wb-result { margin-left: auto; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
+.wb-empty { margin: 0; padding: var(--s4) var(--s3); font-size: var(--t-sm); color: var(--ink-faint); }
+.wb-specimen-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding: var(--s3) 0; }
+
+.wb-tokens { display: grid; gap: var(--s4); }
+.wb-token-group { border-top: 1px solid var(--line); padding-top: var(--s3); }
+.wb-token-group h3 { margin: 0 0 var(--s2); font-size: var(--t-xs); font-weight: 600; color: var(--ink-soft); }
+.wb-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--s2); }
+.wb-swatch { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
+.wb-swatch-chip { display: block; height: 28px; }
+.wb-swatch-label { display: block; padding: 4px 6px; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
+.wb-type-row { display: flex; align-items: baseline; gap: var(--s3); padding: var(--s1) 0; border-bottom: 1px solid var(--line-soft); }
+.wb-type-row:last-child { border-bottom: 0; }
+.wb-type-sample { color: var(--ink); }
+.wb-type-label { font: var(--t-xs) var(--mono); color: var(--ink-faint); margin-left: auto; }
+.wb-space-row { display: flex; align-items: center; gap: var(--s3); padding: 2px 0; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
+.wb-space-bar { height: 8px; background: var(--accent-soft); border: 1px solid var(--accent); }
+.wb-radius-row { display: flex; gap: var(--s4); }
+.wb-radius-box { width: 56px; height: 40px; border: 1px solid var(--line); background: var(--surface-2); display: flex; align-items: center; justify-content: center; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
+
+body.compact .wb-card > summary { min-height: 32px; padding: 2px 0; }
+body.compact .wb-lane > summary { min-height: 40px; }
+
+@media (max-width: 640px) {
+  .wb-meter-stops { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wb-meter-stop { border-top: 1px solid var(--line); }
+  .wb-meter-stop:first-child, .wb-meter-stop:nth-child(2) { border-top: 0; }
+  .wb-result { margin-left: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
@@ -950,6 +1106,75 @@ JS = """
 })();
 """
 
+GALLERY_JS = """
+(function () {
+  var KEY = "board-dashboard-state";
+  var state = {theme: "system", density: "comfortable"};
+  try {
+    var saved = JSON.parse(window.localStorage.getItem(KEY) || "{}");
+    if (saved && typeof saved === "object") {
+      if (saved.theme) { state.theme = saved.theme; }
+      if (saved.density) { state.density = saved.density; }
+    }
+  } catch (e) { /* storage is unavailable; the server defaults are used */ }
+
+  function save() {
+    try { window.localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+  function each(selector, fn) {
+    Array.prototype.forEach.call(document.querySelectorAll(selector), fn);
+  }
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    var label = theme === "system" ? "System" : (theme === "dark" ? "Dark" : "Light");
+    each("[data-wb-theme]", function (button) {
+      button.textContent = label;
+      button.setAttribute("aria-label", "Colour theme: " + label + " (click to change)");
+    });
+    state.theme = theme;
+  }
+  function applyDensity(density) {
+    var compact = density === "compact";
+    document.body.classList.toggle("compact", compact);
+    each("[data-wb-density]", function (button) {
+      button.textContent = compact ? "Compact" : "Comfortable";
+      button.setAttribute("aria-pressed", compact ? "true" : "false");
+      button.setAttribute("aria-label", "Density: " + (compact ? "compact" : "comfortable") + " (click to change)");
+    });
+    state.density = compact ? "compact" : "comfortable";
+  }
+  each("[data-wb-theme]", function (button) {
+    button.addEventListener("click", function () {
+      var next = state.theme === "system" ? "light" : (state.theme === "light" ? "dark" : "system");
+      applyTheme(next);
+      save();
+    });
+  });
+  each("[data-wb-density]", function (button) {
+    button.addEventListener("click", function () {
+      applyDensity(state.density === "compact" ? "comfortable" : "compact");
+      save();
+    });
+  });
+  var search = document.getElementById("search");
+  document.addEventListener("keydown", function (event) {
+    var target = event.target;
+    var typing = target && (target.tagName === "INPUT" || target.tagName === "SELECT" ||
+      target.tagName === "TEXTAREA" || target.isContentEditable);
+    if (event.key === "/" && !typing && search) {
+      event.preventDefault();
+      search.focus();
+      search.select();
+    } else if (event.key === "Escape" && search && document.activeElement === search) {
+      search.value = "";
+      search.blur();
+    }
+  });
+  applyTheme(state.theme);
+  applyDensity(state.density);
+})();
+"""
+
 
 def esc(value):
     return html.escape("" if value is None else str(value), quote=True)
@@ -1120,6 +1345,168 @@ def render_worktrees(worktrees):
         '<th scope="col">Path</th></tr></thead>'
         '<tbody>%s</tbody></table>'
     ) % rows
+
+
+def wb_meter(counts):
+    """One segmented flow meter: a single track plus five clickable stops."""
+    values = {lane: int(counts.get(lane, 0) or 0) for lane in ACTIVE_LANES}
+    peak = max(values.values()) if values else 0
+    segments = "".join(
+        '<span class="wb-meter-seg" style="flex-grow: %d" data-peak="%s" aria-hidden="true"></span>'
+        % (count, "true" if peak and count == peak else "false")
+        for count in values.values() if count > 0
+    )
+    stops = "".join(
+        '<button type="button" class="wb-meter-stop" data-status-filter="%s" aria-pressed="false"%s>'
+        '<span class="wb-meter-name">%s</span>'
+        '<span class="wb-meter-count">%d</span></button>'
+        % (esc(lane), ' data-peak="true"' if peak and count == peak else "",
+           esc(lane), count)
+        for lane, count in values.items()
+    )
+    return (
+        '<div class="wb-meter" role="group" aria-label="Work in flight by lane">'
+        '<div class="wb-meter-track">%s</div>'
+        '<div class="wb-meter-stops">%s</div></div>'
+    ) % (segments, stops)
+
+
+def wb_lane(lane, count, description, cards_html, open=False):
+    """A lane row on the continuous board surface; no per-lane card border."""
+    return (
+        '<details class="wb-lane wb-lane--%s" data-lane="%s"%s>'
+        '<summary>'
+        '<span class="wb-lane-rail" aria-hidden="true"></span>'
+        '<span class="wb-lane-name">%s</span>'
+        '<span class="wb-lane-count">%d</span>'
+        '<span class="wb-lane-desc">%s</span>'
+        '<span class="wb-caret" aria-hidden="true">&#9656;</span>'
+        '</summary>'
+        '<div class="wb-lane-body">%s</div>'
+        '</details>'
+    ) % (
+        "active" if open else "idle",
+        esc(lane),
+        " open" if open else "",
+        esc(lane),
+        count,
+        esc(description),
+        cards_html,
+    )
+
+
+def wb_chip(kind, text):
+    dot = '<span class="wb-dot" aria-hidden="true"></span>' if kind.startswith("risk") else ""
+    return '<span class="wb-chip wb-chip--%s">%s%s</span>' % (esc(kind), dot, esc(text))
+
+
+def wb_empty(lane):
+    return '<p class="wb-empty">%s</p>' % esc(EMPTY_TEXT.get(lane, "Nothing in this lane."))
+
+
+def wb_card(card):
+    """A compact card row; the expanded body reuses render_notes and row_fingerprint."""
+    card_id = clean_text(card.get("ID"))
+    task = clean_text(card.get("Task"))
+    kind = clean_text(card.get("Type"))
+    priority = clean_text(card.get("Priority"))
+    risk_text = clean_text(card.get("Risk"))
+    level = risk_class(risk_text)
+    risk_word = level if level else RISK_EMOJI.sub("", risk_text).strip()
+    blocked = clean_text(card.get("Blocked by"))
+    if blocked in ("-", "- None.", "", "None."):
+        blocked = "none"
+    branch = clean_text(card.get("Branch/Worktree"))
+    if branch in ("-", ""):
+        branch = ""
+    fingerprint = row_fingerprint(card.get("Notes") or "")
+    kv = ["<dt>blocked</dt><dd>%s</dd>" % esc(blocked)]
+    if branch:
+        kv.append("<dt>branch</dt><dd>%s</dd>" % esc(branch))
+    if fingerprint:
+        kv.append("<dt>fingerprint</dt><dd>%s</dd>" % esc(fingerprint))
+    detail = '<dl class="wb-card-kv">%s</dl>' % "".join(kv)
+    notes_html = render_notes(str(card.get("Notes raw", "")).strip())
+    if notes_html:
+        detail += notes_html
+    chips = (
+        wb_chip("type", kind)
+        + wb_chip("prio", priority)
+        + wb_chip("risk-" + (level or "unknown"), risk_word)
+    )
+    return (
+        '<details class="wb-card"%s>'
+        '<summary>'
+        '<span class="wb-card-id">%s</span>'
+        '<span class="wb-card-task">%s</span>'
+        '%s'
+        '<span class="wb-caret" aria-hidden="true">&#9656;</span>'
+        '</summary>'
+        '<div class="wb-card-detail">%s</div>'
+        '</details>'
+    ) % (" open" if card.get("open") else "", esc(card_id), esc(task), chips, detail)
+
+
+def wb_rail(title, meta, body_html):
+    """A flat worktrees rail: title, meta and hairline-separated rows."""
+    return (
+        '<aside class="wb-rail">'
+        '<div class="wb-rail-head"><h2 class="wb-rail-title">%s</h2>'
+        '<span class="wb-rail-meta">%s</span></div>'
+        '<div class="wb-rail-body">%s</div>'
+        '</aside>'
+    ) % (esc(title), esc(meta), body_html)
+
+
+def wb_toolbar(total=0):
+    types = ("Feature", "Fix", "Chore", "Docs", "Research")
+    priorities = ("P1", "P2", "P3", "P4")
+    type_options = '<option value="">All types</option>' + "".join(
+        '<option value="%s">%s</option>' % (esc(t), esc(t)) for t in types)
+    prio_options = '<option value="">All priorities</option>' + "".join(
+        '<option value="%s">%s</option>' % (esc(p), esc(p)) for p in priorities)
+    return (
+        '<div class="wb-toolbar" role="search">'
+        '<div class="wb-search">'
+        '<label class="sr-only" for="search">Search cards</label>'
+        '<input id="search" type="search" placeholder="Search id, task, branch"'
+        ' autocomplete="off" spellcheck="false">'
+        '<kbd class="wb-kbd" aria-hidden="true">/</kbd>'
+        '</div>'
+        '<div class="wb-select-wrap"><label class="sr-only" for="type-filter">Filter by type</label>'
+        '<select id="type-filter" class="wb-select">%s</select></div>'
+        '<div class="wb-select-wrap"><label class="sr-only" for="priority-filter">Filter by priority</label>'
+        '<select id="priority-filter" class="wb-select">%s</select></div>'
+        '<button type="button" class="wb-btn" data-wb-density aria-pressed="false">Comfortable</button>'
+        '<span id="result-count" class="wb-result" aria-live="polite">showing %d of %d</span>'
+        '</div>'
+    ) % (type_options, prio_options, total, total)
+
+
+def wb_wt_row(worktree):
+    tags = []
+    if worktree["main"]:
+        tags.append(wb_chip("main", "main"))
+    tags.append(wb_chip("dirty", "dirty") if worktree["dirty"] else wb_chip("clean", "clean"))
+    ahead = worktree["ahead"] if worktree["ahead"] is not None else "?"
+    behind = worktree["behind"] if worktree["behind"] is not None else "?"
+    return (
+        '<div class="wb-wt">'
+        '<div class="wb-wt-top">'
+        '<span class="wb-wt-branch">%s</span>%s'
+        '<span class="wb-wt-figs">'
+        '<span aria-label="ahead %s">+%s</span>'
+        '<span aria-label="behind %s">-%s</span>'
+        '</span></div>'
+        '<span class="wb-wt-path">%s</span>'
+        '</div>'
+    ) % (
+        esc(worktree["branch"]),
+        " ".join(tags),
+        esc(ahead), esc(ahead),
+        esc(behind), esc(behind),
+        esc(worktree["path"]),
+    )
 
 
 def row_fingerprint(notes):
@@ -1421,11 +1808,221 @@ def build_html(boards, worktrees, generated_at, error, refresh):
         '</details>',
         '</main>',
         '<footer class="shell">', str(total), ' card(s) across ', str(len(boards)), ' board(s)',
-        ' &middot; refresh every ', str(refresh), 's, pausable</footer>\n',
+        ' &middot; refresh every ', str(refresh), 's, pausable',
+        ' &middot; <a href="/gallery">Components</a></footer>\n',
         "<script>", JS, "</script>\n",
         "</body></html>",
     ]
     return "".join(html_parts)
+
+
+GALLERY_COUNTS = {
+    "Ready": 0,
+    "In Progress": 1,
+    "In Review": 2,
+    "Pending Merge": 0,
+    "Blocked": 1,
+}
+WB_SWATCHES = (
+    ("--bg", "paper"),
+    ("--surface", "surface"),
+    ("--surface-2", "surface 2"),
+    ("--ink", "ink"),
+    ("--ink-soft", "ink soft"),
+    ("--ink-faint", "ink faint"),
+    ("--line", "line"),
+    ("--line-soft", "line soft"),
+    ("--accent", "signal orange"),
+    ("--accent-ink", "orange ink"),
+    ("--accent-soft", "orange wash"),
+    ("--ok", "ok"),
+    ("--warn", "warn"),
+    ("--bad", "bad"),
+)
+WB_TYPE_STEPS = (
+    ("--t-xs", "11px", "Caption and chips"),
+    ("--t-sm", "13px", "Meta and card rows"),
+    ("--t-md", "15px", "Body and controls"),
+    ("--t-lg", "20px", "Section figures"),
+    ("--t-display", "34px", "Page display"),
+)
+WB_SPACE_STEPS = (
+    ("--s1", 4),
+    ("--s2", 8),
+    ("--s3", 12),
+    ("--s4", 16),
+    ("--s6", 24),
+    ("--s8", 32),
+    ("--s12", 48),
+    ("--s16", 64),
+)
+WB_RADII = (("--radius-sm", 4), ("--radius", 6), ("--radius-lg", 10))
+
+
+def gallery_tokens_html():
+    swatches = "".join(
+        '<div class="wb-swatch"><span class="wb-swatch-chip" style="background: var(%s)"></span>'
+        '<span class="wb-swatch-label">%s</span></div>' % (esc(name), esc(label))
+        for name, label in WB_SWATCHES
+    )
+    type_rows = "".join(
+        '<div class="wb-type-row"><span class="wb-type-sample" style="font-size: var(%s)">'
+        'Factory components</span><span class="wb-type-label">%s · %s</span></div>'
+        % (esc(name), esc(size), esc(role))
+        for name, size, role in WB_TYPE_STEPS
+    )
+    space_rows = "".join(
+        '<div class="wb-space-row"><span class="wb-space-bar" style="width: %dpx"></span>'
+        '<span>%s · %dpx</span></div>' % (px, esc(name), px)
+        for name, px in WB_SPACE_STEPS
+    )
+    radius_boxes = "".join(
+        '<div class="wb-radius-box" style="border-radius: var(%s)">%dpx</div>'
+        % (esc(name), px)
+        for name, px in WB_RADII
+    )
+    return (
+        '<div class="wb-tokens">'
+        '<div class="wb-token-group"><h3>Colour</h3>'
+        '<div class="wb-swatches">%s</div></div>'
+        '<div class="wb-token-group"><h3>Type</h3>%s</div>'
+        '<div class="wb-token-group"><h3>Spacing</h3>%s</div>'
+        '<div class="wb-token-group"><h3>Radius</h3>'
+        '<div class="wb-radius-row">%s</div></div>'
+        '</div>'
+    ) % (swatches, type_rows, space_rows, radius_boxes)
+
+
+def gallery_fixtures():
+    open_card = {
+        "ID": "BOARD-112",
+        "Task": "Rebuild the factory pages as a split workbench",
+        "Type": "Feature",
+        "Priority": "P2",
+        "Risk": "🟡 medium — console is read-only, the change is visual",
+        "Blocked by": "- None.",
+        "Branch/Worktree": ("branch feat/rebuild-factory-pages-as-a-split · "
+                            ".kilo/worktrees/rebuild-factory-pages-as-a-split"),
+        "Notes": "fp=feat|visual|/gallery|peak-lane",
+        "Notes raw": ("- [x] /gallery returns 200 proof: HTTP 200 · "
+                      "- [ ] Peak lane is the only orange segment proof: capture 1440 · "
+                      "- [ ] Board page keeps its filters, keyboard and URL state"),
+        "open": True,
+    }
+    second_card = {
+        "ID": "BOARD-113",
+        "Task": "Wire the lane filters to the workbench rail",
+        "Type": "Fix",
+        "Priority": "P1",
+        "Risk": "🟢 low — fixture only",
+        "Blocked by": "BOARD-112",
+        "Branch/Worktree": "branch feat/workbench-filters",
+        "Notes": "",
+        "Notes raw": ("- [ ] Filter state stays in the URL · "
+                      "- [ ] Escape clears every control"),
+    }
+    blocked_card = {
+        "ID": "BOARD-104",
+        "Task": "Decide whether the rail folds below the lanes at tablet width",
+        "Type": "Feature",
+        "Priority": "P3",
+        "Risk": "🟡 medium — layout only",
+        "Blocked by": "- None.",
+        "Branch/Worktree": "-",
+        "Notes": "",
+        "Notes raw": "Waiting on gallery approval before the split breakpoint is fixed.",
+    }
+    worktrees = [
+        {"main": True, "branch": "main", "path": "/workspaces/yt",
+         "ahead": 0, "behind": 0, "dirty": False},
+        {"main": False, "branch": "feat/rebuild-factory-pages-as-a-split",
+         "path": "/workspaces/yt/.kilo/worktrees/rebuild-factory-pages-as-a-split",
+         "ahead": 3, "behind": 0, "dirty": False},
+        {"main": False, "branch": "feat/board-console",
+         "path": "/workspaces/yt/.kilo/worktrees/board-console",
+         "ahead": 7, "behind": 2, "dirty": True},
+    ]
+    return open_card, second_card, blocked_card, worktrees
+
+
+def build_gallery_html():
+    open_card, second_card, blocked_card, worktrees = gallery_fixtures()
+    lanes = (
+        wb_lane("In Review", 2, LANE_DESCRIPTION["In Review"],
+                wb_card(open_card) + wb_card(second_card), open=True)
+        + wb_lane("Blocked", 1, LANE_DESCRIPTION["Blocked"], wb_card(blocked_card))
+    )
+    rail = wb_rail(
+        "Worktrees",
+        "3 worktrees · 2 non-main",
+        "".join(wb_wt_row(worktree) for worktree in worktrees),
+    )
+    chips = " ".join(
+        wb_chip(kind, text) for kind, text in (
+            ("type", "Feature"), ("prio", "P2"),
+            ("risk-low", "low"), ("risk-medium", "medium"), ("risk-high", "high"),
+            ("main", "main"), ("dirty", "dirty"), ("clean", "clean"),
+        )
+    )
+    mark = (
+        '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" '
+        'stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
+        '<path d="M3 20V9l6 3V9l6 3V4h6v16z"/>'
+        '<path d="M6 16h3M12 16h3"/></svg>'
+    )
+    return "".join([
+        "<!doctype html>\n",
+        '<html lang="en" data-theme="system"><head><meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<meta name="color-scheme" content="light dark">',
+        '<link rel="icon" href="', FAVICON, '">',
+        "<title>Factory components</title><style>", CSS, "</style></head><body>\n",
+        '<header class="appbar">',
+        '<div class="shell appbar-inner">',
+        '<div class="brand">', mark,
+        '<div class="brand-text">',
+        '<span class="wordmark">Factory components</span>',
+        '<span class="sublabel">One architect sees work in flight, decisions waiting, '
+        'and where the worktrees are</span>',
+        '</div></div>',
+        '<div class="appbar-actions">',
+        '<button type="button" class="btn" data-wb-theme aria-label="Colour theme">System</button>',
+        '<button type="button" class="btn" data-wb-density aria-pressed="false" aria-label="Density">'
+        'Comfortable</button>',
+        '</div></div></header>\n',
+        '<main>',
+        '<section class="shell wb-gallery-head">',
+        '<h1 class="wb-display">Components</h1>',
+        '<p class="wb-intro">The pieces the factory console is built from — flow meter, lanes, '
+        'cards, worktree rail and toolbar.</p>',
+        '</section>',
+        '<section class="shell">',
+        '<div class="wb-split">',
+        '<div class="wb-board-surface">',
+        wb_meter(GALLERY_COUNTS),
+        wb_toolbar(3),
+        '<div class="wb-lanes">', lanes, '</div>',
+        '</div>',
+        '<div>', rail, '</div>',
+        '</div>',
+        '<section class="wb-section">',
+        '<h2 class="wb-section-title">Chips and empty state</h2>',
+        '<p class="wb-section-meta">Semantic chips stay quiet; the empty state names the next action.</p>',
+        '<div class="wb-specimen-row">', chips, '</div>',
+        wb_empty("Ready"),
+        '</section>',
+        '<section class="wb-section">',
+        '<h2 class="wb-section-title">Tokens</h2>',
+        '<p class="wb-section-meta">The language is tokens, not one-off values. '
+        'Swatches follow the active theme.</p>',
+        gallery_tokens_html(),
+        '</section>',
+        '</section>',
+        '</main>',
+        '<footer class="shell"><a href="/">Back to the board</a></footer>\n',
+        "<script>", GALLERY_JS, "</script>\n",
+        "</body></html>",
+    ])
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1464,6 +2061,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/":
             html_body = self.state["html"]()
+            self.send_bytes(200, html_body.encode("utf-8"), "text/html; charset=utf-8")
+            return
+        if path == "/gallery":
+            html_body = self.state["gallery"]()
             self.send_bytes(200, html_body.encode("utf-8"), "text/html; charset=utf-8")
             return
         self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
@@ -1545,6 +2146,7 @@ def main(argv):
         "board_payload": board_payload,
         "worktree_payload": worktree_payload,
         "html": html_page,
+        "gallery": build_gallery_html,
         "refresh": max(1, args.refresh),
     }
 
