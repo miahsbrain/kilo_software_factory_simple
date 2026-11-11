@@ -201,6 +201,7 @@ CSS = """
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px; --s12: 48px;
   --t-xs: 11px; --t-sm: 13px; --t-md: 15px; --t-lg: 20px; --t-xl: 28px;
   --appbar-h: 60px;
+  --shell: 1360px;
   --measure: 65ch;
   --shadow: 0 1px 2px rgba(20, 23, 26, 0.06);
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -255,12 +256,16 @@ button, input, select { font: inherit; color: inherit; }
 a { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+.shell {
+  width: 100%; max-width: var(--shell); margin: 0 auto;
+  padding-left: var(--s6); padding-right: var(--s6);
+}
+
 .appbar {
   position: sticky; top: 0; z-index: 30;
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4);
-  padding: var(--s2) var(--s6); min-height: var(--appbar-h);
   background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
 }
+.appbar-inner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); min-height: var(--appbar-h); }
 .brand { display: flex; align-items: center; gap: var(--s3); min-width: 0; flex: 1 1 260px; }
 .mark { width: 28px; height: 28px; flex: none; color: var(--accent); }
 .brand-text { min-width: 0; }
@@ -285,14 +290,14 @@ a { color: var(--accent); }
 
 main { display: block; }
 
-.overview { padding: var(--s6) var(--s6) var(--s4); border-bottom: 1px solid var(--line); }
+.overview { padding-top: var(--s6); padding-bottom: var(--s4); border-bottom: 1px solid var(--line); }
 .headline { font-size: var(--t-xl); line-height: 1.15; margin: 0; letter-spacing: -0.02em; font-weight: 650; max-width: var(--measure); }
 .headline .num { font-family: var(--mono); }
 .headline .metric, .headline .sep, .headline-meta .metric, .headline-meta .sep { display: inline-block; }
 .headline .sep, .headline-meta .sep { margin: 0 4px; }
 .headline-meta { font-size: var(--t-sm); color: var(--ink-soft); margin: var(--s1) 0 0; max-width: var(--measure); }
 .overview-sub { color: var(--ink-soft); font-size: var(--t-sm); margin: var(--s1) 0 0; max-width: var(--measure); }
-.pipeline { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s2); margin-top: var(--s4); max-width: 1080px; }
+.pipeline { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s2); margin-top: var(--s4); }
 .pipe {
   display: flex; flex-direction: column; gap: var(--s1); text-align: left;
   padding: var(--s2) var(--s3); min-height: 60px; cursor: pointer;
@@ -306,7 +311,7 @@ main { display: block; }
 .pipe-bar { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .pipe-bar span { display: block; height: 100%; background: var(--accent); }
 
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding: var(--s3) var(--s6); border-bottom: 1px solid var(--line); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding-top: var(--s3); padding-bottom: var(--s3); border-bottom: 1px solid var(--line); }
 .search-wrap { position: relative; display: flex; align-items: center; flex: 1 1 240px; max-width: 360px; }
 #search {
   width: 100%; min-height: 32px; padding: var(--s1) 56px var(--s1) var(--s2);
@@ -332,11 +337,10 @@ main { display: block; }
 .toolbar .btn { min-height: 32px; }
 
 .banner {
-  margin: var(--s4) var(--s6) 0; padding: var(--s3) var(--s4);
+  margin: var(--s4) 0 0; padding: var(--s3) var(--s4);
   border: 1px solid var(--bad); border-left-width: 3px; border-radius: var(--radius);
   color: var(--bad); background: var(--surface); font-size: var(--t-sm);
 }
-.board { margin: 0 var(--s6); }
 .panel-head {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s3);
   border-bottom: 1px solid var(--line); padding-bottom: var(--s2); margin-bottom: var(--s3);
@@ -344,7 +348,7 @@ main { display: block; }
 .panel-head > * { min-width: 0; }
 .panel-head h2 { font-size: var(--t-md); margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 .panel-head .meta { margin-left: auto; }
-.panel { margin: var(--s6) var(--s6) 0; }
+.panel { margin: var(--s6) 0 0; }
 details.panel > summary {
   list-style: none; cursor: pointer; min-height: 40px; align-items: center; border-radius: var(--radius);
 }
@@ -373,7 +377,7 @@ details.panel > summary:hover { background: var(--line-soft); }
 .tag.dirty { border-color: var(--bad); color: var(--bad); }
 .tag.clean { border-color: var(--ok); color: var(--ok); }
 
-.lane-stack { margin: var(--s6) 0 var(--s8); display: flex; flex-direction: column; gap: var(--s2); max-width: 1080px; }
+.lane-stack { margin: var(--s6) 0 var(--s8); display: flex; flex-direction: column; gap: var(--s2); }
 .lane {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
   transition: border-color 150ms ease;
@@ -463,7 +467,7 @@ details.panel > summary:hover { background: var(--line-soft); }
 }
 .more:hover { border-color: var(--accent); }
 .empty { font-size: var(--t-xs); color: var(--ink-faint); padding: var(--s2) var(--s1); }
-footer { padding: var(--s6) var(--s6) var(--s8); color: var(--ink-faint); font-size: var(--t-xs); font-family: var(--mono); }
+footer { padding-top: var(--s6); padding-bottom: var(--s8); color: var(--ink-faint); font-size: var(--t-xs); font-family: var(--mono); }
 .hidden { display: none !important; }
 .filtered { display: none !important; }
 .lane-filtered { display: none !important; }
@@ -488,15 +492,14 @@ body.compact .note { line-height: 1.35; }
 }
 @media (max-width: 480px) {
   :root { --appbar-h: 56px; }
-  .appbar { padding: var(--s2) var(--s3); }
-  .overview { padding: var(--s4) var(--s3) var(--s3); }
+  .shell { padding-left: var(--s3); padding-right: var(--s3); }
+  .overview { padding-top: var(--s4); padding-bottom: var(--s3); }
   .headline { font-size: var(--t-lg); }
-  .toolbar { padding: var(--s2) var(--s3); }
-  .banner { margin: var(--s3) var(--s3) 0; }
-  .panel { margin: var(--s4) var(--s3) 0; }
-  .board { margin: 0 var(--s3); }
+  .toolbar { padding-top: var(--s2); padding-bottom: var(--s2); }
+  .banner { margin: var(--s3) 0 0; }
+  .panel { margin: var(--s4) 0 0; }
   .lane-stack { margin: var(--s4) 0 var(--s6); }
-  footer { padding: var(--s6) var(--s3); }
+  footer { padding-top: var(--s6); padding-bottom: var(--s6); }
   .result-count { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1206,7 +1209,7 @@ def render_board(entry):
         banner = '<p class="banner">%s</p>' % esc(entry["error"])
     lanes_html = "\n".join(render_lane(lane, rows, entry["label"]) for lane in LANE_ORDER)
     return (
-        '<section class="board" data-board="%s">'
+        '<section class="board shell" data-board="%s">'
         '<div class="panel-head"><h2>%s board</h2>'
         '<span class="meta">%d card(s) &middot; %s</span></div>'
         '<p class="meta board-path" title="%s">%s</p>%s'
@@ -1267,7 +1270,7 @@ def render_toolbar(total_cards):
     prio_options = '<option value="">All priorities</option>' + "".join(
         '<option value="%s">%s</option>' % (esc(p), esc(p)) for p in priorities)
     return (
-        '<div class="toolbar" role="search">'
+        '<div class="toolbar shell" role="search">'
         '<div class="search-wrap">'
         '<label class="sr-only" for="search">Search cards</label>'
         '<input id="search" type="search" placeholder="Search id, task, branch"'
@@ -1297,7 +1300,7 @@ def build_html(boards, worktrees, generated_at, error, refresh):
     sep = '<span class="sep" aria-hidden="true">&middot;</span>'
     banner = ""
     if error:
-        banner = '<p class="banner">%s</p>' % esc(error)
+        banner = '<div class="shell"><p class="banner">%s</p></div>' % esc(error)
     if active_total == 0:
         meta = []
         merged = last_merged_id(boards)
@@ -1340,6 +1343,7 @@ def build_html(boards, worktrees, generated_at, error, refresh):
         "<title>Factory Board</title><style>", CSS, "</style></head><body",
         ' data-refresh="', str(refresh), '">\n',
         '<header class="appbar">',
+        '<div class="shell appbar-inner">',
         '<div class="brand">', mark,
         '<div class="brand-text">',
         '<span class="wordmark">Factory Board</span>',
@@ -1353,13 +1357,13 @@ def build_html(boards, worktrees, generated_at, error, refresh):
         '<button type="button" class="btn" id="refresh-now">Refresh now</button>',
         '<button type="button" class="btn" id="theme-toggle" aria-label="Colour theme">System</button>',
         '<button type="button" class="btn" id="density-toggle" aria-pressed="false">Comfortable</button>',
-        '</div></header>\n',
+        '</div></div></header>\n',
         '<main>',
-        '<section class="overview">', headline, render_pipeline(counts), '</section>',
+        '<section class="overview shell">', headline, render_pipeline(counts), '</section>',
         render_toolbar(total),
         banner,
         boards_html,
-        '<details class="panel wt-panel">',
+        '<details class="panel wt-panel shell">',
         '<summary class="panel-head">',
         '<span class="caret" aria-hidden="true">&#9656;</span>',
         '<span class="panel-title">Worktrees</span>',
@@ -1367,7 +1371,7 @@ def build_html(boards, worktrees, generated_at, error, refresh):
         render_worktrees(worktrees),
         '</details>',
         '</main>',
-        '<footer>', str(total), ' card(s) across ', str(len(boards)), ' board(s)',
+        '<footer class="shell">', str(total), ' card(s) across ', str(len(boards)), ' board(s)',
         ' &middot; refresh every ', str(refresh), 's, pausable</footer>\n',
         "<script>", JS, "</script>\n",
         "</body></html>",
