@@ -194,502 +194,6 @@ def worktree_state(worktree, root):
     return entries
 
 
-CSS = """
-:root {
-  --bg: #f7f7f5;
-  --surface: #ffffff;
-  --surface-2: #f1f0ec;
-  --line: #e2e0da;
-  --line-soft: #ecebe7;
-  --ink: #16181b;
-  --ink-soft: #4b5259;
-  --ink-faint: #5f666e;
-  --accent: #c2410c;
-  --accent-ink: #b93a0a;
-  --accent-soft: #fdece3;
-  --ok: #2f7d4f;
-  --warn: #a16207;
-  --bad: #b42318;
-  --radius-sm: 4px;
-  --radius: 6px;
-  --radius-lg: 10px;
-  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px; --s12: 48px; --s16: 64px;
-  --t-xs: 11px; --t-sm: 13px; --t-md: 15px; --t-lg: 20px; --t-xl: 28px; --t-display: 34px;
-  --appbar-h: 60px;
-  --shell: 1360px;
-  --measure: 65ch;
-  --shadow: 0 1px 2px rgba(20, 23, 26, 0.06);
-  --mono: ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0e1012;
-    --surface: #15181b;
-    --surface-2: #1b1f23;
-    --line: #2a2e33;
-    --line-soft: #23272b;
-    --ink: #e8e6e1;
-    --ink-soft: #a8b0b8;
-    --ink-faint: #8b939c;
-    --accent: #fb923c;
-    --accent-ink: #fb923c;
-    --accent-soft: #2a1c12;
-    --ok: #5fbf84;
-    --warn: #e0b252;
-    --bad: #ef8078;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0e1012;
-  --surface: #15181b;
-  --surface-2: #1b1f23;
-  --line: #2a2e33;
-  --line-soft: #23272b;
-  --ink: #e8e6e1;
-  --ink-soft: #a8b0b8;
-  --ink-faint: #8b939c;
-  --accent: #fb923c;
-  --accent-ink: #fb923c;
-  --accent-soft: #2a1c12;
-  --ok: #5fbf84;
-  --warn: #e0b252;
-  --bad: #ef8078;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-* { box-sizing: border-box; }
-[hidden] { display: none !important; }
-.sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-}
-body {
-  margin: 0; background: var(--bg); color: var(--ink);
-  font: var(--t-md)/1.5 var(--sans);
-  -webkit-font-smoothing: antialiased;
-}
-button, input, select { font: inherit; color: inherit; }
-a { color: var(--accent-ink); }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-.shell {
-  width: 100%; max-width: var(--shell); margin: 0 auto;
-  padding-left: var(--s6); padding-right: var(--s6);
-}
-
-.appbar {
-  position: sticky; top: 0; z-index: 30;
-  background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
-}
-.appbar-inner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); min-height: 60px; }
-.brand { display: flex; align-items: center; gap: var(--s3); min-width: 0; flex: 1 1 260px; }
-.mark { width: 28px; height: 28px; flex: none; color: var(--accent); }
-.brand-text { min-width: 0; }
-.wordmark { display: block; font-size: var(--t-md); font-weight: 600; line-height: 1.2; }
-.sublabel { display: block; font-size: var(--t-xs); color: var(--ink-soft); line-height: 1.3; max-width: var(--measure); }
-.appbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
-
-.btn {
-  display: inline-flex; align-items: center; gap: var(--s1);
-  min-height: 28px; padding: 0 var(--s2); border: 1px solid var(--line);
-  background: var(--surface); color: var(--ink); border-radius: var(--radius);
-  font-size: var(--t-xs); cursor: pointer; white-space: nowrap;
-}
-.btn:hover { border-color: var(--ink-faint); }
-.btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
-.btn .caret-sm { font-size: 10px; color: var(--ink-faint); }
-
-.live { display: inline-flex; align-items: center; gap: 6px; font: var(--t-xs) var(--mono); color: var(--ink-soft); }
-.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: pulse 2s ease-in-out infinite; }
-.live.stale .live-dot { background: var(--ink-faint); animation: none; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-
-main { display: block; }
-
-.overview { padding-top: var(--s6); padding-bottom: var(--s4); border-bottom: 1px solid var(--line); }
-.headline { font-size: var(--t-xl); line-height: 1.15; margin: 0; letter-spacing: -0.02em; font-weight: 600; max-width: var(--measure); }
-.headline .num { font-family: var(--mono); }
-.headline .metric, .headline .sep, .headline-meta .metric, .headline-meta .sep { display: inline-block; }
-.headline .sep, .headline-meta .sep { margin: 0 4px; }
-.headline-meta { font-size: var(--t-sm); color: var(--ink-soft); margin: var(--s1) 0 0; max-width: var(--measure); }
-.overview-sub { color: var(--ink-soft); font-size: var(--t-sm); margin: var(--s1) 0 0; max-width: var(--measure); }
-.flow {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin-top: var(--s4); border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--surface); overflow: hidden;
-}
-.flow-stop {
-  display: flex; flex-direction: column; gap: var(--s1); text-align: left; cursor: pointer;
-  border: 0; border-left: 1px solid var(--line); border-radius: 0;
-  background: transparent; padding: var(--s3) var(--s3) var(--s2);
-}
-.flow-stop:first-child { border-left: 0; }
-.flow-stop:hover { background: var(--surface-2); }
-.flow-stop[aria-pressed="true"] { background: var(--accent-soft); }
-.flow-name { font-size: var(--t-xs); color: var(--ink-soft); }
-.flow-count { font: 600 var(--t-lg)/1 var(--mono); color: var(--ink-soft); }
-.flow-stop[data-active="true"] .flow-count { color: var(--accent-ink); }
-.flow-bar { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
-.flow-bar span { display: block; height: 100%; background: var(--ink-faint); }
-.flow-stop[data-active="true"] .flow-bar span { background: var(--accent); }
-
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding-top: var(--s3); padding-bottom: var(--s3); border-bottom: 1px solid var(--line); }
-.search-wrap { position: relative; display: flex; align-items: center; flex: 1 1 240px; max-width: 360px; }
-#search {
-  width: 100%; min-height: 32px; padding: var(--s1) 56px var(--s1) var(--s2);
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-  font-size: var(--t-sm);
-}
-#search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.kbd {
-  position: absolute; right: var(--s2); font: var(--t-xs) var(--mono); color: var(--ink-faint);
-  border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; pointer-events: none;
-}
-.search-clear {
-  position: absolute; right: var(--s1); width: 28px; height: 28px; display: inline-flex;
-  align-items: center; justify-content: center; border: 0; background: transparent;
-  color: var(--ink-soft); border-radius: var(--radius); cursor: pointer; font-size: var(--t-md);
-}
-.search-clear:hover { background: var(--line-soft); }
-.toolbar select {
-  min-height: 32px; padding: 0 var(--s2); background: var(--surface);
-  border: 1px solid var(--line); border-radius: var(--radius); font-size: var(--t-sm);
-}
-.result-count { font: var(--t-xs) var(--mono); color: var(--ink-soft); margin-left: auto; }
-.toolbar .btn { min-height: 32px; }
-
-.banner {
-  margin: var(--s4) 0 0; padding: var(--s3) var(--s4);
-  border: 1px solid var(--bad); border-left-width: 3px; border-radius: var(--radius);
-  color: var(--bad); background: var(--surface); font-size: var(--t-sm);
-}
-.panel-head {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s3);
-  border-bottom: 1px solid var(--line); padding-bottom: var(--s2); margin-bottom: var(--s3);
-}
-.panel-head > * { min-width: 0; }
-.panel-head h2 { font-size: var(--t-md); margin: 0; font-weight: 600; }
-.panel-head .meta { margin-left: auto; }
-.panel { margin: var(--s6) 0 0; }
-details.panel > summary {
-  list-style: none; cursor: pointer; min-height: 40px; align-items: center; border-radius: var(--radius);
-}
-details.panel > summary::-webkit-details-marker { display: none; }
-details.panel > summary::marker { content: ""; }
-details.panel > summary:hover { background: var(--line-soft); }
-.panel-title { font-size: var(--t-md); font-weight: 600; }
-
-.wt-table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
-.wt-table th {
-  text-align: left; font: 600 var(--t-xs) var(--mono); color: var(--ink-faint);
-  padding: var(--s2) var(--s3);
-  border-bottom: 1px solid var(--line); background: var(--surface-2);
-}
-.wt-table td { padding: var(--s2) var(--s3); border-bottom: 1px solid var(--line-soft); vertical-align: top; }
-.wt-table tr:last-child td { border-bottom: 0; }
-.wt-table .num { font-family: var(--mono); text-align: right; width: 64px; }
-.wt-table .wt-branch { font-family: var(--mono); font-weight: 500; overflow-wrap: anywhere; }
-.wt-table .path { font-family: var(--mono); font-size: var(--t-xs); color: var(--ink-faint); overflow-wrap: anywhere; }
-.wt-table tr.is-main td { background: var(--surface-2); }
-.tag {
-  display: inline-block; font-size: var(--t-xs); font-family: var(--mono);
-  border: 1px solid var(--line); border-radius: 4px; padding: 0 var(--s2); color: var(--ink-soft);
-}
-.tag.main { border-color: var(--ink-faint); color: var(--ink); }
-.tag.dirty { border-color: var(--bad); color: var(--bad); }
-.tag.clean { border-color: var(--ok); color: var(--ok); }
-
-.lane-stack { margin: var(--s6) 0 var(--s8); display: flex; flex-direction: column; gap: var(--s2); }
-.lane {
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
-  transition: border-color 150ms ease;
-}
-.lane[data-lane="Ready"] > summary { --rail: var(--ink-faint); }
-.lane[data-lane="In Progress"] > summary { --rail: var(--ink); }
-.lane[data-lane="In Review"] > summary { --rail: var(--ink-soft); }
-.lane[data-lane="Pending Merge"] > summary { --rail: var(--warn); }
-.lane[data-lane="Blocked"] > summary { --rail: var(--bad); }
-.lane[data-lane="Merged"] > summary { --rail: var(--ok); }
-.lane > summary {
-  position: sticky; top: var(--appbar-h); z-index: 5;
-  display: flex; align-items: center; gap: var(--s2);
-  padding: var(--s2) var(--s4) var(--s2) var(--s3); cursor: pointer; min-height: 44px;
-  list-style: none; border-radius: var(--radius-lg);
-  border-left: 4px solid var(--rail, var(--line)); background: var(--surface);
-}
-.lane > summary::-webkit-details-marker { display: none; }
-.lane > summary::marker { content: ""; }
-.lane > summary:hover { background: var(--line-soft); }
-.caret { color: var(--ink-faint); flex: none; font-size: var(--t-xs); transition: transform 150ms ease; }
-.lane[open] > summary .caret, .wt-panel[open] > summary .caret { transform: rotate(90deg); }
-.lane-name { font-size: var(--t-sm); font-weight: 600; color: var(--ink); }
-.count {
-  font-family: var(--mono); font-size: var(--t-xs); color: var(--ink-soft);
-  border: 1px solid var(--line); border-radius: 4px; padding: 0 var(--s2);
-}
-.lane-desc { font-size: var(--t-xs); color: var(--ink-faint); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lane-body { display: flex; flex-direction: column; gap: var(--s2); padding: 0 var(--s3) var(--s3); }
-.card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); transition: border-color 150ms ease; }
-.card.extra { display: none; }
-.lane-body.all .card.extra { display: block; }
-.lane-body.searching .card.extra { display: block; }
-.card > summary {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
-  padding: var(--s2) var(--s3); cursor: pointer; min-height: 36px;
-  list-style: none; border-radius: var(--radius);
-}
-.card > summary::-webkit-details-marker { display: none; }
-.card > summary::marker { content: ""; }
-.card > summary:hover { background: var(--line-soft); }
-.card-caret { margin-left: auto; color: var(--ink-faint); font-size: var(--t-xs); transition: transform 150ms ease; flex: none; }
-.card[open] > summary .card-caret { transform: rotate(90deg); }
-.card.selected { border-color: var(--accent); }
-.card.selected > summary { background: var(--accent-soft); outline: 2px solid var(--accent); outline-offset: -2px; }
-.card-id { font-family: var(--mono); font-size: var(--t-xs); font-weight: 600; color: var(--accent-ink); }
-.card-task { font-size: var(--t-sm); line-height: 1.35; margin: 0; font-weight: 500; flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
-.chip {
-  font-size: var(--t-xs); font-family: var(--mono); border-radius: 4px;
-  padding: 1px var(--s2); border: 1px solid var(--line); color: var(--ink-soft); white-space: nowrap;
-}
-.chip.prio { border-color: var(--ink-faint); color: var(--ink); }
-.chip.risk { display: inline-flex; align-items: center; gap: 6px; }
-.chip.risk.low { border-color: var(--ok); }
-.chip.risk.medium { border-color: var(--warn); }
-.chip.risk.high { border-color: var(--bad); }
-.risk-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex: none; }
-.chip.risk.low .risk-dot { background: var(--ok); }
-.chip.risk.medium .risk-dot { background: var(--warn); }
-.chip.risk.high .risk-dot { background: var(--bad); }
-.card-detail { padding: 0 var(--s3) var(--s3); }
-.card-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--s1) var(--s3); font-size: var(--t-xs); margin: var(--s2) 0 0; }
-.card-kv dt { color: var(--ink-faint); font-family: var(--mono); }
-.card-kv dd { margin: 0; color: var(--ink-soft); font-family: var(--mono); overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
-.kv-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
-.copy {
-  font: var(--t-xs) var(--mono); min-height: 24px; padding: 0 var(--s2); cursor: pointer;
-  border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); border-radius: 4px;
-}
-.copy:hover { border-color: var(--accent); color: var(--accent-ink); }
-.notes { list-style: none; margin: var(--s2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); }
-.note { display: flex; align-items: flex-start; gap: var(--s2); font-size: var(--t-xs); color: var(--ink-soft); line-height: 1.45; }
-.note-box {
-  flex: none; width: 14px; height: 14px; margin-top: 1px; border: 1px solid var(--ink-faint);
-  border-radius: 3px; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 10px; color: var(--ok);
-}
-.note-check.done .note-box { border-color: var(--ok); }
-.note-text { min-width: 0; overflow-wrap: anywhere; }
-.note-proof-text { display: block; margin-top: 1px; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
-.note-proof { font-family: var(--mono); color: var(--ink-faint); }
-.note-free { color: var(--ink-soft); }
-.more {
-  align-self: flex-start; font: var(--t-xs)/1.4 var(--mono); color: var(--accent-ink);
-  background: transparent; border: 1px solid var(--line); border-radius: var(--radius);
-  padding: var(--s1) var(--s3); min-height: 28px; cursor: pointer;
-}
-.more:hover { border-color: var(--accent); }
-.empty { font-size: var(--t-xs); color: var(--ink-faint); padding: var(--s2) var(--s1); }
-footer { padding-top: var(--s6); padding-bottom: var(--s8); color: var(--ink-faint); font-size: var(--t-xs); font-family: var(--mono); }
-.hidden { display: none !important; }
-.filtered { display: none !important; }
-.lane-filtered { display: none !important; }
-
-body.compact .lane-body { gap: var(--s1); padding-bottom: var(--s2); }
-body.compact .card > summary { min-height: 28px; padding: 2px var(--s2); }
-body.compact .lane > summary { min-height: 36px; padding-top: var(--s1); padding-bottom: var(--s1); }
-body.compact .card-task { font-size: var(--t-xs); }
-body.compact .note { line-height: 1.35; }
-
-@media (max-width: 760px) {
-  .lane-desc { display: none; }
-}
-@media (max-width: 640px) {
-  .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: hidden; }
-  .flow-stop { padding: var(--s2) var(--s1); }
-  .flow-name { line-height: 1.2; min-height: 2.4em; }
-  .wt-table thead { display: none; }
-  .wt-table, .wt-table tbody, .wt-table tr, .wt-table td { display: block; width: 100%; }
-  .wt-table tr { border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: var(--s2); background: var(--surface); }
-  .wt-table td { border: 0; padding: var(--s1) var(--s3); display: flex; gap: var(--s2); }
-  .wt-table td::before { content: attr(data-label); font: var(--t-xs) var(--mono); color: var(--ink-faint); flex: 0 0 72px; }
-  .wt-table .num { text-align: left; width: auto; }
-}
-@media (max-width: 480px) {
-  :root { --appbar-h: 56px; }
-  .appbar { position: static; }
-  .lane > summary { top: 0; }
-  .btn, .search-clear, .copy, .more, .card > summary, .lane > summary { min-height: 44px; }
-  .search-clear { width: 44px; }
-  .shell { padding-left: var(--s3); padding-right: var(--s3); }
-  .overview { padding-top: var(--s4); padding-bottom: var(--s3); }
-  .headline { font-size: var(--t-lg); }
-  .toolbar { padding-top: var(--s2); padding-bottom: var(--s2); }
-  .banner { margin: var(--s3) 0 0; }
-  .panel { margin: var(--s4) 0 0; }
-  .lane-stack { margin: var(--s4) 0 var(--s6); }
-  footer { padding-top: var(--s6); padding-bottom: var(--s6); }
-  .result-count { margin-left: 0; }
-}
-/* Factory workbench components (wb-). Shared by /gallery and the board screen. */
-.wb-gallery-head { padding-top: var(--s6); padding-bottom: var(--s4); border-bottom: 1px solid var(--line); }
-.wb-display { font-size: var(--t-display); line-height: 1.1; letter-spacing: -0.03em; font-weight: 600; margin: 0; max-width: 68ch; }
-.wb-intro { color: var(--ink-soft); font-size: var(--t-md); margin: var(--s2) 0 0; max-width: 64ch; }
-.wb-section { margin-top: var(--s8); }
-.wb-section-title { font-size: var(--t-md); font-weight: 600; margin: 0; }
-.wb-section-meta { color: var(--ink-faint); font-size: var(--t-xs); font-family: var(--mono); margin: var(--s1) 0 var(--s3); }
-.wb-split { display: grid; gap: var(--s6); margin-top: var(--s6); }
-@media (min-width: 1100px) {
-  .wb-split { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
-}
-.wb-board-surface { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
-
-.wb-meter { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
-.wb-board-surface .wb-meter { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; }
-.wb-meter-track { display: flex; height: 4px; background: var(--line-soft); }
-.wb-meter-seg { display: block; height: 100%; background: var(--ink-faint); }
-.wb-meter-seg[data-peak="true"] { background: var(--accent); }
-.wb-meter-stops { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.wb-meter-stop {
-  display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer;
-  padding: var(--s2) var(--s3); border: 0; border-left: 1px solid var(--line);
-  background: transparent; border-radius: 0; min-height: 44px;
-}
-.wb-meter-stop:first-child { border-left: 0; }
-.wb-meter-stop:hover { background: var(--surface-2); }
-.wb-meter-stop[aria-pressed="true"] { background: var(--accent-soft); }
-.wb-meter-name { font-size: var(--t-xs); color: var(--ink-soft); }
-.wb-meter-count { font: 600 var(--t-md)/1.1 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-faint); }
-.wb-meter-stop[data-peak="true"] .wb-meter-count { color: var(--accent-ink); }
-
-.wb-lane { border-top: 1px solid var(--line-soft); background: var(--surface); }
-.wb-lanes .wb-lane:first-child { border-top: 0; }
-.wb-lane > summary {
-  position: relative; display: flex; align-items: center; gap: var(--s2);
-  min-height: 48px; padding: var(--s2) var(--s4) var(--s2) var(--s3);
-  cursor: pointer; list-style: none;
-}
-.wb-lane > summary::-webkit-details-marker { display: none; }
-.wb-lane > summary::marker { content: ""; }
-.wb-lane > summary:hover { background: var(--surface-2); }
-.wb-lane-rail { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ink-faint); }
-.wb-lane--active .wb-lane-rail { background: var(--accent); }
-.wb-lane-name { font-size: var(--t-md); font-weight: 600; }
-.wb-lane-count { font: 600 var(--t-xs) var(--mono); color: var(--ink-soft); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 var(--s2); }
-.wb-lane-desc { font-size: var(--t-xs); color: var(--ink-faint); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wb-caret { margin-left: auto; color: var(--ink-faint); font-size: var(--t-xs); transition: transform 150ms ease; flex: none; }
-.wb-lane[open] > summary .wb-caret, .wb-card[open] > summary .wb-caret { transform: rotate(90deg); }
-.wb-lane-body { padding: 0 var(--s4) var(--s3) var(--s3); }
-.wb-lane-body .wb-card { border: 0; border-top: 1px solid var(--line-soft); border-radius: 0; background: transparent; }
-.wb-lane-body .wb-card:first-child { border-top: 0; }
-
-.wb-card { background: transparent; }
-.wb-card > summary {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
-  min-height: 40px; padding: var(--s2) 0; cursor: pointer; list-style: none;
-}
-.wb-card > summary::-webkit-details-marker { display: none; }
-.wb-card > summary::marker { content: ""; }
-.wb-card > summary:hover { background: var(--surface-2); }
-.wb-card-id { font: 600 var(--t-xs) var(--mono); color: var(--accent-ink); }
-.wb-card-task { font-size: var(--t-sm); line-height: 1.35; font-weight: 500; flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
-.wb-card-detail { padding: 0 0 var(--s3); }
-.wb-card-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--s1) var(--s3); font-size: var(--t-xs); margin: 0 0 var(--s2); }
-.wb-card-kv dt { color: var(--ink-faint); font-family: var(--mono); }
-.wb-card-kv dd { margin: 0; color: var(--ink-soft); font-family: var(--mono); overflow-wrap: anywhere; min-width: 0; }
-
-.wb-chip {
-  display: inline-flex; align-items: center; gap: 6px; font: var(--t-xs) var(--mono);
-  color: var(--ink-soft); border: 1px solid var(--line); border-radius: var(--radius-sm);
-  padding: 1px var(--s2); white-space: nowrap;
-}
-.wb-chip--prio { color: var(--ink); border-color: var(--ink-faint); }
-.wb-chip--risk-low { border-color: var(--ok); }
-.wb-chip--risk-medium { border-color: var(--warn); }
-.wb-chip--risk-high { border-color: var(--bad); }
-.wb-chip--main { color: var(--ink); border-color: var(--ink-faint); }
-.wb-chip--dirty { color: var(--bad); border-color: var(--bad); }
-.wb-chip--clean { color: var(--ok); border-color: var(--ok); }
-.wb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex: none; }
-.wb-chip--risk-low .wb-dot { background: var(--ok); }
-.wb-chip--risk-medium .wb-dot { background: var(--warn); }
-.wb-chip--risk-high .wb-dot { background: var(--bad); }
-
-.wb-rail { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); }
-.wb-rail-head { padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
-.wb-rail-title { font-size: var(--t-md); font-weight: 600; margin: 0; }
-.wb-rail-meta { display: block; margin-top: var(--s1); font: var(--t-xs) var(--mono); color: var(--ink-faint); }
-.wb-rail-body { padding: 0 var(--s4); }
-.wb-wt { padding: var(--s3) 0; border-bottom: 1px solid var(--line-soft); }
-.wb-wt:last-child { border-bottom: 0; }
-.wb-wt-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
-.wb-wt-branch { font: 500 var(--t-sm) var(--mono); overflow-wrap: anywhere; }
-.wb-wt-figs { display: flex; gap: var(--s2); margin-left: auto; font: var(--t-xs) var(--mono); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.wb-wt-path { display: block; margin-top: var(--s1); font: var(--t-xs) var(--mono); color: var(--ink-faint); overflow-wrap: anywhere; }
-
-.wb-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
-.wb-search { position: relative; display: flex; align-items: center; flex: 1 1 220px; max-width: 340px; }
-.wb-search input {
-  width: 100%; min-height: 32px; background: transparent; border: 0;
-  border-bottom: 1px solid var(--line); border-radius: 0;
-  padding: var(--s1) 32px var(--s1) 0; font-size: var(--t-sm); color: var(--ink);
-}
-.wb-search input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.wb-kbd { position: absolute; right: 0; font: var(--t-xs) var(--mono); color: var(--ink-faint); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 6px; pointer-events: none; }
-.wb-select-wrap { position: relative; display: inline-flex; align-items: center; }
-.wb-select-wrap::after {
-  content: ""; position: absolute; right: 4px; width: 6px; height: 6px;
-  border-right: 1px solid var(--ink-faint); border-bottom: 1px solid var(--ink-faint);
-  transform: rotate(45deg) translateY(-2px); pointer-events: none;
-}
-.wb-select {
-  appearance: none; -webkit-appearance: none; background: transparent; border: 0;
-  border-bottom: 1px solid var(--line); border-radius: 0;
-  padding: var(--s1) 20px var(--s1) 0; font-size: var(--t-sm); color: var(--ink); cursor: pointer;
-}
-.wb-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.wb-btn {
-  display: inline-flex; align-items: center; min-height: 28px; padding: 0 var(--s2);
-  background: transparent; border: 1px solid var(--line); border-radius: var(--radius);
-  font-size: var(--t-xs); color: var(--ink-soft); cursor: pointer; white-space: nowrap;
-}
-.wb-btn:hover { border-color: var(--ink-faint); }
-.wb-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-ink); }
-.wb-result { margin-left: auto; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
-.wb-empty { margin: 0; padding: var(--s4) var(--s3); font-size: var(--t-sm); color: var(--ink-faint); }
-.wb-specimen-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding: var(--s3) 0; }
-
-.wb-tokens { display: grid; gap: var(--s4); }
-.wb-token-group { border-top: 1px solid var(--line); padding-top: var(--s3); }
-.wb-token-group h3 { margin: 0 0 var(--s2); font-size: var(--t-xs); font-weight: 600; color: var(--ink-soft); }
-.wb-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--s2); }
-.wb-swatch { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
-.wb-swatch-chip { display: block; height: 28px; }
-.wb-swatch-label { display: block; padding: 4px 6px; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
-.wb-type-row { display: flex; align-items: baseline; gap: var(--s3); padding: var(--s1) 0; border-bottom: 1px solid var(--line-soft); }
-.wb-type-row:last-child { border-bottom: 0; }
-.wb-type-sample { color: var(--ink); }
-.wb-type-label { font: var(--t-xs) var(--mono); color: var(--ink-faint); margin-left: auto; }
-.wb-space-row { display: flex; align-items: center; gap: var(--s3); padding: 2px 0; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
-.wb-space-bar { height: 8px; background: var(--accent-soft); border: 1px solid var(--accent); }
-.wb-radius-row { display: flex; gap: var(--s4); }
-.wb-radius-box { width: 56px; height: 40px; border: 1px solid var(--line); background: var(--surface-2); display: flex; align-items: center; justify-content: center; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
-
-body.compact .wb-card > summary { min-height: 32px; padding: 2px 0; }
-body.compact .wb-lane > summary { min-height: 40px; }
-
-@media (max-width: 640px) {
-  .wb-meter-stops { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .wb-meter-stop { border-top: 1px solid var(--line); }
-  .wb-meter-stop:first-child, .wb-meter-stop:nth-child(2) { border-top: 0; }
-  .wb-result { margin-left: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
-"""
-
 JS = """
 (function () {
   var KEY = "board-dashboard-state";
@@ -714,15 +218,15 @@ JS = """
   function has(obj, key) { return Object.prototype.hasOwnProperty.call(obj, key); }
   function all(selector, root) { return Array.prototype.slice.call((root || document).querySelectorAll(selector)); }
 
-  var lanes = all(".lane");
-  var cards = all(".card");
-  var boards = all("section.board");
+  var lanes = all(".wb-lane");
+  var cards = all(".wb-card");
+  var boards = all("[data-board-panel]");
 
   lanes.forEach(function (lane) {
     var key = laneKey(lane);
     if (has(state.lanes, key)) { lane.open = !!state.lanes[key]; }
     var body = lane.querySelector(".lane-body");
-    var button = lane.querySelector(".more");
+    var button = lane.querySelector(".wb-more");
     if (button && body) {
       if (state.more[key]) { body.classList.add("all"); }
       var expanded = body.classList.contains("all");
@@ -751,9 +255,9 @@ JS = """
     });
   });
 
-  all(".lane .more").forEach(function (button) {
+  all(".wb-lane .wb-more").forEach(function (button) {
     button.addEventListener("click", function () {
-      var lane = button.closest(".lane");
+      var lane = button.closest(".wb-lane");
       var body = lane ? lane.querySelector(".lane-body") : null;
       if (!body) { return; }
       var expanded = body.classList.toggle("all");
@@ -767,26 +271,28 @@ JS = """
   });
 
   var search = document.getElementById("search");
-  var typeSel = document.getElementById("type-filter");
-  var prioSel = document.getElementById("priority-filter");
+  var typeSels = all("#type-filter, #main-type-filter");
+  var prioSels = all("#priority-filter, #main-priority-filter");
+  var typeSel = typeSels[0] || null;
+  var prioSel = prioSels[0] || null;
   var resultCount = document.getElementById("result-count");
   var resetBtn = document.getElementById("reset");
   var searchClear = document.getElementById("search-clear");
-  var kbd = document.querySelector(".kbd");
-  var pipes = all(".flow-stop");
+  var kbd = document.querySelector(".wb-kbd");
+  var pipes = all("[data-status-filter]");
   var themeBtn = document.getElementById("theme-toggle");
   var densityBtn = document.getElementById("density-toggle");
   var pauseBtn = document.getElementById("pause");
-  var refreshBtn = document.getElementById("refresh-now");
-  var live = document.querySelector(".live");
-  var liveText = document.querySelector(".live-text");
+  var refreshBtn = document.getElementById("refresh");
+  var live = document.querySelector(".wb-live");
+  var liveText = document.querySelector(".wb-live-text");
   var statusFilter = "";
   var selected = null;
 
   var appbar = document.querySelector(".appbar");
   function measureAppbar() {
-    if (!appbar) { return; }
-    document.documentElement.style.setProperty("--appbar-h", appbar.offsetHeight + "px");
+    document.documentElement.style.setProperty(
+      "--appbar-h", appbar ? appbar.offsetHeight + "px" : "0px");
   }
   measureAppbar();
   window.addEventListener("resize", measureAppbar);
@@ -855,7 +361,7 @@ JS = """
       var expanded = body ? body.classList.contains("all") : true;
       var laneShown = 0;
       var laneMatches = 0;
-      var laneCards = all(".card", lane);
+      var laneCards = all(".wb-card", lane);
       laneCards.forEach(function (card) {
         var hit = !laneHidden &&
           (!f.q || card.textContent.toLowerCase().indexOf(f.q) !== -1) &&
@@ -869,7 +375,7 @@ JS = """
         }
       });
 
-      var empty = lane.querySelector(".empty");
+      var empty = lane.querySelector(".wb-empty");
       if (empty) {
         if (laneHidden) {
           empty.classList.add("hidden");
@@ -883,7 +389,7 @@ JS = """
         }
       }
 
-      var count = lane.querySelector(".count");
+      var count = lane.querySelector(".wb-lane-count");
       if (count) {
         count.textContent = anyActive
           ? laneShown + "/" + laneCards.length
@@ -894,7 +400,7 @@ JS = """
     boards.forEach(function (board) {
       var visible = true;
       if (f.status) {
-        visible = all(".lane", board).some(function (lane) {
+        visible = all(".wb-lane", board).some(function (lane) {
           return lane.getAttribute("data-lane") === f.status;
         });
       }
@@ -923,7 +429,7 @@ JS = """
     if (selected) { selected.classList.remove("selected"); }
     selected = card;
     card.classList.add("selected");
-    var lane = card.closest(".lane");
+    var lane = card.closest(".wb-lane");
     if (lane && !lane.open) {
       lane.open = true;
       state.lanes[laneKey(lane)] = true;
@@ -952,10 +458,14 @@ JS = """
     setSelected(list[index]);
   }
 
+  function syncSelects(selects, value) {
+    selects.forEach(function (sel) { sel.value = value; });
+  }
+
   function clearFilters() {
     if (search) { search.value = ""; }
-    if (typeSel) { typeSel.value = ""; }
-    if (prioSel) { prioSel.value = ""; }
+    syncSelects(typeSels, "");
+    syncSelects(prioSels, "");
     statusFilter = "";
     deselect();
     apply();
@@ -970,8 +480,16 @@ JS = """
       apply();
     });
   }
-  if (typeSel) { typeSel.addEventListener("change", apply); }
-  if (prioSel) { prioSel.addEventListener("change", apply); }
+  function bindSelectSync(selects) {
+    selects.forEach(function (sel) {
+      sel.addEventListener("change", function () {
+        syncSelects(selects, sel.value);
+        apply();
+      });
+    });
+  }
+  bindSelectSync(typeSels);
+  bindSelectSync(prioSels);
   if (resetBtn) { resetBtn.addEventListener("click", clearFilters); }
 
   pipes.forEach(function (pipe) {
@@ -1057,13 +575,13 @@ JS = """
   function boardIdle() {
     if (paused) { return false; }
     if (document.visibilityState !== "visible") { return false; }
-    if (document.querySelector(".card[open]")) { return false; }
+    if (document.querySelector(".wb-card[open]")) { return false; }
     if (search && search.value.trim()) { return false; }
     if (typeSel && typeSel.value) { return false; }
     if (prioSel && prioSel.value) { return false; }
     if (all(".lane-body.searching").length) { return false; }
     var active = document.activeElement;
-    if (active && active !== document.body && active.closest && active.closest(".shell")) {
+    if (active && active !== document.body && active.closest && active.closest(".wb-layout")) {
       return false;
     }
     return true;
@@ -1102,8 +620,8 @@ JS = """
   try {
     var params = new URLSearchParams(window.location.search);
     if (search && params.get("q")) { search.value = params.get("q"); }
-    if (typeSel && params.get("type")) { typeSel.value = params.get("type"); }
-    if (prioSel && params.get("priority")) { prioSel.value = params.get("priority"); }
+    if (params.get("type")) { syncSelects(typeSels, params.get("type")); }
+    if (params.get("priority")) { syncSelects(prioSels, params.get("priority")); }
     if (params.get("status")) { statusFilter = params.get("status"); }
     applyTheme(state.theme);
     applyDensity(params.get("density") === "compact" ? "compact" : state.density);
@@ -1406,10 +924,10 @@ def wb_meter(counts):
     ) % (segments, stops)
 
 
-def wb_lane(lane, count, description, cards_html, open=False, signal=False):
+def wb_lane(lane, count, description, cards_html, open=False, signal=False, board=""):
     """A 44px lane summary on the continuous board surface."""
     return (
-        '<details class="wb-lane%s" data-lane="%s"%s>'
+        '<details class="wb-lane%s" data-board="%s" data-lane="%s"%s>'
         '<summary>'
         '<span class="wb-lane-rail" aria-hidden="true"></span>'
         '<span class="wb-lane-name">%s</span>'
@@ -1417,10 +935,11 @@ def wb_lane(lane, count, description, cards_html, open=False, signal=False):
         '<span class="wb-lane-desc">%s</span>'
         '<span class="wb-caret" aria-hidden="true">&#9656;</span>'
         '</summary>'
-        '<div class="wb-lane-body">%s</div>'
+        '<div class="wb-lane-body lane-body">%s</div>'
         '</details>'
     ) % (
         " wb-lane--signal" if signal else "",
+        esc(board),
         esc(lane),
         " open" if open else "",
         esc(lane),
@@ -1435,8 +954,10 @@ def wb_chip(kind, text):
     return '<span class="wb-chip wb-chip--%s">%s%s</span>' % (esc(kind), dot, esc(text))
 
 
-def wb_empty(lane):
-    return '<p class="wb-empty">%s</p>' % esc(EMPTY_TEXT.get(lane, "Nothing in this lane."))
+def wb_empty(lane, hidden=False):
+    text = EMPTY_TEXT.get(lane, "Nothing in this lane.")
+    return '<p class="wb-empty%s" data-empty-default="%s">%s</p>' % (
+        " hidden" if hidden else "", esc(text), esc(text))
 
 
 def wb_card(card):
@@ -1480,7 +1001,8 @@ def wb_card(card):
         + wb_chip("risk-" + (level or "unknown"), risk_word)
     )
     return (
-        '<details class="wb-card"%s>'
+        '<details class="wb-card%s" data-board="%s" data-lane="%s" data-card="%s"'
+        ' data-type="%s" data-priority="%s"%s>'
         '<summary>'
         '<span class="wb-card-id">%s</span>'
         '<span class="wb-card-task">%s</span>'
@@ -1489,17 +1011,29 @@ def wb_card(card):
         '</summary>'
         '<div class="wb-card-detail">%s</div>'
         '</details>'
-    ) % (" open" if card.get("open") else "", esc(card_id), esc(task), chips, detail)
+    ) % (
+        " extra" if card.get("extra") else "",
+        esc(card.get("board", "")),
+        esc(card.get("lane", "")),
+        esc(card_id),
+        esc(kind),
+        esc(priority),
+        " open" if card.get("open") else "",
+        esc(card_id),
+        esc(task),
+        chips,
+        detail,
+    )
 
 
-def wb_panel(title, meta, body_html):
+def wb_panel(title, meta, body_html, attrs=""):
     """A 12px, hairline, soft-shadow dashboard panel with a 40px header."""
     return (
-        '<section class="wb-panel">'
+        '<section class="wb-panel"%s>'
         '<div class="wb-panel-head"><h2 class="wb-panel-title">%s</h2>'
         '<span class="wb-panel-meta">%s</span></div>'
         '%s</section>'
-    ) % (esc(title), esc(meta), body_html)
+    ) % (attrs, esc(title), esc(meta), body_html)
 
 
 def wb_rail(title, meta, body_html):
@@ -1521,8 +1055,8 @@ def wb_filter_selects(prefix, visible_labels=False):
         '<option value="%s">%s</option>' % (esc(t), esc(t)) for t in types)
     prio_options = '<option value="">All priorities</option>' + "".join(
         '<option value="%s">%s</option>' % (esc(p), esc(p)) for p in priorities)
-    type_id = "%s-type-filter" % prefix
-    prio_id = "%s-priority-filter" % prefix
+    type_id = ("%s-type-filter" % prefix) if prefix else "type-filter"
+    prio_id = ("%s-priority-filter" % prefix) if prefix else "priority-filter"
     type_label = "Type" if visible_labels else "Filter by type"
     prio_label = "Priority" if visible_labels else "Filter by priority"
     label_class = "wb-field-label" if visible_labels else "sr-only"
@@ -1544,10 +1078,13 @@ def wb_toolbar(total=0):
         '<label class="sr-only" for="search">Search cards</label>'
         '<input id="search" type="search" placeholder="Search id, task, branch"'
         ' autocomplete="off" spellcheck="false">'
+        '<button type="button" id="search-clear" class="wb-search-clear"'
+        ' aria-label="Clear search" hidden>&times;</button>'
         '<kbd class="wb-kbd" aria-hidden="true">/</kbd>'
         '</div>'
         '<div class="wb-toolbar-filters">%s</div>'
         '<span id="result-count" class="wb-result" aria-live="polite">showing %d of %d</span>'
+        '<button type="button" id="reset" class="wb-btn" hidden>Reset</button>'
         '</div>'
     ) % (wb_filter_selects("main"), total, total)
 
@@ -1584,69 +1121,6 @@ def row_fingerprint(notes):
     return match.group(1) if match else ""
 
 
-def render_card(row, board_label, lane, extra=False):
-    blocked = clean_text(row["Blocked by"])
-    if blocked in ("-", "- None.", "", "None."):
-        blocked = "none"
-    branch = clean_text(row["Branch/Worktree"])
-    if branch.strip() in ("-", ""):
-        branch = ""
-    branch_parts = [clean_text(part) for part in branch.split("·") if clean_text(part)]
-    kv = ""
-    if blocked:
-        kv += "<dt>blocked</dt><dd>%s</dd>" % esc(blocked)
-    if branch_parts:
-        lines = []
-        for part in branch_parts:
-            name = branch_name(part)
-            copy = ""
-            if name:
-                copy = (
-                    '<button type="button" class="copy" data-copy="%s"'
-                    ' aria-label="Copy branch %s">copy</button>'
-                ) % (esc(name), esc(name))
-            lines.append(
-                '<span class="kv-line">%s%s</span>' % (esc_path(part), copy))
-        kv += "<dt>worktree</dt><dd>%s</dd>" % "".join(lines)
-    fingerprint = row_fingerprint(row["Notes"])
-    if fingerprint:
-        kv += "<dt>fingerprint</dt><dd>%s</dd>" % esc(fingerprint)
-    notes = str(row.get("Notes raw", "")).strip()
-    detail = ""
-    if kv:
-        detail += '<dl class="card-kv">%s</dl>' % kv
-    notes_html = render_notes(notes)
-    if notes_html:
-        detail += notes_html
-    return (
-        '<details class="card%s" data-board="%s" data-lane="%s" data-card="%s"'
-        ' data-type="%s" data-priority="%s">'
-        '<summary>'
-        '<span class="card-id">%s</span>'
-        '<span class="card-task">%s</span>'
-        '<span class="chip type">%s</span>'
-        '<span class="chip prio">%s</span>'
-        '%s'
-        '<span class="card-caret" aria-hidden="true">&#9656;</span>'
-        '</summary>'
-        '<div class="card-detail">%s</div>'
-        '</details>'
-    ) % (
-        " extra" if extra else "",
-        esc(board_label),
-        esc(lane),
-        esc(row["ID"]),
-        esc(clean_text(row["Type"])),
-        esc(clean_text(row["Priority"])),
-        esc(row["ID"]),
-        esc(clean_text(row["Task"])),
-        esc(clean_text(row["Type"])),
-        esc(clean_text(row["Priority"])),
-        render_risk(row["Risk"]),
-        detail,
-    )
-
-
 def lane_open_by_default(lane, card_count):
     """A lane with no cards stays collapsed; the server knows the card count."""
     if card_count == 0:
@@ -1654,74 +1128,81 @@ def lane_open_by_default(lane, card_count):
     return lane not in COLLAPSED_BY_DEFAULT
 
 
-def render_lane(lane, rows, board_label):
+def wb_lane_filters(counts):
+    """Sidebar lane rows; the meter stops reuse the same data attribute."""
+    return "".join(
+        '<button type="button" class="wb-lane-filter" data-status-filter="%s" aria-pressed="false">'
+        '<span class="wb-lane-filter-name">%s</span>'
+        '<span class="wb-lane-filter-count">%d</span></button>'
+        % (esc(lane), esc(lane), int(counts.get(lane, 0) or 0))
+        for lane in ACTIVE_LANES
+    )
+
+
+def wb_row_card(row, board_label, lane, extra=False):
+    """Adapt a board row to the shared wb_card component."""
+    card = dict(row)
+    card.update({"board": board_label, "lane": lane, "extra": extra})
+    return wb_card(card)
+
+
+def render_board_lane(lane, rows, board_label, signal=False):
     lane_rows = [row for row in rows if row["Status"] == lane]
     preview = lane_rows
     extra = []
     if lane == "Merged" and len(lane_rows) > MERGED_PREVIEW:
         preview = lane_rows[-MERGED_PREVIEW:]
         extra = lane_rows[:-MERGED_PREVIEW]
-    cards = [render_card(row, board_label, lane, extra=True) for row in extra]
-    cards += [render_card(row, board_label, lane) for row in preview]
+    cards = [wb_row_card(row, board_label, lane, extra=True) for row in extra]
+    cards += [wb_row_card(row, board_label, lane) for row in preview]
     more = ""
     if extra:
         more = (
-            '<button type="button" class="more" aria-expanded="false"'
+            '<button type="button" class="wb-more" aria-expanded="false"'
             ' data-label-expand="Show all %d" data-label-collapse="Show only the last %d">'
             'Show all %d</button>'
         ) % (len(lane_rows), MERGED_PREVIEW, len(lane_rows))
-    body = "".join(cards)
-    empty_text = EMPTY_TEXT.get(lane, "Nothing in this lane.")
-    body += (
-        '<p class="empty%s" data-empty-default="%s">%s</p>'
-    ) % (" hidden" if cards else "", esc(empty_text), esc(empty_text))
-    open_attr = " open" if lane_open_by_default(lane, len(lane_rows)) else ""
-    return (
-        '<details class="lane" data-board="%s" data-lane="%s"%s>'
-        '<summary>'
-        '<span class="caret" aria-hidden="true">&#9656;</span>'
-        '<span class="lane-name">%s</span>'
-        '<span class="count">%d</span>'
-        '<span class="lane-desc">%s</span>'
-        '</summary>'
-        '<div class="lane-body">%s%s</div>'
-        '</details>'
-    ) % (
-        esc(board_label),
-        esc(lane),
-        open_attr,
-        esc(lane),
+    body = "".join(cards) + wb_empty(lane, hidden=bool(cards)) + more
+    return wb_lane(
+        lane,
         len(lane_rows),
-        esc(LANE_DESCRIPTION.get(lane, "")),
+        LANE_DESCRIPTION.get(lane, ""),
         body,
-        more,
+        open=lane_open_by_default(lane, len(lane_rows)),
+        signal=signal,
+        board=board_label,
     )
 
 
-def render_board(entry):
-    """One board: its heading and every lane."""
+def board_signal_lane(counts):
+    peak = max((int(counts.get(lane, 0) or 0) for lane in ACTIVE_LANES), default=0)
+    if peak <= 0:
+        return None
+    for lane in ACTIVE_LANES:
+        if int(counts.get(lane, 0) or 0) == peak:
+            return lane
+    return None
+
+
+def render_board_panel(entry, toolbar_html=""):
+    """A board panel: its toolbar, path, banner and every lane."""
     rows = entry["rows"]
-    counts = entry["counts"]
+    signal = board_signal_lane(entry["counts"])
+    lanes_html = "".join(
+        render_board_lane(lane, rows, entry["label"], signal=(lane == signal))
+        for lane in LANE_ORDER
+    )
+    path = '<p class="wb-board-path" title="%s">%s</p>' % (
+        esc(entry["path"]), esc_path(entry["path"]))
     banner = ""
     if entry.get("error"):
-        banner = '<p class="banner">%s</p>' % esc(entry["error"])
-    lanes_html = "\n".join(render_lane(lane, rows, entry["label"]) for lane in LANE_ORDER)
-    return (
-        '<section class="board shell" data-board="%s">'
-        '<div class="panel-head"><h2>%s board</h2>'
-        '<span class="meta">%d card(s) &middot; %s</span></div>'
-        '<p class="meta board-path" title="%s">%s</p>%s'
-        '<div class="lane-stack">%s</div>'
-        '</section>'
-    ) % (
-        esc(entry["label"]),
-        esc(entry["label"]),
-        len(rows),
-        esc(", ".join("%s %d" % (lane, counts.get(lane, 0)) for lane in LANE_ORDER)),
-        esc(entry["path"]),
-        esc_path(entry["path"]),
-        banner,
-        lanes_html,
+        banner = '<p class="wb-banner" role="alert">%s</p>' % esc(entry["error"])
+    body = toolbar_html + path + banner + '<div class="wb-lanes">%s</div>' % lanes_html
+    return wb_panel(
+        "%s board" % entry["label"],
+        "%d cards" % len(rows),
+        body,
+        attrs=' data-board-panel="%s"' % esc(entry["label"]),
     )
 
 
@@ -1742,143 +1223,129 @@ def last_merged_id(boards):
     return last
 
 
-def render_pipeline(counts):
-    peak = max(counts.values()) or 1
-    active = {lane for lane in ACTIVE_LANES if peak > 0 and counts.get(lane, 0) == peak}
-    parts = []
-    for lane in ACTIVE_LANES:
-        count = counts.get(lane, 0)
-        width = int(round(count * 100 / peak)) if count else 0
-        button = (
-            '<button type="button" class="flow-stop" data-status-filter="%s" aria-pressed="false"%s>'
-            '<span class="flow-name">%s</span>'
-            '<span class="flow-count">%d</span>'
-            '<span class="flow-bar" aria-hidden="true">'
-            '<span style="width: %d%%"></span></span>'
-            '</button>'
-        ) % (
-            esc(lane),
-            ' data-active="true"' if lane in active and count else "",
-            esc(lane),
-            count,
-            width,
-        )
-        parts.append(button)
-    return '<div class="flow" role="group" aria-label="Work in flight by lane">%s</div>' % "".join(parts)
-
-
-def render_toolbar(total_cards):
-    types = ("Feature", "Fix", "Chore", "Docs", "Research")
-    priorities = ("P1", "P2", "P3", "P4")
-    type_options = '<option value="">All types</option>' + "".join(
-        '<option value="%s">%s</option>' % (esc(t), esc(t)) for t in types)
-    prio_options = '<option value="">All priorities</option>' + "".join(
-        '<option value="%s">%s</option>' % (esc(p), esc(p)) for p in priorities)
-    return (
-        '<div class="toolbar shell" role="search">'
-        '<div class="search-wrap">'
-        '<label class="sr-only" for="search">Search cards</label>'
-        '<input id="search" type="search" placeholder="Search id, task, branch"'
-        ' autocomplete="off" spellcheck="false">'
-        '<kbd class="kbd" aria-hidden="true">/</kbd>'
-        '<button type="button" id="search-clear" class="search-clear"'
-        ' aria-label="Clear search" hidden>&times;</button>'
-        '</div>'
-        '<label class="sr-only" for="type-filter">Filter by type</label>'
-        '<select id="type-filter">%s</select>'
-        '<label class="sr-only" for="priority-filter">Filter by priority</label>'
-        '<select id="priority-filter">%s</select>'
-        '<span id="result-count" class="result-count" aria-live="polite">'
-        'showing %d of %d</span>'
-        '<button type="button" id="reset" class="btn" hidden>Reset</button>'
-        '</div>'
-    ) % (type_options, prio_options, total_cards, total_cards)
+def render_board_toolbar(total, board_count):
+    """With several boards the toolbar sits in its own panel."""
+    return wb_panel(
+        "Board",
+        "%d boards · %d cards" % (board_count, total),
+        wb_toolbar(total),
+    )
 
 
 def build_html(boards, worktrees, generated_at, error, refresh):
     total = sum(len(entry["rows"]) for entry in boards)
-    boards_html = "\n".join(render_board(entry) for entry in boards)
-    if not boards_html:
-        boards_html = '<p class="empty">No board file found. Point the server at one with --file.</p>'
     counts = active_counts(boards)
     active_total = sum(counts.values())
-    sep = '<span class="sep" aria-hidden="true">&middot;</span>'
+    if active_total == 0:
+        merged = last_merged_id(boards)
+        subtitle_bits = ["Nothing in flight"]
+        if merged:
+            subtitle_bits.append("last merged %s" % merged)
+        subtitle_bits.append("as of %s" % generated_at.split("T")[0])
+        subtitle = " · ".join(subtitle_bits)
+    else:
+        subtitle = ("Lanes, cards and live worktrees — what is in flight right now. "
+                    "Read fresh on every request.")
+
+    if len(boards) == 1:
+        panels_html = render_board_panel(boards[0], wb_toolbar(total))
+    elif boards:
+        panels_html = render_board_toolbar(total, len(boards))
+        panels_html += "".join(render_board_panel(entry) for entry in boards)
+    else:
+        panels_html = wb_panel(
+            "Board", "0 cards",
+            '<p class="wb-empty">No board file found. Point the server at one with --file.</p>')
+
     banner = ""
     if error:
-        banner = '<div class="shell"><p class="banner">%s</p></div>' % esc(error)
-    if active_total == 0:
-        meta = []
-        merged = last_merged_id(boards)
-        if merged:
-            meta.append("last merged %s" % merged)
-        meta.append("as of %s" % generated_at.split("T")[0])
-        meta_html = sep.join('<span class="metric">%s</span>' % esc(m) for m in meta)
-        headline = (
-            '<h1 class="headline">All clear &mdash; nothing in flight</h1>'
-            '<p class="headline-meta">%s</p>'
-        ) % meta_html
-    else:
-        headline = (
-            '<h1 class="headline">'
-            '<span class="metric"><span class="num">%d</span> active</span>%s'
-            '<span class="metric"><span class="num">%d</span> pending merge</span>%s'
-            '<span class="metric"><span class="num">%d</span> blocked</span></h1>'
-            '<p class="overview-sub">Filter a lane below, or press <kbd>/</kbd> to search. '
-            'The board is read fresh on every request.</p>'
-        ) % (active_total, sep, counts.get("Pending Merge", 0), sep, counts.get("Blocked", 0))
+        banner = '<p class="wb-banner" role="alert">%s</p>' % esc(error)
+
+    kpi_facts = "".join(
+        '<div class="wb-kpi-fact"><span class="wb-kpi-num-sm">%d</span>'
+        '<span class="wb-kpi-label">%s</span></div>' % (value, esc(label))
+        for value, label in (
+            (counts.get("Pending Merge", 0), "pending merge"),
+            (counts.get("Blocked", 0), "blocked"),
+            (total, "total"),
+        )
+    )
 
     active = sum(1 for wt in worktrees if not wt["main"])
-    wt_meta = "%d worktree(s) &middot; %d non-main" % (len(worktrees), active)
+    wt_meta = "%d worktrees · %d non-main" % (len(worktrees), active)
+    ordered_worktrees = sorted(worktrees, key=lambda wt: 1 if wt["main"] else 0)
+    rail_body = "".join(wb_wt_row(wt) for wt in ordered_worktrees)
+    if not rail_body:
+        rail_body = ('<p class="wb-empty">No git worktrees found. '
+                     'Start one with worktree.py create.</p>')
+    rail = wb_rail("Worktrees", wt_meta, rail_body)
+
     try:
         epoch_ms = int(datetime.datetime.fromisoformat(generated_at).timestamp() * 1000)
     except (TypeError, ValueError):
         epoch_ms = 0
     mark = (
-        '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" '
+        '<svg class="wb-mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" '
         'stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
         '<path d="M3 20V9l6 3V9l6 3V4h6v16z"/>'
         '<path d="M6 16h3M12 16h3"/></svg>'
     )
+    theme_boot = (
+        'try{var s=JSON.parse(localStorage.getItem("board-dashboard-state")||"{}");'
+        'if(s&&s.theme){document.documentElement.setAttribute("data-theme",s.theme);}}'
+        'catch(e){}'
+    )
     html_parts = [
         "<!doctype html>\n",
-        '<html lang="en" data-theme="', esc("system"), '"><head><meta charset="utf-8">',
+        '<html lang="en" data-theme="system"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         '<meta name="color-scheme" content="light dark">',
         '<link rel="icon" href="', FAVICON, '">',
-        "<title>Factory Board</title><style>", CSS, "</style></head><body",
+        '<link rel="stylesheet" href="/static/board.css">',
+        "<title>Factory board</title><script>", theme_boot, "</script></head><body",
         ' data-refresh="', str(refresh), '">\n',
-        '<header class="appbar">',
-        '<div class="shell appbar-inner">',
-        '<div class="brand">', mark,
-        '<div class="brand-text">',
-        '<span class="wordmark">Factory Board</span>',
-        '<span class="sublabel">Lanes, cards and live worktrees — what is in flight right now</span>',
-        '</div></div>',
-        '<div class="appbar-actions">',
-        '<span class="live" data-ms="', str(epoch_ms), '">',
-        '<span class="live-dot" aria-hidden="true"></span>',
-        '<span class="live-text">updated ', esc(generated_at[11:19]), '</span></span>',
-        '<button type="button" class="btn" id="pause" aria-pressed="false">Pause</button>',
-        '<button type="button" class="btn" id="refresh-now">Refresh now</button>',
-        '<button type="button" class="btn" id="theme-toggle" aria-label="Colour theme">System</button>',
-        '<button type="button" class="btn" id="density-toggle" aria-pressed="false">Comfortable</button>',
-        '</div></div></header>\n',
-        '<main>',
-        '<section class="overview shell">', headline, render_pipeline(counts), '</section>',
-        render_toolbar(total),
+        '<div class="wb-layout">',
+        '<aside class="wb-sidebar">',
+        '<div class="wb-side-brand">', mark,
+        '<div class="min-w-0"><span class="wb-wordmark">Factory board</span>',
+        '<span class="wb-brand-meta">Read-only · live</span></div></div>',
+        '<nav class="wb-side-nav" aria-label="Lane filters">',
+        '<p class="wb-side-label">Lanes</p>',
+        '<div class="wb-lane-filters">', wb_lane_filters(counts), '</div></nav>',
+        '<div class="wb-side-filters">',
+        '<p class="wb-side-label">Filters</p>',
+        wb_filter_selects("", visible_labels=True),
+        '</div>',
+        '<div class="wb-side-footer">',
+        '<p class="wb-live" data-ms="', str(epoch_ms), '">',
+        '<span class="wb-live-dot" aria-hidden="true"></span>',
+        '<span class="wb-live-text">updated ', esc(generated_at[11:19]), '</span></p>',
+        '<div class="wb-side-actions">',
+        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button>',
+        '<button type="button" class="wb-btn" id="theme-toggle" aria-label="Colour theme">System</button>',
+        '<button type="button" class="wb-btn" id="density-toggle" aria-pressed="false"',
+        ' aria-label="Density">Comfortable</button>',
+        '</div></div></aside>',
+        '<main class="wb-main">',
+        '<header class="wb-page-head">',
+        '<div class="min-w-0"><h1 class="wb-title">Factory board</h1>',
+        '<p class="wb-sub">', esc(subtitle), '</p></div>',
+        '<button type="button" class="wb-btn" id="refresh">Refresh now</button>',
+        '</header>',
+        '<section class="wb-kpi" aria-label="Board summary">',
+        '<div class="wb-kpi-primary"><span class="wb-kpi-num">%d</span>' % active_total,
+        '<span class="wb-kpi-label">in flight</span></div>',
+        kpi_facts,
+        '</section>',
+        wb_panel("Flow", "%d lanes" % len(ACTIVE_LANES), wb_meter(counts)),
         banner,
-        boards_html,
-        '<details class="panel wt-panel shell">',
-        '<summary class="panel-head">',
-        '<span class="caret" aria-hidden="true">&#9656;</span>',
-        '<span class="panel-title">Worktrees</span>',
-        '<span class="meta">', wt_meta, '</span></summary>',
-        render_worktrees(worktrees),
-        '</details>',
+        panels_html,
+        '<footer class="wb-footer">', str(total), ' cards across ', str(len(boards)),
+        ' boards · refresh every ', str(refresh), 's, pausable',
+        ' · <a href="/gallery">Components</a></footer>',
         '</main>',
-        '<footer class="shell">', str(total), ' card(s) across ', str(len(boards)), ' board(s)',
-        ' &middot; refresh every ', str(refresh), 's, pausable',
-        ' &middot; <a href="/gallery">Components</a></footer>\n',
+        rail,
+        '</div>',
         "<script>", JS, "</script>\n",
         "</body></html>",
     ]

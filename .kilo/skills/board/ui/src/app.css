@@ -139,6 +139,10 @@
 }
 
 @layer components {
+  .hidden {
+    display: none !important;
+  }
+
   /* Shell ---------------------------------------------------------------- */
 
   .wb-layout {
@@ -288,6 +292,13 @@
     border-radius: 999px;
     background: var(--color-ok);
   }
+  .wb-live-text {
+    font-size: 11px;
+    color: var(--color-ink-soft);
+  }
+  .wb-live.stale .wb-live-dot {
+    background: var(--color-ink-faint);
+  }
   .wb-side-actions {
     display: flex;
     flex-wrap: wrap;
@@ -315,6 +326,24 @@
     max-width: 65ch;
     font-size: var(--text-meta);
     color: var(--color-ink-soft);
+  }
+  .wb-banner {
+    margin: 12px 16px 0;
+    padding: 10px 12px;
+    border: 1px solid var(--color-bad);
+    border-left-width: 3px;
+    border-radius: 8px;
+    background: var(--color-surface);
+    color: var(--color-bad);
+    font-size: 13px;
+  }
+  .wb-board-path {
+    margin: 0;
+    padding: 0 16px 8px;
+    color: var(--color-ink-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    overflow-wrap: anywhere;
   }
   .wb-kpi {
     display: flex;
@@ -503,6 +532,24 @@
     outline: 2px solid var(--color-signal);
     outline-offset: 2px;
   }
+  .wb-search-clear {
+    position: absolute;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-ink-soft);
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .wb-search-clear:hover {
+    background: var(--color-surface-2);
+  }
   .wb-kbd {
     position: absolute;
     right: 8px;
@@ -578,7 +625,10 @@
     border-top: 0;
   }
   .wb-lane > summary {
-    position: relative;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-surface);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -654,6 +704,33 @@
   .wb-lane-body .wb-card:first-child {
     border-top: 0;
   }
+  .wb-lane.lane-filtered,
+  .wb-card.filtered {
+    display: none !important;
+  }
+  .wb-card.extra {
+    display: none;
+  }
+  .wb-lane-body.all .wb-card.extra,
+  .wb-lane-body.searching .wb-card.extra {
+    display: block;
+  }
+  .wb-more {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    margin: 8px 0 4px;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    color: var(--color-signal);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .wb-more:hover {
+    text-decoration: underline;
+  }
 
   .wb-card > summary {
     display: flex;
@@ -674,6 +751,10 @@
   }
   .wb-card > summary:hover {
     background: var(--color-surface-2);
+  }
+  .wb-card.selected > summary {
+    outline: 2px solid var(--color-signal);
+    outline-offset: -2px;
   }
   .wb-card-id {
     flex: none;
@@ -942,6 +1023,12 @@
     font-size: var(--text-micro);
     color: var(--color-ink-faint);
   }
+  .wb-footer {
+    padding: 24px 0 32px;
+    color: var(--color-ink-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
 
   .wb-tokens {
     display: grid;
@@ -1038,7 +1125,10 @@
     padding-bottom: 2px;
   }
   body.compact .wb-lane > summary {
-    min-height: 40px;
+    min-height: 38px;
+  }
+  body.compact .wb-card-task {
+    font-size: 12px;
   }
 }
 

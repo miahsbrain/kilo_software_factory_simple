@@ -1,5 +1,4 @@
 /*! tailwindcss v4.3.5 | MIT License | https://tailwindcss.com */
-@layer properties;
 @layer theme, base, components, utilities;
 @layer theme {
   :root, :host {
@@ -9,9 +8,6 @@
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
-    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-    --default-transition-duration: 150ms;
-    --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
     --default-font-family: var(--font-sans);
     --default-mono-font-family: var(--font-mono);
     --color-paper: #f5f6f8;
@@ -239,12 +235,6 @@
   .flex-grow {
     flex-grow: 1;
   }
-  .border-collapse {
-    border-collapse: collapse;
-  }
-  .transform {
-    transform: var(--tw-rotate-x, ) var(--tw-rotate-y, ) var(--tw-rotate-z, ) var(--tw-skew-x, ) var(--tw-skew-y, );
-  }
   .resize {
     resize: both;
   }
@@ -256,10 +246,6 @@
   }
   .gap-2 {
     gap: calc(var(--spacing) * 2);
-  }
-  .border {
-    border-style: var(--tw-border-style);
-    border-width: 1px;
   }
   .px-6 {
     padding-inline: calc(var(--spacing) * 6);
@@ -279,19 +265,6 @@
   }
   .text-ink-faint {
     color: var(--color-ink-faint);
-  }
-  .outline {
-    outline-style: var(--tw-outline-style);
-    outline-width: 1px;
-  }
-  .transition {
-    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
-    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
-    transition-duration: var(--tw-duration, var(--default-transition-duration));
-  }
-  .ease-in-out {
-    --tw-ease: var(--ease-in-out);
-    transition-timing-function: var(--ease-in-out);
   }
 }
 @font-face {
@@ -382,6 +355,9 @@
   }
 }
 @layer components {
+  .hidden {
+    display: none !important;
+  }
   .wb-layout {
     display: grid;
     grid-template-columns: 240px minmax(0, 1fr) 320px;
@@ -526,6 +502,13 @@
     border-radius: 999px;
     background: var(--color-ok);
   }
+  .wb-live-text {
+    font-size: 11px;
+    color: var(--color-ink-soft);
+  }
+  .wb-live.stale .wb-live-dot {
+    background: var(--color-ink-faint);
+  }
   .wb-side-actions {
     display: flex;
     flex-wrap: wrap;
@@ -550,6 +533,24 @@
     max-width: 65ch;
     font-size: var(--text-meta);
     color: var(--color-ink-soft);
+  }
+  .wb-banner {
+    margin: 12px 16px 0;
+    padding: 10px 12px;
+    border: 1px solid var(--color-bad);
+    border-left-width: 3px;
+    border-radius: 8px;
+    background: var(--color-surface);
+    color: var(--color-bad);
+    font-size: 13px;
+  }
+  .wb-board-path {
+    margin: 0;
+    padding: 0 16px 8px;
+    color: var(--color-ink-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    overflow-wrap: anywhere;
   }
   .wb-kpi {
     display: flex;
@@ -724,6 +725,24 @@
     outline: 2px solid var(--color-signal);
     outline-offset: 2px;
   }
+  .wb-search-clear {
+    position: absolute;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-ink-soft);
+    cursor: pointer;
+    font-size: 15px;
+  }
+  .wb-search-clear:hover {
+    background: var(--color-surface-2);
+  }
   .wb-kbd {
     position: absolute;
     right: 8px;
@@ -796,7 +815,10 @@
     border-top: 0;
   }
   .wb-lane > summary {
-    position: relative;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--color-surface);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -871,6 +893,31 @@
   .wb-lane-body .wb-card:first-child {
     border-top: 0;
   }
+  .wb-lane.lane-filtered, .wb-card.filtered {
+    display: none !important;
+  }
+  .wb-card.extra {
+    display: none;
+  }
+  .wb-lane-body.all .wb-card.extra, .wb-lane-body.searching .wb-card.extra {
+    display: block;
+  }
+  .wb-more {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    margin: 8px 0 4px;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    color: var(--color-signal);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .wb-more:hover {
+    text-decoration: underline;
+  }
   .wb-card > summary {
     display: flex;
     flex-wrap: wrap;
@@ -890,6 +937,10 @@
   }
   .wb-card > summary:hover {
     background: var(--color-surface-2);
+  }
+  .wb-card.selected > summary {
+    outline: 2px solid var(--color-signal);
+    outline-offset: -2px;
   }
   .wb-card-id {
     flex: none;
@@ -1146,6 +1197,12 @@
     font-size: var(--text-micro);
     color: var(--color-ink-faint);
   }
+  .wb-footer {
+    padding: 24px 0 32px;
+    color: var(--color-ink-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
   .wb-tokens {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -1240,7 +1297,10 @@
     padding-bottom: 2px;
   }
   body.compact .wb-lane > summary {
-    min-height: 40px;
+    min-height: 38px;
+  }
+  body.compact .wb-card-task {
+    font-size: 12px;
   }
 }
 @media (max-width: 1179px) {
@@ -1339,53 +1399,5 @@
   *, *::before, *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
-  }
-}
-@property --tw-rotate-x {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-rotate-y {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-rotate-z {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-skew-x {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-skew-y {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-border-style {
-  syntax: "*";
-  inherits: false;
-  initial-value: solid;
-}
-@property --tw-outline-style {
-  syntax: "*";
-  inherits: false;
-  initial-value: solid;
-}
-@property --tw-ease {
-  syntax: "*";
-  inherits: false;
-}
-@layer properties {
-  @supports ((-webkit-hyphens: none) and (not (margin-trim: block))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
-    *, ::before, ::after, ::backdrop {
-      --tw-rotate-x: initial;
-      --tw-rotate-y: initial;
-      --tw-rotate-z: initial;
-      --tw-skew-x: initial;
-      --tw-skew-y: initial;
-      --tw-border-style: solid;
-      --tw-outline-style: solid;
-      --tw-ease: initial;
-    }
   }
 }
