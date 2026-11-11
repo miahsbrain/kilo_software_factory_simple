@@ -1,5 +1,18 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-118 gallery checkpoint blocked, 2026-11-11**
+> Branch `feat/redesign-board-console-component-gallery`, worktree
+> `.opencode/worktrees/redesign-board-console-component-gallery`, stacked over BOARD-119.
+> Partial gallery-only source previews Project/Harness tabs, scoped summaries/tasks/worktrees,
+> keyboard tab selection, remembered scope and shared filter/refresh/theme/density handlers.
+> Live `/` markup remains unchanged; new layout CSS is scoped to `.wb-workbench`.
+> Asset generation `npm --prefix .opencode/skills/board/ui run build` exited 127:
+> `sh: 1: tailwindcss: not found`. Stopped without installs, retries or alternative generation.
+> Committed `static/board.css` is unchanged and does NOT contain the new styles. Regression
+> extension/run and browser/unslop review remain incomplete. No server or board edits.
+> Next: parent requests approval to provision the existing pinned Tailwind dependencies, then
+> resumes asset authoring and the one regression command. Gallery and screen approval remain open.
+
 > **Session Notes — BOARD-119 data slice, 2026-11-11**
 > Branch: `fix/include-project-repository-worktrees-in-console`; worktree:
 > `.opencode/worktrees/include-project-repository-worktrees-in-console`, based on BOARD-117's
@@ -188,6 +201,9 @@ Chunk 1 reuses these existing boundaries:
 | `board_serve.py` | `.opencode/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
 | `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1704` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
 | `worktree_state()` | `.opencode/skills/board/scripts/board_serve.py:171` | Reloads the existing registry and enumerates control/project via `load_repos`, `resolve_repo`, `is_git_repo`, `list_worktrees`, `default_base` and `git_out`. Omits absent/uninitialized projects. Each entry adds `repo` and `base`; existing array and fields stay intact. Main detection and counts use only that repository. Invalid maps flow through existing payload exception handling. | effectful (filesystem, Git); entry construction is deterministic from results |
+| `wb_scope_default()` / `wb_scope_tabs()` / `wb_scope_content()` | `.opencode/skills/board/scripts/board_serve.py:1456`, `:1463`, `:1477` | Pure reusable selection fallback, tablist and scoped content presenters; map harness to control worktrees and reuse existing counts/panels/lanes/cards/rail. Gallery only, incomplete asset authoring. | pure |
+| `gallery_scope_fixtures()` / `build_gallery_html()` | `.opencode/skills/board/scripts/board_serve.py:1501`, `:1526` | Pure labelled fixtures and gallery composition; identical BOARD-001 IDs are separated by board keys. No live data or second task store. | pure |
+| `selectScope()` / `wb_wt_row(show_base=True)` | `.opencode/skills/board/scripts/board_serve.py:242`, `:1061` | JS tab DOM/storage effects reuse dashboard state and existing handlers; pure worktree row optionally adds base/reference labels, preserving default live output. | effectful JS; pure Python presenter |
 | `worktree.py` | `.opencode/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, `discard` removes one, `discard --force --yes` destroys one after writing a recovery copy, `handoff` prints the hand-off block, `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, `discard` sets `Ready`. | effectful (git, filesystem) |
 | `env.py` | `.opencode/skills/git-worktree/scripts/env.py` | Copies the two local env files from a repository's main checkout into a worktree, excludes them from git, and removes them again. Never prints a value. | effectful (filesystem, git exclude) |
 | `test_env.py` | `.opencode/skills/git-worktree/scripts/test_env.py` | Self-test for the env provisioning and the worktree reuse rules, in a throwaway repository under a temp directory. | effectful (filesystem, git) |

@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Checkpoint repository workbench gallery source
+**Type:** Feature
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `board_serve.py`, `ui/src/app.css` under `.opencode/skills/board/`; `docs/UI-UX.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, ADR-078 and this log. No new files.
+**Why:** Preview approved Project/Harness tabs before screen rollout. Reuse existing wb_ cards/lanes/panels/meter/rail, row adapter, count helpers and dashboard JS rather than duplicate gallery handlers. New pure scope presenters provide missing tablist/default/content composition; fixture adapter reuses existing fixtures, deliberately sharing task IDs across scopes. Optional base rendering preserves default worktree row output.
+**Impact:** Partial gallery-only source; live board markup unchanged, new layout styles scoped. Shared JS adds remembered scope, tab keyboard handling and selected-scope result totals while retaining no-tab behavior. No API changes, installs, server changes, board edits or project reads. Reversible. NOT merge-ready: generated stylesheet remains unchanged.
+**Verification:** Asset authoring `npm --prefix .opencode/skills/board/ui run build` exited 127, `sh: 1: tailwindcss: not found`. Stopped per delegated instructions; regression extension/run and browser/canonical/unslop review incomplete. Parent must obtain approval to provision pinned existing dependencies before resuming.
+
 ## [2026-11-11] Include registered project worktrees in console data
 **Type:** Fix
 **Board:** BOARD-119 | **Branch:** fix/include-project-repository-worktrees-in-console

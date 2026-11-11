@@ -1,6 +1,17 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-119 data slice (2026-11-11)
+## Current session — BOARD-118 gallery checkpoint blocked (2026-11-11)
+
+- **Task:** `feat/redesign-board-console-component-gallery`, assigned worktree of the same slug,
+  stacked over BOARD-119. Gallery-only source partially implemented; no live screen rollout.
+- **Blocker:** `npm --prefix .opencode/skills/board/ui run build` exited 127 with
+  `sh: 1: tailwindcss: not found`. No dependency installation, retry or workaround.
+- **Incomplete:** Generated CSS remains unchanged; test extension and regression command not run
+  after this environmental stop. Canonical capture/unslop/browser review and gallery approval open.
+- **Next:** Parent asks user to approve provisioning existing pinned stylesheet dependencies.
+  Resume asset generation and focused verification only after that decision. Not merge-ready.
+
+## Earlier session — BOARD-119 data slice (2026-11-11)
 
 - **Phase:** Build complete; parent review pending for the data-only slice.
 - **Active task:** `fix/include-project-repository-worktrees-in-console` in

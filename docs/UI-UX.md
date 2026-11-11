@@ -454,3 +454,23 @@ and 40px card rows. The shared components are `wb_meter`, `wb_lane`, `wb_card`, 
 Build after any class change: `npm --prefix .opencode/skills/board/ui run build`. The runtime is still
 Python standard library only, and the page still works offline because the CSS and fonts are
 served locally.
+
+### 6.3 Repository workbench gallery (BOARD-118, direction approved; gallery pending)
+
+Harness/Project tabs replace the sidebar proposal. Each tab owns its tasks, lane counts and
+worktrees. Default to Project when present; remember selection and fall back to the available tab.
+Keep 60-second auto-refresh and manual Refresh now. Preview before live console rollout (ADR-078).
+
+Direction: factory operator reviews project/harness work; precise, quiet, practical; workbench;
+real task/branch information carries detail; repository context stays visible. Keep §6.2 Geist,
+paper/graphite, signal orange, 4px grid, modest corners and existing scale. New layout styles live
+under `.wb-workbench`; `/` retains its current markup and layout. Shared `wb_scope_tabs` and
+`wb_scope_content` compose existing meter, cards, lanes and rail, not gallery forks. Shared JS
+adds tablist/tabpanel arrow/Home/End selection and reuses storage, filters, theme, density, refresh.
+Fixture boards intentionally share BOARD-001; board-scoped fold keys keep them separate.
+
+**Blocked authoring checkpoint:** stylesheet generation exited 127 (`tailwindcss: not found`).
+Committed CSS has not been regenerated. Gallery is not ready for approval or visual QA; neither
+regressions nor canonical captures were run in this slice. No installs or server changes.
+Nine-pass direction informed source layout, but rendered sign audit/checklist and contrast,
+keyboard, responsive, themes and elapsed refresh proof remain unchecked for the reviewer.

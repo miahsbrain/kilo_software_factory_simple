@@ -220,6 +220,7 @@ JS = """
       state.more = saved.more || {};
       if (saved.theme) { state.theme = saved.theme; }
       if (saved.density) { state.density = saved.density; }
+      if (saved.scope) { state.scope = saved.scope; }
     }
   } catch (e) { /* storage is unavailable; the server defaults are used */ }
 
@@ -235,6 +236,45 @@ JS = """
   var lanes = all(".wb-lane");
   var cards = all(".wb-card");
   var boards = all("[data-board-panel]");
+  var tabs = all('[data-wb-scope-tab]');
+  var scopePanels = all('[data-wb-scope-panel]');
+
+  function selectScope(scope, focus) {
+    var tab = tabs.filter(function (item) {
+      return item.getAttribute('data-wb-scope-tab') === scope;
+    })[0] || tabs.filter(function (item) {
+      return item.getAttribute('data-wb-scope-tab') === 'project';
+    })[0] || tabs[0];
+    if (!tab) { return; }
+    state.scope = tab.getAttribute('data-wb-scope-tab');
+    tabs.forEach(function (item) {
+      var active = item === tab;
+      item.setAttribute('aria-selected', active ? 'true' : 'false');
+      item.tabIndex = active ? 0 : -1;
+    });
+    scopePanels.forEach(function (panel) {
+      panel.hidden = panel.getAttribute('data-wb-scope-panel') !== state.scope;
+    });
+    if (focus) { tab.focus(); }
+  }
+  selectScope(state.scope, false);
+  tabs.forEach(function (tab, index) {
+    tab.addEventListener('click', function () {
+      selectScope(tab.getAttribute('data-wb-scope-tab'), false);
+      deselect(); save(); apply();
+    });
+    tab.addEventListener('keydown', function (event) {
+      var next = index;
+      if (event.key === 'ArrowRight') { next = (index + 1) % tabs.length; }
+      else if (event.key === 'ArrowLeft') { next = (index + tabs.length - 1) % tabs.length; }
+      else if (event.key === 'Home') { next = 0; }
+      else if (event.key === 'End') { next = tabs.length - 1; }
+      else { return; }
+      event.preventDefault();
+      selectScope(tabs[next].getAttribute('data-wb-scope-tab'), true);
+      deselect(); save(); apply();
+    });
+  });
 
   lanes.forEach(function (lane) {
     var key = laneKey(lane);
@@ -383,7 +423,8 @@ JS = """
           (!f.priority || card.getAttribute("data-priority") === f.priority);
         card.classList.toggle("filtered", !hit);
         if (hit) {
-          matched += 1;
+          var scopePanel = card.closest('[data-wb-scope-panel]');
+          if (!scopePanel || !scopePanel.hidden) { matched += 1; }
           laneMatches += 1;
           if (expanded || !card.classList.contains("extra")) { laneShown += 1; }
         }
@@ -423,7 +464,11 @@ JS = """
 
     if (selected && selected.classList.contains("filtered")) { deselect(); }
 
-    if (resultCount) { resultCount.textContent = "showing " + matched + " of " + cards.length; }
+    var scopeCards = cards.filter(function (card) {
+      var panel = card.closest('[data-wb-scope-panel]');
+      return !panel || !panel.hidden;
+    });
+    if (resultCount) { resultCount.textContent = "showing " + matched + " of " + scopeCards.length; }
     if (resetBtn) { resetBtn.hidden = !anyActive; }
     if (searchClear) { searchClear.hidden = !(search && search.value); }
     if (kbd) { kbd.hidden = !!(search && search.value); }
@@ -589,7 +634,10 @@ JS = """
   function boardIdle() {
     if (paused) { return false; }
     if (document.visibilityState !== "visible") { return false; }
-    if (document.querySelector(".wb-card[open]")) { return false; }
+    if (all(".wb-card[open]").some(function (card) {
+      var panel = card.closest('[data-wb-scope-panel]');
+      return !panel || !panel.hidden;
+    })) { return false; }
     if (search && search.value.trim()) { return false; }
     if (typeSel && typeSel.value) { return false; }
     if (prioSel && prioSel.value) { return false; }
@@ -647,99 +695,6 @@ JS = """
   apply();
 })();
 """
-
-GALLERY_JS = """
-(function () {
-  var KEY = "board-dashboard-state";
-  var state = {theme: "system", density: "comfortable"};
-  try {
-    var saved = JSON.parse(window.localStorage.getItem(KEY) || "{}");
-    if (saved && typeof saved === "object") {
-      if (saved.theme) { state.theme = saved.theme; }
-      if (saved.density) { state.density = saved.density; }
-    }
-  } catch (e) { /* storage is unavailable; the server defaults are used */ }
-
-  function save() {
-    try { window.localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
-  }
-  function each(selector, fn) {
-    Array.prototype.forEach.call(document.querySelectorAll(selector), fn);
-  }
-  function applyTheme(theme) {
-    document.documentElement.setAttribute("data-theme", theme);
-    var label = theme === "system" ? "System" : (theme === "dark" ? "Dark" : "Light");
-    each("[data-wb-theme]", function (button) {
-      button.textContent = label;
-      button.setAttribute("aria-label", "Colour theme: " + label + " (click to change)");
-    });
-    state.theme = theme;
-  }
-  function applyDensity(density) {
-    var compact = density === "compact";
-    document.body.classList.toggle("compact", compact);
-    each("[data-wb-density]", function (button) {
-      button.textContent = compact ? "Compact" : "Comfortable";
-      button.setAttribute("aria-pressed", compact ? "true" : "false");
-      button.setAttribute("aria-label", "Density: " + (compact ? "compact" : "comfortable") + " (click to change)");
-    });
-    state.density = compact ? "compact" : "comfortable";
-  }
-  each("[data-wb-theme]", function (button) {
-    button.addEventListener("click", function () {
-      var next = state.theme === "system" ? "light" : (state.theme === "light" ? "dark" : "system");
-      applyTheme(next);
-      save();
-    });
-  });
-  each("[data-wb-density]", function (button) {
-    button.addEventListener("click", function () {
-      applyDensity(state.density === "compact" ? "comfortable" : "compact");
-      save();
-    });
-  });
-  each("[data-status-filter]", function (button) {
-    button.addEventListener("click", function () {
-      var lane = button.getAttribute("data-status-filter");
-      var next = button.getAttribute("aria-pressed") !== "true";
-      each("[data-status-filter]", function (peer) {
-        if (peer.getAttribute("data-status-filter") === lane) {
-          peer.setAttribute("aria-pressed", next ? "true" : "false");
-        }
-      });
-    });
-  });
-  each("[data-copy]", function (button) {
-    button.addEventListener("click", function () {
-      var value = button.getAttribute("data-copy") || "";
-      var done = function () {
-        button.textContent = "copied";
-        window.setTimeout(function () { button.textContent = "copy"; }, 1200);
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(value).then(done, function () {});
-      }
-    });
-  });
-  var search = document.getElementById("search");
-  document.addEventListener("keydown", function (event) {
-    var target = event.target;
-    var typing = target && (target.tagName === "INPUT" || target.tagName === "SELECT" ||
-      target.tagName === "TEXTAREA" || target.isContentEditable);
-    if (event.key === "/" && !typing && search) {
-      event.preventDefault();
-      search.focus();
-      search.select();
-    } else if (event.key === "Escape" && search && document.activeElement === search) {
-      search.value = "";
-      search.blur();
-    }
-  });
-  applyTheme(state.theme);
-  applyDensity(state.density);
-})();
-"""
-
 
 def esc(value):
     return html.escape("" if value is None else str(value), quote=True)
@@ -1103,7 +1058,7 @@ def wb_toolbar(total=0):
     ) % (wb_filter_selects("main"), total, total)
 
 
-def wb_wt_row(worktree):
+def wb_wt_row(worktree, show_base=False):
     tags = []
     if worktree["main"]:
         tags.append(wb_chip("main", "main"))
@@ -1118,7 +1073,7 @@ def wb_wt_row(worktree):
         '<span aria-label="ahead %s">+%s</span>'
         '<span aria-label="behind %s">-%s</span>'
         '</span></div>'
-        '<span class="wb-wt-path">%s</span>'
+        '<span class="wb-wt-path">%s</span>%s'
         '</div>'
     ) % (
         esc(worktree["branch"]),
@@ -1126,6 +1081,8 @@ def wb_wt_row(worktree):
         esc(ahead), esc(ahead),
         esc(behind), esc(behind),
         esc(worktree["path"]),
+        ('<span class="wb-wt-path">Base: %s · ahead +%s · behind −%s</span>'
+         % (esc(worktree.get("base") or "unknown"), esc(ahead), esc(behind))) if show_base else "",
     )
 
 
@@ -1496,128 +1453,110 @@ def gallery_fixtures():
     return open_card, second_card, blocked_card, worktrees
 
 
+def wb_scope_default(boards, selected=None):
+    labels = [entry["label"] for entry in boards]
+    if selected in labels:
+        return selected
+    return "project" if "project" in labels else next(iter(labels), None)
+
+
+def wb_scope_tabs(boards, selected=None):
+    selected = wb_scope_default(boards, selected)
+    buttons = "".join(
+        '<button type="button" class="wb-scope-tab" role="tab" id="scope-tab-%s"'
+        ' aria-controls="scope-panel-%s" aria-selected="%s" tabindex="%s"'
+        ' data-wb-scope-tab="%s">%s <span>%d tasks</span></button>'
+        % (esc(entry["label"]), esc(entry["label"]),
+           "true" if entry["label"] == selected else "false",
+           "0" if entry["label"] == selected else "-1", esc(entry["label"]),
+           esc(entry["label"].capitalize()), len(entry["rows"]))
+        for entry in boards)
+    return '<div class="wb-scope-tabs" role="tablist" aria-label="Repository boards">%s</div>' % buttons
+
+
+def wb_scope_content(entry, worktrees, selected):
+    label = entry["label"]
+    repo = "control" if label == "harness" else label
+    scoped = [wt for wt in worktrees if wt.get("repo") == repo]
+    ordered = sorted(scoped, key=lambda wt: wt["main"])
+    rail_body = "".join(wb_wt_row(wt, show_base=True) for wt in ordered)
+    if not rail_body:
+        rail_body = ('<p class="wb-empty">No %s worktrees. '
+                     'Create a worktree for a ready task with worktree.py create.</p>') % esc(label)
+    counts = active_counts([entry])
+    summary = ('<div class="wb-scope-summary"><strong>%d</strong> in flight'
+               '<span>%d pending merge · %d blocked · %d tasks total</span></div>') % (
+                   sum(counts.values()), counts["Pending Merge"], counts["Blocked"], len(entry["rows"]))
+    return (
+        '<section class="wb-scope-content" role="tabpanel" id="scope-panel-%s"'
+        ' aria-labelledby="scope-tab-%s" tabindex="0" data-wb-scope-panel="%s"%s>'
+        '<div class="wb-scope-context">%s / docs/BOARD.md</div>%s'
+        '<div class="wb-scope-grid"><div class="wb-scope-board">%s%s</div>%s</div></section>'
+    ) % (esc(label), esc(label), esc(label), "" if selected == label else " hidden",
+         esc(label.capitalize()), summary, wb_panel("Lanes", "Selected repository only", wb_meter(counts)),
+         render_board_panel(entry), wb_rail("%s worktrees" % label.capitalize(),
+                                          "%d worktrees" % len(scoped), rail_body))
+
+
+def gallery_scope_fixtures():
+    first, second, blocked, worktrees = gallery_fixtures()
+    boards = []
+    for label, fixtures in (("project", (second, blocked)), ("harness", (first,))):
+        rows = []
+        for fixture, lane in zip(fixtures, ("In Review", "Blocked")):
+            row = dict(fixture)
+            row.update({"ID": "BOARD-001" if not rows else "BOARD-002", "Status": lane})
+            row.pop("open", None)
+            row["Task"] = ("Review project search results" if label == "project" and not rows
+                           else "Approve project export permissions" if label == "project"
+                           else "Review factory console components")
+            rows.append(row)
+        lanes = lane_map(rows)
+        boards.append({"label": label, "path": "/fixtures/%s/docs/BOARD.md" % label,
+                       "rows": rows, "counts": {lane: len(ids) for lane, ids in lanes.items()}})
+    scoped_worktrees = []
+    for wt, repo, base in zip(worktrees, ("control", "control", "project"),
+                              ("opencode", "opencode", "main")):
+        scoped_worktrees.append(dict(wt, repo=repo, base=base))
+    scoped_worktrees[0].update(branch="opencode")
+    scoped_worktrees[2].update(branch="feat/project-search", path="/fixtures/project/.opencode/worktrees/project-search")
+    return boards, scoped_worktrees
+
+
 def build_gallery_html():
-    open_card, second_card, blocked_card, worktrees = gallery_fixtures()
-    counts = GALLERY_COUNTS
-    total = sum(counts.values())
-    lane_cards = {
-        "In Review": wb_card(open_card) + wb_card(second_card),
-        "Blocked": wb_card(blocked_card),
-    }
-    open_lanes = {"In Review", "Blocked"}
-    lanes = "".join(
-        wb_lane(
-            lane,
-            counts.get(lane, 0),
-            LANE_DESCRIPTION[lane],
-            lane_cards.get(lane) or wb_empty(lane),
-            open=lane in open_lanes,
-            signal=counts.get(lane, 0) == max(counts.values()),
-        )
-        for lane in ACTIVE_LANES
-    )
-    lane_filters = "".join(
-        '<button type="button" class="wb-lane-filter" data-status-filter="%s" aria-pressed="false">'
-        '<span class="wb-lane-filter-name">%s</span>'
-        '<span class="wb-lane-filter-count">%d</span></button>'
-        % (esc(lane), esc(lane), counts.get(lane, 0))
-        for lane in ACTIVE_LANES
-    )
-    rail_body = "".join(wb_wt_row(worktree) for worktree in worktrees)
-    rail_body += ('<p class="wb-legend">+ ahead · − behind · chips show main, dirty and clean</p>')
-    rail = wb_rail("Worktrees", "3 worktrees · 2 non-main", rail_body)
-    chips = " ".join(
-        wb_chip(kind, text) for kind, text in (
-            ("type", "Feature"), ("prio", "P2"),
-            ("risk-low", "low"), ("risk-medium", "medium"), ("risk-high", "high"),
-            ("main", "main"), ("dirty", "dirty"), ("clean", "clean"),
-        )
-    )
-    mark = (
-        '<svg class="wb-mark" viewBox="0 0 24 24" aria-hidden="true" '
-        'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
-        '<path d="M3 20V9l6 3V9l6 3V4h6v16z"/>'
-        '<path d="M6 16h3M12 16h3"/></svg>'
-    )
-    kpi_facts = "".join(
-        '<div class="wb-kpi-fact"><span class="wb-kpi-num-sm">%d</span>'
-        '<span class="wb-kpi-label">%s</span></div>' % (value, esc(label))
-        for value, label in (
-            (counts.get("Pending Merge", 0), "pending merge"),
-            (counts.get("Blocked", 0), "blocked"),
-            (total, "total"),
-        )
-    )
+    boards, worktrees = gallery_scope_fixtures()
+    selected = wb_scope_default(boards)
+    chips = " ".join(wb_chip(kind, text) for kind, text in (
+        ("type", "Feature"), ("prio", "P2"), ("risk-low", "low"),
+        ("risk-medium", "medium"), ("risk-high", "high"), ("main", "main"),
+        ("dirty", "dirty"), ("clean", "clean")))
     return "".join([
-        "<!doctype html>\n",
-        '<html lang="en" data-theme="system"><head><meta charset="utf-8">',
+        '<!doctype html><html lang="en" data-theme="system"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        '<meta name="color-scheme" content="light dark">',
-        '<link rel="icon" href="', FAVICON, '">',
-        '<link rel="stylesheet" href="/static/board.css">',
-        "<title>Factory board</title></head><body>\n",
-        '<div class="wb-layout">',
-        '<aside class="wb-sidebar">',
-        '<div class="wb-side-brand">', mark,
-        '<div class="min-w-0"><span class="wb-wordmark">Factory board</span>',
-        '<span class="wb-brand-meta">Component gallery</span></div></div>',
-        '<nav class="wb-side-nav" aria-label="Lane filters">',
-        '<p class="wb-side-label">Lanes</p>',
-        '<div class="wb-lane-filters">', lane_filters, '</div></nav>',
-        '<div class="wb-side-filters">',
-        '<p class="wb-side-label">Filters</p>',
-        wb_filter_selects("side", visible_labels=True),
-        '</div>',
-        '<div class="wb-side-footer">',
-        '<p class="wb-live"><span class="wb-live-dot" aria-hidden="true"></span>'
-        '<span>updated %s</span></p>' % datetime.datetime.now().strftime("%H:%M:%S"),
-        '<div class="wb-side-actions">',
-        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button>',
-        '<button type="button" class="wb-btn" data-wb-theme aria-label="Colour theme">System</button>',
-        '<button type="button" class="wb-btn" data-wb-density aria-pressed="false" '
-        'aria-label="Density">Comfortable</button>',
-        '</div></div></aside>',
-        '<main class="wb-main">',
-        '<header class="wb-page-head">',
-        '<div class="min-w-0"><h1 class="wb-title">Factory board</h1>',
-        '<p class="wb-sub">Lanes, cards and live worktrees — what is in flight right now</p></div>',
-        '<button type="button" class="wb-btn" id="refresh-now">Refresh now</button>',
-        '</header>',
-        '<section class="wb-kpi" aria-label="Board summary">',
-        '<div class="wb-kpi-primary"><span class="wb-kpi-num">%d</span>'
-        '<span class="wb-kpi-label">in flight</span></div>' % total,
-        kpi_facts,
-        '</section>',
-        wb_panel(
-            "Flow",
-            "%d lanes" % len(ACTIVE_LANES),
-            wb_meter(counts),
-        ),
-        '<section class="wb-panel">',
-        wb_toolbar(total),
-        '<div class="wb-lanes">', lanes, '</div>',
-        '</section>',
-        '</main>',
-        rail,
-        '</div>',
-        '<div class="wb-sections">',
-        '<section class="wb-section">',
-        '<h2 class="wb-section-title">Chips and empty state</h2>',
-        '<p class="wb-section-meta">Chips stay quiet. The empty state names the next action.</p>',
-        '<div class="flex flex-wrap items-center gap-2 py-3">', chips, '</div>',
-        wb_empty("Ready"),
-        '</section>',
-        '<section class="wb-section">',
-        '<h2 class="wb-section-title">Tokens</h2>',
-        '<p class="wb-section-meta">The language is tokens, not one-off values. '
-        'Swatches follow the active theme.</p>',
-        gallery_tokens_html(),
-        '</section>',
-        '</div>',
-        '<footer class="mx-auto w-full max-w-[1600px] px-6 pb-16 font-mono text-micro '
-        'text-ink-faint"><a href="/">Back to the board</a></footer>\n',
-        "<script>", GALLERY_JS, "</script>\n",
-        "</body></html>",
+        '<meta name="color-scheme" content="light dark"><link rel="icon" href="', FAVICON, '">',
+        '<link rel="stylesheet" href="/static/board.css"><title>Factory component gallery</title>',
+        '</head><body data-refresh="60"><main class="wb-workbench">',
+        '<header class="wb-page-head"><div><p class="wb-scope-context">Factory / Component gallery</p>',
+        '<h1 class="wb-title">Repository workbench</h1>',
+        '<p class="wb-sub">Preview only · labelled fixture data · awaiting gallery approval</p></div>',
+        '<div class="wb-workbench-actions">',
+        '<button type="button" class="wb-btn" id="theme-toggle">System</button>',
+        '<button type="button" class="wb-btn" id="density-toggle" aria-pressed="false">Comfortable</button>',
+        '<button type="button" class="wb-btn" id="refresh">Refresh now</button></div></header>',
+        '<div class="wb-refresh-line"><span>Auto-refresh every 60s · fixture preview</span>',
+        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button></div>',
+        wb_scope_tabs(boards, selected), wb_toolbar(len(boards[0]["rows"])),
+        "".join(wb_scope_content(entry, worktrees, selected) for entry in boards),
+        '<section class="wb-section"><h2 class="wb-section-title">Empty and unavailable states</h2>',
+        '<p class="wb-section-meta">Project fixture · no tasks, no worktrees, and a board read failure</p>',
+        wb_panel("Project tasks", "0 tasks", wb_empty("Ready")), wb_rail("Project worktrees", "0 worktrees",
+            '<p class="wb-empty">No project worktrees. Create a worktree for a ready task with worktree.py create.</p>'),
+        '<p class="wb-banner" role="alert">Project board could not be read. Check project/docs/BOARD.md, then choose Refresh now.</p>',
+        '</section><section class="wb-section"><h2 class="wb-section-title">Chips</h2>',
+        '<div class="wb-workbench-actions">', chips, '</div></section>',
+        '<section class="wb-section"><h2 class="wb-section-title">Tokens</h2>', gallery_tokens_html(),
+        '</section><footer class="wb-footer"><a href="/">Back to the unchanged live board</a></footer>',
+        '</main><script>', JS, '</script></body></html>',
     ])
 
 
