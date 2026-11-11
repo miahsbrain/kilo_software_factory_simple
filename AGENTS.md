@@ -1394,8 +1394,14 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   and whether the screen matches the approved gallery (tokens, states, density).
 - **Review:** a UI/UX critique pass runs alongside QA. Findings are stated as
   expected-vs-actual with the screenshot or `file:line` that proves them.
-- **Verdict:** a frontend row cannot leave `In Review` until both QA and the UI/UX critique are
-  green. Any finding returns the row to `In Progress` with the finding restated.
+- **The unslop pass is mandatory on every UI change, alongside QA.** The reviewer opens
+  `.kilo/skills/unslop/SKILL.md` by path, writes the five-line direction, audits every sign in
+  `references/signs.md`, walks the nine passes and the checklist against the same capture the QA
+  lane uses, and records the result. A UI row with no unslop audit is `In Review`, never
+  `Pending Merge`.
+- **Verdict:** a frontend row cannot leave `In Review` until the QA lane and the UI/UX critique
+  are green **and the unslop audit is recorded**. Any finding returns the row to `In Progress`
+  with the finding restated.
 - The spec is in `docs/UI-UX.md` §5. Keep it lean: one spec file per feature lane, no extra test
   framework.
 
@@ -1471,6 +1477,9 @@ the UI/UX critique pass. Full list with examples in `docs/UI-UX.md` §2.
 
 **Extended checklist.** A screen is also judged against the unslop signs list in
 `.kilo/skills/unslop/references/signs.md`, reported sign by sign with where it lives.
+**Mandatory, not advisory.** The unslop pass runs on every UI change alongside the QA lane
+(§B4.2). The precedence rule below governs only a conflict between its guidance and these rules;
+it never allows the pass to be skipped.
 **Precedence.** Where the unslop skill and this file disagree, this file wins: the skill is
 guidance, these rules are the standard.
 

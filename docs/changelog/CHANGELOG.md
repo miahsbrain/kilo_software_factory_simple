@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] The unslop pass is mandatory on every UI change
+**Type:** Docs
+**Board:** BOARD-111 | **Branch:** docs/make-the-unslop-pass-mandatory
+**Changed:** `AGENTS.md` (§B4.2, §B4.3), `docs/UI-UX.md` (§2.1), `.kilo/agent/ui-critic.md`, `.kilo/agent/frontend-dev.md`, `.kilo/skills/qa-review/SKILL.md`, `docs/changelog/CHANGELOG.md`
+**Why:** The BOARD-109 review read the unslop signs list but never ran the unslop procedure, and the loader does not expose the `unslop` skill, so nothing forced an agent to open it. A real audit of the merged console then found uppercase tracked labels, negative tracking on small text, redundant 650/700 weights and five equal stat cards — signs the QA and UI pass had let through.
+**Impact:** Every UI change now runs the full unslop procedure — five-line direction, full `references/signs.md` audit, nine passes, checklist — in the same review round as the QA capture, recorded in the UI report. A UI row with no recorded unslop audit cannot leave `In Review`. The skill is opened by path because the loader does not expose it. Precedence is unchanged: where the skill and `AGENTS.md` disagree, `AGENTS.md` wins, and the conflict is reported.
+
 ## [2026-11-10] The live board becomes a factory console
 **Type:** Feature
 **Board:** BOARD-109 | **Branch:** feat/elevate-the-live-board-ui-into-a-factory-console
