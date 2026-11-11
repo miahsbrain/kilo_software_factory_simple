@@ -2,6 +2,13 @@
 
 ## Current session — BOARD-118 gallery checkpoint blocked (2026-11-11)
 
+- **Approved resumption:** User authorized `npm --prefix .opencode/skills/board/ui ci` for
+  existing locked dependencies only. It produced no output before the 120000ms tool timeout;
+  no exit code returned. Installation completion unknown. Stopped without retry/workaround.
+  No build, regression command, browser work or source edits in this resumption.
+- **Current next action:** Parent requests a decision on a longer explicit install attempt.
+  Gallery remains incomplete and not ready for preview or merge; original blocker below is history.
+
 - **Task:** `feat/redesign-board-console-component-gallery`, assigned worktree of the same slug,
   stacked over BOARD-119. Gallery-only source partially implemented; no live screen rollout.
 - **Blocker:** `npm --prefix .opencode/skills/board/ui run build` exited 127 with

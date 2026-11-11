@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Record approved gallery dependency install timeout
+**Type:** Docs
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, this log.
+**Why:** User explicitly approved installing existing locked UI dependencies to unblock gallery asset authoring; record the environmental stop without implying completion.
+**Impact:** `npm --prefix .opencode/skills/board/ui ci` produced no output and exceeded 120000ms shell timeout; no exit code returned, completion unknown. Stopped without retry/workaround, build, tests, browser work or source changes. Gallery remains incomplete, not preview-ready or merge-ready. Parent requests a decision on a longer install attempt. No new dependencies or lockfile changes requested.
+**Verification:** No verification command run; installation timed out before source review/verification resumed. No browser/canonical/unslop pass claimed.
+
 ## [2026-11-11] Checkpoint repository workbench gallery source
 **Type:** Feature
 **Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery

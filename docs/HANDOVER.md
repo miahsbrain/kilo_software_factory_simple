@@ -1,5 +1,14 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-118 approved install timed out, 2026-11-11**
+> Confirmed session remains in `.opencode/worktrees/redesign-board-console-component-gallery`.
+> User explicitly approved installing existing lockfile-declared UI dependencies only.
+> `npm --prefix .opencode/skills/board/ui ci` produced no output and exceeded the shell's
+> 120000ms timeout; no process exit code was returned. Installation completion is unknown.
+> Stopped without retry, alternate command, build, tests, browser work or source edits.
+> Gallery remains the partial checkpoint below, not ready for preview or merge.
+> Next: parent reports the timeout and obtains a decision on an explicitly longer install attempt.
+
 > **Session Notes — BOARD-118 gallery checkpoint blocked, 2026-11-11**
 > Branch `feat/redesign-board-console-component-gallery`, worktree
 > `.opencode/worktrees/redesign-board-console-component-gallery`, stacked over BOARD-119.

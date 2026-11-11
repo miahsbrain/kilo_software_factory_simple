@@ -472,5 +472,9 @@ Fixture boards intentionally share BOARD-001; board-scoped fold keys keep them s
 **Blocked authoring checkpoint:** stylesheet generation exited 127 (`tailwindcss: not found`).
 Committed CSS has not been regenerated. Gallery is not ready for approval or visual QA; neither
 regressions nor canonical captures were run in this slice. No installs or server changes.
+On approved resumption, user authorized existing locked dependency installation only.
+`npm --prefix .opencode/skills/board/ui ci` produced no output and hit a 120000ms tool timeout
+without a returned exit code. Completion is unknown. No retry, asset generation, tests or source
+changes followed; the gallery remains incomplete, with no browser or unslop pass claimed.
 Nine-pass direction informed source layout, but rendered sign audit/checklist and contrast,
 keyboard, responsive, themes and elapsed refresh proof remain unchecked for the reviewer.
