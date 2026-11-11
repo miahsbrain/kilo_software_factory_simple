@@ -1,6 +1,20 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-118 gallery ready for browser preview (2026-11-11)
+## Current session — BOARD-118 browser checkpoint blocked (2026-11-11)
+
+- **Preview:** Parent reviewed diff and started http://127.0.0.1:15182/gallery from BOARD-118
+  worktree. Live 15180 and prior preview 15181 unchanged. User will review gallery directly.
+- **Parent observation:** Built-in browser tab `5007dd99-7e7a-47c0-b5d6-3c060c359dd7`, snapshot
+  generation 2: Project selected default, Project 2 / Harness 1 tasks; Project summary 2 in flight,
+  1 blocked, 2 tasks, 1 worktree; labelled fixture empty/error states. Not independent QA.
+- **Stop:** Harness click ref `e46` returned `[browser.operation_failed] browser.click failed. UnknownVizError`
+  (no exit code); following tabs.list confirmed same gallery generation 2. No retry.
+- **Blocked:** Browser error plus gallery approval. Interactions/themes/responsive/canonical
+  evidence and independent unslop incomplete; not merge-ready. Parent handles remaining gates.
+- **Checkpoint:** Docs only, no new checks/source edits/installs. Existing 11 tests passed and
+  user install/build proof below preserved. Next: user reviews preview; no live screen rollout.
+
+## Earlier session — BOARD-118 gallery ready for browser preview (2026-11-11)
 
 - **Phase:** Gallery implementation and focused regression verification complete; browser review
   and gallery approval pending. Same assigned worktree/branch, stacked over BOARD-119.

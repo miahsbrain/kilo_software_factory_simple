@@ -1,5 +1,19 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-118 browser checkpoint blocked, 2026-11-11**
+> Parent reviewed gallery diff and started http://127.0.0.1:15182/gallery from this worktree;
+> live 15180 and earlier preview 15181 untouched. Parent built-in browser snapshot generation 2,
+> tab `5007dd99-7e7a-47c0-b5d6-3c060c359dd7`, showed Project selected by default, Project 2 /
+> Harness 1 task tabs, Project summary 2 in flight / 1 blocked / 2 tasks, Project 1 worktree,
+> and labelled fixture empty/error states. Parent observations, not an independent QA pass.
+> Harness click ref `e46` failed: `[browser.operation_failed] browser.click failed. UnknownVizError`
+> (no exit code). Following tabs.list confirmed same gallery generation 2; no retry.
+> Row Blocked on browser error and gallery approval. User will review gallery directly.
+> Interactions, themes, responsive/canonical evidence and independent unslop remain incomplete;
+> no merge readiness. Existing 11-test pass and user install/build proof below remain unchanged.
+> This checkpoint is docs-only: no further tests, browser checks, source edits or installs.
+> Next: user reviews preview; parent resolves review/tooling gates before any live screen rollout.
+
 > **Session Notes — BOARD-118 gallery ready for browser preview, 2026-11-11**
 > Same branch/worktree: `feat/redesign-board-console-component-gallery`,
 > `.opencode/worktrees/redesign-board-console-component-gallery`, stacked over BOARD-119.

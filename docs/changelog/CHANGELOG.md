@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Checkpoint parent gallery preview and browser error
+**Type:** Docs
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, this log.
+**Why:** Preserve parent preview observations and stop reason without claiming completed QA or approval.
+**Impact:** Parent reviewed diff and started http://127.0.0.1:15182/gallery from BOARD-118; live 15180 and prior 15181 unchanged. Built-in tab `5007dd99-7e7a-47c0-b5d6-3c060c359dd7`, snapshot generation 2 showed Project default, Project 2 / Harness 1 tabs, Project 2 in flight / 1 blocked / 2 tasks / 1 worktree, labelled fixture empty/error states. Harness click ref `e46` failed `[browser.operation_failed] browser.click failed. UnknownVizError` (no exit code); following tabs.list confirmed same gallery generation 2; no retry. Parent observations only, not independent QA. Blocked on browser error and gallery approval; user reviews directly. Interactions/themes/responsive/canonical evidence and independent unslop remain incomplete. Not merge-ready; no live screen rollout.
+**Verification:** Docs-only checkpoint, no further checks/source edits/installs. Existing 11-test pass and user-supplied install/build evidence preserved unchanged. Verification limited to file review because this was a low-risk visual/static change.
+
 ## [2026-11-11] Complete repository workbench gallery for preview
 **Type:** Feature
 **Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery

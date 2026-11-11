@@ -469,6 +469,15 @@ under `.wb-workbench`; `/` retains its current markup and layout. Shared `wb_sco
 adds tablist/tabpanel arrow/Home/End selection and reuses storage, filters, theme, density, refresh.
 Fixture boards intentionally share BOARD-001; board-scoped fold keys keep them separate.
 
+**Current preview:** http://127.0.0.1:15182/gallery, started by parent after diff review;
+live 15180 and prior 15181 untouched. Parent built-in snapshot generation 2 (tab
+`5007dd99-7e7a-47c0-b5d6-3c060c359dd7`) observed Project default selected, Project 2 / Harness 1
+task tabs, scoped Project 2 in flight / 1 blocked / 2 tasks / 1 worktree, labelled empty/error
+fixtures. Harness click ref `e46` failed `[browser.operation_failed] browser.click failed. UnknownVizError`
+(no exit code); tabs.list confirmed same generation 2, no retry. These are parent observations,
+not an independent pass. Blocked on browser error and gallery approval; user reviews directly.
+Interactions, themes, responsive/canonical evidence and independent unslop remain incomplete.
+
 **Ready for browser preview, not approved or merge-ready.** User supplied successful locked
 dependency install/build evidence: 56 packages added, 63 audited in 18s, zero vulnerabilities;
 Tailwind 4.3.5 build 61ms. Builder preserved that output and regenerated after correcting the
