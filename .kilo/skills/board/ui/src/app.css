@@ -804,7 +804,7 @@
   }
   .wb-copy {
     flex: none;
-    height: 20px;
+    min-height: 24px;
     padding: 0 6px;
     border: 1px solid var(--color-line);
     border-radius: var(--radius-sm);
