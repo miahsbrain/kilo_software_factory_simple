@@ -50,6 +50,9 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-0
 # Existing lifecycle/env suite (scratch repositories only)
 python3 .opencode/skills/git-worktree/scripts/test_env.py
 
+# Focused handoff gates (isolated temporary repositories inside the task worktree)
+python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_handoff.py'
+
 # Security adapter boundary tests (temporary dummy repositories only)
 node --test .opencode/plugins/factory-guard/guard.test.mjs
 

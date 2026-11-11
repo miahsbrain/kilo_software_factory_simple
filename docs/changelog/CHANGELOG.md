@@ -3,6 +3,30 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Record independent handoff-gate review PASS
+**Type:** Docs
+**Board:** BOARD-123 | **Branch:** fix/gate-merge-handoffs-on-finished-clean-worktrees
+**Changed:** HANDOVER, PROJECT_STATE and this log only.
+**Why:** Independent QA/review report and ledger committed in `27c2e94` record PASS; parent reports the factory row is Pending Merge, awaiting human merge.
+**Impact:** Status now reflects passed review and pending human action. Parent retains final live handoff check; no merge guidance emitted here. Historical unrelated HANDOVER conflict markers preserved; no source/rules/tests or board changes.
+**Verification:** File review only for this docs update; no tests rerun. Existing authorized focused result remains exit 0, 13 tests in 3.847s. Independent acceptance-criteria evidence and coverage limits: `docs/reviews/BOARD-123-qa.md:3–30`.
+
+## [2026-11-11] Verify corrected handoff status gate
+**Type:** Fix
+**Board:** BOARD-123 | **Branch:** fix/gate-merge-handoffs-on-finished-clean-worktrees
+**Changed:** HANDOVER, PROJECT_STATE and this log record authorized second-run evidence; no further implementation changes.
+**Why:** Architect reviewed the existing `STATUS_INDEX` correction and authorized one focused rerun, exact force-add of ignored new `test_handoff.py`, and narrow tracked-file staging after the earlier ignored-path staging error (exit 1). No broad force-add or repeat of that staging command.
+**Impact:** Handoff gates verified against isolated scratch repositories; parent review and live Pending Merge remain required before merge guidance. No real board/project changes, installs, UI/browser/build work or unrelated historical conflict-marker cleanup.
+**Verification:** `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_handoff.py'` exited 0: 13 tests in 3.847s, OK. Covers staged/unstaged/untracked dirt, nonready/missing status, missing branch/base/worktree/row, no commits ahead, Git failures/empty count, clean Pending Merge ordering, read-only behavior and already-merged nonmerge guidance. Full lifecycle suite not run. Prior failed-run record below remains historical.
+
+## [2026-11-11] Gate merge handoffs on finished clean worktrees
+**Type:** Fix
+**Board:** BOARD-123 | **Branch:** fix/gate-merge-handoffs-on-finished-clean-worktrees
+**Changed:** Existing worktree `cmd_handoff`, lifecycle `handoff()` test; root/template AGENTS §B5/§B11, git-worktree skill, handover/closeout/run/board commands, STACK, DECISIONS (ADR-082), HANDOVER, PROJECT_STATE and this log. New adjacent `test_handoff.py` isolates handoff regressions from the unrelated full env/teardown suite while reusing its scratch fixture builder.
+**Why:** Premature handoffs offered merge and teardown for unfinished work. Reuse board/live-row/repo/base/Git helpers and STATUS_INDEX; add checked status, branch identity, commit count and ancestry inside existing effectful command, no parallel readiness framework. Skills applied: python-pro (standard library/testing), cli-developer (Python CLI/UX), test-master (unit testing), code-documenter (user guides), git-worktree procedure. Python 3.9+/stdlib/unittest conventions prevail.
+**Impact:** Only finished verified/reviewed committed clean Pending Merge work may receive merge guidance; manual commands obey the same gate. Dirty/nonready/missing/Git-error output refuses (exit 1), retains review commands, omits merge/teardown. Clean already-merged path preserves review/cleanup with no merge (exit 0). Factory/future template only; separate existing project deferred. Reversible local harness change; no history rewrite, board/security edits, install, build, UI/server work, merge, push or cleanup.
+**Verification:** Single `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_handoff.py'` exited 1: 13 tests in 3.993s, nine failures. All failures identify status as missing: `field_index` handles editable fields, not Status. Corrected to existing `STATUS_INDEX` after file review; no rerun under one-command budget. Parent must reverify and review; checkpoint is not merge-ready. Initial multi-file policy patch had a template-context mismatch and applied nothing; corrected patch added template B5 step 8 where absent. Existing unrelated HANDOVER conflict-marker history preserved, not resolved by this task.
+
 ## [2026-11-11] Verify local-board migration and untrack runtime state
 **Type:** Feature
 **Board:** BOARD-122 | **Branch:** feat/keep-live-board-local-and-untracked

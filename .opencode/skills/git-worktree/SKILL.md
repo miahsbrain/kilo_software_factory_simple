@@ -411,8 +411,11 @@ A worktree is ready for handoff only when:
 The agent **never** merges.
 
 For an unfinished or blocked handoff, apply the §B11 checkpoint policy from section 6 and
-report the SHA, diff command and outstanding work. The orchestrator keeps blocked work `Blocked`;
-do not present a checkpoint or generated merge command as approval to merge.
+report the SHA, diff command and outstanding work. The orchestrator keeps blocked work `Blocked`.
+Never provide a merge command until work is finished, verification and review passed, all task
+changes committed, the live worktree clean and its board row `Pending Merge`. Recheck the live
+worktree and board before merge guidance. Do not manually add merge or teardown commands to a
+refused handoff; unfinished, blocked, dirty or unverified work gets only review/diff and blockers.
 The steps below apply only after the existing verification, QA and review gates pass.
 
 1. The orchestrator sets the board row to `Pending Merge` in the main checkout, with the
@@ -424,12 +427,15 @@ The steps below apply only after the existing verification, QA and review gates 
 python3 .opencode/skills/git-worktree/scripts/worktree.py handoff --board <BOARD-ID>
 ```
 
-That prints the block: the worktree path, the branch, the base, the diff command, the log
-command, the merge command and the teardown command — commands and paths only. It never runs a
-git command that changes anything. Every session that worked in a worktree ends with it, so the
-diff command and the merge command always reach the human together.
+That prints the worktree path, branch, base, diff and log commands. It never runs a mutating
+Git command. It rechecks the live board status, branch identity, staged/unstaged/untracked
+changes, commit count and ancestry with checked Git results. A clean `Pending Merge` branch
+with commits ahead gets merge and teardown commands (exit 0 / `OK`). Other unfinished states,
+missing information or Git failures get blockers, no merge or teardown (exit 1 / `REFUSED`).
+`Pending Merge` records the orchestrator's completed verification/review gates; the script does
+not run those checks or infer them from cleanliness. Every worktree session ends with this block.
 
-The block looks like this:
+Only after those gates pass, the ready block looks like this:
 
 ```text
 board:    BOARD-00X
@@ -453,10 +459,11 @@ or, by hand:
 The teardown is the last section: it names the row, so one command removes the worktree and
 deletes the branch.
 
-When the branch is already merged into the base, the block prints a `git show --stat` line
-instead of the merge command, so nobody is handed a merge that would fail.
+When a clean branch is already merged into the base, the block retains review/cleanup guidance
+and prints a `git show --stat` line instead of a merge command. Dirty or unknown Git state still
+refuses teardown. This already-merged path does not require `Pending Merge` or commits ahead.
 
-The same commands by hand, if the human prefers them:
+Only after rechecking the same readiness gates, the human may use the same commands by hand:
 
 ```bash
 # review

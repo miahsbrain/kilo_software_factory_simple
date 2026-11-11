@@ -1,5 +1,23 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-123 Pending Merge (2026-11-11)
+
+- Assigned branch/worktree `fix/gate-merge-handoffs-on-finished-clean-worktrees` extends existing
+  handoff CLI and factory/future-template rules; no existing-project, board or security edits.
+- Merge/teardown withheld for dirty, nonready, missing-data or failed Git checks; committed
+  `Pending Merge` plus clean live state required. Already-merged path remains nonmerge guidance.
+- Architect-authorized second focused regression run exited 0: 13 tests in 3.847s. Initial run
+  failed nine assertions because editable-field lookup excludes Status; existing `STATUS_INDEX`
+  correction verified. Independent QA/review PASS: `docs/reviews/BOARD-123-qa.md` and ledger,
+  committed in `27c2e94`. Parent reports live `Pending Merge`; awaiting human merge. Parent owns
+  final live handoff check; no merge commands emitted by this docs-only update.
+- Earlier staging exited 1 on ignored `.opencode`; exact new-test force-add and narrow tracked-
+  path staging authorized. No broad force-add, project/board edits or unrelated conflict cleanup.
+- Root/template §B11 exact approved rule, B5, worktree skill, handover/closeout/run/board commands
+  and ADR-082 align. Checkpoint commits remain mandatory. Separate project copy deferred.
+- No source/rules/test or board changes, reruns, installs, browser/build work or unrelated
+  historical HANDOVER conflict-marker cleanup in this final status update.
+
 ## Current session — BOARD-122 builder verification complete (2026-11-11)
 
 - Bootstrap and marker-based main-checkout resolution implemented; exact approved local-board

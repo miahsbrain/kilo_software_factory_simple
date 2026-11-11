@@ -29,5 +29,8 @@ Then, if asked to start it:
 - On the builder's report: set `In Review`, then `Pending Merge` when the merge gate (§B4) is
   green — including the QA and UI/UX review lanes for frontend work (`/ui`). `Pending Merge`
   means the work is waiting for human approval to merge.
-- Print the review and merge commands for the user. Never merge, push, or open a PR yourself.
+- Recheck the live worktree and board (§B11); print the `worktree.py handoff --board <ID>` block.
+  Only finished, verified, reviewed, committed, clean `Pending Merge` work gets merge guidance.
+  Otherwise provide only review/diff and blockers, with no manually added merge or teardown.
+  Never merge, push, or open a PR yourself.
 - After the user merges, set `Merged` and clean up the worktree.
