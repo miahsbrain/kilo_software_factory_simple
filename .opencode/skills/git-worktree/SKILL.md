@@ -359,13 +359,16 @@ python3 .opencode/skills/git-worktree/scripts/guard.py check-worktree -- "git wo
 ## 6. Commit locally
 
 Local commits on the worktree branch are required — they are what the human reviews and merges.
+Apply `AGENTS.md` §B11's handoff checkpoint policy before returning work: use the appropriate
+type for verified work and a `wip` checkpoint for unfinished or blocked work. Report the local
+commit SHA and diff command; a checkpoint alone does not make the work merge-ready.
 
 ```bash
 git -C .opencode/worktrees/<slug> add -A
 git -C .opencode/worktrees/<slug> commit -m "<emoji> [<type>] <scope>: <subject>" -m "- what changed and why"
 ```
 
-Message format (`AGENTS.md` §B4.1):
+Message format (`AGENTS.md` §B11):
 
     📝 [docs] handover: describe the factory as it is today
 
@@ -400,6 +403,11 @@ A worktree is ready for handoff only when:
 ## 8. Hand off for human approval
 
 The agent **never** merges.
+
+For an unfinished or blocked handoff, apply the §B11 checkpoint policy from section 6 and
+report the SHA, diff command and outstanding work. The orchestrator keeps blocked work `Blocked`;
+do not present a checkpoint or generated merge command as approval to merge.
+The steps below apply only after the existing verification, QA and review gates pass.
 
 1. The orchestrator sets the board row to `Pending Merge` in the main checkout, with the
    worktree path and branch in the `Branch/Worktree` column.

@@ -1504,7 +1504,9 @@ At the end of every session, or when asked to hand over:
 5. Update the **Session Notes** at the top of `docs/HANDOVER.md`.
 6. Make sure the next agent could start with **only** `AGENTS.md` + `DOMAIN.md` + `docs/` and
    no other context.
-7. **End the report with the hand-off block.** For work in a worktree, print the block from
+7. Apply §B11's handoff checkpoint policy, including for blocked work; report the local commit
+   SHA and diff command without implying merge readiness.
+8. **End the report with the hand-off block.** For work in a worktree, print the block from
    `python3 .opencode/skills/git-worktree/scripts/worktree.py handoff --board <ID>` — the diff
    command first, then the merge command. The human gets both every session, without anyone
    having to remember them. The block ends with the command that removes the worktree and
@@ -1641,6 +1643,8 @@ the port values.
 **CLI only: plain `git`. No `gh`, no extension, no browser, no pull requests.**
 
 **A worktree branch must contain commits, or there is nothing for the user to merge.** So:
+
+Before handing work back, commit all task changes locally on the worktree branch. Verified work uses the appropriate commit type; unfinished or blocked work uses a clearly labelled `wip` checkpoint. Report the commit SHA and diff command. A checkpoint does not mean merge-ready. Never commit on an integration branch, merge, or push.
 
 - **Local commits on the worktree branch are allowed and expected.** The builder commits its own
   work in its worktree, on its own branch, with the message format in §B4.1.
