@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Checkpoint corrected gallery preview and independent critique
+**Type:** Docs
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, this log; checkpoint existing new `docs/reviews/BOARD-118-ui.md` and `BOARD-118-ledger.md`. Extend critic report with attributed parent preview steps instead of creating a duplicate preview report. New review/ledger files preserve independent round-1 evidence/state.
+**Why:** Replace stale preview-refresh instructions with observed corrected c77a72a preview and bounded review coverage.
+**Impact:** Parent light/system-dark 1104×877 CSS captures, 20px heading/no desktop overflow, scoped tabs, actual tab/reload/theme behavior and current-document diagnostics recorded. Independent screenshot critique/unslop HOLD, no blocking visible findings; narrow matrix/keyboard/focus/contrast and remaining behavior/user approval open. Built-in catalogue lacks resize. Canonical artifacts notes.md patch guard-refused, no retry/bypass. Policy BOARD-120 commit 800cb3b remains separate Pending Merge. Live 15180 unchanged; not merge-ready.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. No source edits, browser calls, tests or builds in this checkpoint; previous test/build results retained as historical evidence.
+
 ## [2026-11-11] Rework gallery into a compact repository workbench
 **Type:** Fix
 **Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery

@@ -1,16 +1,22 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-118 corrective gallery source (2026-11-11)
+## Current session — BOARD-118 corrected preview checkpoint (2026-11-11)
 
 - Replaced rejected meter/card composition with compact utility header, inline lane navigation,
   populated task groups, two-line task hierarchy and desktop-adjacent worktree rail (≥820px).
 - Shared renderers/styles retained; optional populated-only board mode leaves live `/` unchanged.
   No duplicated filter/storage state. Preview fixtures only; no live redesign authorized yet.
 - CSS generation: exit 0, 59ms. Single Python regression run: exit 0, 12 tests in 0.031s.
-- Built-in browser unavailable in child: `browser.disconnected` from tabs.list, no retry/fallback.
-  No preview process restart. User override is built-in browser only; BOARD-120 owns rule edits.
-- Next: parent refreshes Python preview process, verifies rendered desktop/mobile/themes and
-  interactions, then requests gallery approval. Independent review pending; not merge-ready.
+- Parent fresh c77a72a preview 15182/gallery: light/system-dark at 1104×877 CSS, 20px heading,
+  no desktop overflow; scoped tab contents, actual clicks, saved Harness/reload and Light change
+  observed. Current-document console zero errors/no truncation; four network requests all 200.
+- Independent round-1 screenshot critique/unslop HOLD, no blocking visible findings. Parent
+  interactions are not independent QA. Evidence/unchecked criteria: reviews/BOARD-118-ui.md.
+- Built-in tools lack viewport resize; narrow matrix, keyboard/focus/contrast and remaining
+  behavior unverified. Canonical artifacts notes.md patch was refused; no retry/write bypass.
+- Docs-only checkpoint includes critic report and ledger. No source edits/browser/tests/builds.
+  BOARD-120 policy commit 800cb3b remains separate Pending Merge. Live 15180 unchanged.
+- Next: parent resolves evidence gaps and requests gallery approval; not merge-ready.
 
 ## Earlier session — BOARD-118 browser checkpoint blocked (2026-11-11)
 

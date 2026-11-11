@@ -508,7 +508,20 @@ unchanged live defaults. No dependencies, installs or lockfile edits. Child buil
 `browser.tabs.list()` returned `[browser.disconnected] No desktop browser is connected to this
 session` (no process exit code); no retry/fallback. User's session override requires built-in
 browser only, superseding older capture instructions for this task; permanent policy stays in
-BOARD-120. No server restart performed. Parent must reload the Python preview process from this
-worktree before reviewing new markup; existing 15182 process may still serve earlier markup.
-Rendered desktop/mobile/light/dark, keyboard/storage/filter/timer checks, independent unslop and
-gallery approval remain pending. Not merge-ready; no live screen rollout.
+BOARD-120 (separate commit `800cb3b`, Pending Merge, not copied/merged here).
+
+Parent subsequently reviewed fresh corrected `c77a72a` at 15182/gallery using built-in browser:
+light/system-dark screenshots at 1104×877 CSS (2000×1589 raster), 20px heading and no horizontal
+overflow at that width. Actual tab clicks showed Project two tasks/project-search worktree versus
+Harness one task/two control worktrees; Harness scope persisted through reload. Actual System→Light
+change produced canvas `rgb(245, 246, 248)`. Current-document bounded console had zero errors and
+no truncation/drop; four document/CSS/font requests all 200. These are parent observations, not
+independent QA interactions. Screenshot paths and exact steps are in the parent addendum to
+`docs/reviews/BOARD-118-ui.md`. Independent round-1 screenshot critique includes sign-by-sign
+unslop audit: HOLD, no blocking visual findings in the supplied views, not whole-task PASS.
+
+Built-in catalogue has no viewport resize; narrow/matrix captures are not claimed. Keyboard/focus,
+contrast/targets, expanded criteria, full states, filters/density and elapsed refresh remain open,
+as does user gallery approval. Parent canonical artifact notes.md patch was guard-refused; no
+retry or alternate write bypass. This docs-only checkpoint makes no source/browser/test/build
+changes. Live 15180 unchanged; not merge-ready and no live screen rollout.

@@ -1,6 +1,6 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-118 corrective workbench source, 2026-11-11**
+> **Session Notes — BOARD-118 corrected preview checkpoint, 2026-11-11**
 > Reworked the rejected gallery composition on the same branch/worktree. Scoped `.wb-workbench`
 > styles now use a 20px utility heading, compact lane navigation, continuous populated task groups,
 > dominant 15px task titles/quiet metadata and an adjacent 288px worktree rail from 820px upward.
@@ -9,9 +9,17 @@
 > filters, tabs, fold/storage state and refresh handlers reused; no new function or state source.
 > CSS authoring exited 0 (59ms); one regression run passed 12 tests (0.031s). Built-in browser
 > tabs.list returned browser.disconnected; no retry, fallback, installs, server or board edits.
-> Source nine-pass craft notes in UI-UX §6.3; rendered QA/unslop and user approval remain pending.
-> Next: parent refreshes the preview Python process from this worktree and reviews using built-in
-> browser only under the user's session override. No live rollout or merge readiness claimed.
+> Parent subsequently opened fresh corrected c77a72a preview at 15182/gallery: light/system-dark
+> captures at 1104×877 CSS, 20px heading, no desktop overflow, scoped Project/Harness contents,
+> actual tab clicks, Harness persistence through reload and System→Light change observed.
+> Bounded current-document console: zero errors/no dropped data; four network requests all 200.
+> Independent round-1 screenshot critique/unslop: HOLD, no blocking visual findings in those views.
+> Evidence and remaining criteria: docs/reviews/BOARD-118-ui.md (parent addendum); ledger retained.
+> Narrow matrix unsupported by built-in resize tools; keyboard/focus/contrast and other unchecked
+> behavior remain open. Canonical artifacts notes.md write was guard-refused; no retry/bypass.
+> Docs-only checkpoint; no source/browser/test/build actions. BOARD-120 policy commit 800cb3b
+> stays separate Pending Merge. Next: parent resolves evidence gaps and obtains gallery approval.
+> Live 15180 unchanged; no live rollout or merge readiness claimed.
 
 > **Earlier Session Notes — BOARD-118 browser checkpoint blocked, 2026-11-11**
 > Parent reviewed gallery diff and started http://127.0.0.1:15182/gallery from this worktree;
