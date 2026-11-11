@@ -1,6 +1,20 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-118 gallery checkpoint blocked (2026-11-11)
+## Current session — BOARD-118 gallery ready for browser preview (2026-11-11)
+
+- **Phase:** Gallery implementation and focused regression verification complete; browser review
+  and gallery approval pending. Same assigned worktree/branch, stacked over BOARD-119.
+- **User proof:** Existing locked dependency `npm ci` added 56 packages, audited 63 in 18s,
+  zero vulnerabilities; stylesheet build Tailwind 4.3.5 completed in 61ms. Builder preserved CSS.
+- **Builder proof:** Required CSS regeneration after mobile grid correction exited 0 (62ms).
+  `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0: 11 tests passed.
+  Rendering/markup/CSS and shared JS contract assertions, not browser execution.
+- **Scope:** Gallery only, live `/` markup/layout unchanged. No installs, lockfile changes,
+  server/port changes, real project/board or permanent-rule edits in this resumption.
+- **Next:** Parent arranges `/gallery` browser preview and independent review/user approval.
+  Canonical capture and unslop remain unchecked. Ready for preview, not merge-ready.
+
+## Earlier BOARD-118 blocked checkpoints (2026-11-11)
 
 - **Approved resumption:** User authorized `npm --prefix .opencode/skills/board/ui ci` for
   existing locked dependencies only. It produced no output before the 120000ms tool timeout;

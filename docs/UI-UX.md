@@ -469,12 +469,14 @@ under `.wb-workbench`; `/` retains its current markup and layout. Shared `wb_sco
 adds tablist/tabpanel arrow/Home/End selection and reuses storage, filters, theme, density, refresh.
 Fixture boards intentionally share BOARD-001; board-scoped fold keys keep them separate.
 
-**Blocked authoring checkpoint:** stylesheet generation exited 127 (`tailwindcss: not found`).
-Committed CSS has not been regenerated. Gallery is not ready for approval or visual QA; neither
-regressions nor canonical captures were run in this slice. No installs or server changes.
-On approved resumption, user authorized existing locked dependency installation only.
-`npm --prefix .opencode/skills/board/ui ci` produced no output and hit a 120000ms tool timeout
-without a returned exit code. Completion is unknown. No retry, asset generation, tests or source
-changes followed; the gallery remains incomplete, with no browser or unslop pass claimed.
+**Ready for browser preview, not approved or merge-ready.** User supplied successful locked
+dependency install/build evidence: 56 packages added, 63 audited in 18s, zero vulnerabilities;
+Tailwind 4.3.5 build 61ms. Builder preserved that output and regenerated after correcting the
+gallery mobile grid (62ms, exit 0). No dependency or lockfile changes. The documented Python
+regression command passed 11 tests, covering rendered tab semantics/default fallback, scoped
+tasks/counts/worktrees, errors, escaping, shared handler contracts and stylesheet presence.
+These assertions do not execute browser keyboard/focus/storage/timer behavior. The live board
+markup/layout stays unchanged, and gallery approval must precede rollout. Prior missing-CLI
+and install-timeout checkpoints are historical; canonical browser tooling remains a separate blocker.
 Nine-pass direction informed source layout, but rendered sign audit/checklist and contrast,
 keyboard, responsive, themes and elapsed refresh proof remain unchecked for the reviewer.

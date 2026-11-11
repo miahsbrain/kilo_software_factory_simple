@@ -3,6 +3,15 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Complete repository workbench gallery for preview
+**Type:** Feature
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `.opencode/skills/board/scripts/board_serve.py`, adjacent `test_board_serve.py`, `ui/src/app.css`, generated `static/board.css`; `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/UI-UX.md`, this log. No new files.
+**Why:** Resume after user-provisioned locked UI dependencies. Reuse shared wb_ presenters and dashboard handlers; remove unused count constants, align fixture Notes with review tasks, protect gallery keyboard focus from idle refresh, and allow compact rows to wrap safely at the mobile floor. Existing tests extended instead of adding a test tool or dependency.
+**Impact:** Gallery-only tab/content composition and scoped styling now have generated assets. User-generated CSS was inspected/preserved before regeneration; live `/` markup/layout remains unchanged. No installs by this builder, no package/lockfile changes, server/port changes, real project or board edits. Reversible; ready for browser preview, not gallery-approved or merge-ready.
+**User-supplied evidence:** `npm ci` added 56 packages, audited 63 in 18s, zero vulnerabilities; `npm run build` Tailwind 4.3.5 completed in 61ms. Not represented as builder-run commands.
+**Builder evidence:** `npm --prefix .opencode/skills/board/ui run build` exited 0, Tailwind 4.3.5, 62ms (required CSS authoring, not an application production build). One verification command: `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0, 11 tests passed in 0.033s. Five new tests at lines 212–317 cover rendering/default fallback/isolation/semantics/escaping/handler contracts and gallery CSS; six inherited refresh/data tests stay green. Browser keyboard/storage/timer execution, responsive/contrast/theme inspection, canonical captures, independent review and unslop remain open; no browser attempt or installation.
+
 ## [2026-11-11] Record approved gallery dependency install timeout
 **Type:** Docs
 **Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery

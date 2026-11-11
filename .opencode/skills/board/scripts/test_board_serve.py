@@ -5,6 +5,7 @@ import io
 import json
 import tempfile
 import unittest
+from html.parser import HTMLParser
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -205,6 +206,112 @@ class BoardRefreshTests(unittest.TestCase):
                 self.assertIn("could not read the board:", self.request("/"))
                 self.assertTrue(all(call.args == (str(self.root),)
                                     for call in self.worktree.list_worktrees.call_args_list))
+
+
+class GalleryTests(unittest.TestCase):
+    def test_scope_default_and_missing_selection_fallback(self):
+        harness = {"label": "harness"}
+        project = {"label": "project"}
+        for boards, selected, expected in (
+                ([harness, project], None, "project"),
+                ([harness, project], "harness", "harness"),
+                ([harness, project], "removed", "project"),
+                ([harness], "project", "harness"),
+                ([project], "harness", "project"),
+                ([], "project", None)):
+            with self.subTest(boards=boards, selected=selected):
+                self.assertEqual(viewer.wb_scope_default(boards, selected), expected)
+
+    def test_gallery_semantics_and_duplicate_task_scope(self):
+        page = viewer.build_gallery_html()
+        tags = []
+        parser = HTMLParser()
+        parser.handle_starttag = lambda tag, attrs: tags.append((tag, dict(attrs)))
+        parser.feed(page)
+        ids = [attrs["id"] for _, attrs in tags if "id" in attrs]
+        self.assertEqual(len(ids), len(set(ids)))
+        tabs = [attrs for _, attrs in tags if attrs.get("role") == "tab"]
+        panels = [attrs for _, attrs in tags if attrs.get("role") == "tabpanel"]
+        self.assertEqual(len(tabs), 2)
+        self.assertEqual(len(panels), 2)
+        for tab, panel in zip(tabs, panels):
+            self.assertEqual(tab["aria-controls"], panel["id"])
+            self.assertEqual(panel["aria-labelledby"], tab["id"])
+            active = tab["data-wb-scope-tab"] == "project"
+            self.assertEqual(tab["aria-selected"], "true" if active else "false")
+            self.assertEqual(tab["tabindex"], "0" if active else "-1")
+            self.assertEqual("hidden" in panel, not active)
+        cards = [attrs for _, attrs in tags if "data-card" in attrs]
+        self.assertEqual([(card["data-board"], card["data-card"]) for card in cards],
+                         [("project", "BOARD-001"), ("project", "BOARD-002"),
+                          ("harness", "BOARD-001")])
+        self.assertIn("labelled fixture data", page)
+        self.assertIn('data-refresh="60"', page)
+        self.assertIn('id="refresh">Refresh now</button>', page)
+        self.assertIn('id="pause" aria-pressed="false">Pause</button>', page)
+        self.assertIn('id="theme-toggle"', page)
+        self.assertIn('id="density-toggle"', page)
+
+    def test_scope_content_counts_and_repository_worktrees(self):
+        boards, worktrees = viewer.gallery_scope_fixtures()
+        for entry, task_count, wt_count, base in (
+                (boards[0], 2, 1, "main"), (boards[1], 1, 2, "opencode")):
+            with self.subTest(scope=entry["label"]):
+                page = viewer.wb_scope_content(entry, worktrees, "project")
+                self.assertIn('<strong>%d</strong> in flight' % task_count, page)
+                self.assertIn('%d tasks total' % task_count, page)
+                self.assertIn('%d worktrees</span>' % wt_count, page)
+                self.assertIn('Base: %s' % base, page)
+                self.assertEqual(page.count('class="wb-wt"'), wt_count)
+                self.assertEqual(page.count('data-card='), task_count)
+                other = "harness" if entry["label"] == "project" else "project"
+                self.assertNotIn('data-board="%s"' % other, page)
+                if entry["label"] == "project":
+                    self.assertIn("ahead +7 · behind −2", page)
+                    self.assertIn('wb-chip--dirty', page)
+                    self.assertNotIn('feat/rebuild-factory-pages-as-a-split', page)
+                    self.assertIn("0 pending merge · 1 blocked", page)
+                else:
+                    self.assertNotIn('feat/project-search', page)
+                    self.assertIn("0 pending merge · 0 blocked", page)
+        self.assertEqual(viewer.active_counts([boards[0]])["Blocked"], 1)
+        self.assertEqual(viewer.active_counts([boards[1]])["Blocked"], 0)
+
+    def test_empty_error_escaping_and_worktree_compatibility(self):
+        entry = {"label": "project", "path": "/fixture/docs/BOARD.md", "rows": [],
+                 "counts": {}, "error": "Cannot read <board>; check the path"}
+        page = viewer.wb_scope_content(entry, [], "project")
+        self.assertIn("0 tasks total", page)
+        self.assertIn("No project worktrees.", page)
+        self.assertIn('role="alert">Cannot read &lt;board&gt;; check the path', page)
+        self.assertIn("Nothing ready. Add a row with board.py add.", page)
+        _, worktrees = viewer.gallery_scope_fixtures()
+        wt = dict(worktrees[0], base='<script>bad</script>', ahead=None, behind=None)
+        self.assertNotIn("Base:", viewer.wb_wt_row(wt))
+        self.assertIn("Base: &lt;script&gt;bad&lt;/script&gt;", viewer.wb_wt_row(wt, show_base=True))
+        self.assertIn("ahead +? · behind −?", viewer.wb_wt_row(wt, show_base=True))
+
+    def test_shared_handlers_and_gallery_only_layout_contract(self):
+        page = viewer.build_gallery_html()
+        for key in ("ArrowLeft", "ArrowRight", "Home", "End"):
+            self.assertIn("event.key === '%s'" % key, page)
+        for contract in ("if (saved.scope) { state.scope = saved.scope; }",
+                         "item.tabIndex = active ? 0 : -1;",
+                         "if (focus) { tab.focus(); }",
+                         "selectScope(state.scope, false);",
+                         "return !panel || !panel.hidden;",
+                         'refreshBtn.addEventListener("click", function () { window.location.reload(); });'):
+            self.assertIn(contract, page)
+        live = viewer.build_html([], [], "2026-11-11T12:00:00+00:00", None, 60)
+        self.assertIn('<div class="wb-layout">', live)
+        self.assertNotIn('class="wb-workbench"', live)
+        self.assertNotIn('role="tablist"', live)
+        self.assertNotIn('data-wb-scope-panel="', live)
+        css = (Path(__file__).parents[1] / "static/board.css").read_text(encoding="utf-8")
+        self.assertIn('.wb-workbench .wb-card > summary', css)
+        self.assertIn('.wb-workbench .wb-card-id', css)
+        self.assertIn(':root[data-theme="dark"]', css)
+        self.assertIn(':root[data-theme="light"]', css)
 
 
 if __name__ == "__main__":

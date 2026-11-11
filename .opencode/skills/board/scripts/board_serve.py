@@ -643,7 +643,7 @@ JS = """
     if (prioSel && prioSel.value) { return false; }
     if (all(".lane-body.searching").length) { return false; }
     var active = document.activeElement;
-    if (active && active !== document.body && active.closest && active.closest(".wb-layout")) {
+    if (active && active !== document.body && active.closest && active.closest(".wb-layout, .wb-workbench")) {
       return false;
     }
     return true;
@@ -1324,13 +1324,6 @@ def build_html(boards, worktrees, generated_at, error, refresh):
     return "".join(html_parts)
 
 
-GALLERY_COUNTS = {
-    "Ready": 0,
-    "In Progress": 0,
-    "In Review": 2,
-    "Pending Merge": 0,
-    "Blocked": 1,
-}
 WB_SWATCHES = (
     ("--color-paper", "canvas"),
     ("--color-surface", "surface"),
@@ -1411,10 +1404,10 @@ def gallery_fixtures():
         "Blocked by": "- None.",
         "Branch/Worktree": ("branch feat/rebuild-factory-pages-as-a-split · "
                             ".opencode/worktrees/rebuild-factory-pages-as-a-split"),
-        "Notes": "fp=feat|visual|/gallery|swiss",
-        "Notes raw": ("- [x] /gallery serves the prebuilt stylesheet proof: HTTP 200 text/css · "
-                      "- [ ] Peak lane is the only signal segment proof: capture 1440 · "
-                      "- [ ] Board page keeps its inline CSS until the next chunk"),
+        "Notes": "",
+        "Notes raw": ("- [x] Fixture: component source is ready for review · "
+                      "- [ ] Review both themes in the gallery · "
+                      "- [ ] Approve the gallery before live console rollout"),
         "open": True,
     }
     second_card = {
@@ -1423,11 +1416,11 @@ def gallery_fixtures():
         "Type": "Fix",
         "Priority": "P1",
         "Risk": "🟢 low — fixture only",
-        "Blocked by": "BOARD-112",
-        "Branch/Worktree": "branch feat/workbench-filters",
+        "Blocked by": "- None.",
+        "Branch/Worktree": "branch feat/project-search",
         "Notes": "",
-        "Notes raw": ("- [ ] Filter state stays in the URL · "
-                      "- [ ] Escape clears every control"),
+        "Notes raw": ("- [ ] Review search results for a saved query · "
+                      "- [ ] Confirm the empty result names the next action"),
     }
     blocked_card = {
         "ID": "BOARD-104",
@@ -1438,7 +1431,7 @@ def gallery_fixtures():
         "Blocked by": "- None.",
         "Branch/Worktree": "-",
         "Notes": "",
-        "Notes raw": "Waiting on gallery approval before the split breakpoint is fixed.",
+        "Notes raw": "Fixture decision: confirm which project roles may export search results.",
     }
     worktrees = [
         {"main": True, "branch": "main", "path": "/workspaces/yt",

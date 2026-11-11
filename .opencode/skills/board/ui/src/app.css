@@ -1360,7 +1360,15 @@
 @media (max-width: 640px) {
   .wb-workbench { padding: 16px; }
   .wb-workbench .wb-card > summary {
-    grid-template-columns: minmax(0, 1fr) auto auto auto 12px;
+    grid-template-columns: minmax(0, 1fr) auto auto 12px;
+  }
+  .wb-workbench .wb-card-id {
+    grid-column: 1 / 4;
+    grid-row: 1;
+  }
+  .wb-workbench .wb-card > summary > .wb-caret {
+    grid-column: 4;
+    grid-row: 1;
   }
   .wb-workbench .wb-card-task {
     grid-column: 1 / -1;
