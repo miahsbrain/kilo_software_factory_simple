@@ -1166,6 +1166,29 @@ GALLERY_JS = """
       save();
     });
   });
+  each("[data-status-filter]", function (button) {
+    button.addEventListener("click", function () {
+      var lane = button.getAttribute("data-status-filter");
+      var next = button.getAttribute("aria-pressed") !== "true";
+      each("[data-status-filter]", function (peer) {
+        if (peer.getAttribute("data-status-filter") === lane) {
+          peer.setAttribute("aria-pressed", next ? "true" : "false");
+        }
+      });
+    });
+  });
+  each("[data-copy]", function (button) {
+    button.addEventListener("click", function () {
+      var value = button.getAttribute("data-copy") || "";
+      var done = function () {
+        button.textContent = "copied";
+        window.setTimeout(function () { button.textContent = "copy"; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(done, function () {});
+      }
+    });
+  });
   var search = document.getElementById("search");
   document.addEventListener("keydown", function (event) {
     var target = event.target;
@@ -1367,10 +1390,12 @@ def wb_meter(counts):
         for count in values.values() if count > 0
     )
     stops = "".join(
-        '<button type="button" class="wb-meter-stop" data-status-filter="%s" aria-pressed="false"%s>'
+        '<button type="button" class="wb-meter-stop" data-status-filter="%s" aria-pressed="false"%s%s>'
         '<span class="wb-meter-name">%s</span>'
         '<span class="wb-meter-count">%d</span></button>'
-        % (esc(lane), ' data-peak="true"' if peak and count == peak else "",
+        % (esc(lane),
+           ' data-peak="true"' if peak and count == peak else "",
+           ' data-zero="true"' if count == 0 else "",
            esc(lane), count)
         for lane, count in values.items()
     )
@@ -1381,10 +1406,10 @@ def wb_meter(counts):
     ) % (segments, stops)
 
 
-def wb_lane(lane, count, description, cards_html, open=False):
-    """A rule-separated lane row on the continuous board surface."""
+def wb_lane(lane, count, description, cards_html, open=False, signal=False):
+    """A 44px lane summary on the continuous board surface."""
     return (
-        '<details class="wb-lane wb-lane--%s" data-lane="%s"%s>'
+        '<details class="wb-lane%s" data-lane="%s"%s>'
         '<summary>'
         '<span class="wb-lane-rail" aria-hidden="true"></span>'
         '<span class="wb-lane-name">%s</span>'
@@ -1395,7 +1420,7 @@ def wb_lane(lane, count, description, cards_html, open=False):
         '<div class="wb-lane-body">%s</div>'
         '</details>'
     ) % (
-        "active" if open else "idle",
+        " wb-lane--signal" if signal else "",
         esc(lane),
         " open" if open else "",
         esc(lane),
@@ -1430,11 +1455,21 @@ def wb_card(card):
     if branch in ("-", ""):
         branch = ""
     fingerprint = row_fingerprint(card.get("Notes") or "")
-    kv = ["<dt>blocked by</dt><dd>%s</dd>" % esc(blocked)]
+    kv = ["<dt>Blocked by</dt><dd>%s</dd>" % esc(blocked)]
     if branch:
-        kv.append("<dt>branch</dt><dd>%s</dd>" % esc(branch))
+        name = branch_name(branch)
+        copy = ""
+        if name:
+            copy = (
+                '<button type="button" class="wb-copy" data-copy="%s"'
+                ' aria-label="Copy branch %s">copy</button>'
+            ) % (esc(name), esc(name))
+        kv.append(
+            '<dt>Branch</dt><dd><span class="wb-kv-line">%s%s</span></dd>'
+            % (esc(branch), copy)
+        )
     if fingerprint:
-        kv.append("<dt>fingerprint</dt><dd>%s</dd>" % esc(fingerprint))
+        kv.append("<dt>Fingerprint</dt><dd>%s</dd>" % esc(fingerprint))
     detail = '<dl class="wb-card-kv">%s</dl>' % "".join(kv)
     notes_html = render_notes(str(card.get("Notes raw", "")).strip())
     if notes_html:
@@ -1457,8 +1492,18 @@ def wb_card(card):
     ) % (" open" if card.get("open") else "", esc(card_id), esc(task), chips, detail)
 
 
+def wb_panel(title, meta, body_html):
+    """A 12px, hairline, soft-shadow dashboard panel with a 40px header."""
+    return (
+        '<section class="wb-panel">'
+        '<div class="wb-panel-head"><h2 class="wb-panel-title">%s</h2>'
+        '<span class="wb-panel-meta">%s</span></div>'
+        '%s</section>'
+    ) % (esc(title), esc(meta), body_html)
+
+
 def wb_rail(title, meta, body_html):
-    """A flat sticky worktrees rail: top rule, no radius, no shadow."""
+    """The sticky worktrees panel."""
     return (
         '<aside class="wb-rail">'
         '<div class="wb-rail-head"><h2 class="wb-rail-title">%s</h2>'
@@ -1468,13 +1513,31 @@ def wb_rail(title, meta, body_html):
     ) % (esc(title), esc(meta), body_html)
 
 
-def wb_toolbar(total=0):
+def wb_filter_selects(prefix, visible_labels=False):
+    """Type and priority selects; `prefix` keeps sidebar and toolbar ids unique."""
     types = ("Feature", "Fix", "Chore", "Docs", "Research")
     priorities = ("P1", "P2", "P3", "P4")
     type_options = '<option value="">All types</option>' + "".join(
         '<option value="%s">%s</option>' % (esc(t), esc(t)) for t in types)
     prio_options = '<option value="">All priorities</option>' + "".join(
         '<option value="%s">%s</option>' % (esc(p), esc(p)) for p in priorities)
+    type_id = "%s-type-filter" % prefix
+    prio_id = "%s-priority-filter" % prefix
+    type_label = "Type" if visible_labels else "Filter by type"
+    prio_label = "Priority" if visible_labels else "Filter by priority"
+    label_class = "wb-field-label" if visible_labels else "sr-only"
+    return (
+        '<div class="wb-field"><label class="%s" for="%s">%s</label>'
+        '<span class="wb-select-wrap"><select id="%s" class="wb-select">%s</select></span></div>'
+        '<div class="wb-field"><label class="%s" for="%s">%s</label>'
+        '<span class="wb-select-wrap"><select id="%s" class="wb-select">%s</select></span></div>'
+    ) % (
+        label_class, esc(type_id), esc(type_label), esc(type_id), type_options,
+        label_class, esc(prio_id), esc(prio_label), esc(prio_id), prio_options,
+    )
+
+
+def wb_toolbar(total=0):
     return (
         '<div class="wb-toolbar" role="search">'
         '<div class="wb-search">'
@@ -1483,14 +1546,10 @@ def wb_toolbar(total=0):
         ' autocomplete="off" spellcheck="false">'
         '<kbd class="wb-kbd" aria-hidden="true">/</kbd>'
         '</div>'
-        '<div class="wb-select-wrap"><label class="sr-only" for="type-filter">Filter by type</label>'
-        '<select id="type-filter" class="wb-select">%s</select></div>'
-        '<div class="wb-select-wrap"><label class="sr-only" for="priority-filter">Filter by priority</label>'
-        '<select id="priority-filter" class="wb-select">%s</select></div>'
-        '<button type="button" class="wb-btn" data-wb-density aria-pressed="false">Comfortable</button>'
+        '<div class="wb-toolbar-filters">%s</div>'
         '<span id="result-count" class="wb-result" aria-live="polite">showing %d of %d</span>'
         '</div>'
-    ) % (type_options, prio_options, total, total)
+    ) % (wb_filter_selects("main"), total, total)
 
 
 def wb_wt_row(worktree):
@@ -1828,14 +1887,15 @@ def build_html(boards, worktrees, generated_at, error, refresh):
 
 GALLERY_COUNTS = {
     "Ready": 0,
-    "In Progress": 1,
+    "In Progress": 0,
     "In Review": 2,
     "Pending Merge": 0,
     "Blocked": 1,
 }
 WB_SWATCHES = (
-    ("--color-paper", "paper"),
+    ("--color-paper", "canvas"),
     ("--color-surface", "surface"),
+    ("--color-surface-2", "surface 2"),
     ("--color-ink", "ink"),
     ("--color-ink-soft", "ink soft"),
     ("--color-ink-faint", "ink faint"),
@@ -1848,11 +1908,12 @@ WB_SWATCHES = (
     ("--color-bad", "bad"),
 )
 WB_TYPE_STEPS = (
-    ("--text-micro", "11px", "Caption and chips"),
-    ("--text-meta", "13px", "Meta and card rows"),
-    ("--text-body", "15px", "Body and controls"),
-    ("--text-lead", "20px", "Lane labels"),
-    ("--text-display", "44px", "Page display"),
+    ("--text-micro", "11px", "Meta and chips"),
+    ("--text-tiny", "12px", "Dense controls"),
+    ("--text-meta", "13px", "Body and rows"),
+    ("--text-body", "15px", "Lead paragraphs"),
+    ("--text-lead", "20px", "Section and figures"),
+    ("--text-display", "32px", "Page title"),
 )
 WB_SPACE_STEPS = (
     ("4px", 4),
@@ -1864,7 +1925,7 @@ WB_SPACE_STEPS = (
     ("48px", 48),
     ("64px", 64),
 )
-WB_RADII = (("0", "0"), ("2px", "2px"), ("4px", "4px"))
+WB_RADII = (("6px", "chip"), ("8px", "control"), ("12px", "panel"))
 
 
 def gallery_tokens_html():
@@ -1955,16 +2016,34 @@ def gallery_fixtures():
 
 def build_gallery_html():
     open_card, second_card, blocked_card, worktrees = gallery_fixtures()
-    lanes = (
-        wb_lane("In Review", 2, LANE_DESCRIPTION["In Review"],
-                wb_card(open_card) + wb_card(second_card), open=True)
-        + wb_lane("Blocked", 1, LANE_DESCRIPTION["Blocked"], wb_card(blocked_card))
+    counts = GALLERY_COUNTS
+    total = sum(counts.values())
+    lane_cards = {
+        "In Review": wb_card(open_card) + wb_card(second_card),
+        "Blocked": wb_card(blocked_card),
+    }
+    open_lanes = {"In Review", "Blocked"}
+    lanes = "".join(
+        wb_lane(
+            lane,
+            counts.get(lane, 0),
+            LANE_DESCRIPTION[lane],
+            lane_cards.get(lane) or wb_empty(lane),
+            open=lane in open_lanes,
+            signal=counts.get(lane, 0) == max(counts.values()),
+        )
+        for lane in ACTIVE_LANES
     )
-    rail = wb_rail(
-        "Worktrees",
-        "3 worktrees · 2 non-main",
-        "".join(wb_wt_row(worktree) for worktree in worktrees),
+    lane_filters = "".join(
+        '<button type="button" class="wb-lane-filter" data-status-filter="%s" aria-pressed="false">'
+        '<span class="wb-lane-filter-name">%s</span>'
+        '<span class="wb-lane-filter-count">%d</span></button>'
+        % (esc(lane), esc(lane), counts.get(lane, 0))
+        for lane in ACTIVE_LANES
     )
+    rail_body = "".join(wb_wt_row(worktree) for worktree in worktrees)
+    rail_body += ('<p class="wb-legend">+ ahead · − behind · chips show main, dirty and clean</p>')
+    rail = wb_rail("Worktrees", "3 worktrees · 2 non-main", rail_body)
     chips = " ".join(
         wb_chip(kind, text) for kind, text in (
             ("type", "Feature"), ("prio", "P2"),
@@ -1973,10 +2052,19 @@ def build_gallery_html():
         )
     )
     mark = (
-        '<svg class="h-7 w-7 flex-none text-signal" viewBox="0 0 24 24" aria-hidden="true" '
+        '<svg class="wb-mark" viewBox="0 0 24 24" aria-hidden="true" '
         'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
         '<path d="M3 20V9l6 3V9l6 3V4h6v16z"/>'
         '<path d="M6 16h3M12 16h3"/></svg>'
+    )
+    kpi_facts = "".join(
+        '<div class="wb-kpi-fact"><span class="wb-kpi-num-sm">%d</span>'
+        '<span class="wb-kpi-label">%s</span></div>' % (value, esc(label))
+        for value, label in (
+            (counts.get("Pending Merge", 0), "pending merge"),
+            (counts.get("Blocked", 0), "blocked"),
+            (total, "total"),
+        )
     )
     return "".join([
         "<!doctype html>\n",
@@ -1985,35 +2073,52 @@ def build_gallery_html():
         '<meta name="color-scheme" content="light dark">',
         '<link rel="icon" href="', FAVICON, '">',
         '<link rel="stylesheet" href="/static/board.css">',
-        "<title>Factory components</title></head><body>\n",
-        '<header class="border-b border-line bg-surface">',
-        '<div class="mx-auto flex w-full max-w-[1360px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6">',
-        '<div class="flex min-w-0 flex-1 items-center gap-3">', mark,
-        '<div class="min-w-0">',
-        '<span class="block text-body font-semibold leading-tight">Factory components</span>',
-        '<span class="block text-micro text-ink-soft hidden min-[420px]:block">One architect sees work in flight, '
-        'decisions waiting, and where the worktrees are</span>',
-        '</div></div>',
-        '<div class="flex items-center gap-2">',
+        "<title>Factory board</title></head><body>\n",
+        '<div class="wb-layout">',
+        '<aside class="wb-sidebar">',
+        '<div class="wb-side-brand">', mark,
+        '<div class="min-w-0"><span class="wb-wordmark">Factory board</span>',
+        '<span class="wb-brand-meta">Component gallery</span></div></div>',
+        '<nav class="wb-side-nav" aria-label="Lane filters">',
+        '<p class="wb-side-label">Lanes</p>',
+        '<div class="wb-lane-filters">', lane_filters, '</div></nav>',
+        '<div class="wb-side-filters">',
+        '<p class="wb-side-label">Filters</p>',
+        wb_filter_selects("side", visible_labels=True),
+        '</div>',
+        '<div class="wb-side-footer">',
+        '<p class="wb-live"><span class="wb-live-dot" aria-hidden="true"></span>'
+        '<span>updated %s</span></p>' % datetime.datetime.now().strftime("%H:%M:%S"),
+        '<div class="wb-side-actions">',
+        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button>',
         '<button type="button" class="wb-btn" data-wb-theme aria-label="Colour theme">System</button>',
         '<button type="button" class="wb-btn" data-wb-density aria-pressed="false" '
         'aria-label="Density">Comfortable</button>',
-        '</div></div></header>\n',
-        '<main class="mx-auto w-full max-w-[1360px] px-4 pb-16 sm:px-6">',
-        '<section class="wb-gallery-head">',
-        '<h1 class="wb-display">Components</h1>',
-        '<p class="wb-intro">The pieces the factory console is built from: flow meter, lanes, '
-        'cards, worktree rail and toolbar. Tokens below drive both themes.</p>',
+        '</div></div></aside>',
+        '<main class="wb-main">',
+        '<header class="wb-page-head">',
+        '<div class="min-w-0"><h1 class="wb-title">Factory board</h1>',
+        '<p class="wb-sub">Lanes, cards and live worktrees — what is in flight right now</p></div>',
+        '<button type="button" class="wb-btn" id="refresh-now">Refresh now</button>',
+        '</header>',
+        '<section class="wb-kpi" aria-label="Board summary">',
+        '<div class="wb-kpi-primary"><span class="wb-kpi-num">%d</span>'
+        '<span class="wb-kpi-label">in flight</span></div>' % total,
+        kpi_facts,
         '</section>',
-        '<div class="mt-6 grid gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_360px] '
-        'min-[1100px]:items-start">',
-        '<div class="wb-board-surface min-w-0">',
-        wb_meter(GALLERY_COUNTS),
-        wb_toolbar(3),
+        wb_panel(
+            "Flow",
+            "%d active lanes" % len(ACTIVE_LANES),
+            wb_meter(counts),
+        ),
+        '<section class="wb-panel">',
+        wb_toolbar(total),
         '<div class="wb-lanes">', lanes, '</div>',
+        '</section>',
+        '</main>',
+        rail,
         '</div>',
-        '<div class="min-w-0">', rail, '</div>',
-        '</div>',
+        '<div class="wb-sections">',
         '<section class="wb-section">',
         '<h2 class="wb-section-title">Chips and empty state</h2>',
         '<p class="wb-section-meta">Chips stay quiet. The empty state names the next action.</p>',
@@ -2026,9 +2131,9 @@ def build_gallery_html():
         'Swatches follow the active theme.</p>',
         gallery_tokens_html(),
         '</section>',
-        '</main>',
-        '<footer class="mx-auto w-full max-w-[1360px] px-4 pb-16 font-mono text-micro '
-        'text-ink-faint sm:px-6"><a href="/">Back to the board</a></footer>\n',
+        '</div>',
+        '<footer class="mx-auto w-full max-w-[1600px] px-6 pb-16 font-mono text-micro '
+        'text-ink-faint"><a href="/">Back to the board</a></footer>\n',
         "<script>", GALLERY_JS, "</script>\n",
         "</body></html>",
     ])
