@@ -2108,7 +2108,7 @@ def build_gallery_html():
         '</section>',
         wb_panel(
             "Flow",
-            "%d active lanes" % len(ACTIVE_LANES),
+            "%d lanes" % len(ACTIVE_LANES),
             wb_meter(counts),
         ),
         '<section class="wb-panel">',
