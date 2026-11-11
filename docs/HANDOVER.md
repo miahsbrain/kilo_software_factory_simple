@@ -1,6 +1,17 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-118 corrected preview checkpoint, 2026-11-11**
+> **Session Notes — BOARD-118 hierarchy correction, 2026-11-11**
+> User accepted the workbench direction but found section titles and task boundaries too weak.
+> CSS-only correction: 17px/600 section headings, 13px/500 lane labels, 15px/600 task titles,
+> 12px metadata, bounded 8px task/worktree surfaces with theme-relative 1px borders and 12px gaps.
+> Sections have 24px separation; shared presenters/behavior and live `/` remain unchanged.
+> Required stylesheet authoring exited 0 (Tailwind 4.3.5, 59ms); no tests or browser calls.
+> Verification limited to file review because this was a low-risk visual/static change.
+> Earlier c77a72a captures/critique are historical, not proof for these changed styles.
+> Next: parent captures light/dark hierarchy in built-in browser and requests user approval.
+> Still HOLD, not merge-ready. No server, board, rule or dependency edits.
+
+> **Earlier Session Notes — BOARD-118 corrected preview checkpoint, 2026-11-11**
 > Reworked the rejected gallery composition on the same branch/worktree. Scoped `.wb-workbench`
 > styles now use a 20px utility heading, compact lane navigation, continuous populated task groups,
 > dominant 15px task titles/quiet metadata and an adjacent 288px worktree rail from 820px upward.

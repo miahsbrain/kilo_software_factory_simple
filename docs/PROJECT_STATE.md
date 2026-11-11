@@ -1,6 +1,17 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-118 corrected preview checkpoint (2026-11-11)
+## Current session — BOARD-118 hierarchy correction (2026-11-11)
+
+- User found section/task boundaries too weak. CSS-only change strengthens 17px/600 section
+  headings, differentiates 13px lane labels, and bounds task/worktree surfaces with 1px borders,
+  8px corners and 12px gaps; 15px/600 task titles stay above 12px metadata in both densities.
+- Existing theme palette, shared presenters and interaction state retained; live `/` unchanged.
+- Required stylesheet authoring exited 0 (59ms). File review only; no tests/browser calls.
+- Earlier c77a72a captures and round-1 HOLD are historical, not validation of changed CSS.
+- Next: parent inspects fresh light/dark built-in screenshots for hierarchy and resolves remaining
+  review/approval gates. No server/board/rules/dependency changes. Not merge-ready.
+
+## Earlier session — BOARD-118 corrected preview checkpoint (2026-11-11)
 
 - Replaced rejected meter/card composition with compact utility header, inline lane navigation,
   populated task groups, two-line task hierarchy and desktop-adjacent worktree rail (≥820px).

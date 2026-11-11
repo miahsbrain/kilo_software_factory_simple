@@ -478,9 +478,17 @@ Fixture boards intentionally share BOARD-001; board-scoped fold keys keep them s
 In-flight summary uses 15px inline figures. Lane navigation wraps content-width 32px controls,
 not five equal metric boxes. Task surface has no enclosing radius/shadow; only populated lane
 groups render here. Zero-count controls remain reachable; empty/error examples stay below the
-populated composition. Task titles occupy the first line at 15px/500; 12px IDs/type/priority/risk
-sit below without pill borders. Compact mode uses 13px titles and 56px rows. Expandable criteria
-use 13px text. Rail shares the task surface, divided by one vertical line; at ≥820px it occupies
+populated composition. After user hierarchy feedback, task titles occupy the first line at
+15px/600 in both densities; 12px IDs/type/priority/risk sit below without pill borders, including
+on mobile. Compact rows retain reduced padding. Expandable criteria use 13px text.
+Section headings (`wb-panel-title`, `wb-rail-title`, `wb-section-title`) use 17px/600 with 24px
+line-height. Lane labels are secondary status-role text at 13px/500, separated from their cards
+by 8px. Sections/lane groups have deliberate 24px separation. Individual task and worktree rows
+use the theme surface, an 8px radius and a 1px border mixed from existing faint-ink/line tokens
+(30%/70%) for a perceptible boundary in both themes. Cards have 12px gaps; panel/rail containers
+remain unframed/transparent, avoiding nested thick panels. Hover/focus strengthens card edges;
+existing visible focus ring and 150ms feedback remain. Rail is separated by a 24px gutter;
+at ≥820px it occupies
 288px alongside tasks (including the rejected 1104px desktop width). Below 820px it stacks.
 Controls use 4px corners, surfaces at most 8px, 32px targets and existing 2px focus rings.
 Gallery tokens reflect these scoped values; the live `/` retains its defaults.
@@ -491,7 +499,7 @@ Nine craft passes applied to source, in order:
 3. Icons: retained functional disclosure caret; no new icons or decorative marks.
 4. Copy: labelled fixture preview; repository-specific tasks/worktrees; explicit refresh interval.
 5. Type: 20px utility heading, dominant 15px task title, quiet 12px metadata, 400/500/600 only.
-6. Layout: continuous task list and adjacent 288px rail, rather than nested rounded panels.
+6. Layout: grouped task cards and adjacent 288px rail, rather than nested rounded panels.
 7. Details: borderless metadata, compact rectangular controls, readable expanded criteria.
 8. Visuals: branch/base/ahead/behind/dirty information is the visual detail; no pictures or charts.
 9. Motion: inherited 150ms color/disclosure feedback and reduced-motion override; no entrances.
@@ -502,7 +510,16 @@ neon borders, heavy/uppercase/italic type, emoji decoration, mixed icon sets, hy
 synthetic images, pill controls, sparklines, landing hero, parallax or looping/layout animation added.
 This is a source audit, **not** a rendered sign-by-sign review or contrast/overflow pass.
 
-**Evidence/hold:** CSS authoring command exited 0 (Tailwind 4.3.5, 59ms); documented Python
+**Current hierarchy correction:** CSS-only; catalogue index has no relevant pure-CSS specialist.
+Applied native unslop spacing/type/layout passes: 24px group separation, 12px card gaps,
+17/15/13/12px hierarchy and individually bounded surfaces. No new presenter, state, dependency,
+decoration or layout fork. Required stylesheet authoring exited 0 (Tailwind 4.3.5, 59ms).
+Verification limited to file review because this was a low-risk visual/static change.
+No Python semantics changed, tests or browser calls; parent must inspect fresh light/dark
+screenshots for section/card distinction. Previous captures/critique below do not validate
+these changed styles. Gallery approval and full QA remain open, not merge-ready.
+
+**Earlier evidence/hold (before hierarchy correction):** CSS authoring command exited 0 (Tailwind 4.3.5, 59ms); documented Python
 regression command exited 0, 12 tests passed. Existing tests extended for populated-lane mode and
 unchanged live defaults. No dependencies, installs or lockfile edits. Child built-in
 `browser.tabs.list()` returned `[browser.disconnected] No desktop browser is connected to this
@@ -523,5 +540,5 @@ unslop audit: HOLD, no blocking visual findings in the supplied views, not whole
 Built-in catalogue has no viewport resize; narrow/matrix captures are not claimed. Keyboard/focus,
 contrast/targets, expanded criteria, full states, filters/density and elapsed refresh remain open,
 as does user gallery approval. Parent canonical artifact notes.md patch was guard-refused; no
-retry or alternate write bypass. This docs-only checkpoint makes no source/browser/test/build
+retry or alternate write bypass. That earlier checkpoint made no source/browser/test/build
 changes. Live 15180 unchanged; not merge-ready and no live screen rollout.

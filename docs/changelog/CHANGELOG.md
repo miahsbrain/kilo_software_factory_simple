@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Strengthen gallery section and card hierarchy
+**Type:** Fix
+**Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
+**Changed:** `.opencode/skills/board/ui/src/app.css`, generated `static/board.css`; `docs/UI-UX.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log. No new files.
+**Why:** User found section headings and individual task boundaries hard to distinguish. Extend existing workbench-scoped selectors instead of forking presenters or duplicating layout/state.
+**Impact:** 17px/600 section headings, quiet 13px/500 lane labels, 15px/600 task titles above 12px metadata; 1px theme-relative card edges, 8px corners, 12px gaps and 24px group separation. Comparable worktree surfaces; no shadows, gradients or heavy outer panels. CSS-only, reversible; live `/`, Python/JS behavior, rules, dependencies, servers and board unchanged.
+**Verification:** Required stylesheet authoring exited 0 (Tailwind 4.3.5, 59ms). Verification limited to file review because this was a low-risk visual/static change. No tests or browser calls; prior screenshots/critique are historical, not proof for changed CSS. Parent built-in light/dark inspection and user approval pending; not merge-ready. Catalogue index reviewed: no relevant CSS-only specialist; native unslop spacing/type/layout passes applied.
+
 ## [2026-11-11] Checkpoint corrected gallery preview and independent critique
 **Type:** Docs
 **Board:** BOARD-118 | **Branch:** feat/redesign-board-console-component-gallery
