@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] The /plan and /unslop commands
+**Type:** Chore
+**Board:** BOARD-113 | **Branch:** chore/add-plan-and-unslop-commands
+**Changed:** `.kilo/command/plan.md`, `.kilo/command/unslop.md`, `docs/UI-UX.md` §2.1, `docs/changelog/CHANGELOG.md`
+**Why:** The plan and unslop skills sit in `.kilo/skills/`, but the skill loader does not expose them, so neither was discoverable as a command. Both procedures were already the rules; they were only reachable by asking.
+**Impact:** `/plan` packages the plan skill's five phases into a product-planning shortcut that points at the decision gate; `/unslop` packages the unslop procedure — direction, sign audit, nine passes, checklist — and writes the audit to `docs/reviews/<task-id>-unslop.md`. Neither command adds a rule: both name the by-path read and defer to `AGENTS.md`. The command directory is part of the harness slice, so a project copy carries both.
+
 ## [2026-11-11] The board screen becomes a dense dashboard
 **Type:** Feature
 **Board:** BOARD-112 | **Branch:** feat/rebuild-factory-pages-as-a-split
