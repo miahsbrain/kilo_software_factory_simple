@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-10] The live board becomes a factory console
+**Type:** Feature
+**Board:** BOARD-109 | **Branch:** feat/elevate-the-live-board-ui-into-a-factory-console
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `.kilo/skills/board/SKILL.md`, `docs/UI-UX.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-factory-board-console.md`
+**Why:** The viewer was a vertical accordion that showed cards but not the shape of the flow, and its lane and notes content was slow to scan. The board is the orchestrator's main surface, so it needs a dense, keyboard-first console with filters, parsed acceptance criteria and the worktree state in the same view.
+**Impact:** `GET /` now renders again after a `TypeError` in `render_pipeline()` that broke the whole page while `/health` and the JSON endpoints stayed up. The page keeps its read-only, server-rendered, offline behaviour, and `/api/board` and `/api/worktrees` are unchanged. The visual language is recorded in `docs/UI-UX.md` §6.1.
+
 ## [2026-11-10] The teardown command sets the board lane
 **Type:** Fix
 **Board:** BOARD-108 | **Branch:** fix/cleanup-and-discard-set-the-board

@@ -150,20 +150,30 @@ lets it proceed to `Pending Merge`.
 
 ## 6. See it live
 
-The markdown table is the source of truth, but it is hard to scan. The **board viewer** renders it
-as a dashboard you can open in a browser:
+The markdown table is the source of truth, but it is hard to scan. The **factory board console**
+renders it as a dense, keyboard-first dashboard you can open in a browser:
 
 ```bash
 python3 .kilo/skills/board/scripts/board_serve.py --port 15180
 ```
 
-- One column per lane, so the shape of the flow is always visible.
-- Every card shows its ID, task, type, priority, risk badge, `Blocked by`, and worktree.
-- A **live worktrees** panel shows each worktree with its branch, path, ahead/behind counts, and a
-  dirty marker.
+- An **app bar** carries the wordmark, the live refresh clock, Pause, Refresh now, and the
+  system/light/dark theme and comfortable/compact density toggles.
+- A **pipeline** strip counts the active lanes; each lane button filters the cards and is the
+  primary way to read the shape of the flow.
+- A **toolbar** holds search (`/`), status, type and priority filters, the result count, and
+  Reset. The filter state lives in the URL, so a view can be bookmarked and shared.
+- Every **card** shows its ID, task, type, priority, risk badge, `Blocked by`, and worktree. The
+  parsed **Notes checklist** renders each criterion with its checked/open state and proof line,
+  so acceptance criteria are readable without opening the markdown.
+- A **live worktrees** table shows each worktree with its branch, path, ahead/behind counts, and
+  a dirty marker; a branch can be copied from the card.
+- Keyboard: `/` focuses search, `j`/`k` move between cards, `Enter` opens one, `Esc` closes or
+  clears. Focus rings and accessible names are present throughout.
 - The board is re-read on **every request** and the page auto-refreshes. Nothing is cached.
-- The server is **read-only**. It never writes to the board or the repository.
-- `/api/board` and `/api/worktrees` serve the same data as JSON.
+- The server is **read-only and offline**: standard library only, no external assets, no
+  writes to the board or the repository.
+- `/api/board` and `/api/worktrees` serve the same data as JSON, unchanged.
 
 The port is forwarded by the devcontainer as **Factory Board (15180)**.
 
