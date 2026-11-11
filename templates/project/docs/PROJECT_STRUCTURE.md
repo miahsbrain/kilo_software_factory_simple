@@ -12,11 +12,11 @@ it does not impose it.
     ├── ROADMAP.md             # planned work not in progress
     ├── CHANGELOG.md           # product-facing changelog (user-approved only)
     ├── README.md
-    ├── kilo.jsonc             # Kilo config, permission map, MCPs
+    ├── opencode.jsonc         # OpenCode V2 config, ordered permissions, MCPs
     ├── .gitignore
-    ├── .kilo/
-    │   ├── agent/             # agent definitions
-    │   ├── command/           # slash commands
+    ├── .opencode/
+    │   ├── agents/            # architect primary plus six specialist subagents
+    │   ├── commands/          # slash commands
     │   ├── policies/          # canonical guard-rail policy
     │   ├── repos.json         # repo id → path map
     │   ├── scopes/<id>.md     # canonical scope rules
@@ -49,5 +49,5 @@ it does not impose it.
 
 ## Rules
 
-- The map in `.kilo/repos.json` is the only way into a repository. Never address one by path.
+- The map in `.opencode/repos.json` is the only way into a repository. Never address one by path.
 - One application per folder under `apps/`. Never a folder inside another application.

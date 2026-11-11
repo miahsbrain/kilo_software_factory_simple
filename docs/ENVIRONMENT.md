@@ -5,8 +5,8 @@ The user populates real secrets.
 
 | Variable | Where used | Required | Default | Notes |
 |---|---|---|---|---|
-| `BASH_ENV` | the whole dev container | no | `/home/node/.kilo-redact.sh` | Points bash at the startup file that scrubs credentials from command output and refuses any `bash -c` command that names a protected file. Set by `devcontainer.json` → `remoteEnv`. If the file is missing bash ignores it. |
-| `KILO_CONFIG` | the whole dev container | no | `${containerWorkspaceFolder}/kilo.jsonc` | Loads the permission map in every folder and every nested repository, so the protected-file denies apply without a copied config. Set by `devcontainer.json` → `remoteEnv`. |
+| `BASH_ENV` | legacy dev container, port pending | no | `/home/node/.kilo-redact.sh` | Existing startup file; OpenCode shell enforcement is not yet verified. Container/security work belongs to later BOARD-114 chunks. |
+| `KILO_CONFIG` | legacy dev container only | no | `${containerWorkspaceFolder}/kilo.jsonc` | Not an OpenCode setting. The container is unchanged in chunk 1; this legacy path is not supplied by the port. OpenCode discovers `opencode.jsonc` natively. |
 | `REMOTE_CONTAINERS_IPC` | VS Code Dev Containers | no | set by VS Code | The socket the VS Code credential helper talks to. Not set by hand. |
 | `OPENROUTER_API_KEY` | the agent's model provider | no | — | Value lives in the host environment and is passed through `remoteEnv`. |
 | `DEEPSEEK_API_KEY` | the agent's model provider | no | — | Value lives in the host environment and is passed through `remoteEnv`. |
@@ -16,7 +16,7 @@ The user populates real secrets.
 
 | Key | Where | Notes |
 |---|---|---|
-| `/home/node/.kilo-redact.sh` | the whole dev container | The startup file. It scrubs credentials from command output and refuses `bash -c` commands that name a protected file. Installed by `postCreateCommand` from `.devcontainer/kilo-redact.sh`. |
+| `/home/node/.kilo-redact.sh` | legacy dev container, port pending | Existing startup file installed from `.devcontainer/kilo-redact.sh`; no OpenCode enforcement claim in chunk 1. |
 | `/home/node/.git-credentials` | the whole dev container | The git credential store, mode `600`. Never commit it and never read it into a transcript. |
 | `/home/node/.gitconfig` | the whole dev container | Holds `credential.helper`, `user.*` and `safe.directory`. It must not hold a `url.*.insteadOf` rewrite that embeds a credential. |
 

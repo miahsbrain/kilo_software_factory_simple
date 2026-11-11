@@ -249,7 +249,7 @@ The QA lane for frontend work produces **evidence**, not assertions.
 The QA script drives the project's own Playwright and captures everything below:
 
 ```bash
-node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
+node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
   --scope <scope> --task-id <task-id> --project apps/<scope>
 ```
 
@@ -353,7 +353,7 @@ Reversibility: two-way. Blast radius: <who breaks if this is wrong>.
 ```
 
 ```bash
-python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+python3 .opencode/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
   --kind bug --priority medium --category functional --route /path
 ```
 

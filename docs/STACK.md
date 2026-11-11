@@ -11,33 +11,40 @@ Tailwind stylesheet, and it produces a committed file — the viewer itself need
 
 | Piece | Version | Where |
 |---|---|---|
-| Python | 3.9+ | every script under `.kilo/skills/*/scripts/` |
+| Python | 3.9+ | every script under `.opencode/skills/*/scripts/` |
+| OpenCode | V2 | `opencode.jsonc`, `.opencode/agents/`, `.opencode/commands/`, five discoverable skills |
 | Node.js | 22 | the dev container, the Playwright MCP, the Tailwind build |
 | Playwright | the global install in the dev container | the QA capture script |
 | Chromium | `/usr/bin/chromium` in the dev container | the QA capture script |
-| Tailwind CSS | 4.3.5 (`@tailwindcss/cli`) | `.kilo/skills/board/ui/`, builds the board stylesheet |
-| Geist Sans / Geist Mono | variable woff2, SIL OFL | `.kilo/skills/board/static/fonts/` |
+| Tailwind CSS | 4.3.5 (`@tailwindcss/cli`) | `.opencode/skills/board/ui/`, builds the board stylesheet |
+| Geist Sans / Geist Mono | variable woff2, SIL OFL | `.opencode/skills/board/static/fonts/` |
 
 ## Commands
 
 ```bash
 # Board viewer (read-only dashboard on port 15180)
-python3 .kilo/skills/board/scripts/board_serve.py --port 15180
+python3 .opencode/skills/board/scripts/board_serve.py --port 15180
 
 # Rebuild the board stylesheet after a class change (needs Node 22, not needed at runtime)
-npm --prefix .kilo/skills/board/ui run build
-# output: .kilo/skills/board/static/board.css (committed)
+npm --prefix .opencode/skills/board/ui run build
+# output: .opencode/skills/board/static/board.css (committed)
 
 # Show the board
-python3 .kilo/skills/board/scripts/board.py show
+python3 .opencode/skills/board/scripts/board.py show
 
 # Create the worktree for a board row
-python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
+python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X
+
+# Existing lifecycle/env suite (scratch repositories only)
+python3 .opencode/skills/git-worktree/scripts/test_env.py
+
+# Security adapter boundary tests (temporary dummy repositories only)
+node --test .opencode/plugins/factory-guard/guard.test.mjs
 
 # Guard rails
-python3 .kilo/skills/git-worktree/scripts/guard.py check-git -- "git merge feat/x"
-python3 .kilo/skills/git-worktree/scripts/guard.py check-policy
-python3 .kilo/skills/git-worktree/scripts/guard.py check-repos
+python3 .opencode/skills/git-worktree/scripts/guard.py check-git -- "git merge feat/x"
+python3 .opencode/skills/git-worktree/scripts/guard.py check-policy
+python3 .opencode/skills/git-worktree/scripts/guard.py check-repos
 ```
 
 ## Ports
@@ -50,8 +57,11 @@ python3 .kilo/skills/git-worktree/scripts/guard.py check-repos
 
 ## Environment
 
-`BASH_ENV` and `KILO_CONFIG` are set by `.devcontainer/devcontainer.json`. See
-`docs/ENVIRONMENT.md`.
+The devcontainer is still the legacy Kilo container; its OpenCode port is pending.
+`KILO_CONFIG` is not used by OpenCode. Native config reloads automatically.
+The factory selects `opencode` as base when present; app repository base selection is unchanged.
+Security enforcement for grep/glob target paths and automatic guards is pending.
+See `docs/ENVIRONMENT.md`.
 
 ## What a project adds
 

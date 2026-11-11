@@ -7,7 +7,7 @@ an agent needs. Do not guess commands. Do not read `docs/ENVIRONMENT.md` for sta
 
 ```bash
 # Board viewer (from the repo root)
-python3 .kilo/skills/board/scripts/board_serve.py --port 15180
+python3 .opencode/skills/board/scripts/board_serve.py --port 15180
 
 # The application's own commands go here.
 ```
@@ -27,7 +27,7 @@ Port: TBD
 
 Tool: Python 3 standard library server (`board_serve.py`), no dependencies
 Port: 15180
-Dev command: `python3 .kilo/skills/board/scripts/board_serve.py --port 15180`
+Dev command: `python3 .opencode/skills/board/scripts/board_serve.py --port 15180`
 Host: `127.0.0.1` by default; `--host 0.0.0.0` to bind wider
 Refresh: the page re-reads the board every request and auto-refreshes every 10 seconds
 
@@ -35,7 +35,7 @@ Refresh: the page re-reads the board every request and auto-refreshes every 10 s
 
 Tool: the global install the devcontainer provides, plus the Playwright MCP
 Library: `/usr/local/share/npm-global/lib/node_modules/@playwright/mcp/node_modules/playwright`
-MCP server: `playwright-mcp` (on PATH), configured in `kilo.jsonc`
+MCP server: `playwright-mcp` (on PATH), configured in `opencode.jsonc`
 Browser: system chromium at `/usr/bin/chromium` — the container sets
 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, so there is no downloaded browser
 

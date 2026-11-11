@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] OpenCode V2 port, chunk 1
+**Type:** Chore
+**Board:** BOARD-114 | **Branch:** feat/port-factory-harness-to-opencode-v2
+**Changed:** tracked `.kilo/` harness moved to `.opencode/` with plural agents/commands; `opencode.jsonc`; existing Python/JS path references, native permission generator, factory base selector, templates and active docs. Added architect primary because no existing primary orchestrator definition covered that role; retained six specialists and upstream licences. App base semantics unchanged.
+**Why:** Approved OpenCode-only integration port on `opencode`; `main` retains Kilo. Reused lifecycle, env, scope, board and QA mechanics rather than introducing replacement tools.
+**Impact:** Chunk 1 only, not merge-ready. Bootstrap worktree stays unmoved and ignored; steady-state guards accept only `.opencode/worktrees/`. Security plugin/search-path enforcement, native runtime validation and devcontainer migration remain later work. No dependencies, commit, merge or push.
+**Verification:** `python3 .opencode/skills/git-worktree/scripts/test_env.py` → exit 0, `all checks passed`; the only verification command. Runtime package ignores are root-anchored so moved board UI manifests remain trackable.
+
 ## [2026-11-11] The /plan and /unslop commands
 **Type:** Chore
 **Board:** BOARD-113 | **Branch:** chore/add-plan-and-unslop-commands
@@ -226,3 +234,9 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Changed:** `.kilo/skills/board/scripts/board_serve.py` (new), `.kilo/skills/qa-review/scripts/{browser-review.mjs,check-finding.py,ledger.py}`, `.kilo/skills/board/scripts/board.py`, `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/{board,qa-review}/SKILL.md`, `.kilo/command/{board-view,run,ui}.md`, `.kilo/agent/{qa-reviewer,ui-critic}.md`, `kilo.jsonc` (Playwright MCP), `.devcontainer/devcontainer.json` (port 15180), `AGENTS.md`, `docs/{STACK,DECISIONS}.md`
 **Why:** The markdown board is hard to scan, the UI critique → fix loop could run forever, and Playwright was installed but unreachable — so the agent built a browser driver by hand and looped proving it worked.
 **Impact:** A read-only dashboard on port 15180 shows the lanes and the live worktrees. The QA loop is capped at 3 rounds with fingerprint dedupe and a ledger. The Playwright MCP is configured and the capture script resolves the global Playwright, so no hand-rolled browser client remains.
+## [2026-11-11] OpenCode security adapter awaiting fixture access
+**Type:** Feature
+**Board:** BOARD-114 | **Branch:** feat/port-factory-harness-to-opencode-v2
+**Changed:** `.opencode/plugins/factory-guard/`, canonical policy, guard file/search checks, config sync, STACK and session state
+**Why:** Native search permissions do not enforce target paths; copied control repos need the complete runtime configuration
+**Impact:** Incomplete security migration. Node tests exited 1 on temporary fixture directory EACCES; no workaround attempted. Container and native runtime verification remain pending.

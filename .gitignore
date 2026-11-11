@@ -2,8 +2,10 @@
 # The factory never tracks it. See AGENTS.md §"The factory and the project".
 /project/
 
-# Agent worktrees: one per board row, created by .kilo/skills/git-worktree/scripts/worktree.py
-.kilo/worktrees/
+# Agent worktrees: one per board row, created by .opencode/skills/git-worktree/scripts/worktree.py
+.opencode/worktrees/
+# BOARD-114 bootstrap only: never move or add new worktrees here.
+/.kilo/worktrees/
 
 # QA evidence. The notes and the summaries are tracked; the captures are not.
 artifacts/
