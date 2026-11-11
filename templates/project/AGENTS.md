@@ -1268,6 +1268,8 @@ Keep all written output in the same plain, verifiable style:
 
 The QA lane for frontend work uses **Playwright** and produces evidence, not assertions.
 
+Use OpenCode’s built-in browser for interactive UI checks when available. Keep `browser-review.mjs` as the required source of repeatable screenshot, viewport, console, and network evidence. Built-in browser checks supplement—not replace—the existing QA and unslop gates. If the browser is unavailable, report it; do not silently switch tools.
+
 - **Capture:** the QA script drives the project's own Playwright:
 
       node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
@@ -1300,8 +1302,10 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   **Review reports and the ledger are documents, not artifacts.** They stay where documents live:
   `docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
   `docs/reviews/<task-id>-ledger.md`.
-- **The script is the only way to capture UI evidence.** The QA reviewer and the UI critic capture
-  screenshots **only** through `browser-review.mjs`. Ad-hoc `chromium`, `npx playwright
+- **The script is the only way to capture canonical UI evidence.** The QA reviewer and the UI critic capture
+  canonical screenshots **only** through `browser-review.mjs`. This does not forbid built-in
+  interactive investigation; built-in screenshots are for inspection, not substitutes for scripted
+  evidence. Follow `.opencode/skills/qa-review/SKILL.md` for built-in browser usage. Ad-hoc `chromium`, `npx playwright
   screenshot`, `curl`-and-guess, or any other browser command run from bash is **not acceptable
   evidence** for a UI review. The script never installs a browser and never falls back to another
   driver. If the script cannot do something the review needs, **say what is missing and propose
