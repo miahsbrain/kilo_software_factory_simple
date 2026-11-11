@@ -3,6 +3,15 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Checkpoint blocked BOARD-117 QA
+**Type:** Docs
+**Board:** BOARD-117 | **Branch:** fix/refresh-project-board-discovery-every-minute
+**Changed:** Reviewer report `docs/reviews/BOARD-117-qa.md`, current session notes in `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log. No source or permanent-rule edits.
+**Why:** Preserve independent QA evidence and the environment blocker in a clearly labelled wip local checkpoint, not a merge-ready handoff.
+**Impact:** Parent code review found no blocker; independent regression rerun passed four tests (exit 0). Browser interactions, 60-second elapsed scheduling, visual/unslop and gallery review remain unverified. Main server 15180 unchanged; preview 15181 launched from the worktree. No restarts or dependency installation. User must approve provisioning Playwright or provide its installed location before QA resumes. BOARD-118 approved redesign gallery remains queued behind BOARD-117, not implemented.
+**Capture:** `node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127.0.0.1:15181 --route / --scope factory --task-id BOARD-117 --project . --scheme both --date 2026-11-11` → exit 2: Playwright not found in the project or global npm install (exact error: reviewer report lines 33–35). No canonical evidence produced; no application defect demonstrated.
+**Verification:** Existing reviewer evidence recorded only; no additional test/build/capture commands. Verification limited to file review because this was a low-risk visual/static change.
+
 ## [2026-11-11] Refresh board discovery on every request
 **Type:** Fix
 **Board:** BOARD-117 | **Branch:** fix/refresh-project-board-discovery-every-minute

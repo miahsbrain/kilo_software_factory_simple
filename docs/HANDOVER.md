@@ -1,6 +1,6 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-117 build complete, 2026-11-11**
+> **Session Notes — BOARD-117 QA blocked, 2026-11-11**
 > Branch: `fix/refresh-project-board-discovery-every-minute`; worktree:
 > `.opencode/worktrees/refresh-project-board-discovery-every-minute`.
 > JSON and HTML rediscover boards on every request; ignored projects can appear or disappear
@@ -8,8 +8,20 @@
 > Refresh now remain. Four temporary-fixture regression tests passed (exit 0).
 > The first patch was refused while session context was the factory root; after the orchestrator
 > moved the session into this worktree, the authorized relative-path retry succeeded. No guard changed.
-> Next: parent reviews the diff and arranges browser QA/critique; no live server was restarted.
-> Browser interaction, timers and visual QA are not verified by the Python tests.
+> Parent code review found no blocker. Independent regression rerun: four tests, exit 0.
+> Canonical capture exited 2: Playwright was not found locally or globally (exact command below).
+> Report: `docs/reviews/BOARD-117-qa.md`; no product defect was demonstrated.
+> Main server 15180 is unchanged; preview 15181 was launched from this worktree. No restarts or
+> dependency installation. Browser interactions, elapsed timer, visual/unslop and gallery review
+> remain unverified. This is a wip checkpoint, not merge-ready.
+> Next: user approves provisioning Playwright or provides its installed location, then authorizes QA.
+> BOARD-118 approved redesign gallery is queued behind BOARD-117, not implemented.
+
+Failed capture command (exit 2; recorded, not rerun):
+
+```sh
+node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127.0.0.1:15181 --route / --scope factory --task-id BOARD-117 --project . --scheme both --date 2026-11-11
+```
 
 > **Session Notes — BOARD-116 documentation review passed, 2026-11-11**
 > Added the approved built-in interactive browser policy to root/template §B4.2 and aligned the

@@ -2,15 +2,21 @@
 
 ## Current session — BOARD-117 (2026-11-11)
 
-- **Phase:** Build complete; parent review and browser QA/critique remain.
+- **Phase:** QA blocked on missing Playwright; wip checkpoint, not merge-ready.
 - **Active task:** `fix/refresh-project-board-discovery-every-minute` in
   `.opencode/worktrees/refresh-project-board-discovery-every-minute`.
 - **Changed:** Request-time board rediscovery for JSON/HTML, 60-second default, focused regressions
   and ADR-076. Explicit file selection, refresh override and existing controls retained.
-- **Verification:** `python3 .opencode/skills/board/scripts/test_board_serve.py` → exit 0,
-  four tests passed. Temporary fixtures only; browser interaction/timers not exercised.
-- **Next action:** Parent reviews task diff and arranges browser evidence. Existing server at
-  15180 was not restarted; no main board or ignored project files edited.
+- **Verification:** Independent `python3 .opencode/skills/board/scripts/test_board_serve.py` rerun
+  → exit 0, four tests passed. Parent code review found no blocker. Browser interactions,
+  elapsed timer and visual/unslop/gallery review remain unverified; no product defect proven.
+- **Capture:** `node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127.0.0.1:15181 --route / --scope factory --task-id BOARD-117 --project . --scheme both --date 2026-11-11`
+  → exit 2: Playwright not found in this project or global npm install. Exact error and unchecked
+  criteria: `docs/reviews/BOARD-117-qa.md`. No additional tests/captures run for this checkpoint.
+- **Next action:** User approves provisioning Playwright or supplies its installed location,
+  then authorizes resuming QA. BOARD-118 approved redesign gallery is queued behind this, not implemented.
+- **Servers:** Main 15180 unchanged; preview 15181 launched from this worktree. No restarts,
+  dependency installation, main board or ignored project edits.
 - **Context:** Initial patch refused from factory-root session context; orchestrator moved the
   session to this worktree, and the authorized relative-path retry succeeded without guard changes.
 
