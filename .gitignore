@@ -33,3 +33,6 @@ id_rsa*
 
 .DS_Store
 .vscode/
+
+
+docs/BOARD.md
