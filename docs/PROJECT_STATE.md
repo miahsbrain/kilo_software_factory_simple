@@ -1,5 +1,21 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-117 (2026-11-11)
+
+- **Phase:** Build complete; parent review and browser QA/critique remain.
+- **Active task:** `fix/refresh-project-board-discovery-every-minute` in
+  `.opencode/worktrees/refresh-project-board-discovery-every-minute`.
+- **Changed:** Request-time board rediscovery for JSON/HTML, 60-second default, focused regressions
+  and ADR-076. Explicit file selection, refresh override and existing controls retained.
+- **Verification:** `python3 .opencode/skills/board/scripts/test_board_serve.py` → exit 0,
+  four tests passed. Temporary fixtures only; browser interaction/timers not exercised.
+- **Next action:** Parent reviews task diff and arranges browser evidence. Existing server at
+  15180 was not restarted; no main board or ignored project files edited.
+- **Context:** Initial patch refused from factory-root session context; orchestrator moved the
+  session to this worktree, and the authorized relative-path retry succeeded without guard changes.
+
+## Earlier session context (historical)
+
 - **Phase:** BOARD-116, parent docs review passed; reviewed change prepared for human review/local commit.
 - **Active task:** `docs/use-opencode-browser-for-interactive-ui-reviews` in
   `.kilo/worktrees/use-opencode-browser-for-interactive-ui-reviews`, based on migration checkpoint

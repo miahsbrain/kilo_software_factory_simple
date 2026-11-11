@@ -1,5 +1,16 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-117 build complete, 2026-11-11**
+> Branch: `fix/refresh-project-board-discovery-every-minute`; worktree:
+> `.opencode/worktrees/refresh-project-board-discovery-every-minute`.
+> JSON and HTML rediscover boards on every request; ignored projects can appear or disappear
+> without restarting. Default refresh is 60 seconds; explicit `--file`, `--refresh`, Pause and
+> Refresh now remain. Four temporary-fixture regression tests passed (exit 0).
+> The first patch was refused while session context was the factory root; after the orchestrator
+> moved the session into this worktree, the authorized relative-path retry succeeded. No guard changed.
+> Next: parent reviews the diff and arranges browser QA/critique; no live server was restarted.
+> Browser interaction, timers and visual QA are not verified by the Python tests.
+
 > **Session Notes — BOARD-116 documentation review passed, 2026-11-11**
 > Added the approved built-in interactive browser policy to root/template §B4.2 and aligned the
 > reviewer agents, QA skill, `/ui` and UI-UX guidance. Canonical captures remain script-only;
@@ -142,6 +153,7 @@ Chunk 1 reuses these existing boundaries:
 |---|---|---|---|
 | `board.py` | `.opencode/skills/board/scripts/board.py` | Deterministic manipulation of the markdown board. Never writes prose. | effectful (file I/O) |
 | `board_serve.py` | `.opencode/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
+| `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1691` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
 | `worktree.py` | `.opencode/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, `discard` removes one, `discard --force --yes` destroys one after writing a recovery copy, `handoff` prints the hand-off block, `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, `discard` sets `Ready`. | effectful (git, filesystem) |
 | `env.py` | `.opencode/skills/git-worktree/scripts/env.py` | Copies the two local env files from a repository's main checkout into a worktree, excludes them from git, and removes them again. Never prints a value. | effectful (filesystem, git exclude) |
 | `test_env.py` | `.opencode/skills/git-worktree/scripts/test_env.py` | Self-test for the env provisioning and the worktree reuse rules, in a throwaway repository under a temp directory. | effectful (filesystem, git) |
@@ -200,13 +212,20 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 
 ## 10. Testing
 
-No test suite. The verification of a change is the smallest relevant script run, recorded with
+Verification uses focused script tests. The verification of a change is the smallest relevant script run, recorded with
 its result and a `file:line` proof (AGENTS.md §B4 "Verification cost rule"). The dev container
 ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup file.
 
-`python3 .opencode/skills/git-worktree/scripts/test_env.py` is the one script-level test: it builds
+`python3 .opencode/skills/git-worktree/scripts/test_env.py` builds
 a throwaway git repository under a temp directory and proves the env provisioning, the
 worktree reuse rules, the hand-off block and the teardown named by a board row.
+
+`python3 .opencode/skills/board/scripts/test_board_serve.py` uses standard-library unittest,
+temporary fixture boards and a mocked server. Four tests pass for BOARD-117: new/removed project
+discovery in HTML and JSON, separate tasks even with identical IDs, fixed explicit file selection
+with fresh reads, default 60 seconds, CLI override and existing control source. No sockets, live
+project reads, server restarts or external dependencies. Control-source assertions are not browser
+interaction or timer evidence.
 
 ## 11. Known issues and risks
 

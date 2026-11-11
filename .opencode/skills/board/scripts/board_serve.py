@@ -2,7 +2,7 @@
 """Read-only live board dashboard.
 
     board_serve.py [--port 15180] [--host 127.0.0.1] [--open]
-                   [--file PATH] [--refresh 10]
+                   [--file PATH] [--refresh 60]
 
 Serves a single-page HTML dashboard of docs/BOARD.md plus the live git
 worktrees. Everything is read fresh on every request and nothing is ever
@@ -64,7 +64,7 @@ COLUMNS = ["ID", "Task", "Type", "Status", "Priority", "Risk", "Blocked by",
 GIT_TIMEOUT = 5
 DEFAULT_PORT = 15180
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_REFRESH = 10
+DEFAULT_REFRESH = 60
 BOARD_READ_HINT = (" Check that the board path (--file or docs/BOARD.md) "
                    "exists and is a valid board table.")
 # Inline favicon: the page stays offline and makes no favicon request.
@@ -542,7 +542,7 @@ JS = """
     });
   });
 
-  var refreshSeconds = parseInt(document.body.getAttribute("data-refresh"), 10) || 10;
+  var refreshSeconds = parseInt(document.body.getAttribute("data-refresh"), 10) || 60;
   var paused = false;
   var generatedMs = live ? parseInt(live.getAttribute("data-ms"), 10) : 0;
 
@@ -1690,8 +1690,10 @@ def board_states(board, paths):
 
 def build_payloads(board, worktree, paths, root):
     def board_payload():
+        current_paths = paths if paths is not None else (
+            discover_boards(root) or [("board", board_file(None, root))])
         return {
-            "boards": board_states(board, paths),
+            "boards": board_states(board, current_paths),
             "generated_at": now(),
         }
 
@@ -1703,7 +1705,7 @@ def build_payloads(board, worktree, paths, root):
 
     def html_page():
         try:
-            states = board_states(board, paths)
+            states = board_payload()["boards"]
             state = worktree_state(worktree, root)
             error = None
         except Exception as exc:
@@ -1739,9 +1741,7 @@ def main(argv):
     if args.file:
         paths = [("board", board_file(args.file, root))]
     else:
-        paths = discover_boards(root)
-        if not paths:
-            paths = [("board", board_file(None, root))]
+        paths = None
 
     board_payload, worktree_payload, html_page = build_payloads(board, worktree, paths, root)
     Handler.state = {
@@ -1758,7 +1758,7 @@ def main(argv):
         print("cannot bind %s:%d (%s)" % (args.host, args.port, exc), file=sys.stderr)
         return 1
     url = "http://%s:%d/" % ("127.0.0.1" if args.host == "0.0.0.0" else args.host, args.port)
-    for label, path in paths:
+    for label, path in (paths if paths is not None else discover_boards(root)):
         print("board:   %-8s %s" % (label, path))
     print("serving: %s" % url)
     print("stop with Ctrl-C")

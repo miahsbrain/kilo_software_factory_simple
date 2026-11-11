@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Refresh board discovery on every request
+**Type:** Fix
+**Board:** BOARD-117 | **Branch:** fix/refresh-project-board-discovery-every-minute
+**Changed:** `.opencode/skills/board/scripts/board_serve.py`, new adjacent `test_board_serve.py`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/STACK.md`, `docs/DECISIONS.md` (ADR-076), this log.
+**Why:** `main()` captured discovered paths once, hiding projects created after server initialization. Existing `discover_boards`, payload callbacks, parser and renderer are reused; HTML now uses the same board-payload path as JSON. New test file is needed because board/scripts had no regression tests; standard-library unittest adds no dependency or custom tooling.
+**Impact:** Rediscover filesystem boards per request, including ignored project paths; keep tasks separated and explicit `--file` fixed. Set default/JavaScript fallback to 60 seconds. Existing controls, filters/state, payload shapes and read-only/offline runtime remain; no redesign, live project edits or server restart. Reversible code-only behavior change; parent review and browser QA/critique remain open.
+**Verification:** `python3 .opencode/skills/board/scripts/test_board_serve.py` → exit 0, four tests passed. Temporary fixtures and mocked request handling prove HTML/JSON appearance/removal, isolation, fixed file/fresh reads and refresh defaults/override. Manual controls checked in source only; no browser interaction/timer evidence. Initial patch refusal occurred with factory-root session context; authorized worktree-relative retry succeeded after session move, without guard changes.
+
 ## [2026-11-11] Use OpenCode browser for interactive UI reviews
 **Type:** Docs
 **Board:** BOARD-116 | **Branch:** docs/use-opencode-browser-for-interactive-ui-reviews
