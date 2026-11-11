@@ -1,6 +1,12 @@
 # PROJECT STATE — software factory
 
-- **Phase:** BOARD-114, OpenCode V2 integration port, blocked during security verification.
+- **Phase:** BOARD-115, docs-only review passed; local task commit prepared for human review.
+- **Active task:** `docs/require-committed-worktree-handoff-checkpoints` in
+  `.kilo/worktrees/require-committed-worktree-handoff-checkpoints`, based on migration checkpoint
+  `bc3ca6c` on `feat/port-factory-harness-to-opencode-v2`. Approved rule and derived instructions
+  updated; parent approved the local task commit through the existing Kilo bootstrap guard.
+  File review only; no builds or tests. No approval to merge the migration.
+- **Migration:** BOARD-114 remains blocked during security verification; not resumed by BOARD-115.
 - **Progress:** Native `.opencode/agents`, `commands`, `skills`, `catalog` and `opencode.jsonc`;
   architect primary plus six specialists; models inherit session selection. Existing Python/JS
   mechanics migrated, native ordered permission generator, factory base preference `opencode`.
@@ -14,4 +20,6 @@
 - **Security check:** `node --test .opencode/plugins/factory-guard/guard.test.mjs` exited 1:
   two fixture tests hit `EACCES` creating directories under `/tmp/opencode`; policy/runtime merge
   test passed. No retry, dependency install or alternate fixture path attempted.
-- **Next action:** user authorizes a writable fixture location or repairs temporary-directory access.
+- **Next action:** human reviews the BOARD-115 local task commit. BOARD-114 remains blocked and
+  not merge-ready; it separately awaits user authorization of a
+  writable fixture location or repair of temporary-directory access.

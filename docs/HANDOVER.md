@@ -1,5 +1,18 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-115 documentation review, 2026-11-11**
+> Added the approved §B11 committed-handoff policy to root/template rules and aligned B5,
+> closeout, handover and git-worktree instructions. Branch:
+> `docs/require-committed-worktree-handoff-checkpoints`; worktree:
+> `.kilo/worktrees/require-committed-worktree-handoff-checkpoints`, based on the user-created
+> migration checkpoint `bc3ca6c` on `feat/port-factory-harness-to-opencode-v2`.
+> Parent's docs-only review passed; local task commit prepared for human review through the
+> authorized existing Kilo bootstrap guard. Next: human reviews the BOARD-115 task commit.
+> BOARD-114 remains blocked on the security test's `/tmp/opencode` fixture `EACCES`; no migration
+> work or verification was resumed. The migration is not merge-ready; this is not approval to merge it.
+> Earlier notes below describe that prior session, not current status.
+> Verification limited to file review because this was a low-risk visual/static change.
+
 > **Session Notes — BOARD-114 blocked, 2026-11-11**
 > Security adapter and policy/sync changes are implemented but unverified. The command
 > `node --test .opencode/plugins/factory-guard/guard.test.mjs` exited 1: two tests could not

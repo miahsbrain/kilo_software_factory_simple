@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Require committed worktree handoff checkpoints
+**Type:** Docs
+**Board:** BOARD-115 | **Branch:** docs/require-committed-worktree-handoff-checkpoints
+**Changed:** `AGENTS.md` and `templates/project/AGENTS.md` §B5/§B11; `.opencode/commands/closeout.md`, `.opencode/commands/handover.md`, `.opencode/skills/git-worktree/SKILL.md` §6/§8; `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md` (ADR-074), this log. Extended existing instructions; no new files or tools.
+**Why:** Approved handoff policy requires local task commits and a reported SHA/diff, including clearly labelled `wip` checkpoints for blocked or unfinished work.
+**Impact:** Checkpoints do not imply merge readiness; verification, review, human-merge and integration-branch protections remain. Docs-only parent review passed; local task commit prepared for human review. BOARD-114 remains blocked and not merge-ready; no migration or security-policy changes or approval to merge the migration.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change.
+
 ## [2026-11-11] OpenCode V2 port, chunk 1
 **Type:** Chore
 **Board:** BOARD-114 | **Branch:** feat/port-factory-harness-to-opencode-v2

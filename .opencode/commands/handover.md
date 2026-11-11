@@ -12,4 +12,7 @@ Write the application memory map.
    index, in the structure the agent file specifies.
 3. Update `docs/PROJECT_STRUCTURE.md` only if a unit is missing from it.
 
-Report the files you wrote, the units you documented and skipped, and the mode you used.
+Before reporting, apply `AGENTS.md` §B11's handoff checkpoint policy: commit task changes locally
+on the worktree branch, including a `wip` checkpoint when unfinished or blocked. Report the commit
+SHA and diff command alongside the files you wrote, units documented and skipped, and mode used.
+This checkpoint does not bypass verification or human-merge gates.
