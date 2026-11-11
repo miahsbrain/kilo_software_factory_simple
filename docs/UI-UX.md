@@ -403,3 +403,39 @@ hairline-separated stops, not five cards — and only the stop with the highest 
 carries the accent. Keyboard and URL state are part of the design, not an addition.
 
 All values above are the values in the CSS. No console token is an open assumption.
+
+### 6.2 Factory page language (approved — BOARD-112)
+
+Every factory page uses this language. It is built with Tailwind CSS v4 from
+`.kilo/skills/board/ui/src/app.css`; the built stylesheet is
+`.kilo/skills/board/static/board.css` and is committed. The component gallery at `/gallery`
+renders the same `wb_` components the board uses.
+
+Direction: a dense dashboard console for one architect to see work in flight, what waits for a
+decision, and where the worktrees are. Character: precise, elegant, industrial. World: a modern
+control room on cool paper and graphite. Moments: the KPI strip, the segmented flow meter and the
+parsed acceptance checklist. Signature: the single signal red-orange on the peak meter segment and
+the 3px rail of the lane that carries the most work; nothing else is saturated.
+
+| Group | Values |
+|---|---|
+| Light | canvas `#f5f6f8` · surface `#ffffff` · surface-2 `#f2f4f7` · ink `#0b0f14` · ink-soft `#475467` · ink-faint `#667085` · line `#e4e7ec` · line-soft `#eef0f3` · signal `#c2410c` · signal-soft `#fdf0e9` · ok `#067647` · warn `#b54708` · bad `#b42318` |
+| Dark | canvas `#0b0d10` · surface `#14171c` · surface-2 `#1a1e24` · ink `#eef0f3` · ink-soft `#a9b1bd` · ink-faint `#8b94a3` · line `#262b33` · line-soft `#1e232a` · signal `#ff8a5b` · signal-soft `#2a1a12` · ok `#5fbf84` · warn `#e0b252` · bad `#ef8078` |
+| Type | Self-hosted Geist Sans for prose and UI; Geist Mono for ids, branches, paths and counts with tabular figures. Scale 11 / 12 / 13 / 15 / 20 / 32px. Weights 400 / 500 / 600; page title 600 at `-0.02em`; no uppercase tracking, no negative tracking below 20px. |
+| Spacing | 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64px. |
+| Radius | 6px chip, 8px control, 12px panel. |
+| Elevation | One soft card shadow (`0 1px 2px / 0 1px 3px`, very low alpha); no other shadow. |
+| Motion | 150ms, reduced-motion aware. |
+
+The layout is a three-column shell at ≥1180px: a 240px lane/filter sidebar, a `minmax(0, 1fr)`
+main column, and a 320px sticky worktrees rail, with 24px gaps and a 1600px cap. Below 1180px the
+sidebar's nav groups hide and the Type/Priority filters move into the main toolbar; lane status
+stays reachable through the meter stops. At ≤640px everything stacks, padding drops to 12px, and
+the meter wraps to 3 + 2 with all five stops visible. Main content is a header, one KPI strip
+(in flight, pending merge, blocked, total), a meter panel, and one board panel with 44px lane rows
+and 40px card rows. The shared components are `wb_meter`, `wb_lane`, `wb_card`, `wb_panel`,
+`wb_rail`, `wb_toolbar`, `wb_chip`, `wb_empty` and `wb_wt_row`.
+
+Build after any class change: `npm --prefix .kilo/skills/board/ui run build`. The runtime is still
+Python standard library only, and the page still works offline because the CSS and fonts are
+served locally.

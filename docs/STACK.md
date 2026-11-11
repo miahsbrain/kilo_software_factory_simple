@@ -5,21 +5,28 @@ an agent needs. Do not guess commands.
 
 ## What the factory is made of
 
-No runtime, no package manager, no database. The factory is Markdown rules, agent definitions,
-and Python scripts that run on the standard library alone.
+No application runtime, no database. The factory is Markdown rules, agent definitions, and
+Python scripts that run on the standard library alone. The one build step is the board UI's
+Tailwind stylesheet, and it produces a committed file — the viewer itself needs no Node.
 
 | Piece | Version | Where |
 |---|---|---|
 | Python | 3.9+ | every script under `.kilo/skills/*/scripts/` |
-| Node.js | 20+ | the dev container, the Playwright MCP, the board viewer |
+| Node.js | 22 | the dev container, the Playwright MCP, the Tailwind build |
 | Playwright | the global install in the dev container | the QA capture script |
 | Chromium | `/usr/bin/chromium` in the dev container | the QA capture script |
+| Tailwind CSS | 4.3.5 (`@tailwindcss/cli`) | `.kilo/skills/board/ui/`, builds the board stylesheet |
+| Geist Sans / Geist Mono | variable woff2, SIL OFL | `.kilo/skills/board/static/fonts/` |
 
 ## Commands
 
 ```bash
 # Board viewer (read-only dashboard on port 15180)
 python3 .kilo/skills/board/scripts/board_serve.py --port 15180
+
+# Rebuild the board stylesheet after a class change (needs Node 22, not needed at runtime)
+npm --prefix .kilo/skills/board/ui run build
+# output: .kilo/skills/board/static/board.css (committed)
 
 # Show the board
 python3 .kilo/skills/board/scripts/board.py show

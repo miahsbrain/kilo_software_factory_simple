@@ -157,6 +157,16 @@ renders it as a dense, keyboard-first dashboard you can open in a browser:
 python3 .kilo/skills/board/scripts/board_serve.py --port 15180
 ```
 
+The console is styled with Tailwind CSS v4. The stylesheet is prebuilt and committed, so the
+viewer needs no Node at runtime. After changing a class, rebuild it:
+
+```bash
+npm --prefix .kilo/skills/board/ui run build   # -> .kilo/skills/board/static/board.css
+```
+
+`/gallery` renders the same `wb_` components the board uses; approve it before a screen changes.
+The runtime serves the CSS and the two self-hosted Geist fonts from `.kilo/skills/board/static/`.
+
 - An **app bar** carries the wordmark, the live refresh clock, Pause, Refresh now, and the
   system/light/dark theme and comfortable/compact density toggles.
 - A **pipeline** strip counts the active lanes; each lane button filters the cards and is the

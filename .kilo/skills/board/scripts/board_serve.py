@@ -9,12 +9,16 @@ worktrees. Everything is read fresh on every request and nothing is ever
 written: the board file and the repository are only read.
 
 Endpoints:
-    GET /                the HTML dashboard
-    GET /api/board       JSON: rows, lanes, generated_at
-    GET /api/worktrees   JSON: the list of worktrees
-    GET /health          JSON: {"ok": true}
+    GET /                     the HTML dashboard
+    GET /gallery              the component gallery (read-only)
+    GET /static/board.css     the prebuilt Tailwind stylesheet
+    GET /static/fonts/<file>  the two self-hosted Geist fonts and the licence
+    GET /api/board            JSON: rows, lanes, generated_at
+    GET /api/worktrees        JSON: the list of worktrees
+    GET /health               JSON: {"ok": true}
 
-Standard library only. Python 3.9+.
+Standard library only. Python 3.9+. The static CSS is built ahead of time by
+`.kilo/skills/board/ui`; the server only reads it.
 """
 import argparse
 import datetime
@@ -26,6 +30,7 @@ import re
 import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 LANES = ["Backlog", "Ready", "In Progress", "In Review", "Pending Merge",
          "Merged", "Blocked", "Dropped"]
@@ -65,7 +70,13 @@ BOARD_READ_HINT = (" Check that the board path (--file or docs/BOARD.md) "
 # Inline favicon: the page stays offline and makes no favicon request.
 FAVICON = ("data:image/svg+xml,"
            "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E"
-           "%3Crect width='16' height='16' rx='3' fill='%232f6feb'/%3E%3C/svg%3E")
+           "%3Crect width='16' height='16' rx='3' fill='%23c2410c'/%3E%3C/svg%3E")
+STATIC_ROOT = Path(__file__).resolve().parent.parent / "static"
+STATIC_FONT_TYPES = {
+    "geist-sans-variable.woff2": "font/woff2",
+    "geist-mono-variable.woff2": "font/woff2",
+    "OFL.txt": "text/plain; charset=utf-8",
+}
 
 
 def load_module(name, path):
@@ -183,347 +194,6 @@ def worktree_state(worktree, root):
     return entries
 
 
-CSS = """
-:root {
-  --bg: #f5f6f7;
-  --surface: #ffffff;
-  --surface-2: #fbfbfc;
-  --line: #d9dde2;
-  --line-soft: #eceef1;
-  --ink: #14171a;
-  --ink-soft: #4d545c;
-  --ink-faint: #646c75;
-  --accent: #2f6feb;
-  --accent-ink: #1f5fd6;
-  --accent-soft: #e7efff;
-  --ok: #1f7a45;
-  --warn: #8a5a00;
-  --bad: #b3261e;
-  --radius: 6px;
-  --radius-lg: 10px;
-  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s6: 24px; --s8: 32px; --s12: 48px;
-  --t-xs: 11px; --t-sm: 13px; --t-md: 15px; --t-lg: 20px; --t-xl: 28px;
-  --appbar-h: 60px;
-  --shell: 1360px;
-  --measure: 65ch;
-  --shadow: 0 1px 2px rgba(20, 23, 26, 0.06);
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0f1113;
-    --surface: #171a1d;
-    --surface-2: #1c2024;
-    --line: #2b3036;
-    --line-soft: #23282d;
-    --ink: #e9ebee;
-    --ink-soft: #a7aeb6;
-    --ink-faint: #8b939c;
-    --accent: #6f9dff;
-    --accent-ink: #6f9dff;
-    --accent-soft: #1a2740;
-    --ok: #56c58a;
-    --warn: #e0ac4c;
-    --bad: #ef8078;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0f1113;
-  --surface: #171a1d;
-  --surface-2: #1c2024;
-  --line: #2b3036;
-  --line-soft: #23282d;
-  --ink: #e9ebee;
-  --ink-soft: #a7aeb6;
-  --ink-faint: #8b939c;
-  --accent: #6f9dff;
-  --accent-ink: #6f9dff;
-  --accent-soft: #1a2740;
-  --ok: #56c58a;
-  --warn: #e0ac4c;
-  --bad: #ef8078;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-* { box-sizing: border-box; }
-[hidden] { display: none !important; }
-.sr-only {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-}
-body {
-  margin: 0; background: var(--bg); color: var(--ink);
-  font: var(--t-md)/1.5 var(--sans);
-  -webkit-font-smoothing: antialiased;
-}
-button, input, select { font: inherit; color: inherit; }
-a { color: var(--accent-ink); }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-.shell {
-  width: 100%; max-width: var(--shell); margin: 0 auto;
-  padding-left: var(--s6); padding-right: var(--s6);
-}
-
-.appbar {
-  position: sticky; top: 0; z-index: 30;
-  background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
-}
-.appbar-inner { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); min-height: 60px; }
-.brand { display: flex; align-items: center; gap: var(--s3); min-width: 0; flex: 1 1 260px; }
-.mark { width: 28px; height: 28px; flex: none; color: var(--accent); }
-.brand-text { min-width: 0; }
-.wordmark { display: block; font-size: var(--t-md); font-weight: 600; line-height: 1.2; }
-.sublabel { display: block; font-size: var(--t-xs); color: var(--ink-soft); line-height: 1.3; max-width: var(--measure); }
-.appbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
-
-.btn {
-  display: inline-flex; align-items: center; gap: var(--s1);
-  min-height: 28px; padding: 0 var(--s2); border: 1px solid var(--line);
-  background: var(--surface); color: var(--ink); border-radius: var(--radius);
-  font-size: var(--t-xs); cursor: pointer; white-space: nowrap;
-}
-.btn:hover { border-color: var(--ink-faint); }
-.btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
-.btn .caret-sm { font-size: 10px; color: var(--ink-faint); }
-
-.live { display: inline-flex; align-items: center; gap: 6px; font: var(--t-xs) var(--mono); color: var(--ink-soft); }
-.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: pulse 2s ease-in-out infinite; }
-.live.stale .live-dot { background: var(--ink-faint); animation: none; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-
-main { display: block; }
-
-.overview { padding-top: var(--s6); padding-bottom: var(--s4); border-bottom: 1px solid var(--line); }
-.headline { font-size: var(--t-xl); line-height: 1.15; margin: 0; letter-spacing: -0.02em; font-weight: 600; max-width: var(--measure); }
-.headline .num { font-family: var(--mono); }
-.headline .metric, .headline .sep, .headline-meta .metric, .headline-meta .sep { display: inline-block; }
-.headline .sep, .headline-meta .sep { margin: 0 4px; }
-.headline-meta { font-size: var(--t-sm); color: var(--ink-soft); margin: var(--s1) 0 0; max-width: var(--measure); }
-.overview-sub { color: var(--ink-soft); font-size: var(--t-sm); margin: var(--s1) 0 0; max-width: var(--measure); }
-.flow {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin-top: var(--s4); border: 1px solid var(--line); border-radius: var(--radius);
-  background: var(--surface); overflow: hidden;
-}
-.flow-stop {
-  display: flex; flex-direction: column; gap: var(--s1); text-align: left; cursor: pointer;
-  border: 0; border-left: 1px solid var(--line); border-radius: 0;
-  background: transparent; padding: var(--s3) var(--s3) var(--s2);
-}
-.flow-stop:first-child { border-left: 0; }
-.flow-stop:hover { background: var(--surface-2); }
-.flow-stop[aria-pressed="true"] { background: var(--accent-soft); }
-.flow-name { font-size: var(--t-xs); color: var(--ink-soft); }
-.flow-count { font: 600 var(--t-lg)/1 var(--mono); color: var(--ink-soft); }
-.flow-stop[data-active="true"] .flow-count { color: var(--accent-ink); }
-.flow-bar { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
-.flow-bar span { display: block; height: 100%; background: var(--ink-faint); }
-.flow-stop[data-active="true"] .flow-bar span { background: var(--accent); }
-
-.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding-top: var(--s3); padding-bottom: var(--s3); border-bottom: 1px solid var(--line); }
-.search-wrap { position: relative; display: flex; align-items: center; flex: 1 1 240px; max-width: 360px; }
-#search {
-  width: 100%; min-height: 32px; padding: var(--s1) 56px var(--s1) var(--s2);
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-  font-size: var(--t-sm);
-}
-#search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.kbd {
-  position: absolute; right: var(--s2); font: var(--t-xs) var(--mono); color: var(--ink-faint);
-  border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; pointer-events: none;
-}
-.search-clear {
-  position: absolute; right: var(--s1); width: 28px; height: 28px; display: inline-flex;
-  align-items: center; justify-content: center; border: 0; background: transparent;
-  color: var(--ink-soft); border-radius: var(--radius); cursor: pointer; font-size: var(--t-md);
-}
-.search-clear:hover { background: var(--line-soft); }
-.toolbar select {
-  min-height: 32px; padding: 0 var(--s2); background: var(--surface);
-  border: 1px solid var(--line); border-radius: var(--radius); font-size: var(--t-sm);
-}
-.result-count { font: var(--t-xs) var(--mono); color: var(--ink-soft); margin-left: auto; }
-.toolbar .btn { min-height: 32px; }
-
-.banner {
-  margin: var(--s4) 0 0; padding: var(--s3) var(--s4);
-  border: 1px solid var(--bad); border-left-width: 3px; border-radius: var(--radius);
-  color: var(--bad); background: var(--surface); font-size: var(--t-sm);
-}
-.panel-head {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s3);
-  border-bottom: 1px solid var(--line); padding-bottom: var(--s2); margin-bottom: var(--s3);
-}
-.panel-head > * { min-width: 0; }
-.panel-head h2 { font-size: var(--t-md); margin: 0; font-weight: 600; }
-.panel-head .meta { margin-left: auto; }
-.panel { margin: var(--s6) 0 0; }
-details.panel > summary {
-  list-style: none; cursor: pointer; min-height: 40px; align-items: center; border-radius: var(--radius);
-}
-details.panel > summary::-webkit-details-marker { display: none; }
-details.panel > summary::marker { content: ""; }
-details.panel > summary:hover { background: var(--line-soft); }
-.panel-title { font-size: var(--t-md); font-weight: 600; }
-
-.wt-table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
-.wt-table th {
-  text-align: left; font: 600 var(--t-xs) var(--mono); color: var(--ink-faint);
-  padding: var(--s2) var(--s3);
-  border-bottom: 1px solid var(--line); background: var(--surface-2);
-}
-.wt-table td { padding: var(--s2) var(--s3); border-bottom: 1px solid var(--line-soft); vertical-align: top; }
-.wt-table tr:last-child td { border-bottom: 0; }
-.wt-table .num { font-family: var(--mono); text-align: right; width: 64px; }
-.wt-table .wt-branch { font-family: var(--mono); font-weight: 500; overflow-wrap: anywhere; }
-.wt-table .path { font-family: var(--mono); font-size: var(--t-xs); color: var(--ink-faint); overflow-wrap: anywhere; }
-.wt-table tr.is-main td { background: var(--surface-2); }
-.tag {
-  display: inline-block; font-size: var(--t-xs); font-family: var(--mono);
-  border: 1px solid var(--line); border-radius: 4px; padding: 0 var(--s2); color: var(--ink-soft);
-}
-.tag.main { border-color: var(--ink-faint); color: var(--ink); }
-.tag.dirty { border-color: var(--bad); color: var(--bad); }
-.tag.clean { border-color: var(--ok); color: var(--ok); }
-
-.lane-stack { margin: var(--s6) 0 var(--s8); display: flex; flex-direction: column; gap: var(--s2); }
-.lane {
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
-  transition: border-color 150ms ease;
-}
-.lane[data-lane="Ready"] > summary { --rail: var(--ink-faint); }
-.lane[data-lane="In Progress"] > summary { --rail: var(--ink); }
-.lane[data-lane="In Review"] > summary { --rail: var(--ink-soft); }
-.lane[data-lane="Pending Merge"] > summary { --rail: var(--warn); }
-.lane[data-lane="Blocked"] > summary { --rail: var(--bad); }
-.lane[data-lane="Merged"] > summary { --rail: var(--ok); }
-.lane > summary {
-  position: sticky; top: var(--appbar-h); z-index: 5;
-  display: flex; align-items: center; gap: var(--s2);
-  padding: var(--s2) var(--s4) var(--s2) var(--s3); cursor: pointer; min-height: 44px;
-  list-style: none; border-radius: var(--radius-lg);
-  border-left: 4px solid var(--rail, var(--line)); background: var(--surface);
-}
-.lane > summary::-webkit-details-marker { display: none; }
-.lane > summary::marker { content: ""; }
-.lane > summary:hover { background: var(--line-soft); }
-.caret { color: var(--ink-faint); flex: none; font-size: var(--t-xs); transition: transform 150ms ease; }
-.lane[open] > summary .caret, .wt-panel[open] > summary .caret { transform: rotate(90deg); }
-.lane-name { font-size: var(--t-sm); font-weight: 600; color: var(--ink); }
-.count {
-  font-family: var(--mono); font-size: var(--t-xs); color: var(--ink-soft);
-  border: 1px solid var(--line); border-radius: 4px; padding: 0 var(--s2);
-}
-.lane-desc { font-size: var(--t-xs); color: var(--ink-faint); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lane-body { display: flex; flex-direction: column; gap: var(--s2); padding: 0 var(--s3) var(--s3); }
-.card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); transition: border-color 150ms ease; }
-.card.extra { display: none; }
-.lane-body.all .card.extra { display: block; }
-.lane-body.searching .card.extra { display: block; }
-.card > summary {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2);
-  padding: var(--s2) var(--s3); cursor: pointer; min-height: 36px;
-  list-style: none; border-radius: var(--radius);
-}
-.card > summary::-webkit-details-marker { display: none; }
-.card > summary::marker { content: ""; }
-.card > summary:hover { background: var(--line-soft); }
-.card-caret { margin-left: auto; color: var(--ink-faint); font-size: var(--t-xs); transition: transform 150ms ease; flex: none; }
-.card[open] > summary .card-caret { transform: rotate(90deg); }
-.card.selected { border-color: var(--accent); }
-.card.selected > summary { background: var(--accent-soft); outline: 2px solid var(--accent); outline-offset: -2px; }
-.card-id { font-family: var(--mono); font-size: var(--t-xs); font-weight: 600; color: var(--accent-ink); }
-.card-task { font-size: var(--t-sm); line-height: 1.35; margin: 0; font-weight: 500; flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
-.chip {
-  font-size: var(--t-xs); font-family: var(--mono); border-radius: 4px;
-  padding: 1px var(--s2); border: 1px solid var(--line); color: var(--ink-soft); white-space: nowrap;
-}
-.chip.prio { border-color: var(--ink-faint); color: var(--ink); }
-.chip.risk { display: inline-flex; align-items: center; gap: 6px; }
-.chip.risk.low { border-color: var(--ok); }
-.chip.risk.medium { border-color: var(--warn); }
-.chip.risk.high { border-color: var(--bad); }
-.risk-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex: none; }
-.chip.risk.low .risk-dot { background: var(--ok); }
-.chip.risk.medium .risk-dot { background: var(--warn); }
-.chip.risk.high .risk-dot { background: var(--bad); }
-.card-detail { padding: 0 var(--s3) var(--s3); }
-.card-kv { display: grid; grid-template-columns: auto 1fr; gap: var(--s1) var(--s3); font-size: var(--t-xs); margin: var(--s2) 0 0; }
-.card-kv dt { color: var(--ink-faint); font-family: var(--mono); }
-.card-kv dd { margin: 0; color: var(--ink-soft); font-family: var(--mono); overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
-.kv-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
-.copy {
-  font: var(--t-xs) var(--mono); min-height: 24px; padding: 0 var(--s2); cursor: pointer;
-  border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft); border-radius: 4px;
-}
-.copy:hover { border-color: var(--accent); color: var(--accent-ink); }
-.notes { list-style: none; margin: var(--s2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); }
-.note { display: flex; align-items: flex-start; gap: var(--s2); font-size: var(--t-xs); color: var(--ink-soft); line-height: 1.45; }
-.note-box {
-  flex: none; width: 14px; height: 14px; margin-top: 1px; border: 1px solid var(--ink-faint);
-  border-radius: 3px; display: inline-flex; align-items: center; justify-content: center;
-  font-size: 10px; color: var(--ok);
-}
-.note-check.done .note-box { border-color: var(--ok); }
-.note-text { min-width: 0; overflow-wrap: anywhere; }
-.note-proof-text { display: block; margin-top: 1px; font: var(--t-xs) var(--mono); color: var(--ink-faint); }
-.note-proof { font-family: var(--mono); color: var(--ink-faint); }
-.note-free { color: var(--ink-soft); }
-.more {
-  align-self: flex-start; font: var(--t-xs)/1.4 var(--mono); color: var(--accent-ink);
-  background: transparent; border: 1px solid var(--line); border-radius: var(--radius);
-  padding: var(--s1) var(--s3); min-height: 28px; cursor: pointer;
-}
-.more:hover { border-color: var(--accent); }
-.empty { font-size: var(--t-xs); color: var(--ink-faint); padding: var(--s2) var(--s1); }
-footer { padding-top: var(--s6); padding-bottom: var(--s8); color: var(--ink-faint); font-size: var(--t-xs); font-family: var(--mono); }
-.hidden { display: none !important; }
-.filtered { display: none !important; }
-.lane-filtered { display: none !important; }
-
-body.compact .lane-body { gap: var(--s1); padding-bottom: var(--s2); }
-body.compact .card > summary { min-height: 28px; padding: 2px var(--s2); }
-body.compact .lane > summary { min-height: 36px; padding-top: var(--s1); padding-bottom: var(--s1); }
-body.compact .card-task { font-size: var(--t-xs); }
-body.compact .note { line-height: 1.35; }
-
-@media (max-width: 760px) {
-  .lane-desc { display: none; }
-}
-@media (max-width: 640px) {
-  .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: hidden; }
-  .flow-stop { padding: var(--s2) var(--s1); }
-  .flow-name { line-height: 1.2; min-height: 2.4em; }
-  .wt-table thead { display: none; }
-  .wt-table, .wt-table tbody, .wt-table tr, .wt-table td { display: block; width: 100%; }
-  .wt-table tr { border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: var(--s2); background: var(--surface); }
-  .wt-table td { border: 0; padding: var(--s1) var(--s3); display: flex; gap: var(--s2); }
-  .wt-table td::before { content: attr(data-label); font: var(--t-xs) var(--mono); color: var(--ink-faint); flex: 0 0 72px; }
-  .wt-table .num { text-align: left; width: auto; }
-}
-@media (max-width: 480px) {
-  :root { --appbar-h: 56px; }
-  .appbar { position: static; }
-  .lane > summary { top: 0; }
-  .btn, .search-clear, .copy, .more, .card > summary, .lane > summary { min-height: 44px; }
-  .search-clear { width: 44px; }
-  .shell { padding-left: var(--s3); padding-right: var(--s3); }
-  .overview { padding-top: var(--s4); padding-bottom: var(--s3); }
-  .headline { font-size: var(--t-lg); }
-  .toolbar { padding-top: var(--s2); padding-bottom: var(--s2); }
-  .banner { margin: var(--s3) 0 0; }
-  .panel { margin: var(--s4) 0 0; }
-  .lane-stack { margin: var(--s4) 0 var(--s6); }
-  footer { padding-top: var(--s6); padding-bottom: var(--s6); }
-  .result-count { margin-left: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
-"""
-
 JS = """
 (function () {
   var KEY = "board-dashboard-state";
@@ -548,15 +218,15 @@ JS = """
   function has(obj, key) { return Object.prototype.hasOwnProperty.call(obj, key); }
   function all(selector, root) { return Array.prototype.slice.call((root || document).querySelectorAll(selector)); }
 
-  var lanes = all(".lane");
-  var cards = all(".card");
-  var boards = all("section.board");
+  var lanes = all(".wb-lane");
+  var cards = all(".wb-card");
+  var boards = all("[data-board-panel]");
 
   lanes.forEach(function (lane) {
     var key = laneKey(lane);
     if (has(state.lanes, key)) { lane.open = !!state.lanes[key]; }
     var body = lane.querySelector(".lane-body");
-    var button = lane.querySelector(".more");
+    var button = lane.querySelector(".wb-more");
     if (button && body) {
       if (state.more[key]) { body.classList.add("all"); }
       var expanded = body.classList.contains("all");
@@ -585,9 +255,9 @@ JS = """
     });
   });
 
-  all(".lane .more").forEach(function (button) {
+  all(".wb-lane .wb-more").forEach(function (button) {
     button.addEventListener("click", function () {
-      var lane = button.closest(".lane");
+      var lane = button.closest(".wb-lane");
       var body = lane ? lane.querySelector(".lane-body") : null;
       if (!body) { return; }
       var expanded = body.classList.toggle("all");
@@ -601,26 +271,28 @@ JS = """
   });
 
   var search = document.getElementById("search");
-  var typeSel = document.getElementById("type-filter");
-  var prioSel = document.getElementById("priority-filter");
+  var typeSels = all("#type-filter, #main-type-filter");
+  var prioSels = all("#priority-filter, #main-priority-filter");
+  var typeSel = typeSels[0] || null;
+  var prioSel = prioSels[0] || null;
   var resultCount = document.getElementById("result-count");
   var resetBtn = document.getElementById("reset");
   var searchClear = document.getElementById("search-clear");
-  var kbd = document.querySelector(".kbd");
-  var pipes = all(".flow-stop");
+  var kbd = document.querySelector(".wb-kbd");
+  var pipes = all("[data-status-filter]");
   var themeBtn = document.getElementById("theme-toggle");
   var densityBtn = document.getElementById("density-toggle");
   var pauseBtn = document.getElementById("pause");
-  var refreshBtn = document.getElementById("refresh-now");
-  var live = document.querySelector(".live");
-  var liveText = document.querySelector(".live-text");
+  var refreshBtn = document.getElementById("refresh");
+  var live = document.querySelector(".wb-live");
+  var liveText = document.querySelector(".wb-live-text");
   var statusFilter = "";
   var selected = null;
 
   var appbar = document.querySelector(".appbar");
   function measureAppbar() {
-    if (!appbar) { return; }
-    document.documentElement.style.setProperty("--appbar-h", appbar.offsetHeight + "px");
+    document.documentElement.style.setProperty(
+      "--appbar-h", appbar ? appbar.offsetHeight + "px" : "0px");
   }
   measureAppbar();
   window.addEventListener("resize", measureAppbar);
@@ -689,7 +361,7 @@ JS = """
       var expanded = body ? body.classList.contains("all") : true;
       var laneShown = 0;
       var laneMatches = 0;
-      var laneCards = all(".card", lane);
+      var laneCards = all(".wb-card", lane);
       laneCards.forEach(function (card) {
         var hit = !laneHidden &&
           (!f.q || card.textContent.toLowerCase().indexOf(f.q) !== -1) &&
@@ -703,7 +375,7 @@ JS = """
         }
       });
 
-      var empty = lane.querySelector(".empty");
+      var empty = lane.querySelector(".wb-empty");
       if (empty) {
         if (laneHidden) {
           empty.classList.add("hidden");
@@ -717,7 +389,7 @@ JS = """
         }
       }
 
-      var count = lane.querySelector(".count");
+      var count = lane.querySelector(".wb-lane-count");
       if (count) {
         count.textContent = anyActive
           ? laneShown + "/" + laneCards.length
@@ -728,7 +400,7 @@ JS = """
     boards.forEach(function (board) {
       var visible = true;
       if (f.status) {
-        visible = all(".lane", board).some(function (lane) {
+        visible = all(".wb-lane", board).some(function (lane) {
           return lane.getAttribute("data-lane") === f.status;
         });
       }
@@ -757,7 +429,7 @@ JS = """
     if (selected) { selected.classList.remove("selected"); }
     selected = card;
     card.classList.add("selected");
-    var lane = card.closest(".lane");
+    var lane = card.closest(".wb-lane");
     if (lane && !lane.open) {
       lane.open = true;
       state.lanes[laneKey(lane)] = true;
@@ -786,10 +458,14 @@ JS = """
     setSelected(list[index]);
   }
 
+  function syncSelects(selects, value) {
+    selects.forEach(function (sel) { sel.value = value; });
+  }
+
   function clearFilters() {
     if (search) { search.value = ""; }
-    if (typeSel) { typeSel.value = ""; }
-    if (prioSel) { prioSel.value = ""; }
+    syncSelects(typeSels, "");
+    syncSelects(prioSels, "");
     statusFilter = "";
     deselect();
     apply();
@@ -804,8 +480,16 @@ JS = """
       apply();
     });
   }
-  if (typeSel) { typeSel.addEventListener("change", apply); }
-  if (prioSel) { prioSel.addEventListener("change", apply); }
+  function bindSelectSync(selects) {
+    selects.forEach(function (sel) {
+      sel.addEventListener("change", function () {
+        syncSelects(selects, sel.value);
+        apply();
+      });
+    });
+  }
+  bindSelectSync(typeSels);
+  bindSelectSync(prioSels);
   if (resetBtn) { resetBtn.addEventListener("click", clearFilters); }
 
   pipes.forEach(function (pipe) {
@@ -891,13 +575,13 @@ JS = """
   function boardIdle() {
     if (paused) { return false; }
     if (document.visibilityState !== "visible") { return false; }
-    if (document.querySelector(".card[open]")) { return false; }
+    if (document.querySelector(".wb-card[open]")) { return false; }
     if (search && search.value.trim()) { return false; }
     if (typeSel && typeSel.value) { return false; }
     if (prioSel && prioSel.value) { return false; }
     if (all(".lane-body.searching").length) { return false; }
     var active = document.activeElement;
-    if (active && active !== document.body && active.closest && active.closest(".shell")) {
+    if (active && active !== document.body && active.closest && active.closest(".wb-layout")) {
       return false;
     }
     return true;
@@ -936,8 +620,8 @@ JS = """
   try {
     var params = new URLSearchParams(window.location.search);
     if (search && params.get("q")) { search.value = params.get("q"); }
-    if (typeSel && params.get("type")) { typeSel.value = params.get("type"); }
-    if (prioSel && params.get("priority")) { prioSel.value = params.get("priority"); }
+    if (params.get("type")) { syncSelects(typeSels, params.get("type")); }
+    if (params.get("priority")) { syncSelects(prioSels, params.get("priority")); }
     if (params.get("status")) { statusFilter = params.get("status"); }
     applyTheme(state.theme);
     applyDensity(params.get("density") === "compact" ? "compact" : state.density);
@@ -947,6 +631,98 @@ JS = """
   }
 
   apply();
+})();
+"""
+
+GALLERY_JS = """
+(function () {
+  var KEY = "board-dashboard-state";
+  var state = {theme: "system", density: "comfortable"};
+  try {
+    var saved = JSON.parse(window.localStorage.getItem(KEY) || "{}");
+    if (saved && typeof saved === "object") {
+      if (saved.theme) { state.theme = saved.theme; }
+      if (saved.density) { state.density = saved.density; }
+    }
+  } catch (e) { /* storage is unavailable; the server defaults are used */ }
+
+  function save() {
+    try { window.localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+  function each(selector, fn) {
+    Array.prototype.forEach.call(document.querySelectorAll(selector), fn);
+  }
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    var label = theme === "system" ? "System" : (theme === "dark" ? "Dark" : "Light");
+    each("[data-wb-theme]", function (button) {
+      button.textContent = label;
+      button.setAttribute("aria-label", "Colour theme: " + label + " (click to change)");
+    });
+    state.theme = theme;
+  }
+  function applyDensity(density) {
+    var compact = density === "compact";
+    document.body.classList.toggle("compact", compact);
+    each("[data-wb-density]", function (button) {
+      button.textContent = compact ? "Compact" : "Comfortable";
+      button.setAttribute("aria-pressed", compact ? "true" : "false");
+      button.setAttribute("aria-label", "Density: " + (compact ? "compact" : "comfortable") + " (click to change)");
+    });
+    state.density = compact ? "compact" : "comfortable";
+  }
+  each("[data-wb-theme]", function (button) {
+    button.addEventListener("click", function () {
+      var next = state.theme === "system" ? "light" : (state.theme === "light" ? "dark" : "system");
+      applyTheme(next);
+      save();
+    });
+  });
+  each("[data-wb-density]", function (button) {
+    button.addEventListener("click", function () {
+      applyDensity(state.density === "compact" ? "comfortable" : "compact");
+      save();
+    });
+  });
+  each("[data-status-filter]", function (button) {
+    button.addEventListener("click", function () {
+      var lane = button.getAttribute("data-status-filter");
+      var next = button.getAttribute("aria-pressed") !== "true";
+      each("[data-status-filter]", function (peer) {
+        if (peer.getAttribute("data-status-filter") === lane) {
+          peer.setAttribute("aria-pressed", next ? "true" : "false");
+        }
+      });
+    });
+  });
+  each("[data-copy]", function (button) {
+    button.addEventListener("click", function () {
+      var value = button.getAttribute("data-copy") || "";
+      var done = function () {
+        button.textContent = "copied";
+        window.setTimeout(function () { button.textContent = "copy"; }, 1200);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(done, function () {});
+      }
+    });
+  });
+  var search = document.getElementById("search");
+  document.addEventListener("keydown", function (event) {
+    var target = event.target;
+    var typing = target && (target.tagName === "INPUT" || target.tagName === "SELECT" ||
+      target.tagName === "TEXTAREA" || target.isContentEditable);
+    if (event.key === "/" && !typing && search) {
+      event.preventDefault();
+      search.focus();
+      search.select();
+    } else if (event.key === "Escape" && search && document.activeElement === search) {
+      search.value = "";
+      search.blur();
+    }
+  });
+  applyTheme(state.theme);
+  applyDensity(state.density);
 })();
 """
 
@@ -1122,73 +898,227 @@ def render_worktrees(worktrees):
     ) % rows
 
 
+def wb_meter(counts):
+    """One segmented flow meter: a single track plus five clickable stops."""
+    values = {lane: int(counts.get(lane, 0) or 0) for lane in ACTIVE_LANES}
+    peak = max(values.values()) if values else 0
+    segments = "".join(
+        '<span class="wb-meter-seg" style="flex-grow: %d" data-peak="%s"></span>'
+        % (count, "true" if peak and count == peak else "false")
+        for count in values.values() if count > 0
+    )
+    stops = "".join(
+        '<button type="button" class="wb-meter-stop" data-status-filter="%s" aria-pressed="false"%s%s>'
+        '<span class="wb-meter-name">%s</span>'
+        '<span class="wb-meter-count">%d</span></button>'
+        % (esc(lane),
+           ' data-peak="true"' if peak and count == peak else "",
+           ' data-zero="true"' if count == 0 else "",
+           esc(lane), count)
+        for lane, count in values.items()
+    )
+    return (
+        '<div class="wb-meter" role="group" aria-label="Work in flight by lane">'
+        '<div class="wb-meter-track" aria-hidden="true">%s</div>'
+        '<div class="wb-meter-stops">%s</div></div>'
+    ) % (segments, stops)
+
+
+def wb_lane(lane, count, description, cards_html, open=False, signal=False, board=""):
+    """A 44px lane summary on the continuous board surface."""
+    return (
+        '<details class="wb-lane%s" data-board="%s" data-lane="%s"%s>'
+        '<summary>'
+        '<span class="wb-lane-rail" aria-hidden="true"></span>'
+        '<span class="wb-lane-name">%s</span>'
+        '<span class="wb-lane-count">%d</span>'
+        '<span class="wb-lane-desc">%s</span>'
+        '<span class="wb-caret" aria-hidden="true">&#9656;</span>'
+        '</summary>'
+        '<div class="wb-lane-body lane-body">%s</div>'
+        '</details>'
+    ) % (
+        " wb-lane--signal" if signal else "",
+        esc(board),
+        esc(lane),
+        " open" if open else "",
+        esc(lane),
+        count,
+        esc(description),
+        cards_html,
+    )
+
+
+def wb_chip(kind, text):
+    dot = '<span class="wb-dot" aria-hidden="true"></span>' if kind.startswith("risk") else ""
+    return '<span class="wb-chip wb-chip--%s">%s%s</span>' % (esc(kind), dot, esc(text))
+
+
+def wb_empty(lane, hidden=False):
+    text = EMPTY_TEXT.get(lane, "Nothing in this lane.")
+    return '<p class="wb-empty%s" data-empty-default="%s">%s</p>' % (
+        " hidden" if hidden else "", esc(text), esc(text))
+
+
+def wb_card(card):
+    """A 44px card row; the expanded body reuses render_notes and row_fingerprint."""
+    card_id = clean_text(card.get("ID"))
+    task = clean_text(card.get("Task"))
+    kind = clean_text(card.get("Type"))
+    priority = clean_text(card.get("Priority"))
+    risk_text = clean_text(card.get("Risk"))
+    level = risk_class(risk_text)
+    risk_word = level if level else RISK_EMOJI.sub("", risk_text).strip()
+    blocked = clean_text(card.get("Blocked by"))
+    if blocked in ("-", "- None.", "", "None."):
+        blocked = "none"
+    branch = clean_text(card.get("Branch/Worktree"))
+    if branch in ("-", ""):
+        branch = ""
+    fingerprint = row_fingerprint(card.get("Notes") or "")
+    kv = ["<dt>Blocked by</dt><dd>%s</dd>" % esc(blocked)]
+    if branch:
+        name = branch_name(branch)
+        copy = ""
+        if name:
+            copy = (
+                '<button type="button" class="wb-copy" data-copy="%s"'
+                ' aria-label="Copy branch %s">copy</button>'
+            ) % (esc(name), esc(name))
+        kv.append(
+            '<dt>Branch</dt><dd><span class="wb-kv-line">%s%s</span></dd>'
+            % (esc(branch), copy)
+        )
+    if fingerprint:
+        kv.append("<dt>Fingerprint</dt><dd>%s</dd>" % esc(fingerprint))
+    detail = '<dl class="wb-card-kv">%s</dl>' % "".join(kv)
+    notes_html = render_notes(str(card.get("Notes raw", "")).strip())
+    if notes_html:
+        detail += notes_html
+    chips = (
+        wb_chip("type", kind)
+        + wb_chip("prio", priority)
+        + wb_chip("risk-" + (level or "unknown"), risk_word)
+    )
+    return (
+        '<details class="wb-card%s" data-board="%s" data-lane="%s" data-card="%s"'
+        ' data-type="%s" data-priority="%s"%s>'
+        '<summary>'
+        '<span class="wb-card-id">%s</span>'
+        '<span class="wb-card-task">%s</span>'
+        '%s'
+        '<span class="wb-caret" aria-hidden="true">&#9656;</span>'
+        '</summary>'
+        '<div class="wb-card-detail">%s</div>'
+        '</details>'
+    ) % (
+        " extra" if card.get("extra") else "",
+        esc(card.get("board", "")),
+        esc(card.get("lane", "")),
+        esc(card_id),
+        esc(kind),
+        esc(priority),
+        " open" if card.get("open") else "",
+        esc(card_id),
+        esc(task),
+        chips,
+        detail,
+    )
+
+
+def wb_panel(title, meta, body_html, attrs=""):
+    """A 12px, hairline, soft-shadow dashboard panel with a 40px header."""
+    return (
+        '<section class="wb-panel"%s>'
+        '<div class="wb-panel-head"><h2 class="wb-panel-title">%s</h2>'
+        '<span class="wb-panel-meta">%s</span></div>'
+        '%s</section>'
+    ) % (attrs, esc(title), esc(meta), body_html)
+
+
+def wb_rail(title, meta, body_html):
+    """The sticky worktrees panel."""
+    return (
+        '<aside class="wb-rail">'
+        '<div class="wb-rail-head"><h2 class="wb-rail-title">%s</h2>'
+        '<span class="wb-rail-meta">%s</span></div>'
+        '<div class="wb-rail-body">%s</div>'
+        '</aside>'
+    ) % (esc(title), esc(meta), body_html)
+
+
+def wb_filter_selects(prefix, visible_labels=False):
+    """Type and priority selects; `prefix` keeps sidebar and toolbar ids unique."""
+    types = ("Feature", "Fix", "Chore", "Docs", "Research")
+    priorities = ("P1", "P2", "P3", "P4")
+    type_options = '<option value="">All types</option>' + "".join(
+        '<option value="%s">%s</option>' % (esc(t), esc(t)) for t in types)
+    prio_options = '<option value="">All priorities</option>' + "".join(
+        '<option value="%s">%s</option>' % (esc(p), esc(p)) for p in priorities)
+    type_id = ("%s-type-filter" % prefix) if prefix else "type-filter"
+    prio_id = ("%s-priority-filter" % prefix) if prefix else "priority-filter"
+    type_label = "Type" if visible_labels else "Filter by type"
+    prio_label = "Priority" if visible_labels else "Filter by priority"
+    label_class = "wb-field-label" if visible_labels else "sr-only"
+    return (
+        '<div class="wb-field"><label class="%s" for="%s">%s</label>'
+        '<span class="wb-select-wrap"><select id="%s" class="wb-select">%s</select></span></div>'
+        '<div class="wb-field"><label class="%s" for="%s">%s</label>'
+        '<span class="wb-select-wrap"><select id="%s" class="wb-select">%s</select></span></div>'
+    ) % (
+        label_class, esc(type_id), esc(type_label), esc(type_id), type_options,
+        label_class, esc(prio_id), esc(prio_label), esc(prio_id), prio_options,
+    )
+
+
+def wb_toolbar(total=0):
+    return (
+        '<div class="wb-toolbar" role="search">'
+        '<div class="wb-search">'
+        '<label class="sr-only" for="search">Search cards</label>'
+        '<input id="search" type="search" placeholder="Search id, task, branch"'
+        ' autocomplete="off" spellcheck="false">'
+        '<button type="button" id="search-clear" class="wb-search-clear"'
+        ' aria-label="Clear search" hidden>&times;</button>'
+        '<kbd class="wb-kbd" aria-hidden="true">/</kbd>'
+        '</div>'
+        '<div class="wb-toolbar-filters">%s</div>'
+        '<span id="result-count" class="wb-result" aria-live="polite">showing %d of %d</span>'
+        '<button type="button" id="reset" class="wb-btn" hidden>Reset</button>'
+        '</div>'
+    ) % (wb_filter_selects("main"), total, total)
+
+
+def wb_wt_row(worktree):
+    tags = []
+    if worktree["main"]:
+        tags.append(wb_chip("main", "main"))
+    tags.append(wb_chip("dirty", "dirty") if worktree["dirty"] else wb_chip("clean", "clean"))
+    ahead = worktree["ahead"] if worktree["ahead"] is not None else "?"
+    behind = worktree["behind"] if worktree["behind"] is not None else "?"
+    return (
+        '<div class="wb-wt">'
+        '<div class="wb-wt-top">'
+        '<span class="wb-wt-branch">%s</span>%s'
+        '<span class="wb-wt-figs">'
+        '<span aria-label="ahead %s">+%s</span>'
+        '<span aria-label="behind %s">-%s</span>'
+        '</span></div>'
+        '<span class="wb-wt-path">%s</span>'
+        '</div>'
+    ) % (
+        esc(worktree["branch"]),
+        " ".join(tags),
+        esc(ahead), esc(ahead),
+        esc(behind), esc(behind),
+        esc(worktree["path"]),
+    )
+
+
 def row_fingerprint(notes):
     """The fingerprint carried in a row's Notes cell, or an empty string."""
     match = re.search(r"\bfp=([^\s|·]+\|[^\s|·]+\|[^\s|·]+\|[^\s|·]+)", clean_text(notes))
     return match.group(1) if match else ""
-
-
-def render_card(row, board_label, lane, extra=False):
-    blocked = clean_text(row["Blocked by"])
-    if blocked in ("-", "- None.", "", "None."):
-        blocked = "none"
-    branch = clean_text(row["Branch/Worktree"])
-    if branch.strip() in ("-", ""):
-        branch = ""
-    branch_parts = [clean_text(part) for part in branch.split("·") if clean_text(part)]
-    kv = ""
-    if blocked:
-        kv += "<dt>blocked</dt><dd>%s</dd>" % esc(blocked)
-    if branch_parts:
-        lines = []
-        for part in branch_parts:
-            name = branch_name(part)
-            copy = ""
-            if name:
-                copy = (
-                    '<button type="button" class="copy" data-copy="%s"'
-                    ' aria-label="Copy branch %s">copy</button>'
-                ) % (esc(name), esc(name))
-            lines.append(
-                '<span class="kv-line">%s%s</span>' % (esc_path(part), copy))
-        kv += "<dt>worktree</dt><dd>%s</dd>" % "".join(lines)
-    fingerprint = row_fingerprint(row["Notes"])
-    if fingerprint:
-        kv += "<dt>fingerprint</dt><dd>%s</dd>" % esc(fingerprint)
-    notes = str(row.get("Notes raw", "")).strip()
-    detail = ""
-    if kv:
-        detail += '<dl class="card-kv">%s</dl>' % kv
-    notes_html = render_notes(notes)
-    if notes_html:
-        detail += notes_html
-    return (
-        '<details class="card%s" data-board="%s" data-lane="%s" data-card="%s"'
-        ' data-type="%s" data-priority="%s">'
-        '<summary>'
-        '<span class="card-id">%s</span>'
-        '<span class="card-task">%s</span>'
-        '<span class="chip type">%s</span>'
-        '<span class="chip prio">%s</span>'
-        '%s'
-        '<span class="card-caret" aria-hidden="true">&#9656;</span>'
-        '</summary>'
-        '<div class="card-detail">%s</div>'
-        '</details>'
-    ) % (
-        " extra" if extra else "",
-        esc(board_label),
-        esc(lane),
-        esc(row["ID"]),
-        esc(clean_text(row["Type"])),
-        esc(clean_text(row["Priority"])),
-        esc(row["ID"]),
-        esc(clean_text(row["Task"])),
-        esc(clean_text(row["Type"])),
-        esc(clean_text(row["Priority"])),
-        render_risk(row["Risk"]),
-        detail,
-    )
 
 
 def lane_open_by_default(lane, card_count):
@@ -1198,74 +1128,81 @@ def lane_open_by_default(lane, card_count):
     return lane not in COLLAPSED_BY_DEFAULT
 
 
-def render_lane(lane, rows, board_label):
+def wb_lane_filters(counts):
+    """Sidebar lane rows; the meter stops reuse the same data attribute."""
+    return "".join(
+        '<button type="button" class="wb-lane-filter" data-status-filter="%s" aria-pressed="false">'
+        '<span class="wb-lane-filter-name">%s</span>'
+        '<span class="wb-lane-filter-count">%d</span></button>'
+        % (esc(lane), esc(lane), int(counts.get(lane, 0) or 0))
+        for lane in ACTIVE_LANES
+    )
+
+
+def wb_row_card(row, board_label, lane, extra=False):
+    """Adapt a board row to the shared wb_card component."""
+    card = dict(row)
+    card.update({"board": board_label, "lane": lane, "extra": extra})
+    return wb_card(card)
+
+
+def render_board_lane(lane, rows, board_label, signal=False):
     lane_rows = [row for row in rows if row["Status"] == lane]
     preview = lane_rows
     extra = []
     if lane == "Merged" and len(lane_rows) > MERGED_PREVIEW:
         preview = lane_rows[-MERGED_PREVIEW:]
         extra = lane_rows[:-MERGED_PREVIEW]
-    cards = [render_card(row, board_label, lane, extra=True) for row in extra]
-    cards += [render_card(row, board_label, lane) for row in preview]
+    cards = [wb_row_card(row, board_label, lane, extra=True) for row in extra]
+    cards += [wb_row_card(row, board_label, lane) for row in preview]
     more = ""
     if extra:
         more = (
-            '<button type="button" class="more" aria-expanded="false"'
+            '<button type="button" class="wb-more" aria-expanded="false"'
             ' data-label-expand="Show all %d" data-label-collapse="Show only the last %d">'
             'Show all %d</button>'
         ) % (len(lane_rows), MERGED_PREVIEW, len(lane_rows))
-    body = "".join(cards)
-    empty_text = EMPTY_TEXT.get(lane, "Nothing in this lane.")
-    body += (
-        '<p class="empty%s" data-empty-default="%s">%s</p>'
-    ) % (" hidden" if cards else "", esc(empty_text), esc(empty_text))
-    open_attr = " open" if lane_open_by_default(lane, len(lane_rows)) else ""
-    return (
-        '<details class="lane" data-board="%s" data-lane="%s"%s>'
-        '<summary>'
-        '<span class="caret" aria-hidden="true">&#9656;</span>'
-        '<span class="lane-name">%s</span>'
-        '<span class="count">%d</span>'
-        '<span class="lane-desc">%s</span>'
-        '</summary>'
-        '<div class="lane-body">%s%s</div>'
-        '</details>'
-    ) % (
-        esc(board_label),
-        esc(lane),
-        open_attr,
-        esc(lane),
+    body = "".join(cards) + wb_empty(lane, hidden=bool(cards)) + more
+    return wb_lane(
+        lane,
         len(lane_rows),
-        esc(LANE_DESCRIPTION.get(lane, "")),
+        LANE_DESCRIPTION.get(lane, ""),
         body,
-        more,
+        open=lane_open_by_default(lane, len(lane_rows)),
+        signal=signal,
+        board=board_label,
     )
 
 
-def render_board(entry):
-    """One board: its heading and every lane."""
+def board_signal_lane(counts):
+    peak = max((int(counts.get(lane, 0) or 0) for lane in ACTIVE_LANES), default=0)
+    if peak <= 0:
+        return None
+    for lane in ACTIVE_LANES:
+        if int(counts.get(lane, 0) or 0) == peak:
+            return lane
+    return None
+
+
+def render_board_panel(entry, toolbar_html=""):
+    """A board panel: its toolbar, path, banner and every lane."""
     rows = entry["rows"]
-    counts = entry["counts"]
+    signal = board_signal_lane(entry["counts"])
+    lanes_html = "".join(
+        render_board_lane(lane, rows, entry["label"], signal=(lane == signal))
+        for lane in LANE_ORDER
+    )
+    path = '<p class="wb-board-path" title="%s">%s</p>' % (
+        esc(entry["path"]), esc_path(entry["path"]))
     banner = ""
     if entry.get("error"):
-        banner = '<p class="banner">%s</p>' % esc(entry["error"])
-    lanes_html = "\n".join(render_lane(lane, rows, entry["label"]) for lane in LANE_ORDER)
-    return (
-        '<section class="board shell" data-board="%s">'
-        '<div class="panel-head"><h2>%s board</h2>'
-        '<span class="meta">%d card(s) &middot; %s</span></div>'
-        '<p class="meta board-path" title="%s">%s</p>%s'
-        '<div class="lane-stack">%s</div>'
-        '</section>'
-    ) % (
-        esc(entry["label"]),
-        esc(entry["label"]),
-        len(rows),
-        esc(", ".join("%s %d" % (lane, counts.get(lane, 0)) for lane in LANE_ORDER)),
-        esc(entry["path"]),
-        esc_path(entry["path"]),
-        banner,
-        lanes_html,
+        banner = '<p class="wb-banner" role="alert">%s</p>' % esc(entry["error"])
+    body = toolbar_html + path + banner + '<div class="wb-lanes">%s</div>' % lanes_html
+    return wb_panel(
+        "%s board" % entry["label"],
+        "%d cards" % len(rows),
+        body,
+        attrs=' data-board-panel="%s"' % esc(entry["label"]),
     )
 
 
@@ -1286,146 +1223,388 @@ def last_merged_id(boards):
     return last
 
 
-def render_pipeline(counts):
-    peak = max(counts.values()) or 1
-    active = {lane for lane in ACTIVE_LANES if peak > 0 and counts.get(lane, 0) == peak}
-    parts = []
-    for lane in ACTIVE_LANES:
-        count = counts.get(lane, 0)
-        width = int(round(count * 100 / peak)) if count else 0
-        button = (
-            '<button type="button" class="flow-stop" data-status-filter="%s" aria-pressed="false"%s>'
-            '<span class="flow-name">%s</span>'
-            '<span class="flow-count">%d</span>'
-            '<span class="flow-bar" aria-hidden="true">'
-            '<span style="width: %d%%"></span></span>'
-            '</button>'
-        ) % (
-            esc(lane),
-            ' data-active="true"' if lane in active and count else "",
-            esc(lane),
-            count,
-            width,
-        )
-        parts.append(button)
-    return '<div class="flow" role="group" aria-label="Work in flight by lane">%s</div>' % "".join(parts)
-
-
-def render_toolbar(total_cards):
-    types = ("Feature", "Fix", "Chore", "Docs", "Research")
-    priorities = ("P1", "P2", "P3", "P4")
-    type_options = '<option value="">All types</option>' + "".join(
-        '<option value="%s">%s</option>' % (esc(t), esc(t)) for t in types)
-    prio_options = '<option value="">All priorities</option>' + "".join(
-        '<option value="%s">%s</option>' % (esc(p), esc(p)) for p in priorities)
-    return (
-        '<div class="toolbar shell" role="search">'
-        '<div class="search-wrap">'
-        '<label class="sr-only" for="search">Search cards</label>'
-        '<input id="search" type="search" placeholder="Search id, task, branch"'
-        ' autocomplete="off" spellcheck="false">'
-        '<kbd class="kbd" aria-hidden="true">/</kbd>'
-        '<button type="button" id="search-clear" class="search-clear"'
-        ' aria-label="Clear search" hidden>&times;</button>'
-        '</div>'
-        '<label class="sr-only" for="type-filter">Filter by type</label>'
-        '<select id="type-filter">%s</select>'
-        '<label class="sr-only" for="priority-filter">Filter by priority</label>'
-        '<select id="priority-filter">%s</select>'
-        '<span id="result-count" class="result-count" aria-live="polite">'
-        'showing %d of %d</span>'
-        '<button type="button" id="reset" class="btn" hidden>Reset</button>'
-        '</div>'
-    ) % (type_options, prio_options, total_cards, total_cards)
+def render_board_toolbar(total, board_count):
+    """With several boards the toolbar sits in its own panel."""
+    return wb_panel(
+        "Board",
+        "%d boards · %d cards" % (board_count, total),
+        wb_toolbar(total),
+    )
 
 
 def build_html(boards, worktrees, generated_at, error, refresh):
     total = sum(len(entry["rows"]) for entry in boards)
-    boards_html = "\n".join(render_board(entry) for entry in boards)
-    if not boards_html:
-        boards_html = '<p class="empty">No board file found. Point the server at one with --file.</p>'
     counts = active_counts(boards)
     active_total = sum(counts.values())
-    sep = '<span class="sep" aria-hidden="true">&middot;</span>'
+    if active_total == 0:
+        merged = last_merged_id(boards)
+        subtitle_bits = ["Nothing in flight"]
+        if merged:
+            subtitle_bits.append("last merged %s" % merged)
+        subtitle_bits.append("as of %s" % generated_at.split("T")[0])
+        subtitle = " · ".join(subtitle_bits)
+    else:
+        subtitle = ("Lanes, cards and live worktrees — what is in flight right now. "
+                    "Read fresh on every request.")
+
+    if len(boards) == 1:
+        panels_html = render_board_panel(boards[0], wb_toolbar(total))
+    elif boards:
+        panels_html = render_board_toolbar(total, len(boards))
+        panels_html += "".join(render_board_panel(entry) for entry in boards)
+    else:
+        panels_html = wb_panel(
+            "Board", "0 cards",
+            '<p class="wb-empty">No board file found. Point the server at one with --file.</p>')
+
     banner = ""
     if error:
-        banner = '<div class="shell"><p class="banner">%s</p></div>' % esc(error)
-    if active_total == 0:
-        meta = []
-        merged = last_merged_id(boards)
-        if merged:
-            meta.append("last merged %s" % merged)
-        meta.append("as of %s" % generated_at.split("T")[0])
-        meta_html = sep.join('<span class="metric">%s</span>' % esc(m) for m in meta)
-        headline = (
-            '<h1 class="headline">All clear &mdash; nothing in flight</h1>'
-            '<p class="headline-meta">%s</p>'
-        ) % meta_html
-    else:
-        headline = (
-            '<h1 class="headline">'
-            '<span class="metric"><span class="num">%d</span> active</span>%s'
-            '<span class="metric"><span class="num">%d</span> pending merge</span>%s'
-            '<span class="metric"><span class="num">%d</span> blocked</span></h1>'
-            '<p class="overview-sub">Filter a lane below, or press <kbd>/</kbd> to search. '
-            'The board is read fresh on every request.</p>'
-        ) % (active_total, sep, counts.get("Pending Merge", 0), sep, counts.get("Blocked", 0))
+        banner = '<p class="wb-banner" role="alert">%s</p>' % esc(error)
+
+    kpi_facts = "".join(
+        '<div class="wb-kpi-fact"><span class="wb-kpi-num-sm">%d</span>'
+        '<span class="wb-kpi-label">%s</span></div>' % (value, esc(label))
+        for value, label in (
+            (counts.get("Pending Merge", 0), "pending merge"),
+            (counts.get("Blocked", 0), "blocked"),
+            (total, "total"),
+        )
+    )
 
     active = sum(1 for wt in worktrees if not wt["main"])
-    wt_meta = "%d worktree(s) &middot; %d non-main" % (len(worktrees), active)
+    wt_meta = "%d worktrees · %d non-main" % (len(worktrees), active)
+    ordered_worktrees = sorted(worktrees, key=lambda wt: 1 if wt["main"] else 0)
+    rail_body = "".join(wb_wt_row(wt) for wt in ordered_worktrees)
+    if not rail_body:
+        rail_body = ('<p class="wb-empty">No git worktrees found. '
+                     'Start one with worktree.py create.</p>')
+    rail = wb_rail("Worktrees", wt_meta, rail_body)
+
     try:
         epoch_ms = int(datetime.datetime.fromisoformat(generated_at).timestamp() * 1000)
     except (TypeError, ValueError):
         epoch_ms = 0
     mark = (
-        '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" '
+        '<svg class="wb-mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" '
         'stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
         '<path d="M3 20V9l6 3V9l6 3V4h6v16z"/>'
         '<path d="M6 16h3M12 16h3"/></svg>'
     )
+    theme_boot = (
+        'try{var s=JSON.parse(localStorage.getItem("board-dashboard-state")||"{}");'
+        'if(s&&s.theme){document.documentElement.setAttribute("data-theme",s.theme);}}'
+        'catch(e){}'
+    )
     html_parts = [
         "<!doctype html>\n",
-        '<html lang="en" data-theme="', esc("system"), '"><head><meta charset="utf-8">',
+        '<html lang="en" data-theme="system"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         '<meta name="color-scheme" content="light dark">',
         '<link rel="icon" href="', FAVICON, '">',
-        "<title>Factory Board</title><style>", CSS, "</style></head><body",
+        '<link rel="stylesheet" href="/static/board.css">',
+        "<title>Factory board</title><script>", theme_boot, "</script></head><body",
         ' data-refresh="', str(refresh), '">\n',
-        '<header class="appbar">',
-        '<div class="shell appbar-inner">',
-        '<div class="brand">', mark,
-        '<div class="brand-text">',
-        '<span class="wordmark">Factory Board</span>',
-        '<span class="sublabel">Lanes, cards and live worktrees — what is in flight right now</span>',
-        '</div></div>',
-        '<div class="appbar-actions">',
-        '<span class="live" data-ms="', str(epoch_ms), '">',
-        '<span class="live-dot" aria-hidden="true"></span>',
-        '<span class="live-text">updated ', esc(generated_at[11:19]), '</span></span>',
-        '<button type="button" class="btn" id="pause" aria-pressed="false">Pause</button>',
-        '<button type="button" class="btn" id="refresh-now">Refresh now</button>',
-        '<button type="button" class="btn" id="theme-toggle" aria-label="Colour theme">System</button>',
-        '<button type="button" class="btn" id="density-toggle" aria-pressed="false">Comfortable</button>',
-        '</div></div></header>\n',
-        '<main>',
-        '<section class="overview shell">', headline, render_pipeline(counts), '</section>',
-        render_toolbar(total),
+        '<div class="wb-layout">',
+        '<aside class="wb-sidebar">',
+        '<div class="wb-side-brand">', mark,
+        '<div class="min-w-0"><span class="wb-wordmark">Factory board</span>',
+        '<span class="wb-brand-meta">Read-only · live</span></div></div>',
+        '<nav class="wb-side-nav" aria-label="Lane filters">',
+        '<p class="wb-side-label">Lanes</p>',
+        '<div class="wb-lane-filters">', wb_lane_filters(counts), '</div></nav>',
+        '<div class="wb-side-filters">',
+        '<p class="wb-side-label">Filters</p>',
+        wb_filter_selects("", visible_labels=True),
+        '</div>',
+        '<div class="wb-side-footer">',
+        '<p class="wb-live" data-ms="', str(epoch_ms), '">',
+        '<span class="wb-live-dot" aria-hidden="true"></span>',
+        '<span class="wb-live-text">updated ', esc(generated_at[11:19]), '</span></p>',
+        '<div class="wb-side-actions">',
+        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button>',
+        '<button type="button" class="wb-btn" id="theme-toggle" aria-label="Colour theme">System</button>',
+        '<button type="button" class="wb-btn" id="density-toggle" aria-pressed="false"',
+        ' aria-label="Density">Comfortable</button>',
+        '</div></div></aside>',
+        '<main class="wb-main">',
+        '<header class="wb-page-head">',
+        '<div class="min-w-0"><h1 class="wb-title">Factory board</h1>',
+        '<p class="wb-sub">', esc(subtitle), '</p></div>',
+        '<button type="button" class="wb-btn" id="refresh">Refresh now</button>',
+        '</header>',
+        '<section class="wb-kpi" aria-label="Board summary">',
+        '<div class="wb-kpi-primary"><span class="wb-kpi-num">%d</span>' % active_total,
+        '<span class="wb-kpi-label">in flight</span></div>',
+        kpi_facts,
+        '</section>',
+        wb_panel("Flow", "%d lanes" % len(ACTIVE_LANES), wb_meter(counts)),
         banner,
-        boards_html,
-        '<details class="panel wt-panel shell">',
-        '<summary class="panel-head">',
-        '<span class="caret" aria-hidden="true">&#9656;</span>',
-        '<span class="panel-title">Worktrees</span>',
-        '<span class="meta">', wt_meta, '</span></summary>',
-        render_worktrees(worktrees),
-        '</details>',
+        panels_html,
+        '<footer class="wb-footer">', str(total), ' card' + ('' if total == 1 else 's'),
+        ' across ', str(len(boards)), ' board' + ('' if len(boards) == 1 else 's'),
+        ' · refresh every ', str(refresh), 's, pausable',
+        ' · <a href="/gallery">Components</a></footer>',
         '</main>',
-        '<footer class="shell">', str(total), ' card(s) across ', str(len(boards)), ' board(s)',
-        ' &middot; refresh every ', str(refresh), 's, pausable</footer>\n',
+        rail,
+        '</div>',
         "<script>", JS, "</script>\n",
         "</body></html>",
     ]
     return "".join(html_parts)
+
+
+GALLERY_COUNTS = {
+    "Ready": 0,
+    "In Progress": 0,
+    "In Review": 2,
+    "Pending Merge": 0,
+    "Blocked": 1,
+}
+WB_SWATCHES = (
+    ("--color-paper", "canvas"),
+    ("--color-surface", "surface"),
+    ("--color-surface-2", "surface 2"),
+    ("--color-ink", "ink"),
+    ("--color-ink-soft", "ink soft"),
+    ("--color-ink-faint", "ink faint"),
+    ("--color-line", "line"),
+    ("--color-line-soft", "line soft"),
+    ("--color-signal", "signal"),
+    ("--color-signal-soft", "signal soft"),
+    ("--color-ok", "ok"),
+    ("--color-warn", "warn"),
+    ("--color-bad", "bad"),
+)
+WB_TYPE_STEPS = (
+    ("--text-micro", "11px", "Meta and chips"),
+    ("--text-tiny", "12px", "Dense controls"),
+    ("--text-meta", "13px", "Body and rows"),
+    ("--text-body", "15px", "Lead paragraphs"),
+    ("--text-lead", "20px", "Section and figures"),
+    ("--text-display", "32px", "Page title"),
+)
+WB_SPACE_STEPS = (
+    ("4px", 4),
+    ("8px", 8),
+    ("12px", 12),
+    ("16px", 16),
+    ("24px", 24),
+    ("32px", 32),
+    ("48px", 48),
+    ("64px", 64),
+)
+WB_RADII = (("6px", "chip"), ("8px", "control"), ("12px", "panel"))
+
+
+def gallery_tokens_html():
+    swatches = "".join(
+        '<div class="wb-swatch"><span class="wb-swatch-chip" style="background: var(%s)"></span>'
+        '<span class="wb-swatch-label">%s</span></div>' % (esc(name), esc(label))
+        for name, label in WB_SWATCHES
+    )
+    type_rows = "".join(
+        '<div class="wb-type-row"><span class="wb-type-sample" style="font-size: var(%s)">'
+        'Factory components</span><span class="wb-type-label">%s · %s</span></div>'
+        % (esc(name), esc(size), esc(role))
+        for name, size, role in WB_TYPE_STEPS
+    )
+    space_rows = "".join(
+        '<div class="wb-space-row"><span class="wb-space-bar" style="width: %dpx"></span>'
+        '<span>%s</span></div>' % (px, esc(name))
+        for name, px in WB_SPACE_STEPS
+    )
+    radius_boxes = "".join(
+        '<div class="wb-radius-box" style="border-radius: %s">%s</div>'
+        % (esc(value), esc(label))
+        for value, label in WB_RADII
+    )
+    return (
+        '<div class="wb-tokens">'
+        '<div class="wb-token-group"><h3>Colour</h3>'
+        '<div class="wb-swatches">%s</div></div>'
+        '<div class="wb-token-group"><h3>Type</h3>%s</div>'
+        '<div class="wb-token-group"><h3>Spacing</h3>%s</div>'
+        '<div class="wb-token-group"><h3>Radius</h3>'
+        '<div class="wb-radius-row">%s</div></div>'
+        '</div>'
+    ) % (swatches, type_rows, space_rows, radius_boxes)
+
+
+def gallery_fixtures():
+    open_card = {
+        "ID": "BOARD-112",
+        "Task": "Rebuild the factory gallery in Tailwind",
+        "Type": "Feature",
+        "Priority": "P2",
+        "Risk": "🟡 medium — visual only, the console is read-only",
+        "Blocked by": "- None.",
+        "Branch/Worktree": ("branch feat/rebuild-factory-pages-as-a-split · "
+                            ".kilo/worktrees/rebuild-factory-pages-as-a-split"),
+        "Notes": "fp=feat|visual|/gallery|swiss",
+        "Notes raw": ("- [x] /gallery serves the prebuilt stylesheet proof: HTTP 200 text/css · "
+                      "- [ ] Peak lane is the only signal segment proof: capture 1440 · "
+                      "- [ ] Board page keeps its inline CSS until the next chunk"),
+        "open": True,
+    }
+    second_card = {
+        "ID": "BOARD-113",
+        "Task": "Wire the lane filters to the worktree rail",
+        "Type": "Fix",
+        "Priority": "P1",
+        "Risk": "🟢 low — fixture only",
+        "Blocked by": "BOARD-112",
+        "Branch/Worktree": "branch feat/workbench-filters",
+        "Notes": "",
+        "Notes raw": ("- [ ] Filter state stays in the URL · "
+                      "- [ ] Escape clears every control"),
+    }
+    blocked_card = {
+        "ID": "BOARD-104",
+        "Task": "Decide whether the rail folds below the lanes at tablet width",
+        "Type": "Feature",
+        "Priority": "P3",
+        "Risk": "🟡 medium — layout only",
+        "Blocked by": "- None.",
+        "Branch/Worktree": "-",
+        "Notes": "",
+        "Notes raw": "Waiting on gallery approval before the split breakpoint is fixed.",
+    }
+    worktrees = [
+        {"main": True, "branch": "main", "path": "/workspaces/yt",
+         "ahead": 0, "behind": 0, "dirty": False},
+        {"main": False, "branch": "feat/rebuild-factory-pages-as-a-split",
+         "path": "/workspaces/yt/.kilo/worktrees/rebuild-factory-pages-as-a-split",
+         "ahead": 3, "behind": 0, "dirty": False},
+        {"main": False, "branch": "feat/board-console",
+         "path": "/workspaces/yt/.kilo/worktrees/board-console",
+         "ahead": 7, "behind": 2, "dirty": True},
+    ]
+    return open_card, second_card, blocked_card, worktrees
+
+
+def build_gallery_html():
+    open_card, second_card, blocked_card, worktrees = gallery_fixtures()
+    counts = GALLERY_COUNTS
+    total = sum(counts.values())
+    lane_cards = {
+        "In Review": wb_card(open_card) + wb_card(second_card),
+        "Blocked": wb_card(blocked_card),
+    }
+    open_lanes = {"In Review", "Blocked"}
+    lanes = "".join(
+        wb_lane(
+            lane,
+            counts.get(lane, 0),
+            LANE_DESCRIPTION[lane],
+            lane_cards.get(lane) or wb_empty(lane),
+            open=lane in open_lanes,
+            signal=counts.get(lane, 0) == max(counts.values()),
+        )
+        for lane in ACTIVE_LANES
+    )
+    lane_filters = "".join(
+        '<button type="button" class="wb-lane-filter" data-status-filter="%s" aria-pressed="false">'
+        '<span class="wb-lane-filter-name">%s</span>'
+        '<span class="wb-lane-filter-count">%d</span></button>'
+        % (esc(lane), esc(lane), counts.get(lane, 0))
+        for lane in ACTIVE_LANES
+    )
+    rail_body = "".join(wb_wt_row(worktree) for worktree in worktrees)
+    rail_body += ('<p class="wb-legend">+ ahead · − behind · chips show main, dirty and clean</p>')
+    rail = wb_rail("Worktrees", "3 worktrees · 2 non-main", rail_body)
+    chips = " ".join(
+        wb_chip(kind, text) for kind, text in (
+            ("type", "Feature"), ("prio", "P2"),
+            ("risk-low", "low"), ("risk-medium", "medium"), ("risk-high", "high"),
+            ("main", "main"), ("dirty", "dirty"), ("clean", "clean"),
+        )
+    )
+    mark = (
+        '<svg class="wb-mark" viewBox="0 0 24 24" aria-hidden="true" '
+        'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'
+        '<path d="M3 20V9l6 3V9l6 3V4h6v16z"/>'
+        '<path d="M6 16h3M12 16h3"/></svg>'
+    )
+    kpi_facts = "".join(
+        '<div class="wb-kpi-fact"><span class="wb-kpi-num-sm">%d</span>'
+        '<span class="wb-kpi-label">%s</span></div>' % (value, esc(label))
+        for value, label in (
+            (counts.get("Pending Merge", 0), "pending merge"),
+            (counts.get("Blocked", 0), "blocked"),
+            (total, "total"),
+        )
+    )
+    return "".join([
+        "<!doctype html>\n",
+        '<html lang="en" data-theme="system"><head><meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        '<meta name="color-scheme" content="light dark">',
+        '<link rel="icon" href="', FAVICON, '">',
+        '<link rel="stylesheet" href="/static/board.css">',
+        "<title>Factory board</title></head><body>\n",
+        '<div class="wb-layout">',
+        '<aside class="wb-sidebar">',
+        '<div class="wb-side-brand">', mark,
+        '<div class="min-w-0"><span class="wb-wordmark">Factory board</span>',
+        '<span class="wb-brand-meta">Component gallery</span></div></div>',
+        '<nav class="wb-side-nav" aria-label="Lane filters">',
+        '<p class="wb-side-label">Lanes</p>',
+        '<div class="wb-lane-filters">', lane_filters, '</div></nav>',
+        '<div class="wb-side-filters">',
+        '<p class="wb-side-label">Filters</p>',
+        wb_filter_selects("side", visible_labels=True),
+        '</div>',
+        '<div class="wb-side-footer">',
+        '<p class="wb-live"><span class="wb-live-dot" aria-hidden="true"></span>'
+        '<span>updated %s</span></p>' % datetime.datetime.now().strftime("%H:%M:%S"),
+        '<div class="wb-side-actions">',
+        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button>',
+        '<button type="button" class="wb-btn" data-wb-theme aria-label="Colour theme">System</button>',
+        '<button type="button" class="wb-btn" data-wb-density aria-pressed="false" '
+        'aria-label="Density">Comfortable</button>',
+        '</div></div></aside>',
+        '<main class="wb-main">',
+        '<header class="wb-page-head">',
+        '<div class="min-w-0"><h1 class="wb-title">Factory board</h1>',
+        '<p class="wb-sub">Lanes, cards and live worktrees — what is in flight right now</p></div>',
+        '<button type="button" class="wb-btn" id="refresh-now">Refresh now</button>',
+        '</header>',
+        '<section class="wb-kpi" aria-label="Board summary">',
+        '<div class="wb-kpi-primary"><span class="wb-kpi-num">%d</span>'
+        '<span class="wb-kpi-label">in flight</span></div>' % total,
+        kpi_facts,
+        '</section>',
+        wb_panel(
+            "Flow",
+            "%d lanes" % len(ACTIVE_LANES),
+            wb_meter(counts),
+        ),
+        '<section class="wb-panel">',
+        wb_toolbar(total),
+        '<div class="wb-lanes">', lanes, '</div>',
+        '</section>',
+        '</main>',
+        rail,
+        '</div>',
+        '<div class="wb-sections">',
+        '<section class="wb-section">',
+        '<h2 class="wb-section-title">Chips and empty state</h2>',
+        '<p class="wb-section-meta">Chips stay quiet. The empty state names the next action.</p>',
+        '<div class="flex flex-wrap items-center gap-2 py-3">', chips, '</div>',
+        wb_empty("Ready"),
+        '</section>',
+        '<section class="wb-section">',
+        '<h2 class="wb-section-title">Tokens</h2>',
+        '<p class="wb-section-meta">The language is tokens, not one-off values. '
+        'Swatches follow the active theme.</p>',
+        gallery_tokens_html(),
+        '</section>',
+        '</div>',
+        '<footer class="mx-auto w-full max-w-[1600px] px-6 pb-16 font-mono text-micro '
+        'text-ink-faint"><a href="/">Back to the board</a></footer>\n',
+        "<script>", GALLERY_JS, "</script>\n",
+        "</body></html>",
+    ])
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1448,6 +1627,14 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_bytes(code, body, "application/json; charset=utf-8")
 
+    def send_file(self, path, content_type):
+        try:
+            body = Path(path).read_bytes()
+        except OSError:
+            self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
+            return
+        self.send_bytes(200, body, content_type)
+
     def do_HEAD(self):
         self.do_GET()
 
@@ -1462,8 +1649,23 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/worktrees":
             self.send_json(200, self.state["worktree_payload"]())
             return
+        if path == "/static/board.css":
+            self.send_file(STATIC_ROOT / "board.css", "text/css; charset=utf-8")
+            return
+        if path.startswith("/static/fonts/"):
+            name = path[len("/static/fonts/"):]
+            content_type = STATIC_FONT_TYPES.get(name)
+            if not content_type:
+                self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
+                return
+            self.send_file(STATIC_ROOT / "fonts" / name, content_type)
+            return
         if path == "/":
             html_body = self.state["html"]()
+            self.send_bytes(200, html_body.encode("utf-8"), "text/html; charset=utf-8")
+            return
+        if path == "/gallery":
+            html_body = self.state["gallery"]()
             self.send_bytes(200, html_body.encode("utf-8"), "text/html; charset=utf-8")
             return
         self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
@@ -1545,6 +1747,7 @@ def main(argv):
         "board_payload": board_payload,
         "worktree_payload": worktree_payload,
         "html": html_page,
+        "gallery": build_gallery_html,
         "refresh": max(1, args.refresh),
     }
 

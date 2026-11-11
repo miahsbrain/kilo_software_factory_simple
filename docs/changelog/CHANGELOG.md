@@ -3,6 +3,27 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] The board screen becomes a dense dashboard
+**Type:** Feature
+**Board:** BOARD-112 | **Branch:** feat/rebuild-factory-pages-as-a-split
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `.kilo/skills/board/ui/src/app.css`, `.kilo/skills/board/static/board.css`, `docs/UI-UX.md` §6.2, `docs/reviews/BOARD-112-*.md`, `docs/changelog/CHANGELOG.md`
+**Why:** The board was still the single-column console while `/gallery` already carried the approved dashboard shell. The user asked for an elegant, dense, useful dashboard, so the real board moved onto the same components.
+**Impact:** `GET /` now renders a 240px lane/filter sidebar, a main column with a KPI strip, flow meter and lane panel, and a 320px sticky worktrees rail. All filters, search, keyboard, URL state, folds, pause/refresh, parsed Notes and branch copy are preserved. The old inline CSS and its renderers are removed; the Tailwind stylesheet is the only style system. Footer pluralisation and the copy-button tap target were fixed from the review.
+
+## [2026-11-11] The factory page language moves to Tailwind
+**Type:** Feature
+**Board:** BOARD-112 | **Branch:** feat/rebuild-factory-pages-as-a-split
+**Changed:** `.kilo/skills/board/ui/package.json`, `.kilo/skills/board/ui/package-lock.json`, `.kilo/skills/board/ui/src/app.css`, `.kilo/skills/board/static/board.css`, `.kilo/skills/board/static/fonts/*`, `.kilo/skills/board/scripts/board_serve.py`, `.kilo/skills/board/SKILL.md`, `docs/DECISIONS.md` (ADR-072), `docs/STACK.md`, `docs/UI-UX.md` §6.2, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-11-factory-tailwind.md`
+**Why:** The board screen read as a generic Bootstrap-style stack, and the single-file hand-written CSS made a consistent component language slow to evolve. The user chose Tailwind v4 with a self-hosted Geist pair and a Swiss-industrial direction.
+**Impact:** The board UI is now built from Tailwind v4 at author time into one committed stylesheet; the runtime stays Python-standard-library and offline. `GET /gallery` is rebuilt in the new language; the board screen moves onto the same components in the next chunk. Self-hosted Geist Sans/Mono (SIL OFL) replace system fonts, so the page is noticeably more distinctive and the repo grows by about 140 KB of woff2. A class change now requires `npm --prefix .kilo/skills/board/ui run build`.
+
+## [2026-11-11] The factory page language and component gallery
+**Type:** Feature
+**Board:** BOARD-112 | **Branch:** feat/rebuild-factory-pages-as-a-split
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/UI-UX.md` §6.2, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-11-factory-workbench.md`
+**Why:** The split-workbench direction needed a settled token set and a reusable component factory before the board screen could be rebuilt. The gallery is the human approval artefact for that language.
+**Impact:** Light and dark colour tokens move to paper/graphite with one signal-orange accent, and a `wb-` component set is shared by `/gallery` and, in the next chunk, the board. `GET /` keeps its structure, filters, keyboard and URL state, and gains one quiet footer link to `/gallery`. Routing, dependencies and the read-only, server-rendered, offline behaviour are unchanged.
+
 ## [2026-11-11] The unslop pass is mandatory on every UI change
 **Type:** Docs
 **Board:** BOARD-111 | **Branch:** docs/make-the-unslop-pass-mandatory
