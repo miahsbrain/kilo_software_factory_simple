@@ -4,8 +4,9 @@
 > Branch `fix/gate-merge-handoffs-on-finished-clean-worktrees`, worktree of the same slug.
 > Extended `cmd_handoff` and approved factory/template §B11 policy; derived commands/skill align.
 > Initial focused run failed on Status lookup; corrected to existing `STATUS_INDEX`.
-> Architect-authorized second run passed: 13 tests in 3.847s, exit 0. Parent review and live
-> `Pending Merge` remain required before merge guidance. Existing project untouched.
+> Architect-authorized second run passed: 13 tests in 3.847s, exit 0. Independent QA/review PASS:
+> `docs/reviews/BOARD-123-qa.md`, committed with ledger in `27c2e94`. Parent reports the live row
+> `Pending Merge`; awaiting human merge. Parent owns the final live handoff check. Existing project untouched.
 > Earlier staging exited 1 on ignored `.opencode`; architect authorized exact new-test force-add
 > and narrow tracked-path staging. No broad force-add, installs, browser or build work.
 
@@ -27,7 +28,9 @@
 - Architect-authorized second focused run passed: 13 tests in 3.847s, exit 0. Dirty states,
   all nonready statuses, missing info/Git failures, commits ahead, read-only behavior and already-
   merged paths covered. Initial run failed nine status assertions; correction reused `STATUS_INDEX`.
-  No browser, build, installs or real board edits. Parent review/lane transition still required.
+  Independent QA/review PASS is recorded in `docs/reviews/BOARD-123-qa.md`; parent reports
+  `Pending Merge`, awaiting human merge and final live handoff check. No tests rerun for this
+  docs-only status update; no browser, build, installs or real board edits.
 
 > **Session Notes — BOARD-122 builder verification complete, 2026-11-11**
 > Branch `feat/keep-live-board-local-and-untracked`, worktree of the same slug. Shared bootstrap

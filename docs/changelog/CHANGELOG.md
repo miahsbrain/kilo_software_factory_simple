@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Record independent handoff-gate review PASS
+**Type:** Docs
+**Board:** BOARD-123 | **Branch:** fix/gate-merge-handoffs-on-finished-clean-worktrees
+**Changed:** HANDOVER, PROJECT_STATE and this log only.
+**Why:** Independent QA/review report and ledger committed in `27c2e94` record PASS; parent reports the factory row is Pending Merge, awaiting human merge.
+**Impact:** Status now reflects passed review and pending human action. Parent retains final live handoff check; no merge guidance emitted here. Historical unrelated HANDOVER conflict markers preserved; no source/rules/tests or board changes.
+**Verification:** File review only for this docs update; no tests rerun. Existing authorized focused result remains exit 0, 13 tests in 3.847s. Independent acceptance-criteria evidence and coverage limits: `docs/reviews/BOARD-123-qa.md:3–30`.
+
 ## [2026-11-11] Verify corrected handoff status gate
 **Type:** Fix
 **Board:** BOARD-123 | **Branch:** fix/gate-merge-handoffs-on-finished-clean-worktrees
