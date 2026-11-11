@@ -1,17 +1,18 @@
 # PROJECT STATE — software factory
 
-- **Phase:** BOARD-120 governance-only implementation; consistency check blocked on false positive.
+- **Phase:** BOARD-120 governance-only implementation; corrected consistency check passed, awaiting architect review.
 - **Active task:** `docs/require-catalog-skills-and-browser-ui-reviews` in
   `.opencode/worktrees/require-catalog-skills-and-browser-ui-reviews`, based on `opencode`.
 - **Change:** mandatory catalogue selection/application/reporting for every task; UI verification
   and review use only OpenCode's built-in browser. ADR-079 supersedes script-only capture policy.
   Gallery approval, independent review, accessibility, unslop and bounded findings gates remain.
-- **Verification:** file review completed. The single consistency command exited 1: its generic
-  `script is the only` pattern matched the unrelated board-editing rule. Six exact-block checks
-  and all seven agent checks passed; later assertions did not run. No build/runtime/browser/model tests.
+- **Verification:** file review completed. Architect authorized one corrected browser-specific
+  consistency check after the first check's board-editing false positive. Corrected command exited 0:
+  six exact-block checks, seven agent checks, 23 active documents, preserved nonbrowser script
+  ownership/finding gates, 27 Markdown-only files and clean whitespace. No build/runtime/browser/model tests.
   No board, tool-source, dependency, guard/security or project-copy edits.
-- **Next action:** architect authorizes a browser-specific check or reviews remaining criteria by
-  file inspection. WIP checkpoint is not merge-ready. Existing migration limitations remain unresolved.
+- **Next action:** architect completes review and decides whether to offer the local documentation
+  commits for human merge. Existing migration limitations remain unresolved.
 
 ## Historical state (before BOARD-120)
 

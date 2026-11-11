@@ -10,11 +10,12 @@
 > Gallery approval, independent review, accessibility, unslop, bounded ledger/fingerprint and
 > finding-validation gates remain. Tools and historical evidence are unchanged; scope files
 > remain read-only and their old capture directions are superseded by canonical §B4.2.
-> File review completed; the single targeted consistency command exited 1 on an overbroad
-> `script is the only` pattern matching the board-editing rule, not a UI capture directive.
-> Six exact-block and seven agent checks passed; later assertions did not run. No build,
-> runtime, browser or model-behavior checks. Next: architect authorizes a browser-specific
-> consistency check or reviews the remaining criteria by file inspection. Checkpoint is not merge-ready.
+> File review completed. The architect-authorized corrected consistency command exited 0:
+> six exact-block checks, seven agent checks, 23 active documents, nonbrowser script ownership,
+> bounded finding gates, 27-file Markdown-only scope and whitespace checks passed.
+> The first check's overbroad pattern falsely matched the board-editing rule; that rule remains
+> unchanged. No build, runtime, browser or model-behavior checks. Next: architect completes review
+> and decides whether to offer the local documentation commits for human merge.
 > No board edits, project sync, guard/security changes, merge or push. Earlier notes are historical.
 
 > **Session Notes — BOARD-116 documentation review passed, 2026-11-11**
