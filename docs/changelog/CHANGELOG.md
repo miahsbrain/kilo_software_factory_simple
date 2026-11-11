@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Checkpoint partial parent browser observations
+**Type:** Docs
+**Board:** BOARD-117 | **Branch:** fix/refresh-project-board-discovery-every-minute
+**Changed:** `docs/reviews/BOARD-117-qa.md` (preserved disconnected reviewer addendum; separate parent addendum), `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** Record user-approved parent interactive evidence without representing it as an independent reviewer pass or complete QA.
+**Impact:** Parent saw harness/project panels 18/14 (32 total), configured 60s, Pause state and actual manual reload while paused (changed timeOrigin); Pause resets after reload. Search input/URL observed, filtering not proven with unreliable `.card` selector; `/` left BODY active, shortcut not proven. Later Refresh now click returned `[browser.operation_failed] browser.click failed. UnknownVizError` (no exit code); tabs.list stayed at generation 4, loading false, same URL. No retry; filter retention, elapsed scheduling, keyboard, themes, responsiveness and visual/unslop/gallery gates remain unchecked. No product defect proven. Canonical capture still lacks Playwright; no installs. Main15180 unchanged, preview15181 only; BOARD-118 queued, not implemented. User decides whether to retry after desktop error resolution. Wip, not merge-ready.
+**Verification:** Documentation only, no browser/test/build/source changes. Verification limited to file review because this was a low-risk visual/static change. Previous independent regression remains four tests, exit 0.
+
 ## [2026-11-11] Checkpoint blocked BOARD-117 QA
 **Type:** Docs
 **Board:** BOARD-117 | **Branch:** fix/refresh-project-board-discovery-every-minute

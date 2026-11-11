@@ -12,9 +12,16 @@
 > Canonical capture exited 2: Playwright was not found locally or globally (exact command below).
 > Report: `docs/reviews/BOARD-117-qa.md`; no product defect was demonstrated.
 > Main server 15180 is unchanged; preview 15181 was launched from this worktree. No restarts or
-> dependency installation. Browser interactions, elapsed timer, visual/unslop and gallery review
-> remain unverified. This is a wip checkpoint, not merge-ready.
-> Next: user approves provisioning Playwright or provides its installed location, then authorizes QA.
+> dependency installation. User approved built-in QA; reviewer child disconnected, but attached
+> parent observed separate harness/project panels (18/14 cards, total 32), configured 60s refresh,
+> and actual Refresh now reload while paused (changed timeOrigin). Pause resets after reload.
+> These are parent observations, not an independent reviewer pass; details in the QA addendum.
+> Later click failed `[browser.operation_failed] browser.click failed. UnknownVizError` (no exit
+> code); no retry. Search input/URL observed, filtering not proven with unreliable `.card` selector.
+> Filter retention, elapsed timer, keyboard, themes, responsiveness and visual/unslop/gallery review
+> remain unchecked. This is a wip checkpoint, not merge-ready; no product defect proven.
+> Next: user decides whether to retry built-in checks after desktop error resolution; canonical
+> capture separately needs approved Playwright provisioning or its installed location.
 > BOARD-118 approved redesign gallery is queued behind BOARD-117, not implemented.
 
 Failed capture command (exit 2; recorded, not rerun):

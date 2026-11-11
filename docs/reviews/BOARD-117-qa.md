@@ -47,3 +47,52 @@ Recommendation: have the architect/user restore or explicitly provision the docu
 - Ledger status before review: 0 of 3 rounds used; no ledger write, board edit, source edit or commit made.
 
 **Disposition:** keep BOARD-117 blocked on verification tooling rather than claim merge readiness. No criterion is a proven product failure requiring a Fix row or a build return yet; interactive/canonical QA must resume after the architect decides how to resolve the dependency blocker.
+
+## Interactive QA addendum — 2026-11-11
+
+Requested target: commit `16ffa7c`, existing preview `http://127.0.0.1:15181`. This addendum does not reverify the earlier command results or change the verdict.
+
+Loaded the built-in `browser` skill and discovered exact tools with Code Mode `search`. The first browser operation was `tools.browser.tabs.list()`; it returned:
+
+```text
+[browser.disconnected] No desktop browser is connected to this session. Open this session in the desktop app and wait for it to connect. Then call browser.tabs.list({}). Repeating browser actions while disconnected will not help.
+```
+
+This is a tool error, not a shell command; no exit code was supplied. Reviewer session: `ses_e353521ebffe98nk7trQD9wqQK`. The parent's successful browser attachment does not establish attachment to this child session. No browser retries or alternate drivers were used.
+
+| Requested interactive check | Result |
+|---|---|
+| Factory board visibility | Unverified: no tab could be listed/opened. |
+| Project board visibility through project switch | Unverified: no interactive page access. |
+| Configured 60s schedule and elapsed automatic refresh | Unverified: no live control or timer observation. |
+| Pause, then Refresh now causes actual reload | Unverified: no clicks or navigation observed. |
+| Filters retained across refresh | Unverified: no controls exercised. |
+| Theme toggles and keyboard behavior | Unverified: no controls exercised. |
+| Console and network errors | Unverified: no page logs available; absence of errors is not claimed. |
+
+No screenshots or new canonical artifacts were produced. No board/source/data mutation, capture retry, test/build command, installation, restart or commit was performed. Session moved to the assigned worktree before writing this addendum.
+
+Recommendation: attach the desktop app to this reviewer session, or have the already attached parent perform the interactive checks with explicit evidence. Parent execution avoids a child-attachment dependency but is not an independent reviewer pass. Canonical capture remains blocked separately by the recorded Playwright dependency failure and is not waived. No proven product defect warrants a Fix row or criterion return to In Progress from this attempt; BOARD-117 remains verification-blocked, not merge-ready.
+
+## Parent interactive observations — 2026-11-11 (not an independent pass)
+
+User approved available built-in browser QA. The attached parent used tab
+`tab_1515e945-56cb-4cd3-8052-b5e97be46e3b` at `http://127.0.0.1:15181`.
+These are parent-reported observations, separate from the disconnected child review above;
+this documentation checkpoint made no browser calls and does not change the verdict.
+
+| Action / evidence | Observed result and limit |
+|---|---|
+| Snapshot depth 10, generation 3 | Separate harness 18-card and project 14-card panels, total 32; footer refresh 60s. Configured interval observed, not elapsed automatic scheduling. |
+| Click Pause `refe1`, then evaluate | Resume label, `aria-pressed=true`, refresh 60, `timeOrigin=1794403699070.3`, boards harness/project. |
+| Click Refresh now `refe4` while paused; loading true, then wait(load), evaluate generation 4 | `timeOrigin=1794403751072.6`, boards harness/project. Changed time origin proves an actual reload while paused. Pause resets after reload (existing behavior). |
+| Press `/`, then evaluate | `activeElement=BODY`; keyboard shortcut not proven. |
+| Fresh generation-4 snapshot; fill search `refe39` with `BOARD-117` | URL `?q=BOARD-117`, input `BOARD-117`. `visibleCards` queried with `.card` returned `[]`; selector is unreliable, so no filtering pass is claimed. |
+| Click Refresh now `refe33` | `[browser.operation_failed] browser.click failed. UnknownVizError`; tool supplied no exit code. Subsequent `tabs.list` confirmed the same URL, generation 4, loading false. No retry. Filter retention across refresh not proven. |
+
+Filter retention, elapsed timer, keyboard, themes and responsiveness remain unchecked; visual,
+unslop and gallery review are not complete. No product defect was proven. Canonical capture
+still lacks Playwright; no installation, source change, restart or alternate driver. Main
+15180 unchanged; preview 15181 only. BOARD-118 approved redesign gallery remains queued,
+not implemented. User decision needed on whether to retry built-in checks after the desktop
+error is resolved; canonical tooling approval/location remains separately required. Not merge-ready.

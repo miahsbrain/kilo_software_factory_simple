@@ -2,19 +2,27 @@
 
 ## Current session — BOARD-117 (2026-11-11)
 
-- **Phase:** QA blocked on missing Playwright; wip checkpoint, not merge-ready.
+- **Phase:** QA blocked on canonical tooling and later desktop click error; wip, not merge-ready.
 - **Active task:** `fix/refresh-project-board-discovery-every-minute` in
   `.opencode/worktrees/refresh-project-board-discovery-every-minute`.
 - **Changed:** Request-time board rediscovery for JSON/HTML, 60-second default, focused regressions
   and ADR-076. Explicit file selection, refresh override and existing controls retained.
 - **Verification:** Independent `python3 .opencode/skills/board/scripts/test_board_serve.py` rerun
-  → exit 0, four tests passed. Parent code review found no blocker. Browser interactions,
-  elapsed timer and visual/unslop/gallery review remain unverified; no product defect proven.
+  → exit 0, four tests passed. Parent code review found no blocker. No tests rerun here.
+- **Interactive evidence:** User approved built-in QA; child `ses_e353521ebffe98nk7trQD9wqQK`
+  disconnected. Attached parent observed separate harness/project panels (18/14, total 32),
+  configured 60s and actual manual reload while paused via changed timeOrigin. Pause resets on reload.
+  This is not an independent pass. Exact tab/generation/ref evidence: QA report's parent addendum.
+- **Interactive stop:** Later Refresh now click returned `[browser.operation_failed] browser.click failed. UnknownVizError`
+  (no exit code); tabs.list showed same URL/generation 4, loading false; no retry. Search input/URL
+  observed, filtering not proven (unreliable `.card` selector). Filter retention, elapsed timer,
+  keyboard, themes, responsiveness and visual/unslop/gallery review remain unchecked. No product defect proven.
 - **Capture:** `node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127.0.0.1:15181 --route / --scope factory --task-id BOARD-117 --project . --scheme both --date 2026-11-11`
   → exit 2: Playwright not found in this project or global npm install. Exact error and unchecked
   criteria: `docs/reviews/BOARD-117-qa.md`. No additional tests/captures run for this checkpoint.
-- **Next action:** User approves provisioning Playwright or supplies its installed location,
-  then authorizes resuming QA. BOARD-118 approved redesign gallery is queued behind this, not implemented.
+- **Next action:** User decides whether to retry built-in checks after desktop error resolution;
+  canonical capture separately needs approved Playwright provisioning or its installed location.
+  BOARD-118 approved redesign gallery is queued behind this, not implemented.
 - **Servers:** Main 15180 unchanged; preview 15181 launched from this worktree. No restarts,
   dependency installation, main board or ignored project edits.
 - **Context:** Initial patch refused from factory-root session context; orchestrator moved the
