@@ -3,6 +3,30 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Use OpenCode browser for interactive UI reviews
+**Type:** Docs
+**Board:** BOARD-116 | **Branch:** docs/use-opencode-browser-for-interactive-ui-reviews
+**Changed:** root/template `AGENTS.md` §B4.2; `.opencode/agents/qa-reviewer.md`, `ui-critic.md`; `.opencode/skills/qa-review/SKILL.md`; `.opencode/commands/ui.md`; root/template `docs/UI-UX.md`; `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md` (ADR-075), this log. Extended existing instructions; no new tools or files.
+**Why:** Approved policy uses the built-in browser for interactive checks while keeping canonical QA capture script-only.
+**Impact:** QA and unslop gates remain; built-in screenshots are inspection-only. Guidance covers skill loading, Code Mode signature discovery, explicit tab IDs, fresh refs, untrusted page/log content and desktop attachment. Unavailable browser is reported without retries on disconnection or silent MCP fallback; configured MCP retained. Parent reviewed all 12 file diffs: PASS; reviewed docs change prepared for human review/local commit through the authorized existing Kilo bootstrap guard. BOARD-114 remains blocked and runtime unverified; no migration, source/config, plugin or permission changes or approval to merge the migration.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. Zero verification commands; no browser/runtime checks, builds or tests.
+
+## [2026-11-11] Require committed worktree handoff checkpoints
+**Type:** Docs
+**Board:** BOARD-115 | **Branch:** docs/require-committed-worktree-handoff-checkpoints
+**Changed:** `AGENTS.md` and `templates/project/AGENTS.md` §B5/§B11; `.opencode/commands/closeout.md`, `.opencode/commands/handover.md`, `.opencode/skills/git-worktree/SKILL.md` §6/§8; `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md` (ADR-074), this log. Extended existing instructions; no new files or tools.
+**Why:** Approved handoff policy requires local task commits and a reported SHA/diff, including clearly labelled `wip` checkpoints for blocked or unfinished work.
+**Impact:** Checkpoints do not imply merge readiness; verification, review, human-merge and integration-branch protections remain. Docs-only parent review passed; local task commit prepared for human review. BOARD-114 remains blocked and not merge-ready; no migration or security-policy changes or approval to merge the migration.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change.
+
+## [2026-11-11] OpenCode V2 port, chunk 1
+**Type:** Chore
+**Board:** BOARD-114 | **Branch:** feat/port-factory-harness-to-opencode-v2
+**Changed:** tracked `.kilo/` harness moved to `.opencode/` with plural agents/commands; `opencode.jsonc`; existing Python/JS path references, native permission generator, factory base selector, templates and active docs. Added architect primary because no existing primary orchestrator definition covered that role; retained six specialists and upstream licences. App base semantics unchanged.
+**Why:** Approved OpenCode-only integration port on `opencode`; `main` retains Kilo. Reused lifecycle, env, scope, board and QA mechanics rather than introducing replacement tools.
+**Impact:** Chunk 1 only, not merge-ready. Bootstrap worktree stays unmoved and ignored; steady-state guards accept only `.opencode/worktrees/`. Security plugin/search-path enforcement, native runtime validation and devcontainer migration remain later work. No dependencies, commit, merge or push.
+**Verification:** `python3 .opencode/skills/git-worktree/scripts/test_env.py` → exit 0, `all checks passed`; the only verification command. Runtime package ignores are root-anchored so moved board UI manifests remain trackable.
+
 ## [2026-11-11] The /plan and /unslop commands
 **Type:** Chore
 **Board:** BOARD-113 | **Branch:** chore/add-plan-and-unslop-commands
@@ -226,3 +250,9 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Changed:** `.kilo/skills/board/scripts/board_serve.py` (new), `.kilo/skills/qa-review/scripts/{browser-review.mjs,check-finding.py,ledger.py}`, `.kilo/skills/board/scripts/board.py`, `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/{board,qa-review}/SKILL.md`, `.kilo/command/{board-view,run,ui}.md`, `.kilo/agent/{qa-reviewer,ui-critic}.md`, `kilo.jsonc` (Playwright MCP), `.devcontainer/devcontainer.json` (port 15180), `AGENTS.md`, `docs/{STACK,DECISIONS}.md`
 **Why:** The markdown board is hard to scan, the UI critique → fix loop could run forever, and Playwright was installed but unreachable — so the agent built a browser driver by hand and looped proving it worked.
 **Impact:** A read-only dashboard on port 15180 shows the lanes and the live worktrees. The QA loop is capped at 3 rounds with fingerprint dedupe and a ledger. The Playwright MCP is configured and the capture script resolves the global Playwright, so no hand-rolled browser client remains.
+## [2026-11-11] OpenCode security adapter awaiting fixture access
+**Type:** Feature
+**Board:** BOARD-114 | **Branch:** feat/port-factory-harness-to-opencode-v2
+**Changed:** `.opencode/plugins/factory-guard/`, canonical policy, guard file/search checks, config sync, STACK and session state
+**Why:** Native search permissions do not enforce target paths; copied control repos need the complete runtime configuration
+**Impact:** Incomplete security migration. Node tests exited 1 on temporary fixture directory EACCES; no workaround attempted. Container and native runtime verification remain pending.

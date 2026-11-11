@@ -1,6 +1,10 @@
-# Kilo Software Factory
+# OpenCode Software Factory
 
-An agentic delivery harness for [Kilo Code](https://kilo.ai). It gives an AI team the parts a
+BOARD-114 chunk 1 targets integration branch `opencode`; `main` retains Kilo.
+Native layout/config is ported. Security plugin and devcontainer migration remain pending.
+The existing bootstrap worktree stays unmoved; new worktrees use `.opencode/worktrees/`.
+
+An agentic delivery harness for [OpenCode V2](https://opencode.ai/v2/docs/). It gives an AI team the parts a
 small product team needs: a written rule set, a live work board, specialised builder and reviewer
 agents, and a loop that carries every task from decision to merged branch.
 
@@ -17,14 +21,14 @@ belongs to the project, not to the factory.
 | Path | What it holds |
 |---|---|
 | `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
-| `.kilo/agent/` | Six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
-| `.kilo/command/` | Eight slash commands that package the workflow. |
-| `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
-| `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
-| `.kilo/repos.json`, `.kilo/scopes/` | The repo map and the canonical scope rules for a multi-repo setup. |
+| `.opencode/agents/` | Six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
+| `.opencode/commands/` | Eight slash commands that package the workflow. |
+| `.opencode/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
+| `.opencode/policies/` | Canonical guard policy; generates ordered native `permissions`. |
+| `.opencode/repos.json`, `.opencode/scopes/` | The repo map and the canonical scope rules for a multi-repo setup. |
 | `docs/` | The factory's own documentation set: board, handover, structure, decisions, changelog. |
 | `templates/project/` | The blank project skeleton a new project starts from. |
-| `kilo.jsonc` | Kilo settings, including the Playwright MCP server and the generated permission map. |
+| `opencode.jsonc` | OpenCode V2: default architect, Playwright MCP and generated permissions. No model override. |
 | `.devcontainer/` | The container this was built in: Node, Python, Rust, chromium, Kilo Code. |
 | `project/` | A project repository in this workspace. Its own git repository. Never tracked here. |
 
@@ -54,9 +58,9 @@ cd /path/to/project
 git init && git commit -m "chore: start the project"
 ```
 
-Then open it in Kilo Code and run `/decide` to fill `DOMAIN.md`, `/board` to open the first row.
+Then open it in OpenCode and run `/decide` to fill `DOMAIN.md`, `/board` to open the first row.
 
-**Existing project** — copy `AGENTS.md` and `.kilo/` into the project root, then add the
+**Existing project** — copy `AGENTS.md` and `.opencode/` into the project root, then add the
 documentation set the project needs (`DOMAIN.md`, `docs/BOARD.md`, `docs/STACK.md`) and run
 `guard.py sync` for each app repository. Drop the parts that do not apply.
 
@@ -71,10 +75,10 @@ A project is a control repo plus one repository per application.
 - **Control repo** — the project repository. It holds `AGENTS.md`, `docs/`, the board, the domain
   rules, the API contracts and the guard-rail policy.
 - **App repos** — a git repository at `apps/<name>/`, nested inside the control repo. Each holds one
-  application and its own copy of the `.kilo/` slice, so the guard rails are the same wherever the
+  application and its own copy of the `.opencode/` slice, so the guard rails are the same wherever the
   work happens.
 
-`.kilo/repos.json` maps a repo id to a path:
+`.opencode/repos.json` maps a repo id to a path:
 
     { "control": ".", "api": "apps/api" }
 
@@ -86,7 +90,7 @@ To turn an application into its own repository:
     cd ../..
     # the control repo must not track the nested repository
     printf 'apps/api/\n' >> .gitignore
-    python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
+    python3 .opencode/skills/git-worktree/scripts/guard.py sync --repo api --apply
 
 After that, `worktree.py create --board BOARD-00X --repo api` puts the worktree in that
 repository, and the board still lives in the control repo. A row names the repos it touches in its
@@ -98,9 +102,10 @@ Every change lands in a worktree **inside the repository it touches**, and the r
 lives on the control repo's board:
 
     board row  →  docs/BOARD.md of the control repo          (one writer: the orchestrator)
-    worktree   →  apps/<name>/.kilo/worktrees/<slug>/         (one per row, per repository)
+    worktree   →  apps/<name>/.opencode/worktrees/<slug>/         (one per row, per repository)
 
-The base branch is the target repository's own: `main` when it exists, otherwise the branch it
+The factory prefers `opencode` when present. Other target repositories retain their own base:
+`main` when it exists, otherwise the branch it
 names as `origin/HEAD`. Name one with `--base` to override. A row's `Repos` cell lists every
 repository it touches, and its `Branch/Worktree` cell records the exact path and branch.
 
@@ -109,31 +114,31 @@ repository it touches, and its `Branch/Worktree` cell records the exact path and
 The harness reaches a repository by copy, and the copy is a command:
 
     # one repository
-    python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
+    python3 .opencode/skills/git-worktree/scripts/guard.py sync --repo api --apply
 
     # every repository in the map, except the control repo
-    python3 .kilo/skills/git-worktree/scripts/guard.py sync --all --apply
+    python3 .opencode/skills/git-worktree/scripts/guard.py sync --all --apply
 
-A **control repo** — one that holds a repo map and a board — receives the `.kilo/` slice and a
+A **control repo** — one that holds a repo map and a board — receives the `.opencode/` slice and a
 generated permission map. A **work surface** receives one generated file: `AGENTS.md`, a pointer
 that names the project, the canonical scope rules and the unit's documentation. The pointer is
 never committed: it is listed in the repository's `.git/info/exclude`, which belongs to the clone,
 is shared by every worktree of that repository, and never enters a commit. A work surface's
 committed content is its application code alone.
 
-The factory and the project are two repositories, so a change in the factory's `.kilo/` reaches
+The factory and the project are two repositories, so a change in the factory's `.opencode/` reaches
 the project the same way — sync it into the project, then sync from the project into the work
-surfaces. The project is registered in the factory's `.kilo/repos.json` for exactly that.
+surfaces. The project is registered in the factory's `.opencode/repos.json` for exactly that.
 
 The harness finds the control repo by walking up, so the board, the repo map and the guard rails
 work from inside a work surface as well as from the control repo.
 
 ## Quick start
 
-1. Open the repo in Kilo Code, or open the devcontainer: `code .`
+1. Open the repo in OpenCode V2. The existing devcontainer port is still pending.
 2. `/board` — read the live board. A fresh clone has an empty board, so add the first row:
    ```bash
-   python3 .kilo/skills/board/scripts/board.py add --id BOARD-001 --task "What to build" \
+   python3 .opencode/skills/board/scripts/board.py add --id BOARD-001 --task "What to build" \
      --type Feature --status Ready --priority P1 --risk "🟡 medium — why" --blocked-by "None." \
      --note "- [ ] the criterion someone can check"
    ```
@@ -149,7 +154,7 @@ work from inside a work surface as well as from the control repo.
 
 | Tool | Version | Needed for |
 |---|---|---|
-| Kilo Code CLI | current | the agents and commands |
+| OpenCode | V2 | architect primary, six specialist subagents, commands and five discoverable skills |
 | git | 2.30+ | worktrees, branches, commits |
 | Node.js | 18+ | the Playwright capture script |
 | Python | 3.9+ | the board, worktree, and finding scripts |
@@ -167,26 +172,30 @@ in the main checkout — never by hand, and never from a worktree.
 The read-only dashboard shows the lanes, the cards, and the running worktrees:
 
 ```bash
-python3 .kilo/skills/board/scripts/board_serve.py --port 15180
+python3 .opencode/skills/board/scripts/board_serve.py --port 15180
 ```
 
 ## Rules that are enforced, not only written
 
 | Rule | Enforced by |
 |---|---|
-| Every change happens in a worktree named after the board row | `.kilo/skills/git-worktree/scripts/worktree.py` |
-| Deletes stay inside the worktree | `.kilo/skills/git-worktree/scripts/guard.py` |
-| Every board row is edited through the script | `.kilo/skills/board/scripts/board.py` |
-| UI evidence comes from one capture script | `.kilo/skills/qa-review/scripts/browser-review.mjs` |
-| A finding becomes a row only if it names expected, actual, and evidence | `.kilo/skills/qa-review/scripts/check-finding.py` |
-| The QA↔fix loop stops after three rounds | `.kilo/skills/qa-review/scripts/ledger.py` |
-| Git commands that change history or the remote are classified before they run | `.kilo/skills/git-worktree/scripts/guard.py check-git` |
-| The permission map and the policy file cannot drift apart | `.kilo/skills/git-worktree/scripts/guard.py check-policy` |
+| Every change happens in a worktree named after the board row | `.opencode/skills/git-worktree/scripts/worktree.py` |
+| Deletes stay inside the worktree | `.opencode/skills/git-worktree/scripts/guard.py` |
+| Every board row is edited through the script | `.opencode/skills/board/scripts/board.py` |
+| UI evidence comes from one capture script | `.opencode/skills/qa-review/scripts/browser-review.mjs` |
+| A finding becomes a row only if it names expected, actual, and evidence | `.opencode/skills/qa-review/scripts/check-finding.py` |
+| The QA↔fix loop stops after three rounds | `.opencode/skills/qa-review/scripts/ledger.py` |
+| Git commands that change history or the remote are classified before they run | `.opencode/skills/git-worktree/scripts/guard.py check-git` |
+| The permission map and the policy file cannot drift apart | `.opencode/skills/git-worktree/scripts/guard.py check-policy` |
 
-The permission map in `kilo.jsonc` is the coarse net: it denies the irreversible git commands and
+The permission map in `opencode.jsonc` is the coarse net: it denies the irreversible git commands and
 asks before the rest. `guard.py check-git` is the precise layer — it knows the current branch and
 whether the shell sits in a worktree, so it refuses a commit on `main` and a branch switch inside a
 worktree.
+
+Native read/edit rules match paths. Grep permissions match the expression and glob permissions
+match the requested pattern, not the target paths; hidden-path rules cannot protect search
+results. Automatic context enforcement and shell/container protection remain later chunks.
 
 Two rules have no script behind them, so they need your attention: no screen is built before the
 component gallery is approved, and a failed command is reported to you instead of being routed

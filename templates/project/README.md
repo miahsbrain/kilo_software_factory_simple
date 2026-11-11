@@ -23,5 +23,5 @@ One paragraph: what this project is and who uses it.
 - `docs/DECISIONS.md` — the decisions and why they were made.
 
 This repository was created from the software factory's `templates/project/` skeleton. The harness
-(`AGENTS.md`, `.kilo/`, the permission map) is a copy the project owns; see the factory's
+(`AGENTS.md`, `.opencode/`, the permission map) is a copy the project owns; see the factory's
 `AGENTS.md` §A1.

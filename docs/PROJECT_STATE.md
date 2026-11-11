@@ -1,33 +1,29 @@
 # PROJECT STATE — software factory
 
-- **Phase:** Setup — the factory holds the harness only. One project repository lives in
-  `project/` in this workspace and owns all product documentation.
-- **Progress:** The harness is complete: the rules (`AGENTS.md`), the agent team
-  (`.kilo/agent/`), the command surface (`.kilo/command/`), the skills with their scripts
-  (`.kilo/skills/`), the guard-rail policy (`.kilo/policies/git-policy.json`) that feeds both the
-  generated `permission` map in `kilo.jsonc` and `guard.py check-git`, the blank project skeleton
-  (`templates/project/`), and the QA capture path that drives Playwright only.
-- **Layout:** The factory repository is harness-only (ADR-053). A project is a separate git
-  repository that copies the harness in and owns it (ADR-054). The factory board
-  (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
-  board (ADR-055).
-- **In flight:** one branch waits for the user to merge. `fix/cleanup-and-discard-set-the-board`
-  (BOARD-108) makes the teardown command own the lane for the row it tears down: `cleanup
-  --board` sets `Merged`, `discard --board` sets `Ready`, and both clear the row's
-  `Branch/Worktree` cell in the same atomic board write. The specialist skill catalogue branch
-  (`feat/port-the-specialist-skill-catalog`, BOARD-107) adds the specialist skill catalogue at
-  `.kilo/catalog/` — the 67 upstream skills
-  (MIT, © 2025 Jeffillan) kept as files to read on demand, outside the auto-discovered skills
-  folder, with an index at `.kilo/catalog/README.md`, a Specialist skills section in `AGENTS.md`
-  §A7, the specialists named in each builder agent file, and `catalog` added to the `guard.py
-  sync` slice. The plan skill branch (`feat/port-a-merged-plan-skill`, BOARD-106) and the live
-  board viewer change (`feat/compact-accordion-redesign-of-the-live`, BOARD-102) also wait.
-- **Next action:** the user reviews and merges `fix/cleanup-and-discard-set-the-board`. Then
-  merge the other waiting branches, and pick the first project row from the project's board —
-  `project/docs/RISKS.md` holds the ranked defect list, and the top one is the cross-tenant
-  credential bleed in `payment_gateway_ms`.
-
-## Open questions
-
-- The factory repository has no remote. The user decides where it is published.
-- Whether the project repository gets its own remote, or stays local alongside the factory.
+- **Phase:** BOARD-116, parent docs review passed; reviewed change prepared for human review/local commit.
+- **Active task:** `docs/use-opencode-browser-for-interactive-ui-reviews` in
+  `.kilo/worktrees/use-opencode-browser-for-interactive-ui-reviews`, based on migration checkpoint
+  `ec7501f` on `feat/port-factory-harness-to-opencode-v2`. Approved built-in interactive browser
+  policy and derived instructions updated; canonical captures remain script-only and QA/unslop
+  gates remain mandatory. No approval to merge the migration.
+- **Migration:** BOARD-114 remains blocked during security verification; not resumed by BOARD-116.
+- **Progress:** Native `.opencode/agents`, `commands`, `skills`, `catalog` and `opencode.jsonc`;
+  architect primary plus six specialists; models inherit session selection. Existing Python/JS
+  mechanics migrated, native ordered permission generator, factory base preference `opencode`.
+- **Integration:** `opencode` receives this factory port; `main` retains Kilo. No merge or push.
+- **In flight:** `feat/port-factory-harness-to-opencode-v2` in the unchanged bootstrap worktree
+  `.kilo/worktrees/port-factory-harness-to-opencode-v2`. No board files edited by the builder.
+- **Not complete:** security adapter implemented but not verified; container port, native
+  runtime validation and independent review remain. This is not a security-complete or merge-ready port.
+- **BOARD-116 verification:** Verification limited to file review because this was a low-risk visual/static change.
+  Zero verification commands; no browser/runtime checks, builds or tests.
+- **Earlier migration verification:** `python3 .opencode/skills/git-worktree/scripts/test_env.py`
+  → exit 0, `all checks passed`; not rerun for BOARD-116.
+- **Security check:** `node --test .opencode/plugins/factory-guard/guard.test.mjs` exited 1:
+  two fixture tests hit `EACCES` creating directories under `/tmp/opencode`; policy/runtime merge
+  test passed. No retry, dependency install or alternate fixture path attempted.
+- **Next action:** human reviews the BOARD-116 task commit; parent approved all 12 file diffs
+  and authorized a local docs-only commit through the existing Kilo bootstrap guard.
+  BOARD-114 remains blocked and
+  not merge-ready; it separately awaits user authorization of a
+  writable fixture location or repair of temporary-directory access.

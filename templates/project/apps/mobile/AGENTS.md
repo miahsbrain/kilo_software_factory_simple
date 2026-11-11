@@ -90,7 +90,7 @@ Passing the anti-slop rules is not enough — the result also has to serve the u
 
 ## QA evidence
 
-The QA lane captures evidence through `.kilo/skills/qa-review/scripts/browser-review.mjs`, which
+The QA lane captures evidence through `.opencode/skills/qa-review/scripts/browser-review.mjs`, which
 computes the canonical path itself: `artifacts/mobile/qa/<date>/<task-id>/` in the **main
 checkout**. The task directory holds `notes.md` with what was checked and the expected vs actual
 result. Review reports stay in `docs/reviews/<task-id>-qa.md` and

@@ -6,8 +6,8 @@ apps/*/
 !apps/mobile/
 !apps/api/
 
-# Agent worktrees: one per board row, created by .kilo/skills/git-worktree/scripts/worktree.py
-.kilo/worktrees/
+# Agent worktrees: one per board row, created by .opencode/skills/git-worktree/scripts/worktree.py
+.opencode/worktrees/
 
 # QA evidence. The notes and the summaries are tracked; the captures are not.
 artifacts/**/*.png

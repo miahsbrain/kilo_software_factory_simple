@@ -2,7 +2,7 @@
 
 Every claim below carries a `file:line` citation. A row without one was dropped.
 
-Written by the `docs-writer` agent (`.kilo/agent/docs-writer.md`). Mode: **full read** of every
+Written by the `docs-writer` agent (`.opencode/agents/docs-writer.md`). Mode: **full read** of every
 unit listed in `docs/PROJECT_STRUCTURE.md`.
 
 ## 1. Summary

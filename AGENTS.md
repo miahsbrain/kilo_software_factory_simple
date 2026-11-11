@@ -6,13 +6,15 @@ whether it is acting as the architect/orchestrator or as a builder inside an app
 Read this file completely before doing anything. If a narrower `AGENTS.md` exists closer to the
 files you are working on, it governs that scope and this file still governs everything else.
 
-**Where things live:** this `AGENTS.md` stays at the repository root (Kilo reads it automatically).
+**Where things live:** this `AGENTS.md` stays at the repository root (OpenCode reads it automatically).
 All other documents live in `docs/` — except `DOMAIN.md`, `ROADMAP.md`, and `CHANGELOG.md`, which
 are root-level by design. Do not scatter documents elsewhere.
 
 ---
 
 # PART A — ARCHITECT & ORCHESTRATOR RULES
+
+**OpenCode port.** This branch targets OpenCode V2. The factory integration branch is `opencode`; `main` retains the Kilo factory. Factory task branches start from and are offered for human merge into `opencode`. Agents never commit directly to either integration branch, merge, or push. The `architect` primary agent delegates implementation to the specialist agents. Existing approval, board, worktree, QA, and documentation gates remain mandatory.
 
 ## A0. Role and objective
 
@@ -80,7 +82,7 @@ document.
 
 - **Multi-repo:** an application may be its own git repository, nested at `apps/<name>/`. The repo
   that holds `AGENTS.md`, `docs/` and the board is the **control repo**; each app repo is a
-  **work surface**. `.kilo/repos.json` maps a repo id to its path, and it is the only way into
+  **work surface**. `.opencode/repos.json` maps a repo id to its path, and it is the only way into
   another repository. The board, the domain rules and the API contracts stay in the control repo.
 
 - **Existing project:** the actual layout wins. Keep it. Document the discovered structure in
@@ -100,7 +102,7 @@ a separate git repository that copies the harness in and owns the copy from then
 
 | | Factory repository | Project repository |
 |---|---|---|
-| Holds | `AGENTS.md`, `.kilo/`, `.devcontainer/`, `kilo.jsonc`, `docs/`, `templates/` | `AGENTS.md`, `.kilo/`, `DOMAIN.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/`, `apps/` |
+| Holds | `AGENTS.md`, `.opencode/`, `.devcontainer/`, `opencode.jsonc`, `docs/`, `templates/` | `AGENTS.md`, `.opencode/`, `DOMAIN.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/`, `apps/` |
 | Board | `docs/BOARD.md` — factory work only | `docs/BOARD.md` — project work only |
 | Decisions | `docs/DECISIONS.md`, ADR-001… | `docs/DECISIONS.md`, ADR-100… |
 | Changelog | `docs/changelog/` — the harness | `docs/changelog/` — the product |
@@ -109,7 +111,7 @@ a separate git repository that copies the harness in and owns the copy from then
   board row or a product decision belongs in the project repository. The factory tracks no
   project: `project/` is git-ignored here.
 - **A project gets the harness by copy**, from `templates/project/` for a new project, or by
-  copying `AGENTS.md` and `.kilo/` into an existing one. The copy is deliberate — a project
+  copying `AGENTS.md` and `.opencode/` into an existing one. The copy is deliberate — a project
   owns its harness and does not depend on a path outside itself.
 - **In this workspace the project is `project/`.** It is its own git repository. Work on the
   product happens there; work on the harness happens here.
@@ -162,7 +164,7 @@ If the core project files do not exist, do Day 1 setup before any implementation
 create the folders and all governance files listed in A1 (with `TBD` where unknown), then run
 the discovery interview (A4) before writing code, scaffolding, or a final implementation plan.
 
-The `plan` skill at `.kilo/skills/plan/` carries the planning procedure and its detail: the
+The `plan` skill at `.opencode/skills/plan/` carries the planning procedure and its detail: the
 question banks, the specification template, the EARS syntax, the ADR template and the NFR
 checklist. It states its own precedence over this file in its `SKILL.md`; that rule decides when
 the two disagree.
@@ -221,7 +223,7 @@ write code or delegate while a decision is open.
 After approval, update the governance files (§A10). Preserve stack neutrality until the user
 approves stack choices.
 
-**The detail lives in the plan skill.** `.kilo/skills/plan/` carries the question banks
+**The detail lives in the plan skill.** `.opencode/skills/plan/` carries the question banks
 (`references/interview-questions.md`), the specification template, the EARS syntax, the ADR
 template and the NFR checklist, and it names the document each phase writes into. This section
 remains the contract: a batched interview, a decision sheet, nothing assumed.
@@ -322,7 +324,7 @@ may choose, and you note the choice in the changelog.
 - **Record.** Every approved decision goes into `docs/DECISIONS.md`; every unapproved guess is
   marked `ASSUMPTION` and listed in the handover's Open Questions.
 
-The `plan` skill at `.kilo/skills/plan/` assembles this sheet during its planning phase. This
+The `plan` skill at `.opencode/skills/plan/` assembles this sheet during its planning phase. This
 section owns the rule; the skill owns the mechanics of filling it in.
 
 ---
@@ -348,17 +350,17 @@ the intent. Never have an agent hand-run the underlying command when a script co
 
 | Rule | Script that owns it |
 |---|---|
-| Every change gets a worktree with a feature-named path and branch | `.kilo/skills/git-worktree/scripts/worktree.py` |
-| Deletion only inside the worktree; worktree paths confined to `.kilo/worktrees/` | `.kilo/skills/git-worktree/scripts/guard.py` |
-| The board is edited by lane and cell, never hand-written | `.kilo/skills/board/scripts/board.py` |
-| QA evidence capture: screenshots, console, page errors, network, overflow | `.kilo/skills/qa-review/scripts/browser-review.mjs` |
-| A finding is actionable before it becomes a board row | `.kilo/skills/qa-review/scripts/check-finding.py` |
-| Git commands that change history or the remote are classified before they run | `.kilo/skills/git-worktree/scripts/guard.py check-git` |
-| The permission map and the policy file cannot drift apart | `.kilo/skills/git-worktree/scripts/guard.py check-policy` |
-| A work surface's pointer matches the project's rules | `.kilo/skills/git-worktree/scripts/guard.py sync` |
-| The repo map matches the layout on disk | `.kilo/skills/git-worktree/scripts/guard.py check-repos` |
+| Every change gets a worktree with a feature-named path and branch | `.opencode/skills/git-worktree/scripts/worktree.py` |
+| Deletion only inside the worktree; worktree paths confined to `.opencode/worktrees/` | `.opencode/skills/git-worktree/scripts/guard.py` |
+| The board is edited by lane and cell, never hand-written | `.opencode/skills/board/scripts/board.py` |
+| QA evidence capture: screenshots, console, page errors, network, overflow | `.opencode/skills/qa-review/scripts/browser-review.mjs` |
+| A finding is actionable before it becomes a board row | `.opencode/skills/qa-review/scripts/check-finding.py` |
+| Git commands that change history or the remote are classified before they run | `.opencode/skills/git-worktree/scripts/guard.py check-git` |
+| The permission map and the policy file cannot drift apart | `.opencode/skills/git-worktree/scripts/guard.py check-policy` |
+| A work surface's pointer matches the project's rules | `.opencode/skills/git-worktree/scripts/guard.py sync` |
+| The repo map matches the layout on disk | `.opencode/skills/git-worktree/scripts/guard.py check-repos` |
 
-The skills in `.kilo/skills/` are the executable procedures behind these rules. When a rule
+The skills in `.opencode/skills/` are the executable procedures behind these rules. When a rule
 changes, the script and the skill change with it.
 
 ### Universal builder rule
@@ -607,13 +609,13 @@ apply to it, so a delegated prompt can stay short and specific.
 
 ### Specialist skills
 
-The specialist skills live at `.kilo/catalog/<skill>/`, with an index at
-`.kilo/catalog/README.md`. They are **not** loaded as skills: the loader only scans directories
-named `skill`/`skills`, so the catalogue is invisible to it and its 67 skills never enter the
-system prompt. An agent reaches one by **reading** `.kilo/catalog/<skill>/SKILL.md` when the task
+The specialist skills live at `.opencode/catalog/<skill>/`, with an index at
+`.opencode/catalog/README.md`. They are **not** loaded as skills: OpenCode discovers
+`.opencode/skills/`, not the catalogue, so its 67 skills never enter the
+system prompt. An agent reaches one by **reading** `.opencode/catalog/<skill>/SKILL.md` when the task
 is in that skill's domain.
 
-- Read `.kilo/catalog/README.md` first, then the one matching `SKILL.md`. Do not read the whole
+- Read `.opencode/catalog/README.md` first, then the one matching `SKILL.md`. Do not read the whole
   catalogue.
 - **This repository's rules win.** Where a catalogue skill and `AGENTS.md` disagree, `AGENTS.md`
   wins. The catalogue is specialist background, never policy, never a substitute for the
@@ -711,7 +713,7 @@ Permanent rules live in:
 | File | Owns |
 |---|---|
 | root `AGENTS.md` | architect behavior, quality, governance, orchestration, delegation, chunking, prompts, review, boot, documentation, subagent use, logging governance, learning from feedback |
-| `.kilo/agent/*.md` | The builder and reviewer agent definitions (frontend-dev, backend-dev, mobile-dev, qa-reviewer, ui-critic) |
+| `.opencode/agents/*.md` | The builder and reviewer agent definitions (frontend-dev, backend-dev, mobile-dev, qa-reviewer, ui-critic) |
 | `apps/web/AGENTS.md` | web builder execution, modularity, structure, naming, testing, API consumption, auth/session, styling, accessibility, exploration limits, reference handling |
 | `apps/mobile/AGENTS.md` | mobile builder execution, modularity, structure, naming, testing, API consumption, auth/session, platform behavior, accessibility, exploration limits |
 | `apps/api/AGENTS.md` | API builder execution, modularity, structure, naming, testing, implementation, database behavior, security, runtime logging/observability, exploration limits |
@@ -807,7 +809,7 @@ a follow-up task.
 | New/changed function, class, module | `docs/HANDOVER.md` (inventory, pure/effectful) |
 | New/changed entry point, route, command | `docs/HANDOVER.md` (entry points, API) |
 | New or changed app behaviour | `docs/handover/<unit>.md` (written by the `docs-writer` agent) |
-| New or changed app behaviour in another repo | `docs/handover/<unit>.md` (the unit's repository is read through `.kilo/repos.json`) |
+| New or changed app behaviour in another repo | `docs/handover/<unit>.md` (the unit's repository is read through `.opencode/repos.json`) |
 | New/changed data model, schema, migration | `docs/HANDOVER.md` (data), `docs/ARCHITECTURE.md` if boundaries shift |
 | New/changed state machine or transition | `docs/HANDOVER.md` (state transitions), `docs/BUSINESS-LOGIC.md` |
 | New/changed business rule | `docs/BUSINESS-LOGIC.md`, `DOMAIN.md` if user-facing |
@@ -894,7 +896,7 @@ going on, including work that has not been merged yet.
 
 Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Branch/Worktree | Notes`
 
-- **Repos** — the repositories the row touches, by id from `.kilo/repos.json`: `control` for the
+- **Repos** — the repositories the row touches, by id from `.opencode/repos.json`: `control` for the
   control repo, or the app repo ids. A row that touches two repos names both, comma-separated.
 
 - Status lanes: `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged` /
@@ -919,11 +921,11 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Bra
   at the start of every task. A row's status must match reality; fix the row before starting work.
 - **The board is edited with the script**, never by hand:
 
-      python3 .kilo/skills/board/scripts/board.py show
-      python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "..." --type Feature \
+      python3 .opencode/skills/board/scripts/board.py show
+      python3 .opencode/skills/board/scripts/board.py add --id BOARD-00X --task "..." --type Feature \
           --status Ready --priority P2 --risk "🟡 medium — one line" --blocked-by "None."
-      python3 .kilo/skills/board/scripts/board.py set-status BOARD-00X "In Progress"
-      python3 .kilo/skills/board/scripts/board.py set-field BOARD-00X --field notes --value "..."
+      python3 .opencode/skills/board/scripts/board.py set-status BOARD-00X "In Progress"
+      python3 .opencode/skills/board/scripts/board.py set-field BOARD-00X --field notes --value "..."
 
 - **A teardown command owns the lane for the row it tears down.**
   `worktree.py cleanup --board <ID> --apply` puts the row in `Merged` and clears its
@@ -941,12 +943,18 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Bra
 
 ## B4. Worktree workflow (every change, every session)
 
+**BOARD-114 bootstrap only:** the existing migration worktree remains at
+`.kilo/worktrees/port-factory-harness-to-opencode-v2` until the human merges it.
+Do not move it, create new worktrees there, or broaden the guard's `.opencode/worktrees/`
+confinement. The legacy bootstrap directory stays ignored. Lifecycle operations for it
+remain a human responsibility; it is not a second supported worktree root.
+
 **Every change happens inside a git worktree. There is no exception.** The worktree *is* the unit
 of work and it carries the code **and** every documentation update for that change. `main` stays
 clean and untouched by agents.
 
 This is **CLI only**: plain `git`, no extension, no `gh`, no browser. The executable procedure is
-the `git-worktree` skill at `.kilo/skills/git-worktree/SKILL.md`. Read it before creating a
+the `git-worktree` skill at `.opencode/skills/git-worktree/SKILL.md`. Read it before creating a
 worktree.
 
 ### The enforced rules
@@ -977,23 +985,23 @@ worktree.
    - the **slug** comes from the row's task title, kebab-cased, trimmed to the first 6 words
      when longer than 48 characters
    - branch: `feat/<slug>` | `fix/<slug>` | `chore/<slug>` | `docs/<slug>`
-   - worktree directory: `.kilo/worktrees/<slug>/`
+   - worktree directory: `.opencode/worktrees/<slug>/`
    - examples: `feat/user-login`, `fix/session-timeout`, `docs/handover-template`
    - The script records the exact worktree path and branch back onto the board row, so the row
      and the worktree can never drift apart.
 4. **Create it with the script, from the board row:**
 
-       python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
+       python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X
 
    The script reads the row, derives the type and slug, creates
-   `.kilo/worktrees/<slug>/` on branch `<type>/<slug>`, writes the row's `Branch/Worktree` and
+   `.opencode/worktrees/<slug>/` on branch `<type>/<slug>`, writes the row's `Branch/Worktree` and
    `Status` cells in the main checkout, and refuses when the branch or directory already exists.
    It never deletes anything.
 
 5. **A worktree is created in the repo the row names.** `worktree.py create --board BOARD-00X
-   --repo api` creates it under that repo's own `.kilo/worktrees/`. The board stays in the control
+   --repo api` creates it under that repo's own `.opencode/worktrees/`. The board stays in the control
    repo, and the row's `Branch/Worktree` cell records the worktree path relative to the control
-   repo. The repo id comes from `.kilo/repos.json` — the map is the only way into another
+   repo. The repo id comes from `.opencode/repos.json` — the map is the only way into another
    repository.
 6. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
    happens there. The worktree must contain the code change **and** the matching scope-doc
@@ -1114,10 +1122,10 @@ ledger and the current screenshots.
 Use the script to keep it honest:
 
 ```bash
-python3 .kilo/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
-python3 .kilo/skills/qa-review/scripts/ledger.py finding --task-id BOARD-005 --fingerprint "..." --evidence <file> --fix-row BOARD-010
-python3 .kilo/skills/qa-review/scripts/ledger.py merged --task-id BOARD-005 --fix-row BOARD-010
-python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
+python3 .opencode/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
+python3 .opencode/skills/qa-review/scripts/ledger.py finding --task-id BOARD-005 --fingerprint "..." --evidence <file> --fix-row BOARD-010
+python3 .opencode/skills/qa-review/scripts/ledger.py merged --task-id BOARD-005 --fix-row BOARD-010
+python3 .opencode/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 ```
 
 `next-round` refuses past the cap and tells you the row is done.
@@ -1142,12 +1150,12 @@ the ledger and the current screenshots — not the previous reviewer's reasoning
 The script owns the ledger:
 
 ```bash
-python3 .kilo/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
-python3 .kilo/skills/qa-review/scripts/ledger.py finding  --task-id BOARD-005 \
+python3 .opencode/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
+python3 .opencode/skills/qa-review/scripts/ledger.py finding  --task-id BOARD-005 \
     --fingerprint "bug|functional|/x|export-button" --evidence <path> --fix-row BOARD-010
-python3 .kilo/skills/qa-review/scripts/ledger.py merged   --task-id BOARD-005 --fix-row BOARD-010
-python3 .kilo/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-005 --reason "..."
-python3 .kilo/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
+python3 .opencode/skills/qa-review/scripts/ledger.py merged   --task-id BOARD-005 --fix-row BOARD-010
+python3 .opencode/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-005 --reason "..."
+python3 .opencode/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
 ```
 
 `next-round` refuses to open round 4. That refusal is the cap.
@@ -1157,7 +1165,7 @@ python3 .kilo/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
 fingerprint.
 
 ```bash
-python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+python3 .opencode/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
     --kind bug --priority medium --category functional --route /x
 ```
 
@@ -1168,7 +1176,7 @@ It prints the fingerprint on stdout, in a form that can be pasted into a board r
 refusal names the existing row and prints the command that updates it:
 
 ```bash
-python3 .kilo/skills/board/scripts/board.py add --id BOARD-010 --task "..." --type Fix \
+python3 .opencode/skills/board/scripts/board.py add --id BOARD-010 --task "..." --type Fix \
     --status Ready --priority P2 --risk "🟡 medium — one line" --blocked-by BOARD-005 \
     --fingerprint "bug|functional|/x|export-button" --note "..."
 ```
@@ -1176,7 +1184,7 @@ python3 .kilo/skills/board/scripts/board.py add --id BOARD-010 --task "..." --ty
 A repeat finding updates the existing row's notes instead of creating a new one:
 
 ```bash
-python3 .kilo/skills/board/scripts/board.py note BOARD-010 --value "<the new evidence>"
+python3 .opencode/skills/board/scripts/board.py note BOARD-010 --value "<the new evidence>"
 ```
 
 **The stop conditions.** The loop stops when any of these fires — whichever comes first:
@@ -1243,21 +1251,21 @@ reason on one line.
   shape on the base branch **before** fanning out.
 - Never delete a worktree that holds unmerged or dirty work. Preserve it and report it.
 - Clean up a worktree only after its row reaches `Merged`.
-- Never create, move, or use a worktree outside `.kilo/worktrees/`.
+- Never create, move, or use a worktree outside `.opencode/worktrees/`.
 
 ### Guard rules (enforced by the guard script, not by discipline)
 
 The guard script is the enforcement point. Run it before any destructive command:
 
 ```bash
-python3 .kilo/skills/git-worktree/scripts/guard.py check-delete -- "<command>"
+python3 .opencode/skills/git-worktree/scripts/guard.py check-delete -- "<command>"
 ```
 
 Exit 0 → allowed. Exit 1 → denied; the reason is on stderr, and the command must not be run.
 
 - **Delete inside the worktree only.** Targets outside the current worktree, inside the main
   checkout, at `/`, or at `$HOME` are denied. Temp dirs under `/tmp` and `$TMPDIR` are allowed.
-- **Worktree paths are confined** to `<project>/.kilo/worktrees/`. Check with
+- **Worktree paths are confined** to `<project>/.opencode/worktrees/`. Check with
   `guard.py check-worktree -- "<command>"`.
 - **Secrets.** Never read, grep, cat, or print `.env`, SSH keys, `.npmrc`, `credentials*`, or
   `*.pem`. Check key *presence* by name only, never by value. `.env.example` stays readable.
@@ -1275,9 +1283,9 @@ the guard-rail policy. An **app repo** is a git repository nested at `apps/<name
 application's code and nothing else. The harness lives in the control repo; a work surface never
 carries a second copy of it.
 
-- `.kilo/repos.json` maps a repo id to its path. `guard.py check-repos` fails when the map and the
+- `.opencode/repos.json` maps a repo id to its path. `guard.py check-repos` fails when the map and the
   layout disagree.
-- `.kilo/scopes/<id>.md` is the canonical copy of a scope's rules. A work surface carries a
+- `.opencode/scopes/<id>.md` is the canonical copy of a scope's rules. A work surface carries a
   **generated pointer** — an `AGENTS.md` that names the project, the canonical scope rules and the
   unit's documentation — instead of a copy of the rules. `guard.py sync --repo <id>` writes it. It
   is a dry run until `--apply`.
@@ -1308,7 +1316,7 @@ opens a PR.
 
 ### Commands are derived artifacts
 
-`.kilo/command/*.md` are **shortcuts derived from the rules in this file**. The rules are the
+`.opencode/commands/*.md` are **shortcuts derived from the rules in this file**. The rules are the
 source of truth; the commands only package a sequence for convenience.
 
 - When a rule, lane, or workflow changes, update the affected command file in the same change.
@@ -1335,9 +1343,11 @@ Keep all written output in the same plain, verifiable style:
 
 The QA lane for frontend work uses **Playwright** and produces evidence, not assertions.
 
+Use OpenCode’s built-in browser for interactive UI checks when available. Keep `browser-review.mjs` as the required source of repeatable screenshot, viewport, console, and network evidence. Built-in browser checks supplement—not replace—the existing QA and unslop gates. If the browser is unavailable, report it; do not silently switch tools.
+
 - **Capture:** the QA script drives the project's own Playwright:
 
-      node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
+      node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route /path \
           --scope <scope> --task-id <task-id> --project apps/<scope>
 
   It writes a full-page screenshot, `console.log`, `page-errors.log`, and `network.json` per route
@@ -1367,8 +1377,10 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   **Review reports and the ledger are documents, not artifacts.** They stay where documents live:
   `docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
   `docs/reviews/<task-id>-ledger.md`.
-- **The script is the only way to capture UI evidence.** The QA reviewer and the UI critic capture
-  screenshots **only** through `browser-review.mjs`. Ad-hoc `chromium`, `npx playwright
+- **The script is the only way to capture canonical UI evidence.** The QA reviewer and the UI critic capture
+  canonical screenshots **only** through `browser-review.mjs`. This does not forbid built-in
+  interactive investigation; built-in screenshots are for inspection, not substitutes for scripted
+  evidence. Follow `.opencode/skills/qa-review/SKILL.md` for built-in browser usage. Ad-hoc `chromium`, `npx playwright
   screenshot`, `curl`-and-guess, or any other browser command run from bash is **not acceptable
   evidence** for a UI review. The script never installs a browser and never falls back to another
   driver. If the script cannot do something the review needs, **say what is missing and propose
@@ -1395,7 +1407,7 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
 - **Review:** a UI/UX critique pass runs alongside QA. Findings are stated as
   expected-vs-actual with the screenshot or `file:line` that proves them.
 - **The unslop pass is mandatory on every UI change, alongside QA.** The reviewer opens
-  `.kilo/skills/unslop/SKILL.md` by path, writes the five-line direction, audits every sign in
+  `.opencode/skills/unslop/SKILL.md` by path, writes the five-line direction, audits every sign in
   `references/signs.md`, walks the nine passes and the checklist against the same capture the QA
   lane uses, and records the result. A UI row with no unslop audit is `In Review`, never
   `Pending Merge`.
@@ -1424,14 +1436,14 @@ A review finding is a **bug-fix unit of work**, so it becomes a board row.
 1. The reviewer writes the finding file and **validates it** — a finding that names no expected
    behavior, no repro, or no evidence is refused:
 
-       python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
+       python3 .opencode/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
            --kind bug --priority medium --category functional --route /path
 
    Exit 66 means the finding is too weak to act on. Fix the body, do not bypass the check.
    Exit 0 prints the finding's **fingerprint** on stdout, ready to be pasted into the board row.
 2. The **orchestrator** creates one board row per validated finding, with the script:
 
-       python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "<one line>" \
+       python3 .opencode/skills/board/scripts/board.py add --id BOARD-00X --task "<one line>" \
            --type Fix --status Ready --priority P2 --risk "🟡 medium — <blast radius>" \
            --blocked-by "BOARD-xxx" --fingerprint "<kind|category|route|subject>" \
            --note "<expected vs actual, repro, evidence path>"
@@ -1476,7 +1488,7 @@ the UI/UX critique pass. Full list with examples in `docs/UI-UX.md` §2.
 15. Contrast ≥ 4.5:1, visible focus ring, targets ≥ 24×24 CSS px.
 
 **Extended checklist.** A screen is also judged against the unslop signs list in
-`.kilo/skills/unslop/references/signs.md`, reported sign by sign with where it lives.
+`.opencode/skills/unslop/references/signs.md`, reported sign by sign with where it lives.
 **Mandatory, not advisory.** The unslop pass runs on every UI change alongside the QA lane
 (§B4.2). The precedence rule below governs only a conflict between its guidance and these rules;
 it never allows the pass to be skipped.
@@ -1496,8 +1508,10 @@ At the end of every session, or when asked to hand over:
 5. Update the **Session Notes** at the top of `docs/HANDOVER.md`.
 6. Make sure the next agent could start with **only** `AGENTS.md` + `DOMAIN.md` + `docs/` and
    no other context.
-7. **End the report with the hand-off block.** For work in a worktree, print the block from
-   `python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <ID>` — the diff
+7. Apply §B11's handoff checkpoint policy, including for blocked work; report the local commit
+   SHA and diff command without implying merge readiness.
+8. **End the report with the hand-off block.** For work in a worktree, print the block from
+   `python3 .opencode/skills/git-worktree/scripts/worktree.py handoff --board <ID>` — the diff
    command first, then the merge command. The human gets both every session, without anyone
    having to remember them. The block ends with the command that removes the worktree and
    deletes the branch.
@@ -1541,8 +1555,8 @@ custom tool is a project-sized decision, not a local workaround.
 **Before building a tool, check what exists — then ask.**
 
 1. **Check, in this order:**
-   - the skills in `.kilo/skills/` — a script may already do it
-   - the MCP servers configured in `kilo.jsonc` — a browser, a database, an API client
+   - the skills in `.opencode/skills/` — a script may already do it
+   - the MCP servers configured in `opencode.jsonc` — a browser, a database, an API client
    - globally installed tools (`npm root -g`, `pip list`, system binaries)
    - the language's standard library
    - the scripts already in the repository
@@ -1634,10 +1648,12 @@ the port values.
 
 **A worktree branch must contain commits, or there is nothing for the user to merge.** So:
 
+Before handing work back, commit all task changes locally on the worktree branch. Verified work uses the appropriate commit type; unfinished or blocked work uses a clearly labelled `wip` checkpoint. Report the commit SHA and diff command. A checkpoint does not mean merge-ready. Never commit on an integration branch, merge, or push.
+
 - **Local commits on the worktree branch are allowed and expected.** The builder commits its own
   work in its worktree, on its own branch, with the message format in §B4.1.
 - **Never commit on a protected branch.** Not for a fix, not for a typo, not for a doc. The human
-  owns the base branch. `.kilo/policies/git-policy.json` names the protected branches
+  owns the base branch. `.opencode/policies/git-policy.json` names the protected branches
   (`protected_branches`), and the repository's own default branch from `origin/HEAD` is always
   included — the microservices base on `dev`, so `dev` is protected too.
 - **Never commit to a branch that already has a worktree.** One branch, one worktree, one task.
@@ -1671,9 +1687,15 @@ Subject ≤ 72 characters, imperative voice, plain words. One logical change per
 
 ### The permission map and the guard
 
-`.kilo/policies/git-policy.json` is the single source of truth for what an agent may run without
-the user. `kilo.jsonc` carries the permission map generated from it, and
-`.kilo/skills/git-worktree/scripts/guard.py` reads the same file at runtime.
+**Security port pending:** native `read` and `edit` permissions match paths. `grep` matches
+the requested regular expression; `glob` matches the requested pattern, not the target path.
+Hidden-path patterns therefore do not protect search results. Automatic guard enforcement
+and shell/container protection are not complete until the later security/container chunks.
+Use the explicit guards and never treat this chunk as a completed security migration.
+
+`.opencode/policies/git-policy.json` is the single source of truth for what an agent may run without
+the user. `opencode.jsonc` carries the permission map generated from it, and
+`.opencode/skills/git-worktree/scripts/guard.py` reads the same file at runtime.
 
 - **Deny** — the irreversible: `git push`, `git reset --hard`, `git clean`, `git checkout --`,
   `git branch -D`, a raw `git worktree remove`, `git filter-branch`, `git filter-repo`,
@@ -1687,23 +1709,23 @@ the user. `kilo.jsonc` carries the permission map generated from it, and
   `git worktree list`, `git branch --show-current`.
 
 The guard adds three context checks a keyword list cannot see: **no commit on
-`main`/`master`/`base`**, **no branch switch inside a worktree**, and **no raw
+`main`/`master`/`base`/`opencode`**, **no branch switch inside a worktree**, and **no raw
 `git worktree remove`** — use `worktree.py cleanup`, which checks that the branch is merged and
 the tree is clean.
 
 Run the guard before any git command that changes history or the remote:
 
 ```bash
-python3 .kilo/skills/git-worktree/scripts/guard.py check-git -- "git merge feat/x"
+python3 .opencode/skills/git-worktree/scripts/guard.py check-git -- "git merge feat/x"
 ```
 
 Exit 0 allowed, 1 denied, 2 usage error, 3 needs the user's approval. The permission map in
-`kilo.jsonc` is the coarse net that stops the command before it runs; the guard is the precise
+`opencode.jsonc` is the coarse net that stops the command before it runs; the guard is the precise
 layer. `guard.py check-policy` proves the two still match, and `check-policy --write`
 regenerates the map after the policy changes.
 
 Edits follow the same split: the rules files (`AGENTS.md`, `apps/*/AGENTS.md`,
-`.kilo/agent/*.md`, `.kilo/command/*.md`, `.kilo/skills/*.md`, `.kilo/policies/*.json`,
+`.opencode/agents/*.md`, `.opencode/commands/*.md`, `.opencode/skills/*.md`, `.opencode/policies/*.json`,
 `docs/BOARD.md`) ask first, and `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12` and `id_rsa*` are
 denied. The agent adds `.env.example`; the user writes the real `.env`.
 
@@ -1720,7 +1742,7 @@ Work lands on a branch. A human reviews it and decides where it goes:
 
 - Then the human (or the agent, once the branch is confirmed merged) cleans up:
 
-      git worktree remove .kilo/worktrees/<feature-slug>
+      git worktree remove .opencode/worktrees/<feature-slug>
       git branch -d <type>/<feature-slug>
 
 The agent stops at `Pending Merge`. It does not merge, does not push, and does not open a PR.
@@ -1730,14 +1752,14 @@ The agent stops at `Pending Merge`. It does not merge, does not push, and does n
 | Question | Answer |
 |---|---|
 | What worktrees exist? | `git worktree list` |
-| What changed in mine? | `git -C .kilo/worktrees/<slug> status` and `git -C .kilo/worktrees/<slug> diff main` |
-| What is on my branch? | `git -C .kilo/worktrees/<slug> log --oneline main..HEAD` |
-| Is it mergeable? | `git -C .kilo/worktrees/<slug> merge-base --is-ancestor main HEAD && echo "no conflicts expected"` |
-| Clean it up after merge | `git worktree remove .kilo/worktrees/<slug>` and `git branch -d <branch>` |
+| What changed in mine? | `git -C .opencode/worktrees/<slug> status` and `git -C .opencode/worktrees/<slug> diff opencode` |
+| What is on my branch? | `git -C .opencode/worktrees/<slug> log --oneline opencode..HEAD` |
+| Is it mergeable? | `git -C .opencode/worktrees/<slug> merge-base --is-ancestor opencode HEAD && echo "no conflicts expected"` |
+| Clean it up after merge | `git worktree remove .opencode/worktrees/<slug>` and `git branch -d <branch>` |
 | Which row owns it? | The board row's `Branch/Worktree` column |
 
-Worktrees live under `.kilo/worktrees/<feature-slug>/` and are git-ignored. The full procedure is
-the `git-worktree` skill at `.kilo/skills/git-worktree/SKILL.md`.
+Worktrees live under `.opencode/worktrees/<feature-slug>/` and are git-ignored. The full procedure is
+the `git-worktree` skill at `.opencode/skills/git-worktree/SKILL.md`.
 
 ## B12. Definition of Done
 
