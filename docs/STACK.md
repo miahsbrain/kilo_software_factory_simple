@@ -25,6 +25,9 @@ Tailwind stylesheet, and it produces a committed file — the viewer itself need
 # Board viewer (read-only dashboard on port 15180)
 python3 .opencode/skills/board/scripts/board_serve.py --port 15180
 
+# BOARD-121 main preview, run from its assigned worktree (parent started; live 15180 unchanged)
+python3 .opencode/skills/board/scripts/board_serve.py --port 15183
+
 # Rebuild the board stylesheet after a class change (needs Node 22, not needed at runtime)
 npm --prefix .opencode/skills/board/ui run build
 # output: .opencode/skills/board/static/board.css (committed)
@@ -55,6 +58,7 @@ python3 .opencode/skills/git-worktree/scripts/guard.py check-repos
 | Port | What | Notes |
 |---|---|---|
 | 15180 | Board viewer | Read-only. `board_serve.py`. Forwarded by the dev container. |
+| 15183 | BOARD-121 main preview | Parent started from the assigned worktree; built-in browser QA held on visible-window screenshot requirement. |
 | 8080 | Gateway | Forwarded by the dev container for project work. |
 | 10350 | Tilt UI | Forwarded by the dev container for project work. |
 

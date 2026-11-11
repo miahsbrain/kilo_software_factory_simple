@@ -1,6 +1,19 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-121 main workbench implementation, 2026-11-11**
+> **Session Notes — BOARD-121 parent preview screenshot hold, 2026-11-11**
+> Parent inspected implementation `fd89d5b` and started main preview http://127.0.0.1:15183/.
+> Parent snapshot/DOM: Project selected, 14 tasks/result 14 of 14/three project worktrees;
+> Harness hidden, 21 tasks/eight control worktrees. At 1000×700 CSS, no horizontal overflow;
+> 60s refresh, 17px/600 section heading, no fixture notice. These are parent observations,
+> not independent QA. Evidence and project branch names: `docs/reviews/BOARD-121-qa.md`.
+> After tabs.focus, screenshot returned browser.operation_failed: “Screenshot needs a visible tab.
+> Call browser.tabs.focus and keep its desktop window visible.” No retry/fallback or screenshot.
+> Next: keep desktop window visible so parent can resume built-in screenshot/QA/critique.
+> Independent visual/unslop, keyboard and full responsive checks remain held; not merge-ready.
+> Existing 15-test/0.048s pass preserved. This checkpoint changes docs only: no source, browser,
+> tests/builds, rules/board or artifacts workaround. Live 15180 unchanged.
+
+> **Earlier Session Notes — BOARD-121 main workbench implementation, 2026-11-11**
 > User approved the latest hierarchy gallery: “fantastic, now build main dashboard”. Assigned
 > branch `feat/apply-approved-workbench-to-main-dashboard`, worktree of the same slug, based on
 > approved gallery `da864ef`. Main `/` now composes the same workbench tabs, toolbar, scoped board,
@@ -15,8 +28,8 @@
 > Single documented regression run exited 0: 15 tests in 0.048s. Temporary fixture trees/mocked Git,
 > no live server. CSS source/generated asset unchanged, no installs/builds or new files.
 > Source unslop passes preserve approved hierarchy/tokens; rendered QA/unslop not claimed.
-> Next: parent starts fresh preview 15183 and runs built-in-browser-only QA and critique; live
-> 15180 untouched. Not merge-ready. No board, rule, dependency or real project edits.
+> Parent has since started preview 15183; current screenshot hold is recorded above.
+> Live 15180 untouched. Not merge-ready. No board, rule, dependency or real project edits.
 
 > **Session Notes — BOARD-118 hierarchy correction, 2026-11-11**
 > User accepted the workbench direction but found section titles and task boundaries too weak.

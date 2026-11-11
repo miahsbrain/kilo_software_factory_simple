@@ -9,8 +9,15 @@
   notice or fixture rendering on main. Explicit `--file` stays fixed and associates by repo path.
 - Single regression run: `python3 .opencode/skills/board/scripts/test_board_serve.py` exited 0,
   15 tests in 0.048s. No CSS change/regeneration, dependencies, server/port, board or rule changes.
-- Next: parent starts fresh preview 15183 for built-in-browser-only QA/critique/unslop. No rendered
-  result claimed; not merge-ready. Production 15180 untouched; BOARD-120 policy stays separate.
+- Parent inspected `fd89d5b` and started main preview 15183. Supplied snapshot/DOM: Project default,
+  14 tasks/result 14 of 14/three project worktrees; hidden Harness 21 tasks/eight control worktrees.
+  At 1000×700 CSS no horizontal overflow; 60s refresh, 17px/600 heading, no fixture notice.
+- Parent observations only, not independent QA: `docs/reviews/BOARD-121-qa.md`. Screenshot after
+  tabs.focus returned browser.operation_failed: “Screenshot needs a visible tab. Call
+  browser.tabs.focus and keep its desktop window visible.” No retry/fallback or screenshot.
+- Next: visible desktop window, then parent resumes built-in screenshot/QA/critique. Independent
+  visual/unslop, keyboard and full responsive checks held; no blanket pass or merge readiness.
+  Docs-only checkpoint, no new tests/builds/browser calls. Production 15180 and BOARD-120 unchanged.
 
 ## Earlier session — BOARD-118 hierarchy correction (2026-11-11)
 

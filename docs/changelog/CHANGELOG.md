@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-11] Checkpoint main preview and screenshot hold
+**Type:** Docs
+**Board:** BOARD-121 | **Branch:** feat/apply-approved-workbench-to-main-dashboard
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/STACK.md`, this log; new `docs/reviews/BOARD-121-qa.md` stores this task's attributed parent observations and hold, not an independent verdict.
+**Why:** Parent inspected `fd89d5b` and started main preview 15183; preserve observed initial scope/DOM state and exact screenshot blocker for resumption.
+**Impact:** Parent observed Project default 14 tasks/result 14 of 14/three project worktrees; hidden Harness 21 tasks/eight control worktrees, proper isolation. At 1000×700 CSS no horizontal overflow, 60s refresh, 17px/600 heading and no fixture notice. Built-in screenshot after tabs.focus returned browser.operation_failed: “Screenshot needs a visible tab. Call browser.tabs.focus and keep its desktop window visible.” No retry/fallback or screenshot; independent visual/unslop, keyboard/full responsive QA remain held. Visible desktop window needed; not merge-ready. Live 15180 unchanged. Reversible docs-only checkpoint; no source, board, rules or artifacts workaround.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. No browser calls, tests or builds in this checkpoint. Prior implementation proof retained: documented Python regression command exited 0, 15 tests in 0.048s.
+
 ## [2026-11-11] Apply approved workbench to the main dashboard
 **Type:** Feature
 **Board:** BOARD-121 | **Branch:** feat/apply-approved-workbench-to-main-dashboard
