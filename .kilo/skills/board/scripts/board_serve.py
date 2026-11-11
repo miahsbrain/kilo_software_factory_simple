@@ -495,7 +495,7 @@ body.compact .note { line-height: 1.35; }
 @media (max-width: 640px) {
   .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: hidden; }
   .flow-stop { padding: var(--s2) var(--s1); }
-  .flow-name { line-height: 1.2; }
+  .flow-name { line-height: 1.2; min-height: 2.4em; }
   .wt-table thead { display: none; }
   .wt-table, .wt-table tbody, .wt-table tr, .wt-table td { display: block; width: 100%; }
   .wt-table tr { border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: var(--s2); background: var(--surface); }
