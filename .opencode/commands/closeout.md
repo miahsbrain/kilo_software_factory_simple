@@ -23,3 +23,8 @@ approval waits for the user. Never push, never merge, never open a PR.
 Report your lane status and evidence to the orchestrator. Blocked work stays `Blocked`; only
 work that passes the existing review and merge gates moves through `In Review` to `Pending Merge`,
 the state that waits for human approval to merge.
+Recheck the live worktree and board before presenting merge guidance (§B11). Run
+`python3 .opencode/skills/git-worktree/scripts/worktree.py handoff --board <ID>` for the final
+block. Only finished, verified, reviewed, committed, clean `Pending Merge` work gets a merge
+command. Otherwise provide only review/diff commands and blockers; never manually append merge
+or teardown commands to a refused handoff.

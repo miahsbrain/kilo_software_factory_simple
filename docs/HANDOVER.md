@@ -1,5 +1,34 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-123 handoff gates, 2026-11-11**
+> Branch `fix/gate-merge-handoffs-on-finished-clean-worktrees`, worktree of the same slug.
+> Extended `cmd_handoff` and approved factory/template §B11 policy; derived commands/skill align.
+> Initial focused run failed on Status lookup; corrected to existing `STATUS_INDEX`.
+> Architect-authorized second run passed: 13 tests in 3.847s, exit 0. Parent review and live
+> `Pending Merge` remain required before merge guidance. Existing project untouched.
+> Earlier staging exited 1 on ignored `.opencode`; architect authorized exact new-test force-add
+> and narrow tracked-path staging. No broad force-add, installs, browser or build work.
+
+## BOARD-123 handoff contract
+
+- Effectful `cmd_handoff` (`.opencode/skills/git-worktree/scripts/worktree.py:971`) reuses the
+  board parser, live-row resolver, `STATUS_INDEX`, repo/base and Git helpers. It checks live branch
+  identity, staged/unstaged/untracked status, commit count and ancestry; failed/missing Git data
+  refuses guidance. No second readiness framework or change to `cmd_verify`.
+- Exit 1 / `REFUSED`: review/diff/log plus specific blockers, no merge or teardown. Exit 0 / `OK`:
+  clean `Pending Merge` with commits ahead gets diff/log before human merge/cleanup guidance.
+  Clean already-merged work retains show/cleanup without a merge command; other gates still apply.
+- `Pending Merge` represents the orchestrator's passed verification/review gates; the CLI does
+  not run verification or certify review itself. Manual merge commands are gated by §B11 too.
+- New adjacent `test_handoff.py` reuses effectful `test_env.make_repo/run/git/write` scratch
+  fixtures, isolates temporary repositories inside this task tree, and mocks only Git failures.
+  Existing lifecycle `handoff()` assertions now create a task commit and set scratch Pending Merge
+  before expecting merge guidance. Full lifecycle suite not run; focused command in STACK.
+- Architect-authorized second focused run passed: 13 tests in 3.847s, exit 0. Dirty states,
+  all nonready statuses, missing info/Git failures, commits ahead, read-only behavior and already-
+  merged paths covered. Initial run failed nine status assertions; correction reused `STATUS_INDEX`.
+  No browser, build, installs or real board edits. Parent review/lane transition still required.
+
 > **Session Notes — BOARD-122 builder verification complete, 2026-11-11**
 > Branch `feat/keep-live-board-local-and-untracked`, worktree of the same slug. Shared bootstrap
 > and marker-based control-root lookup implemented; approved root/template rules and derived
@@ -422,9 +451,10 @@ The factory exposes no network API. Its public surface is the file layout above 
 the scripts. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
 `verify`, `cleanup`) and `env.py` (`sync`, `status`, `clean`). `discard` takes `--apply`, `--force`
 and `--yes`: `--force` alone prints the destruction plan, and `--force --yes` acts after writing a
-recovery copy under the repository's `cleanup-wt/` folder. `handoff --board <ID>` prints the
-hand-off block — the diff command, then the merge command, then the teardown command — and
-changes nothing. `cleanup` takes the worktree either as a slug or as `--board <ID>`, which
+recovery copy under the repository's `cleanup-wt/` folder. `handoff --board <ID>` prints review
+commands and changes nothing. Merge/teardown guidance requires the live §B11 readiness gate;
+refused handoffs show blockers only after review commands (see BOARD-123 contract above).
+`cleanup` takes the worktree either as a slug or as `--board <ID>`, which
 resolves the row's `Branch/Worktree` cell and clears it when the worktree is gone; giving both or
 neither is a usage error. The lane each command sets: `create` and `resume` put the row in
 `In Progress`, `cleanup --board` puts it in `Merged`, `discard --board` puts it back in `Ready`,

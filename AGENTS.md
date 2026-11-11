@@ -1493,10 +1493,9 @@ At the end of every session, or when asked to hand over:
 7. Apply §B11's handoff checkpoint policy, including for blocked work; report the local commit
    SHA and diff command without implying merge readiness.
 8. **End the report with the hand-off block.** For work in a worktree, print the block from
-   `python3 .opencode/skills/git-worktree/scripts/worktree.py handoff --board <ID>` — the diff
-   command first, then the merge command. The human gets both every session, without anyone
-   having to remember them. The block ends with the command that removes the worktree and
-   deletes the branch.
+   `python3 .opencode/skills/git-worktree/scripts/worktree.py handoff --board <ID>`.
+   Apply §B11's merge-guidance gate; a refused handoff supplies review commands and blockers,
+   never a manually added merge or teardown command.
 
 ## B6. Reuse before creation (hard rule)
 
@@ -1631,6 +1630,8 @@ the port values.
 **A worktree branch must contain commits, or there is nothing for the user to merge.** So:
 
 Before handing work back, commit all task changes locally on the worktree branch. Verified work uses the appropriate commit type; unfinished or blocked work uses a clearly labelled `wip` checkpoint. Report the commit SHA and diff command. A checkpoint does not mean merge-ready. Never commit on an integration branch, merge, or push.
+
+Never provide a merge command until the work is finished, verification and review have passed, all task changes are committed, the worktree is clean, and its board row is Pending Merge. For unfinished, blocked, dirty, or unverified work, provide only review/diff commands and blockers. Recheck the live worktree and board before presenting merge guidance.
 
 - **Local commits on the worktree branch are allowed and expected.** The builder commits its own
   work in its worktree, on its own branch, with the message format in §B4.1.

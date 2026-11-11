@@ -55,10 +55,10 @@ references under `AGENTS.md` §A7, and report skills used or that none matched.
    to `Pending Merge` with `board.py set-status`.
    That state means the work is waiting for human approval to merge.
 6. **Hand off.** Report the worktree path, the branch, the commits, and the review commands.
-   Print the merge command for the user:
-
-       git merge --no-ff <type>/<feature-slug> -m "merge: <feature-slug>"
-
+   Recheck the live worktree and board under §B11's merge-guidance gate. Print the block from
+   `python3 .opencode/skills/git-worktree/scripts/worktree.py handoff --board <ID>`.
+   Only finished, verified, reviewed, committed, clean `Pending Merge` work gets merge guidance.
+   Otherwise provide only review/diff commands and blockers, never manually added merge or teardown.
    Never merge, push, or open a PR yourself.
 
 Report in this order: what was done, what is proven, what is not done and why, next action.

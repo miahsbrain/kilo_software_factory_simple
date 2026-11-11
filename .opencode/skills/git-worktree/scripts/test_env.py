@@ -311,7 +311,7 @@ def main():
 
 
 def handoff(repo, worktree_script, call, check):
-    """The hand-off block: the diff command first, then the merge command."""
+    """Review first; merge guidance only for committed, finished work."""
     code, out, err = call(worktree_script, "handoff", "--board", "BOARD-901")
     check(code != 0, "handoff did not refuse for a row with no worktree")
     check("no live worktree" in out + err, "the refusal does not say what is missing")
@@ -321,6 +321,17 @@ def handoff(repo, worktree_script, call, check):
     slug = "hand-off-a-worktree"
     worktree = os.path.join(repo, ".opencode", "worktrees", slug)
     check(os.path.isdir(worktree), "the BOARD-904 worktree was not created")
+
+    code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")
+    check(code == 1, "unfinished handoff did not refuse merge guidance")
+    check("git merge --no-ff" not in out, "unfinished handoff offered a merge")
+    check("cleanup --board" not in out, "unfinished handoff offered teardown")
+    write(os.path.join(worktree, "kept.txt"), "committed on the branch\n")
+    git(worktree, "add", "kept.txt")
+    git(worktree, "commit", "-m", "a commit on the branch")
+    board_script = os.path.join(repo, ".opencode", "skills", "board", "scripts", "board.py")
+    code, out, err = call(board_script, "set-status", "BOARD-904", "Pending Merge")
+    check(code == 0, "could not mark finished scratch work Pending Merge")
 
     code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")
     check(code == 0, "handoff failed: %s%s" % (out, err))
@@ -340,9 +351,6 @@ def handoff(repo, worktree_script, call, check):
     check("git branch -d feat/hand-off-a-worktree" in out, "the block has no manual branch delete")
     check(teardown_at > merge_at, "the teardown comes before the merge command")
 
-    write(os.path.join(worktree, "kept.txt"), "committed on the branch\n")
-    git(worktree, "add", "-A")
-    git(worktree, "commit", "-m", "a commit on the branch")
     git(repo, "merge", "--no-ff", "feat/hand-off-a-worktree", "-m", "merge: hand-off-a-worktree")
 
     code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")

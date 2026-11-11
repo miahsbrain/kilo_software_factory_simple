@@ -16,3 +16,6 @@ Before reporting, apply `AGENTS.md` §B11's handoff checkpoint policy: commit ta
 on the worktree branch, including a `wip` checkpoint when unfinished or blocked. Report the commit
 SHA and diff command alongside the files you wrote, units documented and skipped, and mode used.
 This checkpoint does not bypass verification or human-merge gates.
+Apply §B11's merge-guidance gate: recheck the live worktree and board. Never provide a merge
+command before finished, verified, reviewed, committed, clean `Pending Merge` work. Otherwise
+provide only review/diff commands and blockers, with no manually added merge or teardown command.

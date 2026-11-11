@@ -31,8 +31,9 @@ destruction plan and never acts, and --force --yes acts after writing a
 recovery copy — the uncommitted changes as a patch, and the lost commit shas
 in the recovery TSV, both under <git-common-dir>/cleanup-wt/.
 
-handoff prints the hand-off block for a row: the diff command first, then the
-merge command. It prints commands and paths only; it never changes anything.
+handoff prints review commands for a row. Merge guidance requires Pending Merge,
+a clean worktree and committed work ahead of base; failed checks refuse guidance.
+It never changes anything.
 
 --repo picks the repository the worktree is created in. The id comes from
 .opencode/repos.json in the control repo; the default is "control", the control
@@ -993,8 +994,13 @@ def cmd_handoff(args, cwd):
         print("row %s has no live worktree in %s; nothing to hand off" % (args.board, target),
               file=sys.stderr)
         return REFUSED
-    branch = branch or (git_out(path, "rev-parse", "--abbrev-ref", "HEAD") or "")
-    repo = repo_of_path(path) or target
+    live_branch = git_out(path, "symbolic-ref", "--short", "HEAD")
+    repo = repo_of_path(path)
+    if not repo:
+        print("cannot determine the worktree repository; merge guidance withheld", file=sys.stderr)
+        return REFUSED
+    recorded_branch = branch
+    branch = branch or live_branch
     base, base_err = resolve_base(repo, args.base)
     if base_err:
         print(base_err, file=sys.stderr)
@@ -1010,7 +1016,37 @@ def cmd_handoff(args, cwd):
     print("  git -C %s diff %s" % (path, base))
     print("log:")
     print("  git -C %s log --oneline %s..HEAD" % (path, base))
-    if branch_already_merged(repo, branch, base):
+    blockers = []
+    status = cells[STATUS_INDEX] if len(cells) > STATUS_INDEX else ""
+    if not recorded_branch or not live_branch or live_branch != branch:
+        blockers.append("cannot confirm the live branch matches the board worktree")
+    code, dirty, _ = git(path, "status", "--porcelain", "--untracked-files=all")
+    if code != 0:
+        blockers.append("git status failed; cleanliness is unknown")
+    elif dirty:
+        blockers.append("the worktree has staged, unstaged or untracked changes; commit task changes")
+    code, ahead, _ = git(path, "rev-list", "--count", "%s..HEAD" % base)
+    if code != 0 or not ahead.isdigit():
+        blockers.append("cannot determine commits ahead of %s" % base)
+    ancestor_code, _, _ = git(path, "merge-base", "--is-ancestor", "HEAD", base)
+    if ancestor_code not in (0, 1):
+        blockers.append("git ancestry check failed; merge state is unknown")
+    tip = git_out(path, "rev-parse", "HEAD")
+    base_tip = git_out(path, "rev-parse", "refs/heads/" + base)
+    if not tip or not base_tip:
+        blockers.append("cannot resolve worktree and base commits")
+    merged = ancestor_code == 0 and tip and base_tip and tip != base_tip
+    if not merged:
+        if status != "Pending Merge":
+            blockers.append("board status is %s, not Pending Merge; finish verification and review"
+                            % (status or "missing"))
+        if ahead == "0":
+            blockers.append("no committed work ahead of %s" % base)
+    if blockers:
+        for blocker in blockers:
+            print("NOT READY: %s" % blocker, file=sys.stderr)
+        return REFUSED
+    if merged:
         print("show:")
         print("  git -C %s show --stat %s..%s" % (path, base, branch))
         print("the branch is already merged into %s; there is nothing to merge" % base)
