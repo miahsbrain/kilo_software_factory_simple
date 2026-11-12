@@ -527,7 +527,7 @@ class BoardMigrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="migration-test-", dir=Path(__file__).parents[4]) as temp:
             repo = test_env.make_repo(temp)
             test_env.write(str(Path(repo, ".gitignore")),
-                           ".opencode/worktrees/\n__pycache__/\ndocs/BOARD.md\n")
+                           "/.factory-state/\n.opencode/worktrees/\n__pycache__/\ndocs/BOARD.md\n")
             self.assertEqual(test_env.git(repo, "add", ".gitignore")[0], 0)
             self.assertEqual(test_env.git(repo, "commit", "-m", "ignore runtime files")[0], 0)
             board_script = Path(repo, ".opencode/skills/board/scripts/board.py")
