@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Align BOARD-146 docs after rebase
+**Type:** Docs
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Preserve BOARD-149 artifact policy and retain BOARD-146 decisions under unique ADR numbers after rebasing onto `opencode`.
+**Impact:** Documentation only; no board state or application behavior changed. User-reported board suite result was not rerun.
+
 ## [2026-11-12] Record BOARD-149 final review handoff
 **Type:** Docs
 **Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts

@@ -4,8 +4,9 @@
 > BOARD-146 adds normalized planned items, criteria, active work, and terminal history with an
 > explicit migration and compatibility CLI. Same-line checklists retain separate verification and
 > proof; `remove` cancels while retaining history. The user reports the suite passed 42 tests in
-> 3.139s; it was not rerun for this alignment. The branch is being rebased onto current `opencode`;
-> no live board or migration was run.
+> 3.139s; it was not rerun for this alignment. Rebased onto local `opencode` at `1ca043a`;
+> BOARD-149 artifact policy and BOARD-146 schema/docs are retained with unique ADR-099/100/101.
+> No live board or migration was run.
 
 > **Session Notes — BOARD-149 QA artifacts, 2026-11-12**
 > New QA/UI reports and evidence live in the shared main-checkout directory

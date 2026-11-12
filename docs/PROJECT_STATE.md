@@ -4,8 +4,9 @@
 
 - BOARD-146 normalized storage, compatibility CLI, explicit migration, checklist parsing and
   cancellation history are retained. The user reports the board suite passed 42 tests in 3.139s;
-  it was not rerun for this alignment. Rebase onto current `opencode` is in progress. Do not run a
-  live migration or modify the live board.
+  it was not rerun for this alignment. Rebased onto local `opencode` at `1ca043a`; conflict
+  resolution retained BOARD-149 artifact policy and unique ADR-099/100/101. Do not run a live
+  migration or modify the live board.
 
 ## Previous session — BOARD-149 QA report artifacts (2026-11-12)
 
