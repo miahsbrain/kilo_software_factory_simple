@@ -12,13 +12,15 @@
 > Fixture prefixes now resolve inside this task worktree using the repo-local `test_handoff.py`
 > precedent. All subprocess working directories are explicit and in-worktree; no cleanup/deletes
 > or test rerun occurred. No outside paths were accessed during the correction.
-> Read-only diagnosis: configured permissions have 142 rules, generated policy 136. Only configured
-> indices 64–69 (zero-based) differ: edit denies for `artifacts/**`, `**/artifacts/**`,
-> `/**/artifacts/**`, `.factory-state/reviews/*-ledger.md`,
-> `**/.factory-state/reviews/*-ledger.md`, `/**/.factory-state/reviews/*-ledger.md`.
-> All remaining rules match in order. Policy/config are unchanged. Recommendation awaiting approval:
-> add those six denies to canonical policy at the corresponding position, preserving role overrides.
-> Next: orchestrator obtains policy correction approval and authorizes verification.
+> Approved synchronization added the six existing config denies to `policy.native` (not `edit`)
+> and regenerated config with `guard.py check-policy --write`. Policy equality now passes.
+> Final authorized test run exited 1: 4/5 passed in 4437.727463ms; the role test failed at
+> `.opencode/plugins/factory-guard/guard.test.mjs:184`: `frontend-dev: qa.md`,
+> `'allow' !== 'deny'`. No third run or workaround. Scratch fixtures remain inside this worktree.
+> Security blocker: `generated_permission` (`.opencode/skills/git-worktree/scripts/guard.py:758`)
+> emits native denies before the blanket edit allow, which overrides them. Agent rules are unchanged.
+> Next: approve ordering native denies after base edit rules, preserving per-agent overrides,
+> then authorize focused correction and verification. Do not merge this checkpoint.
 > Independent QA/review remain outstanding; this checkpoint is not merge-ready.
 
 > **Session Notes — BOARD-150 planning CLI database resolution, 2026-11-12**

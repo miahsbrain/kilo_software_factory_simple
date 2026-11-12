@@ -13,7 +13,13 @@
     "reason": "Not a guarded operation."
   },
   "native": [
-    { "action": "factory_guard_approval", "resource": "*", "effect": "ask" }
+    { "action": "factory_guard_approval", "resource": "*", "effect": "ask" },
+    { "action": "edit", "resource": "artifacts/**", "effect": "deny" },
+    { "action": "edit", "resource": "**/artifacts/**", "effect": "deny" },
+    { "action": "edit", "resource": "/**/artifacts/**", "effect": "deny" },
+    { "action": "edit", "resource": ".factory-state/reviews/*-ledger.md", "effect": "deny" },
+    { "action": "edit", "resource": "**/.factory-state/reviews/*-ledger.md", "effect": "deny" },
+    { "action": "edit", "resource": "/**/.factory-state/reviews/*-ledger.md", "effect": "deny" }
   ],
   "blocked_tools": ["opencode_worktree_create", "opencode_worktree_remove"],
   "shell": [

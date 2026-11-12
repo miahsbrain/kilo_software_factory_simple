@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Checkpoint native deny synchronization with ordering blocker
+**Type:** Fix
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `.opencode/policies/git-policy.json`, script-generated `opencode.jsonc`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Approved addition of six existing config artifact/ledger edit denies to `policy.native` avoids applying role-independent Python `file_effect` denials. Reused `guard.py check-policy --write`; no hand edits to generated config, shell or agent rules.
+**Impact:** Final authorized test run exited 1: 4/5 passed, 4437.727463ms. Policy equality passes; role regression fails at `guard.test.mjs:184`: `frontend-dev: qa.md`, `'allow' !== 'deny'`. Native denies precede and are overridden by the generated blanket edit allow. Security blocker; no third run, workaround or cleanup. Recommend approval to order native denies after base edit rules while retaining role overrides. Repo-local scratch fixtures retained; independent QA/review pending, not merge-ready.
+
 ## [2026-11-12] Keep BOARD-151 fixtures in the task worktree and diagnose policy drift
 **Type:** Fix
 **Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions

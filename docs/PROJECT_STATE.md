@@ -10,12 +10,14 @@
   `/tmp/opencode` is forbidden, not an environment needing access repair. Fixtures now use unique
   prefixes inside this task worktree; Python subprocess cwd is explicitly this worktree.
   No test rerun, outside-path access, deletes or live artifact writes during this correction.
-- Exact read-only mismatch: config 142 rules vs generated 136; config-only edit denies at zero-based
-  indices 64–69: `artifacts/**`, `**/artifacts/**`, `/**/artifacts/**`,
-  `.factory-state/reviews/*-ledger.md`, `**/.factory-state/reviews/*-ledger.md`,
-  `/**/.factory-state/reviews/*-ledger.md`. Every other rule matches in order. Policy/config unchanged.
-- Next: approve adding these six denies to canonical policy (recommended; retain role overrides),
-  then authorize verification and independent QA/review. Not merge-ready; earlier sessions historical.
+- Approved six-deny synchronization into `policy.native` and script regeneration completed;
+  policy/config equality now passes. Shell rules and per-agent permissions remain unchanged.
+- Final authorized verification exited 1: 4/5 passed in 4437.727463ms. Role test at
+  `.opencode/plugins/factory-guard/guard.test.mjs:184` failed: `frontend-dev: qa.md`,
+  `'allow' !== 'deny'`. Generator emits native denies before the blanket edit allow,
+  so the later allow overrides them. Security boundary is red; no third run or workaround.
+- Next: approve generation ordering that puts native denies after base edit rules while retaining
+  role overrides, then authorize correction/verification. QA/review pending; not merge-ready.
 
 ## Current session — BOARD-150 planning CLI database resolution (2026-11-12)
 
