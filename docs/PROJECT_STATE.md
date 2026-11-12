@@ -7,9 +7,8 @@
   `.factory-state/`; the original `.git/` state remains untouched, and cleanup was not approved
   or performed. `state.py path` and `board.py show` resolve to the new state.
 - Verification: runtime-state suite passed 13 tests; board suite passed 35; handoff suite passed
-  34 (run by the user after the final fixture correction). BOARD-148 remains In Progress while
-  the independent QA report and final review are completed. Next: finish the review and request
-  human integration only after the board row reaches Pending Merge.
+  34 (run by the user after the final fixture correction). Independent QA returned PASS. Next:
+  record the acceptance proofs on BOARD-148 and present the verified branch for human integration.
 
 ## Current session — BOARD-131 factory backlog plan reviewed (2026-11-12)
 

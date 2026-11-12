@@ -4,9 +4,9 @@
 > The verified snapshot is installed at `.factory-state/`; the original `.git/` state remains
 > untouched and cleanup was not approved or performed. `state.py path` resolves to the new store,
 > and `board.py show` reads the migrated board. Runtime-state tests passed 13/13, board tests 35/35,
-> and the user-run handoff suite passed 34/34 after the final fixture correction. BOARD-148 remains
-> In Progress in `chore/move-clone-local-state-out-of-git-metadata`; next: finish independent QA
-> evidence and review before requesting human integration.
+> and the user-run handoff suite passed 34/34 after the final fixture correction. Independent QA
+> returned PASS. Next: record BOARD-148 acceptance proofs and present the verified branch for human
+> integration. No cleanup of the original `.git/` state was approved or performed.
 
 > **Session Notes — BOARD-126 ready for human inspection, 2026-11-12**
 > Registered repositories appear in the read-only feeds. `/api/repo-candidates` lists
