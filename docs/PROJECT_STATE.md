@@ -12,12 +12,12 @@
   No test rerun, outside-path access, deletes or live artifact writes during this correction.
 - Approved six-deny synchronization into `policy.native` and script regeneration completed;
   policy/config equality now passes. Shell rules and per-agent permissions remain unchanged.
-- Final authorized verification exited 1: 4/5 passed in 4437.727463ms. Role test at
-  `.opencode/plugins/factory-guard/guard.test.mjs:184` failed: `frontend-dev: qa.md`,
-  `'allow' !== 'deny'`. Generator emits native denies before the blanket edit allow,
-  so the later allow overrides them. Security boundary is red; no third run or workaround.
-- Next: approve generation ordering that puts native denies after base edit rules while retaining
-  role overrides, then authorize correction/verification. QA/review pending; not merge-ready.
+- The prior role failure led to explicitly approved generation ordering correction: native rules
+  now follow generic shell/edit rules. Shell semantics, approval ask and agent exceptions are retained.
+- Explicitly approved further verification passed: `node --test .opencode/plugins/factory-guard/guard.test.mjs`,
+  exit 0, 5/5 tests, 8146.249618ms. Canonical boundaries, role denials and ordering regressions pass.
+- Repo-local scratch directories are retained under narrow root-anchored test-prefix ignores;
+  no fixture bytes staged or deleted. Next: independent QA/review; not yet merge-ready.
 
 ## Current session — BOARD-150 planning CLI database resolution (2026-11-12)
 

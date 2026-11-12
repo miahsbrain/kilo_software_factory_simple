@@ -21,6 +21,8 @@ artifacts/**/network.json
 
 # Local scratch
 .tmp/
+/factory-guard-test-*/
+/factory-hook-test-*/
 **/__pycache__/
 *.pyc
 node_modules/

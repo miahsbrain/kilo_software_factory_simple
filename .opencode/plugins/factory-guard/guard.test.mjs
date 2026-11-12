@@ -99,6 +99,11 @@ test('generated native policy and portable runtime merge preserve settings', asy
   const code = `import importlib.util,json,sys
 spec=importlib.util.spec_from_file_location('guard',sys.argv[1]); g=importlib.util.module_from_spec(spec);spec.loader.exec_module(g)
 p=g.load_policy(sys.argv[2]); c,_=g.load_config(sys.argv[3]); assert c['permissions']==g.generated_permission(p)
+generated=g.generated_permission(p)
+base=[{'action':'*','resource':'*','effect':p['fallback']['action']}]+[{'action':kind,'resource':r['pattern'],'effect':r['action']} for kind in ('shell','edit') for r in p[kind]]
+assert generated[:len(base)]==base
+assert generated[len(base):len(base)+len(p['native'])]==p['native']
+assert {'action':'factory_guard_approval','resource':'*','effect':'ask'} in p['native']
 m=g.merge_runtime(c,{'model':'fixture/model','mcp':{'servers':{'custom':{'type':'local','command':['dummy']}}}})
 assert m['default_agent']=='architect' and m['model']=='fixture/model'
 assert 'playwright' in m['mcp']['servers'] and 'custom' in m['mcp']['servers']

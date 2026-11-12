@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Preserve native deny ordering and verify BOARD-151
+**Type:** Fix
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `.opencode/skills/git-worktree/scripts/guard.py`, `.opencode/plugins/factory-guard/guard.test.mjs`, script-generated `opencode.jsonc`, `.gitignore`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Approved ordering correction extends existing `generated_permission`: native restrictions now follow generic shell/edit rules, so blanket allow cannot override artifact/ledger denies. Existing regression checks preserve base shell/edit order, approval ask and configured role exceptions.
+**Impact:** Approved further `node --test .opencode/plugins/factory-guard/guard.test.mjs` run passed 5/5, exit 0, 8146.249618ms. No shell/agent rules changed. Scratch fixtures remain repository-local, retained under root-anchored `/factory-guard-test-*/` and `/factory-hook-test-*/` ignores; no deletes or fixture commits. Independent QA/review remain pending; builder verification is not merge approval.
+
 ## [2026-11-12] Checkpoint native deny synchronization with ordering blocker
 **Type:** Fix
 **Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions

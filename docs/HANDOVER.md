@@ -14,14 +14,14 @@
 > or test rerun occurred. No outside paths were accessed during the correction.
 > Approved synchronization added the six existing config denies to `policy.native` (not `edit`)
 > and regenerated config with `guard.py check-policy --write`. Policy equality now passes.
-> Final authorized test run exited 1: 4/5 passed in 4437.727463ms; the role test failed at
-> `.opencode/plugins/factory-guard/guard.test.mjs:184`: `frontend-dev: qa.md`,
-> `'allow' !== 'deny'`. No third run or workaround. Scratch fixtures remain inside this worktree.
-> Security blocker: `generated_permission` (`.opencode/skills/git-worktree/scripts/guard.py:758`)
-> emits native denies before the blanket edit allow, which overrides them. Agent rules are unchanged.
-> Next: approve ordering native denies after base edit rules, preserving per-agent overrides,
-> then authorize focused correction and verification. Do not merge this checkpoint.
-> Independent QA/review remain outstanding; this checkpoint is not merge-ready.
+> The prior 4/5 run exposed native denies preceding the blanket edit allow. User approved correcting
+> `generated_permission` (`.opencode/skills/git-worktree/scripts/guard.py:758`) to emit native
+> restrictions after generic shell/edit rules. Config was regenerated; agent rules are unchanged.
+> The explicitly approved further run passed 5/5 in 8146.249618ms (exit 0), including configured
+> role denials, canonical boundaries and generation ordering. No additional test run occurred.
+> Scratch fixtures remain inside this worktree; root-anchored `/factory-guard-test-*/` and
+> `/factory-hook-test-*/` ignores retain disposable bytes without staging them. Nothing was deleted.
+> Next: independent QA/review of the committed change. Builder verification is green, not merge approval.
 
 > **Session Notes — BOARD-150 planning CLI database resolution, 2026-11-12**
 > On `fix/fix-planning-cli-database-resolution` in `.opencode/worktrees/fix-planning-cli-database-resolution/`,

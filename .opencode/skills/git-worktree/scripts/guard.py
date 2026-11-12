@@ -763,11 +763,11 @@ def generated_permission(policy):
     """
     fallback = policy.get("fallback", {}).get("action", "allow")
     block = [{"action": "*", "resource": "*", "effect": fallback}]
-    for rule in policy.get("native", []):
-        block.append(dict(rule))
     for kind in ("shell", "edit"):
         for rule in policy.get(kind, []):
             block.append({"action": kind, "resource": rule["pattern"], "effect": rule["action"]})
+    for rule in policy.get("native", []):
+        block.append(dict(rule))
     hidden = policy.get("hidden_paths") or {}
     tools = [tool for tool in hidden.get("tools", FILE_TOOLS) if tool in FILE_TOOLS]
     for tool in tools:
