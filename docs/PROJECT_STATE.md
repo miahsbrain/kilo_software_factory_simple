@@ -3,12 +3,23 @@
 ## Current session — BOARD-152 task purge (2026-11-12)
 
 - Worktree `.opencode/worktrees/add-human-confirmed-task-purge/`, branch
-  `feat/add-human-confirmed-task-purge`. Implementation added; the single documented check passed
-  20 tests in 5.876 seconds. Awaiting independent QA/review, not marked merge-ready by the builder.
+  `feat/add-human-confirmed-task-purge`. Implementation checkpoint `7e30045` is **Blocked**:
+  independent QA round 1 FAIL. Builder check passed 20 tests in 5.876 seconds; QA's documented
+  `test_task_purge.py` run passed 20 in 5.744 seconds but does not prove destructive isolation.
+- Source findings: `.opencode/skills/git-worktree/scripts/task_purge.py:62-78` accepts nested linked
+  repositories with `.git` files, then recursive deletion at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:359-360` can remove them. Backup preparation
+  at `.opencode/skills/git-worktree/scripts/task_purge.py:457-471` precedes the durable manifest;
+  a partial `content/` directory can prevent retry.
+- Validated evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-152/`
+  (`qa.md`, `finding-1.md`, `finding-2.md`). Architect owns round-1 ledger/fingerprint records.
 - Four follow-up policies approved: independent high-water IDs, explicit cancelled-orphan evidence,
   durable resumable manifest with task deletion last, historical/shared backup retention.
 - No live purge, cleanup, integration or remote operation. BOARD-153 clean-slate and BOARD-154
-  shortcuts remain queued. Next: independent review of this worktree and its focused-test evidence.
+  shortcuts remain queued. Next: human decision before the original builder corrects this worktree.
+  Recommend nested Git-marker rejection with only the expected root marker allowed, durable/resumable
+  backup preparation and isolation/crash/sentinel tests plus adjacent allocator/viewer/lifecycle checks.
+  Current checkpoint is docs-only; file review only, no source changes or tests.
 
 ## Current session — BOARD-151 shared QA artifact guard (2026-11-12)
 

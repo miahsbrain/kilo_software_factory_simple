@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Record BOARD-152 blocked independent QA
+**Type:** Docs
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Record round-1 FAIL against implementation checkpoint `7e30045`; passing targeted tests do not establish destructive isolation.
+**Impact:** BOARD-152 is Blocked pending human decision. Builder's documented check passed 20 tests in 5.876s; QA rerun passed 20 in 5.744s. Source-traced findings: `.opencode/skills/git-worktree/scripts/task_purge.py:62-78` rejects only `.git` directories, allowing nested linked repositories with `.git` files into recursive deletion at `.opencode/skills/git-worktree/scripts/task_purge.py:359-360`; optional backup preparation at `.opencode/skills/git-worktree/scripts/task_purge.py:457-471` precedes durable manifest publication, so an interrupted partial `content/` directory prevents retry. Validated reports: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-152/{qa.md,finding-1.md,finding-2.md}`; architect recorded fingerprints/round-1 ledger. Recommend nested marker rejection except the expected root worktree marker, durable resumable backup preparation, isolation/crash/sentinel tests and adjacent allocator/viewer/lifecycle verification. No correction before human decision; no source changes or live deletion.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. No tests rerun for this documentation checkpoint.
+
 ## [2026-11-12] Record BOARD-151 independent QA and current handover
 **Type:** Docs
 **Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
