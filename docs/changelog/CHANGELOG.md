@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Gate env provisioning and add human-only finalization
+**Type:** Feature
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `worktree.py`, `env.py`, lifecycle tests, HANDOVER and this log.
+**Why:** Reuse existing board/Git/env lifecycle adapters; fail closed on unsafe env sources and destinations and replace raw merge guidance with a single human operation. New `cmd_finalize` is needed for ordered preflight, merge, recovery and teardown.
+**Impact:** Partial failed creations remain owned and Blocked. Finalize preflights conflicts and records branch tip before integration; never runs automatically. Pending Merge certifies review evidence that cannot be independently parsed by the CLI. Skills: python-pro, cli-developer, secure-code-guardian.
+**Verification:** Two allowed suite runs: first 19 tests/2 stale-fixture failures; second 19 tests OK (9.198s) after fixing scratch SQLite mutation. Subsequent small guidance/legacy-cleanup tightening is unverified and needs independent review before the row advances.
+
 ## [2026-11-12] Move the live board core to SQLite
 **Type:** Feature
 **Board:** bootstrap slice | **Branch:** feat/sqlite-board-bootstrap

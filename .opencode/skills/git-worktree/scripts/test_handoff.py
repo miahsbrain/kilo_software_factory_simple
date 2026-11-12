@@ -58,8 +58,9 @@ class HandoffTests(unittest.TestCase):
     def test_clean_pending_merge_has_diff_before_merge_and_cleanup(self):
         code, out, err = self.handoff()
         self.assertEqual(code, worktree.OK, err)
-        self.assertLess(out.index("diff main"), out.index("git merge --no-ff"))
-        self.assertLess(out.index("git merge --no-ff"), out.index("cleanup --board BOARD-904"))
+        self.assertLess(out.index("diff main"), out.index("finalize --board BOARD-904"))
+        self.assertNotIn("git merge --no-ff", out)
+        self.assertNotIn("cleanup --board", out)
         self.assertIn("log --oneline main..HEAD", out)
 
     def test_untracked_changes_withhold_merge(self):
@@ -84,9 +85,7 @@ class HandoffTests(unittest.TestCase):
                 self.assert_withheld("board status is %s, not Pending Merge" % status)
 
     def test_missing_status_withholds_merge(self):
-        board = os.path.join(self.repo, "docs", "BOARD.md")
-        content = Path(board).read_text().replace("| Pending Merge |", "|  |")
-        Path(board).write_text(content)
+        self.change_cell(3, "")
         self.assert_withheld("board status is missing")
 
     def test_no_task_commits_withholds_merge(self):
@@ -112,10 +111,22 @@ class HandoffTests(unittest.TestCase):
                     self.assert_withheld(reason)
 
     def test_missing_branch_information_withholds_merge(self):
-        board = Path(self.repo, "docs", "BOARD.md")
-        content = board.read_text().replace("branch feat/hand-off-a-worktree", "")
-        board.write_text(content)
+        self.change_cell(8, ".opencode/worktrees/hand-off-a-worktree · branch ")
         self.assert_withheld("cannot confirm the live branch")
+
+    def change_cell(self, column, value):
+        import importlib.util
+        location = Path(self.repo, ".opencode/skills/board/scripts/board.py")
+        spec = importlib.util.spec_from_file_location("scratch_board_edit", location)
+        board = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(board)
+        board_file = str(Path(self.repo, "docs/BOARD.md"))
+        table, error = board.read_table(board_file)
+        self.assertIsNone(error)
+        index = board.row_by_id(table, "BOARD-904")
+        lines = list(table["lines"])
+        lines[index] = board.replace_cell(lines[index], column, value)
+        board.write_atomic(board_file, lines)
 
     def test_missing_base_withholds_merge(self):
         self.args.base = "missing-base"
@@ -135,17 +146,109 @@ class HandoffTests(unittest.TestCase):
         self.args.board = "BOARD-999"
         self.assert_withheld("no row with ID")
 
-    def test_already_merged_has_review_and_cleanup_but_no_merge(self):
+    def test_already_merged_pending_row_offers_finalize_but_no_merge(self):
         code, out, err = test_env.git(self.repo, "merge", "--no-ff", "feat/hand-off-a-worktree",
                                      "-m", "scratch merge")
         self.assertEqual(code, 0, err)
-        self.set_status("Merged")
         code, out, err = self.handoff()
         self.assertEqual(code, worktree.OK, err)
         self.assertIn("show --stat main..feat/hand-off-a-worktree", out)
         self.assertIn("already merged", out)
-        self.assertIn("cleanup --board BOARD-904", out)
+        self.assertIn("finalize --board BOARD-904", out)
         self.assertNotIn("git merge --no-ff", out)
+        self.set_status("Merged")
+        self.assert_withheld("not Pending Merge")
+
+    def test_human_finalize_integrates_cleans_and_preserves_board_file(self):
+        board_file = Path(self.repo, "docs", "BOARD.md")
+        before = board_file.read_bytes()
+        code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
+        self.assertEqual(code, 0, out + err)
+        self.assertFalse(os.path.exists(self.path))
+        self.assertEqual(test_env.git(self.repo, "branch", "--list", "feat/hand-off-a-worktree")[1], "")
+        self.assertEqual(board_file.read_bytes(), before)
+        self.assertEqual(self.board_cells()[3], "Merged")
+        self.assertEqual(self.board_cells()[8], "-")
+        self.assertIn("recovery record:", out)
+
+    def board_cells(self):
+        import importlib.util
+        path = Path(self.repo, ".opencode/skills/board/scripts/board.py")
+        spec = importlib.util.spec_from_file_location("scratch_board", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        table, error = module.read_table(str(Path(self.repo, "docs/BOARD.md")))
+        self.assertIsNone(error)
+        return module.cell_texts(table["lines"], module.row_by_id(table, "BOARD-904"))
+
+    def test_finalize_refuses_unfinished_and_dirty(self):
+        self.set_status("In Review")
+        code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
+        self.assertNotEqual(code, 0)
+        self.assertIn("not Pending Merge", err)
+        self.set_status("Pending Merge")
+        test_env.write(os.path.join(self.path, "dirty.txt"), "scratch\n")
+        code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
+        self.assertNotEqual(code, 0)
+        self.assertIn("dirty", err)
+        self.assertTrue(os.path.isdir(self.path))
+
+    def test_conflict_preflight_retains_both_worktrees_and_row(self):
+        test_env.write(os.path.join(self.repo, "kept.txt"), "competing base edit\n")
+        code, _, err = test_env.git(self.repo, "add", "kept.txt")
+        self.assertEqual(code, 0, err)
+        code, _, err = test_env.git(self.repo, "commit", "-m", "competing base")
+        self.assertEqual(code, 0, err)
+        code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
+        self.assertNotEqual(code, 0, out + err)
+        self.assertIn("kept.txt", err)
+        self.assertTrue(os.path.isdir(self.path))
+        self.assertEqual(self.board_cells()[3], "Pending Merge")
+
+    def test_retry_after_interrupted_board_update(self):
+        with patch.object(worktree, "script_root", return_value=self.repo):
+            with patch.object(worktree, "clear_row_worktree", return_value=(False, "injected")):
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(worktree.cmd_finalize(SimpleNamespace(board="BOARD-904", repo=None),
+                                                            self.repo), worktree.REFUSED)
+        self.assertFalse(os.path.exists(self.path))
+        self.assertEqual(self.board_cells()[3], "Pending Merge")
+        code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.board_cells()[3], "Merged")
+
+
+class EnvFailureTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="env-failure-", dir=Path(__file__).parents[4])
+        self.addCleanup(self.temp.cleanup)
+        self.repo = test_env.make_repo(self.temp.name)
+        self.script = os.path.join(self.repo, ".opencode/skills/git-worktree/scripts/worktree.py")
+        self.source = Path(self.repo, ".env")
+        self.path = Path(self.repo, ".opencode/worktrees/hand-off-a-worktree")
+
+    def test_source_symlink_blocks_create_and_records_partial_worktree(self):
+        self.source.symlink_to(Path(self.temp.name, "missing"))
+        code, out, err = test_env.run(self.repo, self.script, "create", "--board", "BOARD-904")
+        self.assertNotEqual(code, 0)
+        self.assertIn("source is not a regular file", err)
+        self.assertTrue(self.path.is_dir())
+        self.assertNotIn("board:    BOARD-904", out)
+        code, out, err = test_env.run(self.repo, self.script, "create", "--board", "BOARD-904",
+                                      "--slug", "different")
+        self.assertNotEqual(code, 0)
+        self.assertNotIn("new slug:", err)
+        self.source.unlink()
+        code, out, err = test_env.run(self.repo, self.script, "resume", "--board", "BOARD-904")
+        self.assertEqual(code, 0, out + err)
+
+    def test_failed_resume_does_not_advance_lane(self):
+        code, out, err = test_env.run(self.repo, self.script, "create", "--board", "BOARD-904")
+        self.assertEqual(code, 0, out + err)
+        self.source.symlink_to(Path(self.temp.name, "missing"))
+        code, out, err = test_env.run(self.repo, self.script, "resume", "--board", "BOARD-904")
+        self.assertNotEqual(code, 0)
+        self.assertNotIn("is In Progress", out)
 
 
 if __name__ == "__main__":

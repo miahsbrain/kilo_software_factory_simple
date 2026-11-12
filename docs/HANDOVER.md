@@ -1,5 +1,33 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-124 lifecycle slice, 2026-11-12**
+> `feat/sqlite-board-bootstrap` now makes create/resume refuse env errors; failed create records
+> a Blocked partial worktree rather than losing its ownership. Human-only `finalize --board ID`
+> checks Pending Merge, clean correct branch and base, committed work and conflict preflight;
+> merges only from the configured base main checkout, retains a recovery record and retries
+> interrupted teardown. Handoff offers only that command after its readiness gate. Next: parent
+> independently reviews tests and governance before offering the task branch for human merge.
+
+## Lifecycle slice inventory
+
+- `env.py:inside_worktrees` (effectful filesystem), `write_file` (effectful atomic 0600 write),
+  `sync_into` (effectful source validation, Git tracked-file check, exclude, provision) reject
+  symlinks and tracked destinations. Only `.env` and `.env.local` from the main checkout copy.
+- `worktree.py:provision_env`, `cmd_create`, `cmd_resume` (effectful) fail closed on env errors;
+  `cmd_finalize` (effectful) is a human-only CLI entry point. Pending Merge is a human/reviewer
+  certification: QA and verification evidence is not machine-readable; finalize prints this
+  limitation and must never be called by an agent. Recovery journal is stored in the Git common
+  directory's `cleanup-wt/` before merge, with branch tip and base identity; no secret contents.
+- Conflict preflight reports paths and competing edits; resolve in the original task worktree.
+  No merge or cleanup on preflight conflict. After a successful integration, ancestry is checked;
+  cleanup removes env copies, worktree and branch, then updates SQLite board. Interrupted cleanup
+  reruns from the journal. Multi-repo rows remain Pending Merge while another entry is recorded.
+- Tests: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'`.
+  First run: 19 tests, 2 failures from stale Markdown fixture mutations; changed them to
+  update scratch SQLite. Second run: 19 tests, OK (9.198s). A final source-only tightening
+  withholds finalize guidance for a row already marked Merged and avoids marking a multi-repo
+  row Merged during legacy cleanup; these last edits were not rerun within the two-attempt cap.
+
 > **Session Notes — SQLite board core slice, 2026-11-12**
 > Worktree `feat/sqlite-board-bootstrap` implements the first data slice only. The live board is
 > `<git-common-dir>/factory-board.sqlite3`; first initialization imports existing main-checkout

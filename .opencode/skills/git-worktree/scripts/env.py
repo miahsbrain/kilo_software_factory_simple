@@ -24,7 +24,9 @@ import argparse
 import errno
 import importlib.util
 import os
+import stat
 import sys
+import tempfile
 
 ENV_NAMES = (".env", ".env.local")
 WORKTREES_DIR = os.path.join(".opencode", "worktrees")
@@ -54,7 +56,9 @@ def inside_worktrees(path, repo_root):
     """True when the path resolves under <repo_root>/.opencode/worktrees/."""
     base = os.path.realpath(os.path.join(repo_root, WORKTREES_DIR))
     real = os.path.realpath(path)
-    return real.startswith(base + os.sep)
+    return (real.startswith(base + os.sep) and
+            os.path.abspath(path).startswith(os.path.abspath(os.path.join(repo_root, WORKTREES_DIR)) + os.sep) and
+            os.path.isdir(path) and not os.path.islink(path))
 
 
 def read_text(path):
@@ -147,53 +151,58 @@ def ensure_excluded(repo_root):
 
 
 def write_file(dst, data):
-    """Write the bytes to a regular file at dst, never through a symlink.
-
-    A symlink planted at the destination is replaced by the copy, so the link
-    target is never written to.
-    """
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    nofollow = getattr(os, "O_NOFOLLOW", 0)
-    if nofollow:
-        flags |= nofollow
-    elif os.path.islink(dst):
-        os.unlink(dst)
+    """Publish a 0600 copy atomically; never follow or replace a planted link."""
+    fd, temp = tempfile.mkstemp(prefix=".factory-env-", dir=os.path.dirname(dst))
     try:
-        fd = os.open(dst, flags, 0o600)
-    except OSError as e:
-        if e.errno != errno.ELOOP or not os.path.islink(dst):
-            raise
-        os.unlink(dst)
-        fd = os.open(dst, flags, 0o600)
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(data)
-    os.chmod(dst, 0o600)
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+        if os.path.lexists(dst) and not stat.S_ISREG(os.lstat(dst).st_mode):
+            raise OSError(errno.EINVAL, "unsafe existing destination")
+        os.replace(temp, dst)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
 
 
 def sync_into(worktree_path, repo_root):
     """(lines, error). Copies the env files into the worktree and excludes them."""
-    wt = worktree_module()
     if not inside_worktrees(worktree_path, repo_root):
         return None, ("refused: %s is not under %s" %
                       (worktree_path, os.path.join(repo_root, WORKTREES_DIR)))
     source = source_root(repo_root)
-    lines = []
+    if os.path.realpath(source) != os.path.realpath(repo_root):
+        return None, "refused: env source is not the repository main checkout"
+    sources = {}
     for name in ENV_NAMES:
         src = os.path.join(source, name)
         dst = os.path.join(worktree_path, name)
-        if not os.path.isfile(src):
-            lines.append("%s: no file in the main checkout" % name)
-            continue
-        try:
-            with open(src, "rb") as fh:
-                data = fh.read()
-            write_file(dst, data)
-        except OSError as e:
-            return None, "cannot copy %s: %s" % (name, e.strerror)
-        lines.append("%s: copied (%d bytes)" % (name, os.path.getsize(dst)))
+        if os.path.lexists(src):
+            if not stat.S_ISREG(os.lstat(src).st_mode):
+                return None, "refused: %s source is not a regular file" % name
+            sources[name] = src
+        if os.path.lexists(dst) and not stat.S_ISREG(os.lstat(dst).st_mode):
+            return None, "refused: %s destination is not a regular file" % name
+        code, _, _ = worktree_module().git(repo_root, "ls-files", "--error-unmatch", "--", name)
+        if code == 0:
+            return None, "refused: %s is tracked; cannot provision or overwrite" % name
     path, err = ensure_excluded(repo_root)
     if err:
         return None, err
+    lines = []
+    for name in ENV_NAMES:
+        dst = os.path.join(worktree_path, name)
+        if name not in sources:
+            lines.append("%s: no file in the main checkout" % name)
+            continue
+        try:
+            fd = os.open(sources[name], os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            with os.fdopen(fd, "rb") as fh:
+                data = fh.read()
+            write_file(dst, data)
+        except OSError as e:
+            return None, "cannot copy %s: %s" % (name, e.strerror or "I/O failure")
+        lines.append("%s: copied (%d bytes)" % (name, os.path.getsize(dst)))
     lines.append("excluded in %s" % path)
     return lines, None
 

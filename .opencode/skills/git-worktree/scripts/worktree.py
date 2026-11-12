@@ -529,8 +529,7 @@ def cmd_create(args, cwd):
         if (os.path.isdir(recorded_path)
                 and repo_of_path(recorded_path) == os.path.realpath(target)
                 and not os.path.realpath(recorded_path).startswith(confined)):
-            print("row %s records an existing worktree outside %s: %s; "
-                  "human bootstrap handling required; refusing a duplicate" %
+            print("row %s records an existing worktree outside %s: %s; refusing a duplicate" %
                   (args.board, WORKTREES_DIR, recorded_path), file=sys.stderr)
             return REFUSED
     live_path, live_branch = live_row_worktree(cell_text, root, target)
@@ -540,8 +539,6 @@ def cmd_create(args, cwd):
         print("pick one:", file=sys.stderr)
         print("  resume:  worktree.py resume --board %s" % args.board, file=sys.stderr)
         print("  discard: worktree.py discard --board %s --apply" % args.board, file=sys.stderr)
-        print("  new slug: worktree.py create --board %s --slug <other-slug>" % args.board,
-              file=sys.stderr)
         return REFUSED
     existing = find_worktree(target, slug)
     if existing:
@@ -584,6 +581,10 @@ def cmd_create(args, cwd):
     if code != 0:
         print("git worktree add failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         return REFUSED
+    env_ready = provision_env(path, target)
+    if not env_ready:
+        print("refused: worktree created but env provisioning failed; worktree and branch remain "
+              "for safe inspection. Do not create a second worktree.", file=sys.stderr)
     scope = load_scope_module(script_root())
     if scope is not None:
         content = scope.pointer_content(root, repo_id, path)
@@ -618,11 +619,16 @@ def cmd_create(args, cwd):
             if repo_id not in ids:
                 ids.append(repo_id)
             lines[index] = board.replace_cell(lines[index], repos_index, ",".join(ids))
-        lines[index] = board.replace_cell(lines[index], STATUS_INDEX, "In Progress")
+        lines[index] = board.replace_cell(lines[index], STATUS_INDEX,
+                                          "In Progress" if env_ready else "Blocked")
         board.write_atomic(board_file, lines)
     except Exception as exc:
         print("warning: worktree %s exists but row %s was not updated (%s)" %
               (path, args.board, exc), file=sys.stderr)
+        return REFUSED
+    if not env_ready:
+        print("row %s is Blocked and records the partial worktree; fix env and resume" % args.board,
+              file=sys.stderr)
         return REFUSED
     print("board:    %s" % args.board)
     print("board file: %s" % board_file)
@@ -631,7 +637,6 @@ def cmd_create(args, cwd):
     print("branch:   %s" % branch)
     print("worktree: %s" % os.path.abspath(path))
     print("base:     %s" % base)
-    provision_env(path, target)
     return OK
 
 
@@ -640,13 +645,14 @@ def provision_env(path, target):
     env = load_env_module(script_root())
     if env is None:
         print("env: not provisioned; the env script is missing", file=sys.stderr)
-        return
+        return False
     lines, err = env.sync_into(path, target)
     if err:
         print("env: %s" % err, file=sys.stderr)
-        return
+        return False
     for line in lines:
         print("env: %s" % line)
+    return True
 
 
 def commits_ahead(cwd, branch, base):
@@ -742,9 +748,9 @@ def cmd_resume(args, cwd):
         print("row %s has no live worktree in %s; nothing to resume" % (args.board, target),
               file=sys.stderr)
         return REFUSED
-    print("worktree: %s" % path)
-    print("branch:   %s" % (branch or "(detached)"))
-    print("repo:     %s (%s)" % (repo_id, target))
+    if not provision_env(path, target):
+        print("refused: row unchanged; repair env provisioning and resume again", file=sys.stderr)
+        return REFUSED
     try:
         lines = list(table["lines"])
         lines[index] = board.replace_cell(lines[index], STATUS_INDEX, "In Progress")
@@ -753,7 +759,9 @@ def cmd_resume(args, cwd):
         print("warning: row %s was not updated (%s)" % (args.board, exc), file=sys.stderr)
         return REFUSED
     print("board:    %s is In Progress" % args.board)
-    provision_env(path, target)
+    print("worktree: %s" % path)
+    print("branch:   %s" % (branch or "(detached)"))
+    print("repo:     %s (%s)" % (repo_id, target))
     return OK
 
 
@@ -1036,10 +1044,10 @@ def cmd_handoff(args, cwd):
     if not tip or not base_tip:
         blockers.append("cannot resolve worktree and base commits")
     merged = ancestor_code == 0 and tip and base_tip and tip != base_tip
+    if status != "Pending Merge":
+        blockers.append("board status is %s, not Pending Merge; finish verification and review"
+                        % (status or "missing"))
     if not merged:
-        if status != "Pending Merge":
-            blockers.append("board status is %s, not Pending Merge; finish verification and review"
-                            % (status or "missing"))
         if ahead == "0":
             blockers.append("no committed work ahead of %s" % base)
     if blockers:
@@ -1050,15 +1058,151 @@ def cmd_handoff(args, cwd):
         print("show:")
         print("  git -C %s show --stat %s..%s" % (path, base, branch))
         print("the branch is already merged into %s; there is nothing to merge" % base)
+        print("human recovery: python3 .opencode/skills/git-worktree/scripts/worktree.py "
+              "finalize --board %s%s" % (args.board, " --repo " + repo_id if args.repo else ""))
     else:
-        print("merge (run by the human, in the main checkout):")
-        print("  git merge --no-ff %s -m \"merge: %s\"" % (branch, slug))
-    print("after the merge, remove the worktree and delete the branch:")
-    print("  python3 .opencode/skills/git-worktree/scripts/worktree.py cleanup --board %s --apply"
-          % args.board)
-    print("or, by hand:")
-    print("  git worktree remove %s" % path)
-    print("  git branch -d %s" % branch)
+        print("human-only finalize (run from the main checkout after review):")
+        print("  python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board %s%s"
+              % (args.board, " --repo " + repo_id if args.repo else ""))
+    return OK
+
+
+def cmd_finalize(args, cwd):
+    """Human-invoked integration and resumable teardown, never called by agent workflows."""
+    control = control_root(cwd)
+    board = load_board_module(script_root())
+    if board is None:
+        return REFUSED
+    board_file = os.path.join(control, "docs", "BOARD.md")
+    table, index = board_row(board, board_file, args.board)
+    if table is None:
+        return REFUSED
+    cells = board.cell_texts(table["lines"], index)
+    if cells[STATUS_INDEX] != "Pending Merge":
+        print("refused: board is not Pending Merge; verification and review must pass",
+              file=sys.stderr)
+        return REFUSED
+    repos, error = load_repos(control)
+    if error:
+        print(error, file=sys.stderr)
+        return REFUSED
+    repo_id = args.repo or "control"
+    repo, error = resolve_repo(control, repos, repo_id)
+    if error or not is_git_repo(repo):
+        print(error or "refused: mapped repository missing", file=sys.stderr)
+        return REFUSED
+    if os.path.realpath(cwd) != os.path.realpath(repo):
+        print("refused: finalize must run in the target repository's main checkout", file=sys.stderr)
+        return REFUSED
+    base, error = resolve_base(repo, None)
+    if error or git_out(repo, "symbolic-ref", "--short", "HEAD") != base:
+        print(error or "refused: main checkout is not on its configured base branch", file=sys.stderr)
+        return REFUSED
+    column = board.field_index(table, "branch-worktree")
+    recorded = row_worktrees(cells[column] if column is not None else "", control)
+    scoped = [(p, b) for p, b in recorded
+              if os.path.realpath(p).startswith(os.path.realpath(os.path.join(repo, WORKTREES_DIR)) + os.sep)]
+    if len(scoped) != 1:
+        print("refused: expected exactly one recorded worktree in the selected repository",
+              file=sys.stderr)
+        return REFUSED
+    path, branch = scoped[0]
+    if not branch or branch == base or not git_out(repo, "check-ref-format", "--branch", branch):
+        # check-ref-format prints the branch name on success.
+        print("refused: invalid recorded branch", file=sys.stderr)
+        return REFUSED
+    common = common_dir(repo)
+    journal = os.path.join(common, "cleanup-wt", "finalize-%s-%s.json" % (args.board, repo_id))
+    existing = None
+    if os.path.exists(journal):
+        with open(journal, encoding="utf-8") as stream:
+            existing = json.load(stream)
+        if existing.get("path") != path or existing.get("branch") != branch:
+            print("refused: recovery record does not match row", file=sys.stderr)
+            return REFUSED
+    tip = git_out(repo, "rev-parse", "refs/heads/" + branch)
+    if existing and tip and tip != existing["tip"]:
+        print("refused: branch changed since recovery record", file=sys.stderr)
+        return REFUSED
+    tip = tip or (existing["tip"] if existing else None)
+    if not tip:
+        print("refused: missing branch and recovery record", file=sys.stderr)
+        return REFUSED
+    integrated = git(repo, "merge-base", "--is-ancestor", tip, base)[0] == 0
+    if not integrated:
+        if not os.path.isdir(path) or repo_of_path(path) != os.path.realpath(repo):
+            print("refused: recorded worktree missing or in wrong repository", file=sys.stderr)
+            return REFUSED
+        if git_out(path, "symbolic-ref", "--short", "HEAD") != branch or git_out(path, "rev-parse", "HEAD") != tip:
+            print("refused: live worktree branch or tip does not match the board", file=sys.stderr)
+            return REFUSED
+        ahead = git_out(repo, "rev-list", "--count", "%s..%s" % (base, branch))
+        if not ahead or not ahead.isdigit() or int(ahead) < 1:
+            print("refused: no committed work ahead of the base", file=sys.stderr)
+            return REFUSED
+    for location in (repo, path) if os.path.isdir(path) else (repo,):
+        code, dirty, _ = git(location, "status", "--porcelain", "--untracked-files=all")
+        if code != 0 or dirty:
+            print("refused: main checkout or task worktree is dirty", file=sys.stderr)
+            return REFUSED
+    if not integrated:
+        code, output, error = git(repo, "merge-tree", "--write-tree", "--name-only",
+                                  "--no-messages", base, branch)
+        if code != 0:
+            paths = output.splitlines()[1:]
+            print("refused: merge conflict; retain the task worktree. Resolve there and re-review.",
+                  file=sys.stderr)
+            for conflict in paths:
+                print("conflict: %s — competing edits on base and task branch" % conflict,
+                      file=sys.stderr)
+            if not paths:
+                print("preflight failed: %s" % (error.splitlines() or ["unknown reason"])[-1],
+                      file=sys.stderr)
+            return REFUSED
+    print("limitation: QA, review, acceptance proofs and verification are certified by the "
+          "Pending Merge lane; their evidence is not machine-readable here.")
+    if not existing:
+        os.makedirs(os.path.dirname(journal), exist_ok=True)
+        with open(journal, "x", encoding="utf-8") as stream:
+            json.dump({"path": path, "branch": branch, "tip": tip, "base": base,
+                       "base_tip": git_out(repo, "rev-parse", base)}, stream)
+    if not integrated:
+        code, _, error = git(repo, "merge", "--no-ff", branch,
+                             "-m", "merge: %s" % slug_of(path, repo))
+        if code != 0:
+            print("merge failed; repository state retained: %s" % (error.splitlines() or ["unknown"])[-1],
+                  file=sys.stderr)
+            return REFUSED
+    if git(repo, "merge-base", "--is-ancestor", tip, base)[0] != 0:
+        print("refused: integration ancestry could not be verified", file=sys.stderr)
+        return REFUSED
+    env = load_env_module(script_root())
+    if os.path.isdir(path):
+        if env is None:
+            print("refused: env cleaner missing; retry finalize", file=sys.stderr)
+            return REFUSED
+        _, error = env.clean_into(path, repo, True)
+        if error:
+            print("refused: env cleanup failed: %s; retry finalize" % error, file=sys.stderr)
+            return REFUSED
+        code, _, error = git(repo, "worktree", "remove", path)
+        if code != 0:
+            print("refused: worktree removal failed: %s; retry finalize" % error, file=sys.stderr)
+            return REFUSED
+    if git_out(repo, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
+        code, _, error = git(repo, "branch", "-d", branch)
+        if code != 0:
+            print("refused: branch deletion failed: %s; retry finalize" % error, file=sys.stderr)
+            return REFUSED
+    remaining = [p for p, _ in recorded if os.path.realpath(p) != os.path.realpath(path)]
+    ok, message = clear_row_worktree(board, board_file, table, index, control, path,
+                                     None if remaining else "Merged")
+    if not ok:
+        print("refused: board update failed: %s; retry finalize" % message, file=sys.stderr)
+        return REFUSED
+    print("integrated into %s; cleaned %s; board %s" %
+          (base, branch, "Pending Merge (other repos remain)" if remaining else "Merged"))
+    print("recovery record: %s" % journal)
     return OK
 
 
@@ -1263,7 +1407,11 @@ def cmd_cleanup(args, cwd):
     for d in done:
         print(d)
     if table is not None:
-        lane = "Merged" if branch_deleted else None
+        cell_index = board.field_index(table, "branch-worktree")
+        cells = board.cell_texts(table["lines"], index)
+        others = [p for p, _ in row_worktrees(cells[cell_index], control)
+                  if os.path.realpath(p) != os.path.realpath(path)]
+        lane = "Merged" if branch_deleted and not others else None
         ok, message = clear_row_worktree(board, board_file, table, index, control, path, lane)
         if ok:
             if lane:
@@ -1309,6 +1457,10 @@ def main(argv):
     p.add_argument("--repo", help="repo id from .opencode/repos.json (default: control)")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
 
+    p = sub.add_parser("finalize", help="human-only: integrate and clean a reviewed worktree")
+    p.add_argument("--board", required=True, help="board row ID")
+    p.add_argument("--repo", help="repo id from .opencode/repos.json (default: control)")
+
     p = sub.add_parser("verify", help="check whether a worktree is ready to merge")
     p.add_argument("slug")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
@@ -1332,6 +1484,8 @@ def main(argv):
         return cmd_discard(args, cwd)
     if args.command == "handoff":
         return cmd_handoff(args, cwd)
+    if args.command == "finalize":
+        return cmd_finalize(args, cwd)
     if args.command == "list":
         return cmd_list(args, cwd)
     if args.command == "verify":
