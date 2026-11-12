@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic manipulation of the markdown board at docs/BOARD.md.
+"""Manipulate the SQLite-backed board, with Markdown import/export.
 
     board.py show [ID]
     board.py add --id BOARD-00X --task "..." --type Feature --status Backlog
@@ -19,12 +19,11 @@ Repos | Branch/Worktree | Notes. `Repos` holds the repo ids from
 column into an existing table without a hand edit; it is the only way the table
 changes shape.
 
-The table is located by its header row and separator row. Rows are split on
-`|`, so an escaped or unescaped pipe inside a cell breaks the parse; the script
-refuses to touch the file when the table cannot be parsed, or when a row has a
-different cell count from the header. Only the named cell changes: every other
-cell keeps its bytes. The file is written atomically (temp file in the same
-directory, then os.replace).
+The SQLite database lives in Git's common directory, shared across worktrees.
+On first initialization it imports the main checkout's legacy Markdown once.
+The existing table parser and cell API remain available for lifecycle callers.
+Writes merge disjoint cell edits under a SQLite transaction and refuse conflicts.
+`export` publishes a Markdown snapshot outside tracked paths on demand.
 
 A Fix row may carry a fingerprint — kind|category|route|subject — so the same
 complaint about the same thing is recognised when it is filed again. A row with
@@ -34,16 +33,21 @@ existing row with `board.py note`.
 Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 """
 import argparse
+import contextlib
 import importlib.util
 import os
 import re
+import sqlite3
 import stat
 import subprocess
 import sys
 import tempfile
-import uuid
+import threading
 
 BOARD_PATH = os.path.join("docs", "BOARD.md")
+DATABASE_NAME = "factory-board.sqlite3"
+EXPORT_NAME = "factory-board-export.md"
+_snapshots = threading.local()
 TYPES = ["Feature", "Fix", "Chore", "Docs", "Research"]
 STATUSES = ["Backlog", "Ready", "In Progress", "In Review", "Pending Merge",
             "Merged", "Blocked", "Dropped"]
@@ -76,61 +80,98 @@ def board_path(explicit):
 
 def empty_board() -> str:
     return ("# BOARD\n\n"
-            "Local workspace state. Only the orchestrator edits rows through board.py.\n\n"
+            "Generated view of local SQLite state. Edit rows through board.py.\n\n"
             "| " + " | ".join(COLUMNS) + " |\n"
             "|" + "|".join("---" for _ in COLUMNS) + "|\n")
 
 
 def initialize_board(root: str) -> str:
-    """Publish a complete missing board exclusively; existing bytes are never changed."""
+    """Import the main checkout's legacy board once without modifying its bytes."""
     path = os.path.join(root, BOARD_PATH)
-    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-    with_fd = os.open(root, flags)
-    try:
-        try:
-            os.mkdir("docs", dir_fd=with_fd)
-        except FileExistsError:
-            pass
-        directory = os.open("docs", flags, dir_fd=with_fd)
-    finally:
-        os.close(with_fd)
-    try:
-        try:
-            existing = os.stat("BOARD.md", dir_fd=directory, follow_symlinks=False)
-        except FileNotFoundError:
-            existing = None
-        if existing is not None:
-            if not stat.S_ISREG(existing.st_mode):
-                raise OSError("refusing non-regular board: %s" % path)
-            return path
-        name = ".board.%s.tmp" % uuid.uuid4().hex
-        fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                stream.write(empty_board())
-                stream.flush()
-                os.fsync(stream.fileno())
+    with connect(database_path(root)) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute("CREATE TABLE IF NOT EXISTS board (id INTEGER PRIMARY KEY CHECK (id = 1), "
+                           "markdown TEXT NOT NULL, source_bytes BLOB, revision INTEGER NOT NULL)")
+        if connection.execute("SELECT id FROM board WHERE id = 1").fetchone() is None:
+            source = None
             try:
-                os.link(name, "BOARD.md", src_dir_fd=directory, dst_dir_fd=directory,
-                        follow_symlinks=False)
-            except FileExistsError:
-                existing = os.stat("BOARD.md", dir_fd=directory, follow_symlinks=False)
-                if not stat.S_ISREG(existing.st_mode):
+                info = os.lstat(path)
+            except FileNotFoundError:
+                pass
+            else:
+                if not stat.S_ISREG(info.st_mode):
                     raise OSError("refusing non-regular board: %s" % path)
-        finally:
-            os.unlink(name, dir_fd=directory)
-    finally:
-        os.close(directory)
+                with open(path, "rb") as stream:
+                    source = stream.read()
+            content = source.decode("utf-8") if source is not None else empty_board()
+            parsed, error = parse_table(content, path)
+            if parsed is None:
+                raise ValueError(error)
+            connection.execute("INSERT INTO board VALUES (1, ?, ?, 0)", (content, source))
     return path
+
+
+def database_path(root):
+    result = subprocess.run(["git", "-C", root, "rev-parse", "--git-common-dir"],
+                            capture_output=True, text=True, timeout=10)
+    if result.returncode:
+        raise OSError("cannot locate Git common directory for %s: %s" % (root, result.stderr.strip()))
+    return os.path.join(os.path.abspath(os.path.join(root, result.stdout.strip())), DATABASE_NAME)
+
+
+@contextlib.contextmanager
+def connect(path):
+    connection = sqlite3.connect(path, timeout=10, isolation_level=None)
+    try:
+        connection.execute("PRAGMA busy_timeout=10000")
+        connection.execute("PRAGMA journal_mode=WAL")
+        yield connection
+        if connection.in_transaction:
+            connection.commit()
+    except BaseException:
+        if connection.in_transaction:
+            connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def live_database(path):
+    candidate = os.path.abspath(path)
+    root = os.path.dirname(os.path.dirname(candidate))
+    if candidate != os.path.join(root, BOARD_PATH):
+        return None
+    result = subprocess.run(["git", "-C", root, "rev-parse", "--show-toplevel"],
+                            capture_output=True, text=True, timeout=10)
+    if result.returncode or os.path.realpath(result.stdout.strip()) != os.path.realpath(root):
+        return None
+    if candidate != os.path.abspath(os.path.join(control_root(root), BOARD_PATH)):
+        return None
+    return database_path(root)
 
 
 def read_table(path):
     """(lines, header_index, row_indexes) for the board table, or None when it cannot be parsed."""
     try:
-        with open(path) as fh:
-            lines = fh.read().split("\n")
-    except OSError as e:
-        return None, "cannot read %s: %s" % (path, e.strerror)
+        db = live_database(path)
+        if db:
+            initialize_board(os.path.dirname(os.path.dirname(os.path.abspath(path))))
+            with connect(db) as connection:
+                content, revision = connection.execute(
+                    "SELECT markdown, revision FROM board WHERE id = 1").fetchone()
+            if not hasattr(_snapshots, "values"):
+                _snapshots.values = {}
+            _snapshots.values[db] = (content, revision)
+        else:
+            with open(path, encoding="utf-8") as stream:
+                content = stream.read()
+        return parse_table(content, path)
+    except (OSError, UnicodeError, sqlite3.Error, ValueError) as exc:
+        return None, "cannot read %s: %s" % (path, exc)
+
+
+def parse_table(content, path="board"):
+    lines = content.split("\n")
 
     header = None
     for i, line in enumerate(lines):
@@ -234,6 +275,24 @@ def replace_cell(line, index, value):
 
 
 def write_atomic(path, lines):
+    db = live_database(path)
+    if db:
+        snapshot = getattr(_snapshots, "values", {}).pop(db, None)
+        if snapshot is None:
+            raise ValueError("read_table must precede a board mutation")
+        baseline, _ = snapshot
+        proposed = "\n".join(lines)
+        parsed, error = parse_table(proposed, path)
+        if parsed is None:
+            raise ValueError(error)
+        with connect(db) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            latest, revision = connection.execute(
+                "SELECT markdown, revision FROM board WHERE id = 1").fetchone()
+            merged = merge_board_changes(baseline, proposed, latest)
+            connection.execute("UPDATE board SET markdown = ?, revision = ? WHERE id = 1",
+                               (merged, revision + 1))
+        return
     directory = os.path.dirname(os.path.abspath(path)) or "."
     fd, tmp = tempfile.mkstemp(dir=directory, prefix=".board.", suffix=".tmp")
     try:
@@ -246,7 +305,61 @@ def write_atomic(path, lines):
         raise
 
 
+def merge_board_changes(baseline, proposed, latest):
+    """Apply changed cells by ID; refuse overlapping edits instead of losing updates."""
+    original, error = parse_table(baseline)
+    updated, update_error = parse_table(proposed)
+    current, current_error = parse_table(latest)
+    if original is None or updated is None or current is None:
+        raise ValueError(error or update_error or current_error)
+    before = {cell_texts(original["lines"], i)[0]: original["lines"][i] for i in original["rows"]}
+    after = {cell_texts(updated["lines"], i)[0]: updated["lines"][i] for i in updated["rows"]}
+    if len(before) != len(original["rows"]) or len(after) != len(updated["rows"]):
+        raise ValueError("duplicate board ID")
+    if (header_cells(original) != header_cells(updated)
+            or original["lines"][original["header"] + 1] != updated["lines"][updated["header"] + 1]):
+        if latest != baseline:
+            raise ValueError("board columns changed concurrently; retry")
+        return proposed
+    result = list(current["lines"])
+    indexes = {cell_texts(result, i)[0]: i for i in current["rows"]}
+    if len(indexes) != len(current["rows"]):
+        raise ValueError("duplicate board ID in live state")
+    for row_id, raw in before.items():
+        if row_id not in after:
+            if row_id not in indexes or result[indexes[row_id]] != raw:
+                raise ValueError("row %s changed concurrently; retry" % row_id)
+            result[indexes[row_id]] = None
+        elif raw != after[row_id]:
+            if row_id not in indexes:
+                raise ValueError("row %s removed concurrently; retry" % row_id)
+            old_cells = split_row(raw)
+            new_cells = split_row(after[row_id])
+            live_cells = split_row(result[indexes[row_id]])
+            if len(old_cells) != len(new_cells) or len(live_cells) != len(old_cells):
+                raise ValueError("board columns changed concurrently; retry")
+            for n, (old, new) in enumerate(zip(old_cells, new_cells)):
+                if old != new:
+                    if live_cells[n] != old:
+                        raise ValueError("row %s cell changed concurrently; retry" % row_id)
+                    result[indexes[row_id]] = replace_cell(result[indexes[row_id]], n, new.strip().replace("\\|", "|"))
+                    live_cells = split_row(result[indexes[row_id]])
+    result = [line for line in result if line is not None]
+    additions = [after[cell_texts(updated["lines"], i)[0]] for i in updated["rows"]
+                 if cell_texts(updated["lines"], i)[0] not in before]
+    for row in additions:
+        row_id = cell_texts([row], 0)[0]
+        if row_id in indexes:
+            raise ValueError("row %s added concurrently; retry" % row_id)
+    insert_at = (max((i for i, line in enumerate(result) if line.lstrip().startswith("|")
+                      and cell_texts(result, i)[0] in indexes), default=current["header"] + 1) + 1)
+    result[insert_at:insert_at] = additions
+    return "\n".join(result)
+
+
 def note_uncommitted(path):
+    if live_database(path):
+        return
     try:
         r = subprocess.run(["git", "status", "--short", "--", os.path.relpath(path)],
                            capture_output=True, text=True, timeout=15)
@@ -570,8 +683,8 @@ def cmd_lanes(args, path):
 
 def main(argv):
     parser = argparse.ArgumentParser(
-        prog="board.py", description="Manipulate the markdown board at docs/BOARD.md.")
-    parser.add_argument("--file", help="board file (default: local docs/BOARD.md in the control main checkout)")
+        prog="board.py", description="Manipulate the per-clone SQLite board.")
+    parser.add_argument("--file", help="read-only Markdown fixture (not the live SQLite board)")
     sub = parser.add_subparsers(dest="command")
 
     p = sub.add_parser("show", help="print board rows")
@@ -613,16 +726,30 @@ def main(argv):
     p.add_argument("id")
 
     sub.add_parser("lanes", help="count rows per status lane")
+    sub.add_parser("export", help="write a Markdown snapshot to the Git common directory")
 
     args = parser.parse_args(argv)
     if not args.command:
         parser.print_help()
         return USAGE
+    if args.file and args.command not in ("show", "lanes"):
+        print("--file is read-only; use the default SQLite board for mutations", file=sys.stderr)
+        return REFUSED
     try:
         path = args.file if args.file else initialize_board(control_root(os.getcwd()))
-    except OSError as exc:
+    except (OSError, UnicodeError, ValueError, sqlite3.Error) as exc:
         print("cannot initialize board: %s" % exc, file=sys.stderr)
         return REFUSED
+
+    if args.command == "export":
+        table, error = read_table(path)
+        if table is None:
+            print(error, file=sys.stderr)
+            return REFUSED
+        destination = os.path.join(os.path.dirname(live_database(path)), EXPORT_NAME)
+        write_export(destination, "\n".join(table["lines"]))
+        print(destination)
+        return OK
 
     if args.command == "add":
         if args.type not in TYPES:
@@ -653,6 +780,17 @@ def main(argv):
     if args.command == "lanes":
         return cmd_lanes(args, path)
     return cmd_show(args, path)
+
+
+def write_export(destination, content):
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(destination), prefix=".board-export.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(content)
+        os.replace(tmp, destination)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
 
 
 if __name__ == "__main__":

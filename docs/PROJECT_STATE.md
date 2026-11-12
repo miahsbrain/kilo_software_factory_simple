@@ -1,5 +1,13 @@
 # PROJECT STATE — software factory
 
+## Current session — SQLite board core slice (2026-11-12)
+
+- `feat/sqlite-board-bootstrap` in its assigned worktree moves default board reads/mutations
+  to per-clone SQLite in the Git common directory, with one-time legacy import and manual
+  Markdown export. `worktree.py` and permanent rules remain unchanged in this first slice.
+- Legacy tracked Markdown remains untouched; human migration/merge and follow-up lifecycle
+  governance are not done. Parent reviews tests and decides next sequential slice.
+
 ## Current session — BOARD-123 Pending Merge (2026-11-11)
 
 - Assigned branch/worktree `fix/gate-merge-handoffs-on-finished-clean-worktrees` extends existing

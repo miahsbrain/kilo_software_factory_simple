@@ -2,7 +2,7 @@
 # The factory never tracks it. See AGENTS.md §"The factory and the project".
 /project/
 
-# Live board is local workspace state; the template starter remains tracked.
+# Legacy board is retained for first import; SQLite and its export live in Git's common directory.
 /docs/BOARD.md
 
 # Agent worktrees: one per board row, created by .opencode/skills/git-worktree/scripts/worktree.py
@@ -33,6 +33,3 @@ id_rsa*
 
 .DS_Store
 .vscode/
-
-
-docs/BOARD.md

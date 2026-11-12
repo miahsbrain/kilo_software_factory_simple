@@ -5,13 +5,14 @@ an agent needs. Do not guess commands.
 
 ## What the factory is made of
 
-No application runtime, no database. The factory is Markdown rules, agent definitions, and
-Python scripts that run on the standard library alone. The one build step is the board UI's
+No application runtime. The board uses standard-library SQLite in the Git common directory;
+the factory otherwise uses Markdown rules, agent definitions, and Python scripts. The one build step is the board UI's
 Tailwind stylesheet, and it produces a committed file — the viewer itself needs no Node.
 
 | Piece | Version | Where |
 |---|---|---|
 | Python | 3.9+ | every script under `.opencode/skills/*/scripts/` |
+| SQLite | Python `sqlite3` | `<git-common-dir>/factory-board.sqlite3`, one per clone; WAL and 10s busy timeout |
 | OpenCode | V2 | `opencode.jsonc`, `.opencode/agents/`, `.opencode/commands/`, five discoverable skills |
 | Node.js | 22 | the dev container, the Playwright MCP, the Tailwind build |
 | Playwright | the global install in the dev container | retained historical/test tooling, not UI QA |
@@ -37,6 +38,9 @@ npm --prefix .opencode/skills/board/ui run build
 
 # Show the board
 python3 .opencode/skills/board/scripts/board.py show
+
+# Generate a readable Markdown snapshot in the Git common directory (prints its path)
+python3 .opencode/skills/board/scripts/board.py export
 
 # Board refresh regressions (temporary fixture trees, no live server)
 python3 .opencode/skills/board/scripts/test_board_serve.py

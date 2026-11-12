@@ -1,5 +1,33 @@
 # HANDOVER — software factory
 
+> **Session Notes — SQLite board core slice, 2026-11-12**
+> Worktree `feat/sqlite-board-bootstrap` implements the first data slice only. The live board is
+> `<git-common-dir>/factory-board.sqlite3`; first initialization imports existing main-checkout
+> `docs/BOARD.md` once and retains source bytes in the database without writing that file.
+> `board.py export` writes `<git-common-dir>/factory-board-export.md` on demand. `--file` is a
+> read-only Markdown fixture; board viewer default reads SQLite. `worktree.py` remains unchanged
+> and uses the compatible `read_table`/`write_atomic` API. Conflicting cell edits refuse rather
+> than overwrite; distinct rows/cells merge under `BEGIN IMMEDIATE`. The old tracked Markdown
+> remains in this branch to avoid removing a possibly newer integration-checkout board on merge.
+> Later slices must reconcile legacy tracking, lifecycle governance and human-only finalization.
+
+## SQLite board core inventory
+
+- `board.py:initialize_board`, `database_path`, `connect`, `live_database`, `read_table`,
+  `write_atomic`, `write_export` are **effectful**: Git discovery, SQLite read/write or local
+  export. `parse_table`, `merge_board_changes`, `cell_texts`, `replace_cell` are **pure**.
+- Schema: one `board` row (`id=1`, Markdown snapshot, original import bytes, revision); no
+  runtime files in the checkout. WAL and busy timeout serialize concurrent writers. First
+  import validates the old table; malformed UTF-8/table fails closed without changing source.
+- CLI `show`/`lanes` read current SQLite state; `add`, `note`, `set-status`, `set-field`,
+  `add-column`, `remove` update SQLite; `export` writes a readable Markdown snapshot in the
+  common Git directory. The viewer discovers per-clone control/project databases and reads
+  live rows via `read_table`. Existing template starter is unchanged.
+- In this transition the documented worktree lifecycle still uses its original calls and
+  independently retains its old governance wording. No application data model or env vars.
+- Verification: `python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'`.
+  This slice does not run the full lifecycle suite; parent must review before any merge.
+
 > **Session Notes — BOARD-123 handoff gates, 2026-11-11**
 > Branch `fix/gate-merge-handoffs-on-finished-clean-worktrees`, worktree of the same slug.
 > Extended `cmd_handoff` and approved factory/template §B11 policy; derived commands/skill align.

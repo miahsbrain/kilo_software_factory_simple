@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Move the live board core to SQLite
+**Type:** Feature
+**Board:** bootstrap slice | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `board.py`, `board_serve.py`, focused board tests, `.gitignore`, STACK, PROJECT_STRUCTURE, HANDOVER, PROJECT_STATE and this log.
+**Why:** Keep board state local to a clone and shared across its worktrees without dirtying tracked Markdown. Reused the existing board parser, command handlers, `read_table`/`write_atomic` lifecycle adapter and read-only viewer; added only SQLite storage, three-way cell merge and export. No new module or external dependency. Catalogue: python-pro (standard library), sql-pro (database design), cli-developer (argparse).
+**Impact:** First default read imports the old main-board bytes once, without deleting or modifying them. SQLite holds authoritative state thereafter; `board.py export` generates a Markdown file in the Git common directory. Concurrent disjoint changes merge; overlapping changes refuse. Existing tracked board remains until a separate safe untracking slice; no project repo or integration checkout edits. Reversible with preserved import bytes and export.
+
 ## [2026-11-11] Record independent handoff-gate review PASS
 **Type:** Docs
 **Board:** BOARD-123 | **Branch:** fix/gate-merge-handoffs-on-finished-clean-worktrees

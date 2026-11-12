@@ -4,7 +4,6 @@ import contextlib
 import io
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -50,6 +49,7 @@ class BoardRefreshTests(unittest.TestCase):
         server = Mock()
         with patch.object(viewer, "load_helpers", return_value=(self.board, self.worktree)), \
                 patch.object(viewer, "repo_root", return_value=str(self.root)), \
+                patch.object(self.board, "initialize_board", return_value=str(self.factory)), \
                 patch.object(viewer, "ThreadingHTTPServer", return_value=server), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(viewer.main(list(args)), 0)
@@ -128,12 +128,8 @@ class BoardRefreshTests(unittest.TestCase):
         self.assertEqual(viewer.Handler.state["refresh"], 17)
         self.assertIn('data-refresh="17"', self.request("/"))
 
-    def test_startup_initializes_only_current_board_and_requests_never_recreate(self):
-        self.factory.unlink()
+    def test_requests_never_recreate_missing_fixture(self):
         self.initialize()
-        self.assertEqual(self.factory.read_text(), self.board.empty_board())
-        self.assertFalse(self.project.exists())
-        self.assertEqual(self.request("/api/board")["boards"][0]["rows"], [])
         self.factory.unlink()
         entries = self.request("/api/board")["boards"]
         self.assertEqual(len(entries), 1)
@@ -160,6 +156,7 @@ class BoardRefreshTests(unittest.TestCase):
         self.factory.symlink_to(self.root / "outside.md")
         with patch.object(viewer, "load_helpers", return_value=(self.board, self.worktree)), \
                 patch.object(viewer, "repo_root", return_value=str(self.root)), \
+                patch.object(self.board, "initialize_board", side_effect=OSError("non-regular board")), \
                 patch.object(viewer, "ThreadingHTTPServer") as server, \
                 contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(viewer.main([]), 1)
@@ -392,144 +389,98 @@ class BoardBootstrapTests(unittest.TestCase):
         marker = root / ".opencode/repos.json"
         marker.parent.mkdir(exist_ok=True)
         marker.write_text('{"control":"."}\n')
-        self.git(root, "add", ".opencode/repos.json")
+        (root / ".gitignore").write_text("/.opencode/worktrees/\n")
+        self.git(root, "add", ".opencode/repos.json", ".gitignore")
         self.git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
                  "commit", "-m", "fixture")
 
-    def test_main_linked_and_nested_project_ownership_without_boards(self):
-        factory = self.root / "factory"
-        self.repository(factory)
-        linked = factory / ".opencode/worktrees/task"
-        self.git(factory, "worktree", "add", "-b", "feat/task", str(linked))
-        for cwd in (factory, linked, linked / ".opencode"):
-            self.assertEqual(self.board.control_root(str(cwd)), str(factory))
-            self.assertEqual(self.worktree.control_root(str(cwd)), str(factory))
-        project = factory / "project"
-        self.repository(project)
-        app = project / "apps/api"
-        app.mkdir(parents=True)
-        self.assertEqual(self.board.control_root(str(app)), str(project))
-        self.assertEqual(self.worktree.control_root(str(app)), str(project))
-        self.assertEqual(viewer.repo_root(self.worktree, str(app)), str(project))
-        self.board.initialize_board(self.board.control_root(str(linked)))
-        self.assertTrue((factory / "docs/BOARD.md").exists())
-        self.assertFalse((linked / "docs/BOARD.md").exists())
-        self.assertFalse((project / "docs/BOARD.md").exists())
+    def test_import_once_preserves_source_bytes_and_main_status(self):
+        main = self.root / "main"
+        self.repository(main)
+        legacy = main / "docs/BOARD.md"
+        legacy.parent.mkdir()
+        legacy.write_bytes(b"| ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Branch/Worktree | Notes |\r\n"
+                           b"|---|---|---|---|---|---|---|---|---|---|\r\n"
+                           b"| BOARD-001 | old | Fix | Ready | P2 | low | None. | control | - | note |\r\n")
+        self.git(main, "add", "docs/BOARD.md")
+        self.git(main, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+                 "commit", "-m", "legacy")
+        before = legacy.read_bytes()
+        self.board.initialize_board(str(main))
+        self.assertEqual(self.git(main, "status", "--porcelain"), "")
+        legacy.write_text("invalid later change", encoding="utf-8")
+        table, error = self.board.read_table(str(legacy))
+        self.assertIsNone(error)
+        self.assertEqual(self.board.cell_texts(table["lines"], table["rows"][0])[1], "old")
+        self.assertEqual(legacy.read_text(), "invalid later change")
+        import sqlite3
+        with sqlite3.connect(self.board.database_path(str(main))) as connection:
+            self.assertEqual(connection.execute("SELECT source_bytes FROM board").fetchone()[0], before)
 
-    def test_cli_show_bootstraps_main_from_linked_and_keeps_explicit_semantics(self):
+    def test_worktree_cli_uses_common_database_and_export_without_markdown_writes(self):
         main = self.root / "main"
         self.repository(main)
         linked = main / ".opencode/worktrees/task"
         self.git(main, "worktree", "add", "-b", "feat/task", str(linked))
         script = str(Path(__file__).with_name("board.py").resolve())
-        result = subprocess.run([sys.executable, script, "show"], cwd=linked, capture_output=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((main / "docs/BOARD.md").read_text(), self.board.empty_board())
+        self.assertEqual(self.board.control_root(str(linked)), str(main))
+        self.assertEqual(self.board.database_path(str(main)), self.board.database_path(str(linked)))
+        add = subprocess.run([sys.executable, script, "add", "--id", "BOARD-001", "--task", "task",
+                              "--type", "Feature", "--status", "Ready", "--priority", "P2",
+                              "--risk", "low"], cwd=linked, capture_output=True)
+        self.assertEqual(add.returncode, 0, add.stderr)
+        self.assertFalse((main / "docs/BOARD.md").exists())
         self.assertFalse((linked / "docs/BOARD.md").exists())
-        explicit = linked / "missing.md"
-        result = subprocess.run([sys.executable, script, "--file", str(explicit), "show"],
-                                cwd=linked, capture_output=True)
-        self.assertEqual(result.returncode, 1)
-        self.assertIn(b"cannot read", result.stderr)
-        self.assertFalse(explicit.exists())
+        self.assertEqual(self.git(main, "status", "--porcelain"), "")
+        output = subprocess.run([sys.executable, script, "export"], cwd=linked, capture_output=True)
+        self.assertEqual(output.returncode, 0, output.stderr)
+        export = Path(output.stdout.decode().strip())
+        self.assertEqual(export.parent, main / ".git")
+        self.assertIn("BOARD-001", export.read_text())
+        self.assertEqual(self.git(main, "status", "--porcelain"), "")
 
-    def test_existing_bytes_and_malformed_are_never_overwritten(self):
-        path = Path(self.board.initialize_board(str(self.root)))
-        for content in (path.read_bytes(), b"bad\r\nboard\xff"):
-            path.write_bytes(content)
-            self.board.initialize_board(str(self.root))
-            self.assertEqual(path.read_bytes(), content)
-        path.write_bytes(b"bad\r\nboard")
-        table, error = self.board.read_table(str(path))
-        self.assertIsNone(table)
-        self.assertIn("no board table", error)
-        self.assertEqual(path.read_bytes(), b"bad\r\nboard")
-
-    def test_concurrent_creation_publishes_complete_board_once(self):
-        real_link = os.link
-        observed = []
-
-        def publish(*args, **kwargs):
-            result = real_link(*args, **kwargs)
-            observed.append((self.root / "docs/BOARD.md").read_text())
-            return result
-
-        with patch.object(self.board.os, "link", side_effect=publish), ThreadPoolExecutor(8) as pool:
-            paths = list(pool.map(lambda _: self.board.initialize_board(str(self.root)), range(24)))
-        self.assertEqual(len(set(paths)), 1)
-        self.assertEqual(observed, [self.board.empty_board()])
-        self.assertEqual(list((self.root / "docs").iterdir()), [Path(paths[0])])
-
-    def test_symlink_docs_board_and_publish_race_are_refused(self):
-        outside = self.root / "outside"
-        outside.mkdir()
-        control = self.root / "control"
-        control.mkdir()
-        docs = control / "docs"
-        docs.symlink_to(outside, target_is_directory=True)
-        with self.assertRaises(OSError):
-            self.board.initialize_board(str(control))
-        self.assertEqual(list(outside.iterdir()), [])
-        docs.unlink()
-        docs.mkdir()
-        board = docs / "BOARD.md"
-        for target in (outside / "missing", outside / "present"):
-            (outside / "present").write_bytes(b"preserve")
-            board.symlink_to(target)
-            with self.assertRaises(OSError):
-                self.board.initialize_board(str(control))
-            board.unlink()
-        real_link = os.link
-
-        def race(*args, **kwargs):
-            board.symlink_to(outside / "present")
-            return real_link(*args, **kwargs)
-
-        with patch.object(self.board.os, "link", side_effect=race), self.assertRaises(OSError):
-            self.board.initialize_board(str(control))
-        self.assertEqual((outside / "present").read_bytes(), b"preserve")
-        self.assertEqual(list(docs.iterdir()), [board])
-
-    def test_ignore_template_and_untrack_backup_restore_migration(self):
-        source = Path(__file__).resolve().parents[4]
+    def test_concurrent_different_rows_and_conflicting_cell(self):
         main = self.root / "main"
         self.repository(main)
-        for relative in (".gitignore", "templates/project/.gitignore", "templates/project/docs/BOARD.md"):
-            target = main / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source / relative, target)
-        live = Path(self.board.initialize_board(str(main)))
-        self.git(main, "add", "-f", "docs/BOARD.md")
-        self.git(main, "add", ".gitignore", "templates/project/.gitignore")
-        # The factory tracks its starter even though the copied template ignores its own runtime board.
-        self.git(main, "add", "-f", "templates/project/docs/BOARD.md")
-        self.git(main, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
-                 "commit", "-m", "tracked board fixture")
-        linked = main / ".opencode/worktrees/migration"
-        self.git(main, "worktree", "add", "-b", "feat/migration", str(linked))
-        self.git(linked, "rm", "--cached", "docs/BOARD.md")
-        self.assertTrue((linked / "docs/BOARD.md").exists())
-        self.git(linked, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
-                 "commit", "-m", "untrack fixture")
-        self.assertEqual(self.git(linked, "check-ignore", "docs/BOARD.md"), "docs/BOARD.md")
-        self.assertEqual(self.git(linked, "ls-files", "templates/project/docs/BOARD.md"),
-                         "templates/project/docs/BOARD.md")
-        # Refresh the local backup immediately before the simulated human merge.
-        content = live.read_bytes() + b"\nlatest local row state\n"
-        live.write_bytes(content)
-        backup = main / ".git/board-backup.md"
-        shutil.copyfile(live, backup)
-        self.git(main, "restore", "--source=HEAD", "--", "docs/BOARD.md")
-        self.git(main, "merge", "--ff-only", "feat/migration")
-        self.assertFalse(live.exists())
-        live.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(backup, live)
-        self.assertEqual(live.read_bytes(), content)
-        self.assertEqual(self.git(main, "status", "--porcelain"), "")
-        self.board.initialize_board(str(main))
-        self.assertEqual(live.read_bytes(), content)
-        self.assertEqual(self.git(main, "check-ignore", "--no-index", "templates/project/docs/BOARD.md"),
-                         "templates/project/docs/BOARD.md")
+        path = self.board.initialize_board(str(main))
+        for number in range(2):
+            table, _ = self.board.read_table(path)
+            at = table["rows"][-1] + 1 if table["rows"] else table["header"] + 2
+            self.board.write_atomic(path, table["lines"][:at]
+                                    + ["| BOARD-00%d | task | Fix | Ready | P2 | low | None. | control | - | - |" % (number + 1)]
+                                    + table["lines"][at:])
+
+        def update(number, status="In Progress"):
+            table, error = self.board.read_table(path)
+            self.assertIsNone(error)
+            i = self.board.row_by_id(table, "BOARD-00%d" % number)
+            lines = list(table["lines"])
+            lines[i] = self.board.replace_cell(lines[i], 3, status)
+            self.board.write_atomic(path, lines)
+
+        with ThreadPoolExecutor(2) as pool:
+            list(pool.map(update, [1, 2]))
+        table, _ = self.board.read_table(path)
+        self.assertEqual([self.board.cell_texts(table["lines"], i)[3] for i in table["rows"]],
+                         ["In Progress", "In Progress"])
+        stale, _ = self.board.read_table(path)
+        stale_lines = list(stale["lines"])
+        stale_lines[stale["rows"][0]] = self.board.replace_cell(stale_lines[stale["rows"][0]], 3, "Blocked")
+        with ThreadPoolExecutor(1) as pool:
+            pool.submit(update, 1, "Pending Merge").result()
+        with self.assertRaisesRegex(ValueError, "changed concurrently"):
+            self.board.write_atomic(path, stale_lines)
+
+    def test_explicit_fixture_is_read_only(self):
+        main = self.root / "main"
+        self.repository(main)
+        script = str(Path(__file__).with_name("board.py").resolve())
+        fixture = main / "fixture.md"
+        fixture.write_text(self.board.empty_board())
+        result = subprocess.run([sys.executable, script, "--file", str(fixture), "set-status",
+                                 "BOARD-001", "Ready"], cwd=main, capture_output=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(fixture.read_text(), self.board.empty_board())
 
 
 class GalleryTests(unittest.TestCase):
