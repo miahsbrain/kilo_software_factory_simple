@@ -1,0 +1,56 @@
+# Factory architecture
+
+## Shape
+
+The factory is a local, single-user OpenCode control repository. It owns the harness, policies,
+documentation and SQLite task board. Product repositories live separately and are accessed only
+through explicit IDs in `.opencode/repos.json`.
+
+```text
+OpenCode architect
+  ├── SQLite board (task state and dependencies)
+  ├── isolated Git worktrees (one task per worktree)
+  ├── specialist builders → QA reviewer → independent review
+  └── human-only integration gate
+
+Read-only dashboard
+  ├── SQLite board rows and lanes
+  └── Git branch/worktree metadata
+```
+
+The default product shape is a monorepo under `/projects/<project-id>`, with one app per `apps/`
+folder. A service may become a separate repository when it has independent ownership or release
+needs. Every work surface must be registered before the factory reads its contents.
+
+## State and boundaries
+
+- The live board is `<git-common-dir>/factory-board.sqlite3`; Markdown is a one-time import or
+  generated export, never the live state.
+- Git is the source of branch and worktree state. The board's `Branch/Worktree` cell links a task
+  to its isolated worktree.
+- The dashboard is read-only. It shows board state, branches and worktrees. It does not expose
+  OpenCode sessions, dispatch agents, write board rows or maintain a second run-history table.
+- OpenCode's architect coordinates specialist agents. The approved builder limit is two total and
+  one per repository. This policy is not enforced until BOARD-133 is complete.
+- A `factory-dev` specialist is approved for control-repo board/worktree/guard tooling, but its
+  exact agent rule and permission entry still need A9 approval (BOARD-143).
+- QA and review use specialist agents; UI evidence uses OpenCode's built-in browser and the
+  approved gallery/anti-slop checks. BOARD-130 remains Blocked, so the approved task-local evidence
+  path is not yet integrated into the base branch.
+- A task becomes Pending Merge only after acceptance evidence, verification, independent review,
+  documentation and a clean committed worktree. The human alone integrates it.
+
+## Runtime and dependencies
+
+The board and dashboard use Python standard-library SQLite and HTTP. The dashboard runs on loopback
+port 15180. The viewer has no write endpoint. Node 22 is used only to author the committed Tailwind
+stylesheet; no Node runtime or external service is required to serve the dashboard.
+
+## Deferred architecture
+
+The code-graph engine, graph dashboard, session APIs, dashboard dispatch, distributed workers and
+multi-user service are deferred. Reconsider graph memory only after safe task execution,
+registration, concurrency and QA have been proven.
+
+See [DECISIONS.md](DECISIONS.md), [FACTORY_ROADMAP.md](FACTORY_ROADMAP.md), [RISKS.md](RISKS.md),
+[API_CONTRACTS.md](API_CONTRACTS.md) and [STACK.md](STACK.md).

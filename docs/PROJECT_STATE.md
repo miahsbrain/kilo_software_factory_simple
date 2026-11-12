@@ -1,6 +1,19 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-126 registered-repo feed reviewed (2026-11-12)
+## Current session — BOARD-131 factory backlog plan reviewed (2026-11-12)
+
+- The approved factory scope is a read-only board/worktree/branch dashboard, SQLite as the task
+  source of truth, a maximum of two builders with one per repository, and monorepo-first projects
+  registered by ID. Graph memory is deferred. A scoped factory-dev specialist was selected; its
+  exact rule/config changes still require A9 approval.
+- `docs/FACTORY_ROADMAP.md` and 13 granular board rows are drafted in
+  `.opencode/worktrees/plan-factory-implementation-backlog` on
+  `docs/plan-factory-implementation-backlog`.
+- BOARD-130 remains Blocked; no fourth QA round is authorized. BOARD-131 passed docs-only review
+  and `git diff --check`; no application tests were needed. Next: commit BOARD-131 and request
+  human review.
+
+## Previous session — BOARD-126 registered-repo feed reviewed (2026-11-12)
 
 - Registered-repo APIs and no-follow candidate discovery are committed on
   `feat/expose-registered-repos-and-safe-candidates`. Read-only secondary SQLite reads
