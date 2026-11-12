@@ -464,6 +464,8 @@ After confirmation it holds the SQLite writer lock across row validation, merge,
 and the final board update. Other board writers may wait or time out during integration.
 Before merge/teardown it publishes a complete synced recovery record in `.factory-state/cleanup-wt/<repo-id>/`
 without replacing an existing record; an interrupted temp write cannot poison the final path.
+Recovery writers fail closed while Git-metadata runtime state remains and the new board database is
+absent; run the explicit runtime-state migration before creating recovery records.
 If cleanup stops after removing the worktree or branch, rerun the same human-only command
 from the base checkout: the record proves the integrated tip and the board row is completed
 without re-merging. An invalid record or changed row refuses rather than guessing.

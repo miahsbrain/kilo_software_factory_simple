@@ -79,7 +79,7 @@ python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*
 # Ledger path-validation regressions (temporary directories only)
 python3 -m unittest discover -s .opencode/skills/qa-review/scripts -p 'test_ledger.py'
 
-# Runtime-state path and migration regressions (temporary repositories only)
+# Read-only SQLite WAL snapshots and atomic migration regressions (temporary repositories only)
 python3 -m unittest discover -s .opencode/skills/runtime-state/scripts -p 'test_*.py'
 
 # Security adapter boundary tests (temporary dummy repositories only)

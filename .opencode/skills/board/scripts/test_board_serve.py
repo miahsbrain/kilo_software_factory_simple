@@ -656,6 +656,19 @@ class BoardBootstrapTests(unittest.TestCase):
         self.assertIn("pre-merge check refused", result.stderr)
         self.assertFalse(Path(self.board.database_path(str(main))).exists())
 
+    def test_legacy_runtime_state_blocks_board_bootstrap_before_empty_database(self):
+        main = self.root / "main"
+        self.repository(main)
+        legacy_export = main / ".git/factory-board-export.md"
+        legacy_export.write_text("old board export", encoding="utf-8")
+        script = str(Path(__file__).with_name("board.py").resolve())
+        result = subprocess.run([sys.executable, script, "show"], cwd=main,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, self.board.REFUSED)
+        self.assertIn("run .opencode/skills/runtime-state/scripts/state.py migrate first",
+                      result.stderr)
+        self.assertFalse((main / ".factory-state").exists())
+
     def test_import_once_preserves_source_bytes_and_main_status(self):
         main = self.root / "main"
         self.repository(main)

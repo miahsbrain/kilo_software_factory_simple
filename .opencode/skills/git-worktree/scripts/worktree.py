@@ -168,6 +168,7 @@ def factory_state_root(control):
     spec = importlib.util.spec_from_file_location("factory_runtime_state", state_file)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    module.ensure_runtime_ready(control)
     return module.state_root(control)
 
 
@@ -1123,6 +1124,9 @@ def cmd_finalize(args, cwd):
         return REFUSED
     recovery_dir = recovery_directory(control, repo_id)
     journal = os.path.join(recovery_dir, "finalize-%s.json" % args.board)
+    legacy_journal = os.path.join(recovery_dir, "finalize-%s-%s.json" % (args.board, repo_id))
+    if not os.path.lexists(journal) and os.path.lexists(legacy_journal):
+        journal = legacy_journal
     existing = None
     if os.path.exists(journal):
         try:

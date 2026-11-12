@@ -104,7 +104,7 @@ a separate git repository that copies the harness in and owns the copy from then
 | | Factory repository | Project repository |
 |---|---|---|
 | Holds | `AGENTS.md`, `.opencode/`, `.devcontainer/`, `opencode.jsonc`, `docs/`, `templates/` | `AGENTS.md`, `.opencode/`, `DOMAIN.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/`, `apps/` |
-| Board | Git-common-dir SQLite — factory work only | Git-common-dir SQLite — project work only |
+| Board | `<primary-checkout>/.factory-state/factory-board.sqlite3` — factory work only | Git-common-dir SQLite — project work only |
 | Decisions | `docs/DECISIONS.md`, ADR-001… | `docs/DECISIONS.md`, ADR-100… |
 | Changelog | `docs/changelog/` — the harness | `docs/changelog/` — the product |
 

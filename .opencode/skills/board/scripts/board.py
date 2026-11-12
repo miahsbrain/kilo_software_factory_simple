@@ -88,6 +88,7 @@ def empty_board() -> str:
 
 def initialize_board(root: str) -> str:
     """Import the main checkout's legacy board once without modifying its bytes."""
+    runtime_state_module().ensure_runtime_ready(root)
     path = os.path.join(root, BOARD_PATH)
     with connect(database_path(root)) as connection:
         connection.execute("BEGIN IMMEDIATE")
@@ -149,12 +150,16 @@ def cmd_pre_merge_check(root):
 
 
 def database_path(root):
+    return os.path.join(runtime_state_module().state_root(root), DATABASE_NAME)
+
+
+def runtime_state_module():
     state_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                               "../../runtime-state/scripts/state.py"))
     spec = importlib.util.spec_from_file_location("factory_runtime_state", state_file)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return os.path.join(module.state_root(root), DATABASE_NAME)
+    return module
 
 
 @contextlib.contextmanager

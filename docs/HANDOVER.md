@@ -1,11 +1,11 @@
 # HANDOVER — software factory
 
 > **Session Notes — BOARD-148 runtime state tooling in progress, 2026-11-12**
-> Shared resolver and explicit dry-run/apply migration tooling are being added in
+> Shared resolver and explicit dry-run/apply migration tooling are being corrected in
 > `.opencode/worktrees/move-clone-local-state-out-of-git-metadata`. Production state was not read,
-> copied, or migrated; no live board update was made. Next: verify and review the implementation,
-> commit the task branch, then the architect may run the migration after review. Do not run handoff
-> before the new state store is bootstrapped.
+> copied, or migrated; no live board update was made. Tests were not run by the builder; the
+> architect will run the documented focused suite after review. Do not run handoff before the new
+> state store is bootstrapped.
 
 > **Session Notes — BOARD-126 ready for human inspection, 2026-11-12**
 > Registered repositories appear in the read-only feeds. `/api/repo-candidates` lists
@@ -157,28 +157,22 @@
 > historical tracked rows. Human-only finalize requires a real TTY and typed board ID, base,
 > branch and full tip; merge preflight reports conflict paths/types, and a failed initiated merge
 > is aborted if safe. QA/UI findings now return to the original builder in the same worktree;
-> reviewer reports and ledger belong under `<git-common-dir>/reviews/`. Next: independent parent
+> reviewer reports and ledger belong under `<primary-checkout>/.factory-state/reviews/`. Next: independent parent
 > review and QA; this task is not merge-ready merely because it is committed.
 
 ## Transition and recovery
 
-- Existing local board: `board.py show` imports main-checkout legacy bytes once into the local
-  SQLite `source_bytes` snapshot without changing the Markdown. `board.py export` writes the
-  current readable snapshot under Git common dir. Use a consistent SQLite backup (or export)
-  when transferring a clone; Git does not synchronize live rows or reviewer reports.
-- On integration of this branch, tracked `docs/BOARD.md` is deleted from the integration checkout;
-  a previously initialized SQLite database retains the live rows. **Before the one-time human
-  integration**, stop board writers and run from this bootstrap worktree:
-  `python3 .opencode/skills/board/scripts/board.py pre-merge-check`, then
-  `python3 .opencode/skills/board/scripts/board.py export`. The check imports a missing database
-  from the main-checkout source, verifies its `source_bytes` match, refuses a missing/changed
-  source, and writes/prints the SQLite, byte-exact legacy backup and current Markdown export
-  paths in Git common dir. The second command refreshes the export. Do not proceed if either
-  fails. Review the handoff, then run the absolute `finalize` command printed by
-  `worktree.py handoff --board BOARD-124` from the clean `opencode` base checkout in a real TTY;
-  it uses this bootstrap worktree's script, not the base's old relative script. After integration,
-  a new clone with no local board initializes empty. The still-tracked blank project template is
-  not historical state.
+- The live board, generated exports, legacy backup, review reports/ledgers, and cleanup recovery
+  records live under `<primary-checkout>/.factory-state/`, shared across linked worktrees. Board
+  initialization refuses to create an empty database while legacy Git-metadata state remains;
+  a fresh clone with no legacy runtime state initializes normally.
+- Migrate existing local state explicitly with `python3 .opencode/skills/runtime-state/scripts/state.py migrate`
+  to review the plan, then `python3 .opencode/skills/runtime-state/scripts/state.py migrate --apply`
+  to install it. The migration reads the SQLite source through a read-only connection and backs
+  it up consistently, including WAL data,
+  verifies integrity, and atomically installs a complete snapshot without deleting its source.
+  Any partial or non-identical existing destination is refused. `board.py export` writes the
+  current Markdown snapshot under `.factory-state/`; Git does not synchronize live rows or reports.
 - `board.py:cmd_pre_merge_check` (effectful filesystem/SQLite), `write_export` (effectful atomic
   bytes/text snapshot) preserve the import and byte backup; `worktree.py:cmd_handoff` (effectful)
   prints the absolute shell-quoted control script and target main checkout for app/control repos.
@@ -187,7 +181,7 @@
   confirmation and resumable integration. `confirm_finalize` (effectful TTY stdin/stderr) cannot
   establish identity against a process sharing the same OS user. Failed merge abort is scoped
   to `MERGE_HEAD` created during this call and unchanged pre-merge HEAD; otherwise inspect
-  manually. `ledger.py:main` (effectful Git discovery) defaults to common-dir local reviews;
+  manually. `ledger.py:main` (effectful Git discovery) defaults to primary-checkout `.factory-state/reviews/`;
   `parse_ledger`/`render_ledger` (pure) retain historical Fix-row fields for old records.
 - Verification: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'`;
   parent independently reviews evidence before marking Pending Merge.
@@ -210,8 +204,8 @@
 - `worktree.py:provision_env`, `cmd_create`, `cmd_resume` (effectful) fail closed on env errors;
   `cmd_finalize` (effectful) is a human-only CLI entry point. Pending Merge is a human/reviewer
   certification: QA and verification evidence is not machine-readable; finalize prints this
-  limitation and must never be called by an agent. Recovery journal is stored in the Git common
-  directory's `cleanup-wt/` before merge, with branch tip and base identity; no secret contents.
+  limitation and must never be called by an agent. Recovery journal is stored in
+  `.factory-state/cleanup-wt/<repo-id>/` before merge, with branch tip and base identity; no secret contents.
 - Conflict preflight reports paths and competing edits; resolve in the original task worktree.
   No merge or cleanup on preflight conflict. After a successful integration, ancestry is checked;
   cleanup removes env copies, worktree and branch, then updates SQLite board. Interrupted cleanup

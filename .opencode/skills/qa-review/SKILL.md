@@ -95,6 +95,8 @@ out of git. Do not create empty logs or summaries that imply unobserved checks p
 
 **Review reports and the ledger live outside task worktrees:**
 `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md`, `-ui.md`, and `-ledger.md`.
+Default ledger writers fail closed while Git-metadata runtime state remains and the new board
+database is absent; run the explicit runtime-state migration before writing reports or ledgers.
 
 Per route, viewport, and scheme:
 

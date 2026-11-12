@@ -235,6 +235,8 @@ def main(argv):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         try:
+            if args.command in {"next-round", "finding", "merged", "stop"}:
+                module.ensure_runtime_ready(os.getcwd())
             args.ledger_dir = os.path.join(module.state_root(os.getcwd()), "reviews")
         except OSError as exc:
             print("refused: cannot resolve local review ledger: %s" % exc, file=sys.stderr)

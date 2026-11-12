@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import contextlib
 import io
+import json
 import os
 import shlex
 import sqlite3
@@ -30,6 +31,17 @@ class HandoffTests(unittest.TestCase):
         self.git("commit", "-m", "task work")
         self.set_status("Pending Merge")
         self.args = SimpleNamespace(board="BOARD-904", repo=None, base="main")
+
+    def test_recovery_path_refuses_legacy_state_before_creating_state_directory(self):
+        with tempfile.TemporaryDirectory() as folder:
+            subprocess.run(["git", "-C", folder, "init"], check=True,
+                           capture_output=True, text=True)
+            old_recovery = Path(folder, ".git/cleanup-wt/recovery.patch")
+            old_recovery.parent.mkdir()
+            old_recovery.write_bytes(b"recovery")
+            with self.assertRaisesRegex(OSError, "run .*state.py migrate"):
+                worktree.recovery_directory(folder, "control")
+            self.assertFalse(Path(folder, ".factory-state").exists())
 
     def git(self, *args):
         code, out, err = test_env.git(self.path, *args)
@@ -233,6 +245,28 @@ class HandoffTests(unittest.TestCase):
         self.assertIn("recovery record does not match", err)
         self.assertTrue(os.path.isdir(self.path))
         self.assertEqual(self.board_cells()[3], "Pending Merge")
+
+    def test_legacy_control_journal_is_replayed_without_renaming(self):
+        journal = Path(self.repo, ".factory-state/cleanup-wt/control/"
+                                 "finalize-BOARD-904-control.json")
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            "path": self.path,
+            "branch": "feat/hand-off-a-worktree",
+            "tip": self.git("rev-parse", "HEAD"),
+            "base": "main",
+            "base_tip": self.git("rev-parse", "main"),
+        }
+        original = json.dumps(record).encode("utf-8")
+        journal.write_bytes(original)
+
+        code, out, err = self.finalize_confirmed()
+
+        self.assertEqual(code, worktree.OK, out + err)
+        self.assertFalse(os.path.exists(self.path))
+        self.assertEqual(journal.read_bytes(), original)
+        self.assertIn(str(journal), out)
+        self.assertEqual(self.board_cells()[3], "Merged")
 
     def test_incomplete_journal_never_publishes_or_merges_and_retry_works(self):
         journal = Path(self.repo, ".factory-state/cleanup-wt/control/finalize-BOARD-904.json")
