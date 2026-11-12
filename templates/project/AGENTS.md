@@ -944,7 +944,7 @@ worktree.
      and the worktree can never drift apart.
 4. **Create it with the script, from the board row:**
 
-       python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
+       python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X
 
    The script reads the row, derives the type and slug, creates
    `.opencode/worktrees/<slug>/` on branch `<type>/<slug>`, writes the row's `Branch/Worktree` and
@@ -1169,7 +1169,8 @@ reason on one line.
 - If several worktrees depend on the same contract, schema, or file layout, settle that shared
   shape on the base branch **before** fanning out.
 - Never delete a worktree that holds unmerged or dirty work. Preserve it and report it.
-- Clean up a worktree only after its row reaches `Merged`.
+- Use human-only `finalize` to integrate and clean up a Pending Merge worktree; legacy `cleanup`
+  applies to work already merged into the base. Never remove unmerged or dirty work.
 - Never create, move, or use a worktree outside `.opencode/worktrees/`.
 
 ### Guard rules (enforced by the guard script, not by discipline)
@@ -1223,8 +1224,8 @@ stays in `In Review` or bounces to `In Progress` — it does not become `Pending
 5. The documentation set is updated for the change (§B1).
 6. The worktree is clean — nothing uncommitted.
 
-The user performs the merge, into `main` or a feature branch. The agent never merges, pushes, or
-opens a PR.
+The human runs `finalize` into the configured base (or an approved feature branch). The agent
+never merges, pushes, or opens a PR.
 
 ## B4.1 Writing standard
 
@@ -1289,8 +1290,8 @@ historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser w
   the canonical path. Never assume desktop and server filesystems are shared.
   **Review reports and ledger live outside task worktrees:** `<git-common-dir>/reviews/`.
 - **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
-  recording what was checked and expected vs actual. Commit `notes.md` and small component shots;
-  leave full-page captures out of git.
+  recording what was checked and expected vs actual. Reviewers leave this main-checkout evidence
+  uncommitted and do not edit the task worktree; leave full-page captures out of git.
 - **Check:** keyboard focus and focus trapping, contrast, accessible names, tap target size
   (≥24×24 CSS px), console errors, unexpected network failures, horizontal overflow at 320px,
   and whether the screen matches the approved gallery (tokens, states, density).
@@ -1575,8 +1576,8 @@ the user. `opencode.jsonc` carries the permission map generated from it, and
 
 The guard adds three context checks a keyword list cannot see: **no commit on
 `main`/`master`/`base`**, **no branch switch inside a worktree**, and **no raw
-`git worktree remove`** — use `worktree.py cleanup`, which checks that the branch is merged and
-the tree is clean.
+`git worktree remove`** — the human uses `worktree.py finalize` for integration and cleanup;
+legacy `cleanup` checks that the branch is already merged and the tree is clean.
 
 Run the guard before any git command that changes history or the remote:
 
@@ -1613,10 +1614,10 @@ The agent stops at `Pending Merge`. It does not merge, does not push, and does n
 | Question | Answer |
 |---|---|
 | What worktrees exist? | `git worktree list` |
-| What changed in mine? | `git -C .opencode/worktrees/<slug> status` and `git -C .opencode/worktrees/<slug> diff main` |
-| What is on my branch? | `git -C .opencode/worktrees/<slug> log --oneline main..HEAD` |
-| Is it mergeable? | `git -C .opencode/worktrees/<slug> merge-base --is-ancestor main HEAD && echo "no conflicts expected"` |
-| Clean it up after merge | `git worktree remove .opencode/worktrees/<slug>` and `git branch -d <branch>` |
+| What changed in mine? | `git -C .opencode/worktrees/<slug> status` and `git -C .opencode/worktrees/<slug> diff <configured-base>` |
+| What is on my branch? | `git -C .opencode/worktrees/<slug> log --oneline <configured-base>..HEAD` |
+| Is it up to date with base? | `git -C .opencode/worktrees/<slug> merge-base --is-ancestor <configured-base> HEAD && echo "base is ancestor"` |
+| Integrate and clean up | Human runs `python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board <ID>` from the target base checkout; legacy `cleanup --board <ID> --apply` is only for already-merged work |
 | Which row owns it? | The board row's `Branch/Worktree` column |
 
 Worktrees live under `.opencode/worktrees/<feature-slug>/` and are git-ignored. The full procedure is
@@ -1635,4 +1636,4 @@ the `git-worktree` skill at `.opencode/skills/git-worktree/SKILL.md`.
 - [ ] `docs/changelog/` entry written.
 - [ ] SQLite board row updated through `board.py` (orchestrator).
 - [ ] `docs/PROJECT_STATE.md` updated.
-- [ ] Board row is `Pending Merge` and the user has been asked to inspect and merge into `main`.
+- [ ] Board row is `Pending Merge` and the user has been asked to inspect and run human-only `finalize` into the configured base.

@@ -15,8 +15,8 @@ orchestrator updates rows through `board.py`; `docs/BOARD.md` is a legacy import
 Markdown exports are generated snapshots. The human-only finalize command owns merge cleanup.
 
 Board CLI/viewer startup owns missing-board initialization. Worktree lifecycle commands resolve
-the control repo by its repo-map marker, not board presence. Cleanup's final local row update
-does not dirty Git and requires no commit.
+the control repo by its repo-map marker, not board presence. Finalize's local row update does not
+dirty Git and requires no commit; legacy cleanup handles work already merged into the base.
 
 **The script does the mechanics. You supply the intent.** Do not hand-run `git worktree add` when
 the script can do it — the script is where the naming rules and the refusals live.
@@ -27,7 +27,7 @@ the script can do it — the script is where the naming rules and the refusals l
 
 | Script | Does |
 |---|---|
-| `.opencode/skills/git-worktree/scripts/worktree.py` | create · resume · discard · handoff · list · verify · cleanup |
+| `.opencode/skills/git-worktree/scripts/worktree.py` | create · resume · discard · handoff · list · verify · finalize (human only) · legacy cleanup |
 | `.opencode/skills/git-worktree/scripts/env.py` | sync · status · clean — the env files of a worktree |
 | `.opencode/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · install-hooks · policy |
 
@@ -60,9 +60,9 @@ The script refuses when the row does not exist, when the branch or directory alr
 when the row's type is unknown. It never deletes anything. It writes the board row in the **main
     SQLite board**, so the live board always points at the running worktree.
 
-**When the row already has a live worktree, `create` refuses** and prints the three ways
-forward: `resume` the worktree, `discard` it, or create with `--slug <other-slug>`. A second
-worktree for one row is never created.
+**When the row already has a live worktree, `create` refuses**: `resume` or `discard` that
+worktree. `--slug <other-slug>` cannot bypass this refusal; a second worktree for one row is
+never created.
 
 **When the slug directory is already taken by another row's worktree, `create` refuses too**,
 with a different message: it names the slug directory, the row that owns it when the board
@@ -443,12 +443,12 @@ Only after those gates pass, the ready block looks like this:
 board:    BOARD-00X
 worktree: <path>/.opencode/worktrees/<slug>
 branch:   <type>/<slug>
-base:     main
+base:     <configured-base>
 
 diff:
-  git -C <path>/.opencode/worktrees/<slug> diff main
+  git -C <path>/.opencode/worktrees/<slug> diff <configured-base>
 log:
-  git -C <path>/.opencode/worktrees/<slug> log --oneline main..HEAD
+  git -C <path>/.opencode/worktrees/<slug> log --oneline <configured-base>..HEAD
 human-only finalize (run from target base checkout in a real terminal):
   python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
 ```
@@ -468,19 +468,25 @@ Only after rechecking the same readiness gates, the human may use the same comma
 ```bash
 # review
 python3 .opencode/skills/git-worktree/scripts/worktree.py list
-git -C .opencode/worktrees/<slug> diff main
-git -C .opencode/worktrees/<slug> log --oneline main..HEAD
+git -C .opencode/worktrees/<slug> diff <configured-base>
+git -C .opencode/worktrees/<slug> log --oneline <configured-base>..HEAD
 
 # integrate — run only by the human, in the target base checkout with a real terminal
 python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
 ```
 
-The merge target is the human's call: `main`, or a feature branch when the work is part of a
-larger feature.
+The configured base is `opencode` for factory tasks; project repositories use their own
+configured base. A separately approved feature branch may be the target for a larger feature.
+
+**One-time bootstrap handoff:** before this branch is integrated, the main checkout still has
+the old `worktree.py` and cannot run its `finalize` command. After review and human approval,
+the human must manually merge `feat/sqlite-board-bootstrap` into `opencode`, then handle its
+worktree cleanup and local board transition. Do not run the old main-checkout script as if it
+were the new finalize gate; this bootstrap exception does not apply to later tasks.
 
 ---
 
-## 9. Clean up
+## 9. Legacy cleanup for already-merged work
 
 ```bash
 python3 .opencode/skills/git-worktree/scripts/worktree.py cleanup <slug>           # dry run
@@ -488,11 +494,12 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply
 python3 .opencode/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
 ```
 
+Use human-only `finalize` for a normal Pending Merge task. Legacy `cleanup` is for a branch
+already merged into the base, not a substitute for the approval and integration gate.
 `--board` is the alternative to the slug: it takes the worktree from the row's
 `Branch/Worktree` cell, the same way `resume` and `discard` do, and it clears that cell when
 the worktree is gone. Give a slug or `--board`, never both and never neither — either mistake
-is a usage error. The teardown the hand-off block names is the `--board` form, because the row
-is what the human holds.
+is a usage error. The normal hand-off block names `finalize`, not this legacy teardown.
 
 `cleanup --board` owns the lane for the row it tears down: a successful cleanup puts the row in
 `Merged` and clears the cell, in the same write. The slug form of `cleanup` cannot know the
@@ -513,7 +520,7 @@ unmerged work.**
 | `fatal: invalid reference: HEAD` | The repository has no commits | The base branch needs one commit before any worktree exists |
 | `branch ... is already checked out` | The branch already has a worktree | Use a new branch, or clean up the old worktree first |
 | `worktree.py create` refuses | The slug, branch, or directory already exists | Pick another slug, or clean up first |
-| `worktree.py create` refuses with resume / discard / new slug | The row already has a live worktree | `resume` it, `discard` it, or create with `--slug` — never a second worktree |
+| `worktree.py create` refuses with resume / discard | The row already has a live worktree | `resume` or `discard` that row; `--slug` cannot bypass the live-worktree refusal |
 | `worktree.py create` refuses with new slug / discard <other row> | The slug directory is taken by another row's worktree | Create with `--slug`, or discard that other row's worktree with its own row id |
 | `worktree.py resume` refuses | The row has no live worktree | `create` one, or `discard` the stale entry first |
 | `worktree.py discard` refuses | The worktree is dirty or holds commits the base does not have | Commit or hand the work over first; unmerged work is never deleted |
@@ -532,5 +539,6 @@ unmerged work.**
 - The board row is the work item; the worktree is where it happens; the row records the path.
 - The builder agents (`frontend-dev`, `backend-dev`, `mobile-dev`) work inside the worktree.
 - The reviewer agents (`qa-reviewer`, `ui-critic`) run against the worktree state and report
-  findings; the orchestrator turns findings into `Type: Fix` board rows.
+  findings; the orchestrator returns in-task findings to the same builder and worktree. Only
+  independently approved defects become separate `Type: Fix` tasks.
 - The root `AGENTS.md` owns the rules. This skill is the executable procedure for them.

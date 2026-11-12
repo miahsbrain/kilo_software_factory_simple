@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Align bootstrap lifecycle and review guidance
+**Type:** Docs
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `AGENTS.md`, `templates/project/AGENTS.md`, `.opencode/skills/git-worktree/SKILL.md`, `.opencode/commands/ui.md`.
+**Why:** Remove stale second-worktree, automatic Fix-row, raw teardown, main-target and review-artifact commit instructions; identify the one-time human-managed bootstrap integration while the base checkout still has old tooling.
+**Impact:** Guidance only; no tooling behavior change. Normal tasks use human-only finalize; this bootstrap requires human manual merge and cleanup after approval.
+**Verification:** File review and `git diff --check` only.
+
 ## [2026-11-12] Complete local-board and human-gate migration
 **Type:** Fix
 **Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap

@@ -27,8 +27,8 @@ Do not use Playwright, browser MCP alternatives or `browser-review.mjs` for UI v
 
    The ledger lives at `<git-common-dir>/reviews/<task-id>-ledger.md`.
 4. **Store artifacts** under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` with a
-   `notes.md` recording route, viewport, theme, steps, expected and observed results. Commit
-   `notes.md` and small component shots only. Review reports stay in
+   `notes.md` recording route, viewport, theme, steps, expected and observed results. Reviewers
+   leave main-checkout artifacts uncommitted and do not edit the task worktree. Review reports stay in
    `<git-common-dir>/reviews/<task-id>-qa.md` and `-ui.md`, outside the task worktree.
 5. **Check** and report findings as expected-vs-actual:
    - keyboard focus, visible focus ring, focus trapping in dialogs
@@ -49,8 +49,9 @@ Do not use Playwright, browser MCP alternatives or `browser-review.mjs` for UI v
        python3 .opencode/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
            --kind bug --priority medium --category functional --route /path
 
-   Exit 0 prints the fingerprint on stdout. Pass it to `board.py add --fingerprint`; a repeat
-   fingerprint is refused and the existing row is escalated to `Blocked` instead.
+   Exit 0 prints the fingerprint on stdout. Record it in the original row's notes and local
+   ledger. Return an in-task finding to the same builder and worktree; a repeated fingerprint
+   blocks the original row. Only an independently approved defect gets a separate Fix task.
 8. **Verdict**: a frontend row cannot leave `In Review` until QA and independent critique are
    green and the unslop audit is recorded. Gallery approval and accessibility gates remain
    mandatory. Any finding returns the row to `In Progress` with the finding restated. The round cap
