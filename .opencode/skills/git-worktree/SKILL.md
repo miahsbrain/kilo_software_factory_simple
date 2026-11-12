@@ -460,7 +460,10 @@ preflights conflicts, then coordinates merge, cleanup and board update. Non-inte
 refused with no bypass flag. Same-identity code can bypass this local policy/deterrence gate;
 it is not an OS security boundary. Conflicts are reported per path and resolved in the task
 worktree before re-review; an initiated merge is aborted on failure when safe.
-Before merge/teardown it persists a validated recovery record in the Git common directory.
+After confirmation it holds the SQLite writer lock across row validation, merge, teardown
+and the final board update. Other board writers may wait or time out during integration.
+Before merge/teardown it publishes a complete synced recovery record in the Git common directory
+without replacing an existing record; an interrupted temp write cannot poison the final path.
 If cleanup stops after removing the worktree or branch, rerun the same human-only command
 from the base checkout: the record proves the integrated tip and the board row is completed
 without re-merging. An invalid record or changed row refuses rather than guessing.

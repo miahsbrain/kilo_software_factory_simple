@@ -64,6 +64,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 
 TYPE_MAP = {"Feature": "feat", "Fix": "fix", "Chore": "chore", "Docs": "docs",
             "Research": "chore"}
@@ -1146,6 +1147,9 @@ def cmd_finalize(args, cwd):
         return REFUSED
     integrated = git(repo, "merge-base", "--is-ancestor", tip, base)[0] == 0
     base_tip = git_out(repo, "rev-parse", "refs/heads/" + base)
+    if not base_tip or not re.fullmatch(r"[0-9a-f]{40,64}", base_tip):
+        print("refused: cannot resolve base commit for recovery", file=sys.stderr)
+        return REFUSED
     if not integrated:
         if not os.path.isdir(path) or repo_of_path(path) != os.path.realpath(repo):
             print("refused: recorded worktree missing or in wrong repository", file=sys.stderr)
@@ -1189,30 +1193,77 @@ def cmd_finalize(args, cwd):
             or git(repo, "status", "--porcelain", "--untracked-files=all")[0:2] != (0, "")):
         print("refused: base, branch or main checkout changed during confirmation", file=sys.stderr)
         return REFUSED
-    current, current_index = board_row(board, board_file, args.board)
-    if current is None:
+    try:
+        with board.connect(board.database_path(control)) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            markdown, revision = connection.execute(
+                "SELECT markdown, revision FROM board WHERE id = 1").fetchone()
+            current, error = board.parse_table(markdown, board_file)
+            current_index = board.row_by_id(current, args.board) if current else None
+            if current_index is None:
+                print("refused: board row missing or invalid under lock: %s" % (error or args.board),
+                      file=sys.stderr)
+                connection.rollback()
+                return REFUSED
+            current_cells = board.cell_texts(current["lines"], current_index)
+            if (current_cells[STATUS_INDEX] != "Pending Merge"
+                    or current_cells[column] != cells[column]):
+                print("refused: board row changed during confirmation", file=sys.stderr)
+                connection.rollback()
+                return REFUSED
+            print("limitation: QA, review, acceptance proofs and verification are certified by the "
+                  "Pending Merge lane; their evidence is not machine-readable here.")
+            result = finish_finalize_locked(board, connection, board_file, current, current_index,
+                                            revision, control, repo, path, branch, base, tip,
+                                            base_tip, journal, existing, integrated, recorded)
+            if result != OK:
+                connection.rollback()
+            return result
+    except (OSError, ValueError, board.sqlite3.Error) as exc:
+        print("refused: board finalization failed: %s; retry finalize" % exc, file=sys.stderr)
         return REFUSED
-    current_cells = board.cell_texts(current["lines"], current_index)
-    if (current_cells[STATUS_INDEX] != "Pending Merge"
-            or current_cells[column] != cells[column]):
-        print("refused: board row changed during confirmation", file=sys.stderr)
-        return REFUSED
-    table, index = current, current_index
-    print("limitation: QA, review, acceptance proofs and verification are certified by the "
-          "Pending Merge lane; their evidence is not machine-readable here.")
-    if not existing:
-        os.makedirs(os.path.dirname(journal), exist_ok=True)
+
+
+def publish_finalize_journal(journal, record):
+    """Publish a complete synced recovery record without replacing an existing one."""
+    directory = os.path.dirname(journal)
+    os.makedirs(directory, exist_ok=True)
+    fd, temp = tempfile.mkstemp(dir=directory, prefix=".finalize-", suffix=".tmp")
+    published = False
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(record, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        with open(temp, encoding="utf-8") as stream:
+            if json.load(stream) != record:
+                raise OSError("recovery record verification failed")
+        os.link(temp, journal)
+        published = True
+        os.unlink(temp)
+        temp = None
+        directory_fd = os.open(directory, os.O_RDONLY)
         try:
-            with open(journal, "x", encoding="utf-8") as stream:
-                json.dump({"path": path, "branch": branch, "tip": tip, "base": base,
-                           "base_tip": base_tip}, stream)
-                stream.flush()
-                os.fsync(stream.fileno())
-            directory = os.open(os.path.dirname(journal), os.O_RDONLY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except OSError:
+        if published:
+            os.unlink(journal)
+        raise
+    finally:
+        if temp is not None and os.path.exists(temp):
+            os.unlink(temp)
+
+
+def finish_finalize_locked(board, connection, board_file, table, index, revision, control,
+                           repo, path, branch, base, tip, base_tip, journal, existing,
+                           integrated, recorded):
+    """Keep the approved row locked from recovery publication through Git and SQLite."""
+    if not existing:
+        try:
+            publish_finalize_journal(journal, {"path": path, "branch": branch, "tip": tip,
+                                               "base": base, "base_tip": base_tip})
         except OSError as exc:
             print("refused: recovery record is not durable: %s" % exc, file=sys.stderr)
             return REFUSED
@@ -1254,7 +1305,8 @@ def cmd_finalize(args, cwd):
             return REFUSED
     remaining = [p for p, _ in recorded if os.path.realpath(p) != os.path.realpath(path)]
     ok, message = clear_row_worktree(board, board_file, table, index, control, path,
-                                     None if remaining else "Merged")
+                                      None if remaining else "Merged", connection=connection,
+                                      revision=revision)
     if not ok:
         print("refused: board update failed: %s; retry finalize" % message, file=sys.stderr)
         return REFUSED
@@ -1340,7 +1392,8 @@ def recovery_tsv(common, rows):
     return path
 
 
-def clear_row_worktree(board, board_file, table, index, root, path, status=None):
+def clear_row_worktree(board, board_file, table, index, root, path, status=None,
+                       connection=None, revision=None):
     """(ok, message). Drops the worktree from the row's Branch/Worktree cell.
 
     With a status, the row's lane moves to it in the same write, so the cell
@@ -1360,7 +1413,15 @@ def clear_row_worktree(board, board_file, table, index, root, path, status=None)
         lines[index] = board.replace_cell(lines[index], branch_index, merged or "-")
         if status:
             lines[index] = board.replace_cell(lines[index], STATUS_INDEX, status)
-        board.write_atomic(board_file, lines)
+        if connection is None:
+            board.write_atomic(board_file, lines)
+        else:
+            proposed = "\n".join(lines)
+            parsed, error = board.parse_table(proposed, board_file)
+            if parsed is None:
+                raise ValueError(error)
+            connection.execute("UPDATE board SET markdown = ?, revision = ? WHERE id = 1",
+                               (proposed, revision + 1))
     except Exception as exc:
         return False, str(exc)
     return True, ""

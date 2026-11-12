@@ -64,6 +64,7 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-0
 python3 .opencode/skills/git-worktree/scripts/test_env.py
 
 # Focused handoff gates (isolated temporary repositories inside the task worktree)
+# Includes SQLite lock, atomic recovery journal and replay regressions; no live finalize.
 python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_handoff.py'
 
 # Lifecycle and TTY/conflict regressions (temporary repositories only)

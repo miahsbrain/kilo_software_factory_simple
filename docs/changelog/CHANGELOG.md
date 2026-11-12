@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Hold approval lock and publish finalize recovery atomically
+**Type:** Fix
+**Board:** BOARD-125 | **Branch:** fix/repair-finalize-after-worktree-removal
+**Changed:** `worktree.py`, `test_handoff.py`, git-worktree skill, `docs/STACK.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md`, this log.
+**Why:** An incomplete direct journal write blocked retry; board approval could change between confirmation and merge.
+**Impact:** No-overwrite synced journal and a SQLite writer lock from approval recheck through integration and board update; other writers may wait/time out. Failure retains recovery for replay; no live integration by agents.
+**Verification:** Focused scratch-repository handoff suite, then independent parent review.
+
 ## [2026-11-12] Repair finalize after self-removal
 **Type:** Fix
 **Board:** BOARD-125 | **Branch:** fix/repair-finalize-after-worktree-removal

@@ -3,6 +3,7 @@ import contextlib
 import io
 import os
 import shlex
+import sqlite3
 from pathlib import Path
 import subprocess
 import tempfile
@@ -232,6 +233,55 @@ class HandoffTests(unittest.TestCase):
         self.assertIn("recovery record does not match", err)
         self.assertTrue(os.path.isdir(self.path))
         self.assertEqual(self.board_cells()[3], "Pending Merge")
+
+    def test_incomplete_journal_never_publishes_or_merges_and_retry_works(self):
+        journal = Path(self.repo, ".git/cleanup-wt/finalize-BOARD-904-control.json")
+        for operation in ("fsync", "link"):
+            with self.subTest(operation=operation):
+                with patch.object(worktree.os, operation, side_effect=OSError("injected failure")):
+                    code, out, err = self.finalize_confirmed()
+                self.assertEqual(code, worktree.REFUSED, out + err)
+                self.assertIn("recovery record is not durable", err)
+                self.assertFalse(journal.exists())
+                self.assertEqual(list(journal.parent.glob(".finalize-*.tmp")), [])
+                self.assertTrue(os.path.isdir(self.path))
+                self.assertEqual(self.board_cells()[3], "Pending Merge")
+                self.assertEqual(test_env.git(self.repo, "rev-list", "--count",
+                                              "main..feat/hand-off-a-worktree")[1], "1")
+        code, out, err = self.finalize_confirmed()
+        self.assertEqual(code, worktree.OK, out + err)
+        self.assertEqual(self.board_cells()[3], "Merged")
+
+    def test_board_writer_cannot_revoke_approval_during_git_integration(self):
+        original = worktree.git
+        lock_observed = []
+
+        def check_lock(cwd, *args, **kwargs):
+            if cwd == self.repo and args[:2] == ("merge", "--no-ff"):
+                board = worktree.load_board_module(self.repo)
+                with sqlite3.connect(board.database_path(self.repo), timeout=0) as rival:
+                    with self.assertRaisesRegex(sqlite3.OperationalError, "locked"):
+                        rival.execute("BEGIN IMMEDIATE")
+                lock_observed.append(True)
+            return original(cwd, *args, **kwargs)
+
+        with patch.object(worktree, "git", side_effect=check_lock):
+            code, out, err = self.finalize_confirmed()
+        self.assertEqual(code, worktree.OK, out + err)
+        self.assertEqual(lock_observed, [True])
+        self.assertEqual(self.board_cells()[3], "Merged")
+
+    def test_finalize_preserves_unrelated_sqlite_row(self):
+        board_script = os.path.join(self.repo, ".opencode/skills/board/scripts/board.py")
+        code, out, err = test_env.run(self.repo, board_script, "set-status", "BOARD-901", "Blocked")
+        self.assertEqual(code, 0, out + err)
+        code, out, err = self.finalize_confirmed()
+        self.assertEqual(code, worktree.OK, out + err)
+        board = worktree.load_board_module(self.repo)
+        table, error = board.read_table(os.path.join(self.repo, "docs/BOARD.md"))
+        self.assertIsNone(error)
+        row = board.row_by_id(table, "BOARD-901")
+        self.assertEqual(board.cell_texts(table["lines"], row)[3], "Blocked")
 
     def test_finalize_preserves_other_repo_worktree_entry(self):
         other = "apps/api/.opencode/worktrees/api-task · branch feat/api-task"

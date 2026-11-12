@@ -1,5 +1,27 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-125 independent-review correction, 2026-11-12**
+> The same `fix/repair-finalize-after-worktree-removal` worktree now publishes a
+> verified, fsynced recovery temp file without replacing an existing journal. A
+> failed write/link leaves no final record or merge; retry can proceed. After human
+> confirmation, a SQLite `BEGIN IMMEDIATE` writer lock covers fresh Pending Merge
+> validation, Git integration/cleanup and the final SQLite row update. Failed
+> operations roll back the board transaction but retain a published recovery record
+> for safe replay. Other writers may wait or time out (board busy timeout: 10s).
+> Next: parent independent review; no agent-run finalize or merge.
+
+## BOARD-125 corrective inventory
+
+- `worktree.py:publish_finalize_journal` (effectful filesystem) verifies and fsyncs
+  a private temp file, atomically links it without replacing existing recovery,
+  syncs the directory, and removes only its own incomplete temp on failure.
+- `worktree.py:finish_finalize_locked` (effectful Git/filesystem/SQLite) runs
+  recovery publication, merge, cleanup and row update under the SQLite writer
+  transaction. `cmd_finalize` (effectful) rechecks the approved row under that
+  transaction after terminal confirmation, commits only a successful row update,
+  and rolls back failure. `clear_row_worktree` (effectful) updates the passed
+  connection rather than opening a nested writer; unrelated rows are preserved.
+
 > **Session Notes — BOARD-125 finalize teardown repair, 2026-11-12**
 > In `fix/repair-finalize-after-worktree-removal`, the human-only finalize command now
 > displays board, base, branch and full tip before requiring an exact `yes` on TTY stdin.
