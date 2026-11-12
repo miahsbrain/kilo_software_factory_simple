@@ -1,5 +1,12 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-126 WAL test clarification (2026-11-12)
+
+- Human approved transient `-shm` metadata changes on active-WAL reads, not DB/WAL writes or
+  board/sidecar creation. Scoped test assertion and contract/ADR updated; server unchanged.
+- Focused four-test second attempt exited 0 (4 tests, 0.088s). Next: parent review. Earlier
+  twice-failed broad board suite is unverified.
+
 ## Current session — BOARD-126 candidate race correction (2026-11-12)
 
 - In the same task worktree, candidate directory lookup is anchored to no-follow descriptors,

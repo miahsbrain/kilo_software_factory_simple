@@ -200,12 +200,17 @@ class BoardRefreshTests(unittest.TestCase):
             writer.commit()
             files = [db, db.with_name(db.name + "-wal"), db.with_name(db.name + "-shm")]
             self.assertTrue(all(path.exists() for path in files))
-            before = {path.name: path.read_bytes() for path in files}
+            sidecar_names = {path.name for path in db.parent.glob(db.name + "*")}
+            before = {path.name: path.read_bytes() for path in files[:2]}
             status = self.independent_status(project)
+            self.assertEqual(status, "")
             entry = self.request("/api/board")["boards"][1]
             self.assertEqual([row["Task"] for row in entry["rows"]], ["Live WAL task"])
             self.assertIsNone(entry["error"])
-            self.assertEqual({path.name: path.read_bytes() for path in files}, before)
+            self.assertEqual({path.name: path.read_bytes() for path in files[:2]}, before)
+            self.assertEqual({path.name for path in db.parent.glob(db.name + "*")}, sidecar_names)
+            self.assertIn("Live WAL task", writer.execute(
+                "SELECT markdown FROM board WHERE id = 1").fetchone()[0])
             self.assertEqual(self.independent_status(project), status)
 
     def test_candidate_mid_scan_failure_and_invalid_registry_are_safe(self):

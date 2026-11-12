@@ -1,5 +1,20 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-126 approved WAL read semantics, 2026-11-12**
+> Current-data reads of an active WAL board may change transient metadata in an existing
+> SQLite `-shm` file. The test now preserves the no-new-sidecar, unchanged DB/WAL, unchanged
+> row and clean Git requirements. Focused four-test rerun passed (0.088s); no server source
+> changed. Next: parent review; the earlier twice-failed broad suite remains unverified.
+
+## BOARD-126 WAL verification scope
+
+- `test_board_serve.py:test_active_wal_secondary_board_reads_current_data_without_sidecar_writes`
+  (effectful scratch Git/SQLite fixture) checks latest row, unchanged DB/WAL bytes, the same
+  sidecar filenames and unchanged clean Git status. It intentionally does not compare `-shm`
+  bytes, since SQLite may update transient read-lock metadata there (ADR-089).
+- `test_independent_registered_board_get_never_initializes_sqlite` remains unchanged: GET on a
+  missing secondary board creates no DB or sidecars and leaves tracked/untracked status clean.
+
 > **Session Notes — BOARD-126 candidate race correction, 2026-11-12**
 > The existing task worktree now anchors the two-level candidate scan to no-follow directory
 > descriptors. Replacing a listed directory with a symlink cannot redirect `.git` inspection;

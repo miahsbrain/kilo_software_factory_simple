@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Clarify active-WAL read verification
+**Type:** Test
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `test_board_serve.py`, `docs/API_CONTRACTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** SQLite may change existing `-shm` metadata on a read-only active-WAL lookup.
+**Impact:** The regression still requires current row, unchanged DB/WAL bytes and sidecar set, and clean Git status; only existing transient `-shm` bytes are exempt. Missing-board no-write assertions remain. No server change. Catalogue: python-pro, secure-code-guardian.
+**Verification:** Focused four-test second attempt exited 0: 4 tests in 0.088s. Earlier broad suite remains unverified; parent review pending.
+
 ## [2026-11-12] Anchor candidate discovery to no-follow directory handles
 **Type:** Fix
 **Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
