@@ -2,13 +2,14 @@
 
 ## Current session — BOARD-148 clone-local state migration tooling (2026-11-12)
 
-- Runtime state migration corrections are in progress in
-  `.opencode/worktrees/move-clone-local-state-out-of-git-metadata`. No live state was read,
-  copied, initialized, or migrated. No board row was edited from this task worktree.
-- Builder tests were not run under the architect's verification restriction. Next: architect
-  reviews and runs the documented focused suite, then performs the explicitly approved migration.
-  The migration-completion manifest is installed atomically and gates default writers while
-  legacy Git-metadata state remains.
+- BOARD-148 is in `.opencode/worktrees/move-clone-local-state-out-of-git-metadata` on
+  `chore/move-clone-local-state-out-of-git-metadata`. The verified snapshot is installed at
+  `.factory-state/`; the original `.git/` state remains untouched, and cleanup was not approved
+  or performed. `state.py path` and `board.py show` resolve to the new state.
+- Verification: runtime-state suite passed 13 tests; board suite passed 35; handoff suite passed
+  34 (run by the user after the final fixture correction). BOARD-148 remains In Progress while
+  the independent QA report and final review are completed. Next: finish the review and request
+  human integration only after the board row reaches Pending Merge.
 
 ## Current session — BOARD-131 factory backlog plan reviewed (2026-11-12)
 
