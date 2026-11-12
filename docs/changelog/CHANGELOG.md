@@ -31,6 +31,13 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Why:** Keep reports/evidence with task artifacts while reserving `.factory-state/reviews/` for bounded-loop ledgers.
 **Impact:** New report paths and role-specific file-tool permissions; shell remains trusted-agent authority. Ledger location, 10-round cap and stop conditions remain unchanged. Historical reports remain untouched.
 
+## [2026-11-12] Correct normalized migration fixture count
+**Type:** Fix
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/test_board_normalized.py`, `docs/PROJECT_STATE.md`, `docs/HANDOVER.md`
+**Why:** Match the apply-result assertion to the fixture's 22 rows after three status-mapping cases were added.
+**Impact:** Test expectation only; not rerun because the prescribed verification attempts are exhausted.
+
 ## [2026-11-12] Normalize planned and active board storage
 **Type:** Feature
 **Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board

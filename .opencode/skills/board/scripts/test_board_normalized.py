@@ -61,7 +61,7 @@ class NormalizedBoardMigrationTests(unittest.TestCase):
                                    "completed": 3, "cancelled": 1})
         self.assertEqual(self.snapshot(), before)
         result = board.migrate_normalized(self.path, apply=True)
-        self.assertEqual(result["items"], 19)
+        self.assertEqual(result["items"], 22)
         self.assertEqual(Path(result["backup"]).is_file(), True)
         with board.connect(self.path) as connection:
             self.assertEqual(connection.execute(
