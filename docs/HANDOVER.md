@@ -5,8 +5,9 @@
 > `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA writes `qa.md`, UI critique writes `ui.md`,
 > builders write only under `builder/`. The ledger remains at
 > `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and is updated only through
-> `ledger.py`. BOARD-146's existing QA report was copied byte-for-byte to its task artifact
-> directory; its original remains. Next: human review of BOARD-149's worktree.
+> `ledger.py`, serially. Native edit/write/patch permissions constrain file tools only; shell
+> remains trusted-agent authority. BOARD-146's QA report was copied byte-for-byte to its task
+> artifact directory; its original remains. Next: human review of BOARD-149's worktree.
 
 > **Session Notes — BOARD-145 QA↔fix round cap, 2026-11-12**
 > Raised the new QA↔fix loop cap to 10. The ledger opens round 10 and refuses round 11;
@@ -683,8 +684,10 @@ Chunk 1 reuses these existing boundaries:
   project/app defaults stay unchanged. `repo_root()` (effectful) uses Git's main checkout.
 - `board_serve.worktree_state()` (effectful filesystem/Git inspection) reuses registry resolution,
   repository validation, worktree parsing and base selection for per-repository state.
-- Native read/edit path rules remain; grep/glob target-path and automatic context enforcement
-  are pending the limited guard plugin. Legacy bootstrap is not accepted by steady-state guards.
+- Native read/edit/write/patch path rules constrain file tools; shell remains trusted-agent
+  authority. Grep/glob target-path and automatic context enforcement are pending the limited guard
+  plugin. These rules are not an absolute security boundary. Legacy bootstrap is not accepted by
+  steady-state guards.
 
 | Symbol | File | Responsibility | Kind |
 |---|---|---|---|

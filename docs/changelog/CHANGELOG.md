@@ -6,9 +6,9 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 ## [2026-11-12] Move QA reports into shared task artifacts
 **Type:** Chore
 **Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts
-**Changed:** QA/UI instructions, permissions, UI-UX guidance, handover, project state and decisions; copied BOARD-146 QA report to its approved artifact path.
+**Changed:** QA/UI instructions, native edit/write/patch role permissions, project templates and scopes, UI-UX guidance, handover, project state and decisions; copied BOARD-146 QA report to its approved artifact path.
 **Why:** Keep reports/evidence with task artifacts while reserving `.factory-state/reviews/` for bounded-loop ledgers.
-**Impact:** New report paths and role-specific edit permissions; ledger location, 10-round cap and stop conditions remain unchanged. Historical reports remain untouched.
+**Impact:** New report paths and role-specific file-tool permissions; shell remains trusted-agent authority. Ledger location, 10-round cap and stop conditions remain unchanged. Historical reports remain untouched.
 
 ## [2026-11-12] Correct ledger invalid-ID test mock
 **Type:** Fix

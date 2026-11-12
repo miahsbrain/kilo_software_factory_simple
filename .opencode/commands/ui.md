@@ -31,10 +31,8 @@ Do not use Playwright, browser MCP alternatives or `browser-review.mjs` for UI v
     only through `ledger.py`, never concurrently.
 4. **Store reports and evidence** under
    `<primary-checkout>/artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`, outside the task worktree.
-   QA writes `qa.md` and evidence; UI critique writes `ui.md`; builders write only in `builder/`.
-   Reviewers leave shared artifacts uncommitted. Only the ledger stays in
-   `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and it is changed through
-   `ledger.py`, never concurrently.
+    QA writes `qa.md` and evidence; UI critique writes `ui.md`; builders write only in `builder/`.
+    Reviewers leave shared artifacts uncommitted.
 5. **Check** and report findings as expected-vs-actual:
    - keyboard focus, visible focus ring, focus trapping in dialogs
    - contrast, accessible names on controls, alt text

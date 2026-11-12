@@ -97,16 +97,20 @@ Passing the anti-slop rules is not enough — the result also has to serve the u
 
 ## QA and UI/UX review
 
-The QA lane uses **Playwright** and produces evidence, not assertions. Spec: `docs/UI-UX.md` §5.
+The QA lane produces evidence, not assertions. For UI verification and review, load the `browser`
+skill and use only OpenCode's built-in browser. Do not use Playwright, browser MCP alternatives, or
+`browser-review.mjs`. Spec: `docs/UI-UX.md` §5 and root `AGENTS.md` §B4.2.
 
 - Full-page screenshot per route per viewport: 390×844, 834×1112, 1440×900, 1920×1080, and
   320×800 as the overflow floor.
 - Component screenshots for each changed component, at desktop and mobile.
-- Artifacts under `artifacts/web/qa/<date>/<task-id>/` with `notes.md` recording what was
-  checked and expected vs actual. Commit `notes.md` and small component shots; leave full-page
-  captures out of git. QA writes `qa.md` and evidence; UI critique writes `ui.md`; builders write
-  only under `builder/`, all in the shared task artifact directory. Only the ledger remains in
-  `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`.
+- Store shared artifacts outside task worktrees under
+  `<primary-checkout>/artifacts/web/qa/<YYYY-MM-DD>/<task-id>/`. All agents may read them; QA owns
+  `qa.md` and QA evidence, UI critique owns `ui.md`, and builders own only `builder/`. Keep full-page
+  captures out of git. The ledger alone remains at
+  `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`, updated through `ledger.py`
+  serially. Follow root `AGENTS.md` §B4.4: at most 10 QA↔fix rounds; round 10 is last, and a still-
+  failing row is blocked. The immediate stop conditions remain in force.
 - Check: keyboard focus and trapping, contrast, accessible names, tap targets ≥24×24 CSS px,
   console errors, unexpected network failures, no horizontal overflow at 320px, and whether the
   screen matches the approved gallery.

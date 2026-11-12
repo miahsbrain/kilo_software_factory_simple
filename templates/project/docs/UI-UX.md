@@ -294,10 +294,12 @@ Store the returned browser files under this path in the **main checkout**, inclu
 reviews. Retain historical evidence. Logs and summaries describe actual observations, not
 automatically generated results or unchecked passes.
 
-New QA/UI reports and evidence are shared artifacts outside task worktrees. QA writes `qa.md` and
-QA evidence; the UI critic writes `ui.md`; builders write only under `builder/`. The ledger alone
-remains at `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and is updated only
-through `ledger.py`, never concurrently.
+New QA/UI reports and evidence are shared artifacts outside task worktrees. All agents may read
+them; QA owns `qa.md` and QA evidence, the UI critic owns `ui.md`, and builders own only `builder/`.
+The ledger alone remains at `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and is
+updated only through `ledger.py`, serially. Follow root `AGENTS.md` §B4.4: at most 10 QA↔fix
+rounds; round 10 is last, and a still-failing row is blocked. The immediate stop conditions remain
+in force.
 
 Shared task artifacts remain in the main checkout and uncommitted. Keep full-page captures out of
 git unless the team wants a visual record — they are large and churn.

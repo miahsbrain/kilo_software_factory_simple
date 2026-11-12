@@ -163,7 +163,7 @@ expanding one? Name the existing code if it does.
 One file per finding, in the scope you reviewed:
 
 ```
-    artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md
+artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md
 ```
 
 Required sections — the validator enforces this:

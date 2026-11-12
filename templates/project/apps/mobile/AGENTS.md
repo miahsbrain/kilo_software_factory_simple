@@ -90,10 +90,13 @@ Passing the anti-slop rules is not enough — the result also has to serve the u
 
 ## QA evidence
 
-The QA lane stores evidence and reports in the **main checkout** at
-`artifacts/mobile/qa/<YYYY-MM-DD>/<task-id>/`: QA writes `qa.md` and evidence, UI critique writes
-`ui.md`, and builders write only under `builder/`. The ledger remains at
-`<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`.
+The QA lane stores evidence and reports outside task worktrees at
+`<primary-checkout>/artifacts/mobile/qa/<YYYY-MM-DD>/<task-id>/`. All agents may read the artifacts
+and ledger; QA owns `qa.md` and QA evidence, UI critique owns `ui.md`, and builders own only
+`builder/`. The ledger alone remains at
+`<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and is updated through `ledger.py`
+serially. Follow root `AGENTS.md` §B4.4: at most 10 QA↔fix rounds; round 10 is last, and a still-
+failing row is blocked. The immediate stop conditions remain in force.
 
 ## Production expectations
 
