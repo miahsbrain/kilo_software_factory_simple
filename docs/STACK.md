@@ -49,6 +49,9 @@ python3 .opencode/skills/board/scripts/board.py migrate-normalized
 # Apply only after reviewing the preview; creates a consistent .pre-normalized.bak backup
 python3 .opencode/skills/board/scripts/board.py migrate-normalized --apply
 
+# BOARD-150 focused verification: real CLI dispatch in disposable Git repositories
+python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedCliDatabaseTests PlannedLifecycleTests
+
 # List the queue and retained completion/cancellation history
 python3 .opencode/skills/board/scripts/board.py plan queue
 python3 .opencode/skills/board/scripts/board.py plan history

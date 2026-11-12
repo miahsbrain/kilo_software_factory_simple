@@ -1,5 +1,15 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-150 planning CLI database resolution, 2026-11-12**
+> On `fix/fix-planning-cli-database-resolution` in `.opencode/worktrees/fix-planning-cli-database-resolution/`,
+> effectful `board.py:main` (`.opencode/skills/board/scripts/board.py:1436`) resolves every plan
+> dispatch through existing `live_database` before calling the SQLite lifecycle handlers.
+> Subprocess regressions cover all six commands, absent/preserved legacy source and read-only fixtures.
+> The documented BOARD-150 check passed 7 tests in 2.621s. Next: independent review of this worktree.
+> Architect reports live migration already succeeded (20 items: 13 queued, 2 active, 5 history).
+> The accidental empty primary `docs/BOARD.md` remains: primary-checkout protection blocked cleanup;
+> only the human may remove it. This change touches no live database, migration source or backups.
+
 > **Session Notes — BOARD-146 round-four review, 2026-11-12**
 > Independent QA round 4 passed at `03b90fc`; architect review found no blocker. Results: migration
 > suite 42 tests (user-reported), lifecycle 5, HTTP 7, and projection validation 2. No live

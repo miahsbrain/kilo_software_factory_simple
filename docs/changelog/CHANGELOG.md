@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Resolve plan CLI commands to the canonical SQLite database
+**Type:** Fix
+**Board:** BOARD-150 | **Branch:** fix/fix-planning-cli-database-resolution
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/test_board_normalized.py`, `docs/STACK.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Initialization returns the legacy Markdown path; plan handlers require the existing live SQLite database. Reuse `live_database` at dispatch rather than add another resolver.
+**Impact:** All plan subcommands target canonical state; lifecycle semantics and read-only fixtures remain unchanged. `python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedCliDatabaseTests PlannedLifecycleTests` passed 7 tests in 2.621s. No live data changed; human cleanup of the accidental empty primary `docs/BOARD.md` remains blocked by primary-checkout protection.
+
 ## [2026-11-12] Record BOARD-146 round-four review
 **Type:** Docs
 **Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
