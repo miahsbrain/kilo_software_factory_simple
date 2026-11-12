@@ -66,6 +66,7 @@ def make_repo(base):
     shutil.copyfile(os.path.join(REPO_SCRIPTS, "runtime-state", "scripts", "state.py"),
                     os.path.join(state_scripts, "state.py"))
     write(os.path.join(repo, ".opencode", "repos.json"), '{\n  "control": "."\n}\n')
+    write(os.path.join(repo, ".gitignore"), "/.factory-state/\n/.opencode/worktrees/\n")
     write(os.path.join(repo, "docs", "BOARD.md"), (
         "| ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | "
         "Branch/Worktree | Notes |\n"
