@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Correct ledger invalid-ID test mock
+**Type:** Fix
+**Board:** BOARD-145 | **Branch:** chore/raise-qa-review-loop-limit-to-ten
+**Changed:** `.opencode/skills/qa-review/scripts/test_ledger.py`
+**Why:** Mock the runtime-state lookup and ledger file operations actually used by the ledger module.
+**Impact:** Test-only; production behavior is unchanged.
+
 ## [2026-11-12] Move runtime state outside Git metadata
 **Type:** Feature
 **Board:** BOARD-148 | **Branch:** chore/move-clone-local-state-out-of-git-metadata

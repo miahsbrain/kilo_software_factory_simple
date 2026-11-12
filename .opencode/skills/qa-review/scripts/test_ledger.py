@@ -35,11 +35,12 @@ class LedgerTaskIdTests(unittest.TestCase):
             for task_id in ("../../outside", "BOARD-12/../../outside", "BOARD-1/../2",
                             "BOARD-", "BOARD-1.md", "BOARD-１２", "BOARD-1\n"):
                 with self.subTest(task_id=task_id), \
-                        patch.object(ledger.subprocess, "run", side_effect=AssertionError("git access")), \
+                        patch.object(ledger.importlib.util, "spec_from_file_location",
+                                    side_effect=AssertionError("runtime-state lookup")), \
                         patch.object(ledger, "read_ledger", side_effect=AssertionError("file access")), \
+                        patch.object(ledger, "write_ledger", side_effect=AssertionError("file access")), \
                         contextlib.redirect_stderr(io.StringIO()) as errors:
-                    self.assertEqual(ledger.main(["--ledger-dir", folder, "next-round",
-                                                  "--task-id", task_id]), ledger.USAGE)
+                    self.assertEqual(ledger.main(["next-round", "--task-id", task_id]), ledger.USAGE)
                     self.assertIn("expected BOARD-[0-9]+", errors.getvalue())
             self.assertEqual(list(Path(folder).iterdir()), [])
 
