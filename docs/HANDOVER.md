@@ -7,9 +7,8 @@
 > `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and is updated only through
 > `ledger.py`, serially. Native edit/write/patch permissions constrain file tools only; shell
 > remains trusted-agent authority. BOARD-146's QA report was copied byte-for-byte to its task
-> artifact directory; its original remains. Round-2 QA: PASS. Final architect review of this
-> docs-only update is pending; after review, the user should inspect the worktree and use the
-> human-only finalize command.
+> artifact directory; its original remains. Round-2 QA: PASS. The docs-only follow-up passed
+> architect review. Next: the user inspects the worktree and runs the human-only finalize command.
 
 > **Session Notes — BOARD-145 QA↔fix round cap, 2026-11-12**
 > Raised the new QA↔fix loop cap to 10. The ledger opens round 10 and refuses round 11;

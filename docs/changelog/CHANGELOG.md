@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Record BOARD-149 final review handoff
+**Type:** Docs
+**Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`
+**Why:** Record that the docs-only follow-up passed architect review and user inspection is next.
+**Impact:** Documentation only; task behavior and status are unchanged.
+
 ## [2026-11-12] Update BOARD-149 review handoff
 **Type:** Docs
 **Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts

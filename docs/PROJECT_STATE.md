@@ -7,8 +7,8 @@
   ledger remains under `<primary-checkout>/.factory-state/reviews/` and changes only through
   `ledger.py`; the 10-round cap and stop conditions are unchanged. BOARD-146's QA report was copied
   byte-for-byte to its approved artifact path; the source remains untouched. Round-2 QA: PASS.
-  Final architect review of this docs-only update is pending; after review, the user should inspect
-  the worktree and use the human-only finalize command.
+  The docs-only follow-up passed architect review. Next: the user inspects the worktree and runs
+  the human-only finalize command.
 
 ## Previous session — BOARD-145 QA↔fix cap update (2026-11-12)
 
