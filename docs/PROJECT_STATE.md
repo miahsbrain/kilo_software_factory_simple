@@ -1,5 +1,15 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-152 task purge (2026-11-12)
+
+- Worktree `.opencode/worktrees/add-human-confirmed-task-purge/`, branch
+  `feat/add-human-confirmed-task-purge`. Implementation added; the single documented check passed
+  20 tests in 5.876 seconds. Awaiting independent QA/review, not marked merge-ready by the builder.
+- Four follow-up policies approved: independent high-water IDs, explicit cancelled-orphan evidence,
+  durable resumable manifest with task deletion last, historical/shared backup retention.
+- No live purge, cleanup, integration or remote operation. BOARD-153 clean-slate and BOARD-154
+  shortcuts remain queued. Next: independent review of this worktree and its focused-test evidence.
+
 ## Current session — BOARD-151 shared QA artifact guard (2026-11-12)
 
 - Branch `fix/fix-shared-qa-artifact-guard-permissions`, worktree

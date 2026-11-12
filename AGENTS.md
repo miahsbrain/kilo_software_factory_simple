@@ -1239,6 +1239,8 @@ reason on one line.
 
 ### Guard rules (enforced by the guard script, not by discipline)
 
+**Human-only destructive maintenance.** Task purge may remove an explicitly selected task’s board record, branch, worktree, reports and ledger. Project clean-slate may clear the selected repository’s boards, plans, artifacts and runtime state, and reset explicitly listed project documents to templates. Preserve application source, harness files, Git history, secrets and unrelated repositories. Both operations default to preview, list exact targets, offer an optional recovery backup, and require interactive confirmation naming the task or repository. Refuse ambiguous ownership, dependent tasks, unsafe paths or changed targets. Agents may preview but never execute deletion. These commands are narrow exceptions to ordinary history-retention and primary-checkout deletion restrictions; existing safeguards remain unchanged elsewhere.
+
 The guard script is the enforcement point. Run it before any destructive command:
 
 ```bash

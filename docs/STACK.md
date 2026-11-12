@@ -23,6 +23,18 @@ Tailwind stylesheet, and it produces a committed file — the viewer itself need
 
 ## Commands
 
+BOARD-152 verification (standard-library Python, repository-local disposable fixtures only):
+
+```bash
+python3 .opencode/skills/git-worktree/scripts/test_task_purge.py
+```
+
+Task purge preview: `python3 .opencode/skills/git-worktree/scripts/worktree.py purge --board BOARD-NNN`.
+Human-only apply adds `--apply`, optionally `--backup`; run from the primary control checkout and
+type the exact task ID at the terminal prompt. Cancelled orphan evidence is repeated
+`--orphan <registered-repo-id> <exact-worktree-path> <exact-branch>`.
+No unattended confirmation flag exists. POSIX `fcntl` supplies the apply lock.
+
 UI verification/review uses only OpenCode's built-in browser (`AGENTS.md` §B4.2, QA skill).
 Load `browser` first. An unavailable browser or measurement holds the criterion; no fallback.
 

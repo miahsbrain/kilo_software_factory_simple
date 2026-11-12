@@ -172,18 +172,8 @@ def readonly_board_connection(board, root):
         raise FileNotFoundError("Board not initialized")
     if not stat.S_ISREG(info.st_mode):
         raise ValueError("cannot read the board")
-    wal = os.path.exists(db + "-wal")
-    shm = os.path.exists(db + "-shm")
-    if wal != shm:
-        raise ValueError("cannot read the board")
-    # Immutable reads avoid creating WAL sidecars on a fully checkpointed board.
-    uri = "file:%s?mode=ro%s" % (quote(db, safe="/"), "" if wal else "&immutable=1")
-    with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
-        connection.execute("BEGIN")
-        try:
-            yield connection
-        finally:
-            connection.rollback()
+    with board.readonly_connection(db) as connection:
+        yield connection
 
 
 def read_secondary_table(board, path, root):

@@ -1617,6 +1617,13 @@ def main(argv):
 
     sub.add_parser("list", help="list worktrees")
 
+    p = sub.add_parser("purge", help="preview task erasure; apply is human-only")
+    p.add_argument("--board", required=True, help="exact canonical task ID")
+    p.add_argument("--apply", action="store_true", help="require a real terminal and named confirmation")
+    p.add_argument("--backup", action="store_true", help="retain a private recovery content backup")
+    p.add_argument("--orphan", nargs=3, action="append", default=[],
+                   metavar=("REPO", "PATH", "BRANCH"), help="explicit cancelled-task ownership evidence")
+
     p = sub.add_parser("handoff", help="print the hand-off block for a board row")
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
     p.add_argument("--repo", help="repo id from .opencode/repos.json (default: control)")
@@ -1641,6 +1648,9 @@ def main(argv):
         parser.print_help()
         return USAGE
     cwd = os.getcwd()
+    if args.command == "purge":
+        import task_purge
+        return task_purge.command(args, cwd, sys.modules[__name__])
     if args.command == "create":
         return cmd_create(args, cwd)
     if args.command == "resume":

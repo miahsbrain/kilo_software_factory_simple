@@ -721,3 +721,10 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Changed:** `.opencode/plugins/factory-guard/`, canonical policy, guard file/search checks, config sync, STACK and session state
 **Why:** Native search permissions do not enforce target paths; copied control repos need the complete runtime configuration
 **Impact:** Incomplete security migration. Node tests exited 1 on temporary fixture directory EACCES; no workaround attempted. Container and native runtime verification remain pending.
+## [2026-11-12] Add human-confirmed task purge
+**Type:** Feature
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** worktree CLI, focused task-purge module/tests, board allocator/read-only connection, viewer connection reuse, approved root/template maintenance paragraph and scope docs
+**Why:** erase explicitly selected task resources without weakening ordinary retention or isolation
+**Impact:** preview by default; human-only apply with durable recovery and optional private content backup; task IDs remain reserved after purge. Historical/shared copies remain; Git history is not rewritten. The single documented check passed 20 tests in 5.876 seconds; no live deletion.
+**Reuse:** extracted the viewer's read-only connection into board.py, reused existing primary resolver, repo mapping, branch policy and journal publication. New task_purge.py isolates purge inventory/recovery from the general lifecycle orchestrator; test_task_purge.py adds focused disposable-repository safety coverage.

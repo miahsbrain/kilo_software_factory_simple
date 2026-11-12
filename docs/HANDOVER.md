@@ -1,5 +1,40 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-152 task purge, 2026-11-12**
+> In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.
+> Added human-only purge, read-only preview, explicit cancelled-orphan evidence, durable recovery
+> phases and independent ID high-water state. No live maintenance has run. Focused verification
+> is documented in `docs/STACK.md`: 20 tests passed in 5.876 seconds (one run).
+> Next: independent QA and source review; this builder has not marked the task merge-ready.
+
+### BOARD-152 module inventory
+
+- `.opencode/skills/git-worktree/scripts/task_purge.py:16` (`digest`) and
+  `.opencode/skills/git-worktree/scripts/task_purge.py:31` (`validate_dependencies`) are pure.
+  Identity/inventory read effects: `task_snapshot`, `safe_path`, `tree_stamp`, `targets_for_task`,
+  `report_targets` and `read_inventory` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:20-214`; `validate_manifest` and
+  `revalidate_target` at `.opencode/skills/git-worktree/scripts/task_purge.py:239-318`.
+  Explicit write/terminal effects: `confirm`, `save_manifest` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:217-236`; `copy_backup` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:285-295`; `execute_locked` and `command`
+  at `.opencode/skills/git-worktree/scripts/task_purge.py:321-477`.
+- `.opencode/skills/board/scripts/board.py:189`: `readonly_connection` is the shared read-only boundary
+  used by the viewer and purge; `reserve_plan_ids` persists allocation state under the caller's
+  transaction at `.opencode/skills/board/scripts/board.py:463`; pure `validate_plan_batch`
+  at `.opencode/skills/board/scripts/board.py:344` accepts its high-water input explicitly.
+- CLI: `worktree.py purge --board <ID> [--apply] [--backup] [--orphan REPO PATH BRANCH ...]`.
+  Preview is safe for agents; apply is human-only. Mandatory metadata remains under
+  `.factory-state/purges/<ID>/`; optional backups under its `content/`, private permissions.
+  A partial tree removal whose identity cannot be re-proven needs human inspection, not blind retry.
+- Verification: `python3 .opencode/skills/git-worktree/scripts/test_task_purge.py` passed 20 tests.
+  Evidence: read-only preview at `.opencode/skills/git-worktree/scripts/test_task_purge.py:67`,
+  cancelled-orphan handling at `.opencode/skills/git-worktree/scripts/test_task_purge.py:124`,
+  partial-failure retry at `.opencode/skills/git-worktree/scripts/test_task_purge.py:189`,
+  high-water allocation at `.opencode/skills/git-worktree/scripts/test_task_purge.py:205`,
+  commit/ack crash recovery at `.opencode/skills/git-worktree/scripts/test_task_purge.py:213`,
+  no unattended CLI bypass at `.opencode/skills/git-worktree/scripts/test_task_purge.py:265`.
+
 > **Session Notes — BOARD-151 shared QA artifact guard, 2026-11-12**
 > Source candidate `af1701dd14fd82c9256534c649f57de2011ee175` passed independent round-1 QA
 > and security/code review; architect review found no blocking source issue. Reviewer command
