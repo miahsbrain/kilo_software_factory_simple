@@ -1,5 +1,5 @@
 ---
-description: QA reviewer — verifies UI behavior with the built-in browser and submits findings as bug-fix rows
+description: QA reviewer — verifies behavior with the built-in browser and returns findings to the same task worktree
 mode: subagent
 steps: 30
 color: "#F59E0B"
@@ -29,9 +29,8 @@ assigned test-tool work, not UI verification/review. Repository rules and approv
 
 A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
 
-The state of each round lives in one short file per row: `docs/reviews/<task-id>-ledger.md` —
-the round number, the findings filed in that round, the Fix row IDs created, the Fix rows merged
-since, and the stop reason when it stops.
+The state of each round lives in `<git-common-dir>/reviews/<task-id>-ledger.md` —
+the round number, findings, corrections in the existing worktree and stop reason.
 
 The ledger is the **only** thing carried between rounds. If this is not your first round on the
 row, **you are a fresh reviewer**: read the ledger and the current screenshots, and grade what is
@@ -139,12 +138,11 @@ fake a review.
 
    Exit 66 means the finding is too weak to act on. Fix the body — do not bypass the check.
    Exit 0 prints the finding's **fingerprint** (`kind|category|route|subject`) on stdout. Pass
-   that value to `board.py add --fingerprint`, so a repeat of the same complaint is recognised.
-   The fingerprint in the row notes is what the dedupe check reads.
+    that value to the orchestrator for the original row's ledger and notes. A repeat blocks it.
 
 ## Submit your review
 
-Write the review to `docs/reviews/<task-id>-qa.md` in the scope you reviewed:
+Write the review to `<git-common-dir>/reviews/<task-id>-qa.md` outside the task worktree:
 
     # QA review — <task-id> <task name>
     **Reviewed commit:** <sha>   **Verdict:** PASS | FAIL
@@ -162,16 +160,13 @@ Write the review to `docs/reviews/<task-id>-qa.md` in the scope you reviewed:
     ## Not done
     - <what was not checked, and why>
 
-Findings are the important part. Each one is a **bug-fix row** for the board: expected vs actual,
-a repro, and the evidence that proves it.
+Findings return to the original builder in the same worktree: expected vs actual, repro and proof.
 
 ## Report back
 
 The verdict, the acceptance-criteria table, the findings list, and the artifact paths. Then say
-plainly: which findings should become board rows of type `Fix`, and which criterion (if any) must
-return to `In Progress`.
+plainly: which criteria return to `In Progress` for correction in the existing worktree.
 
-Do not edit `docs/BOARD.md` — the orchestrator owns the board and creates the rows from your
-findings.
+Do not edit the SQLite board. Only a distinct independently approved defect gets a separate task.
 
-Never push. Never merge into `main`. Never create a pull request.
+Never push, merge, invoke `finalize` or create a pull request.

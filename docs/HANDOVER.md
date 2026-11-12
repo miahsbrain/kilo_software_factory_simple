@@ -1,5 +1,119 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-124 terminal confirmation correction, 2026-11-12**
+> In `feat/sqlite-board-bootstrap`, `confirm_finalize` uses TTY stdin and stderr rather than
+> opening `/dev/tty`, which raised `io.UnsupportedOperation` on the human's interactive host.
+> The exact board/base/branch/full-tip challenge and post-confirmation base recheck remain;
+> non-TTY, EOF, mismatch and stream failures refuse. Focused handoff suite: 24 tests, OK.
+> Next: independent parent QA/review;
+> agents do not run human finalize or merge.
+
+> **Session Notes — BOARD-124 independent QA corrections, 2026-11-12**
+> Existing `feat/sqlite-board-bootstrap` worktree now supplies a pre-merge legacy import/byte
+> backup check, shell-quoted absolute control-script handoff for app repos, and strict ledger IDs.
+> Focused board 24, handoff 24, ledger 2 tests pass; parent review remains open.
+> Next: parent independent QA/review in this same worktree; no merge or finalize by agents.
+
+> **Session Notes — SQLite migration corrective slice, 2026-11-12**
+> Worktree `feat/sqlite-board-bootstrap` keeps the live board in Git-common-dir SQLite.
+> Factory `docs/BOARD.md` is untracked on this task branch; its on-disk bytes and preexisting
+> SQLite import snapshot remain. A fresh clone after integration starts empty, never from
+> historical tracked rows. Human-only finalize requires a real TTY and typed board ID, base,
+> branch and full tip; merge preflight reports conflict paths/types, and a failed initiated merge
+> is aborted if safe. QA/UI findings now return to the original builder in the same worktree;
+> reviewer reports and ledger belong under `<git-common-dir>/reviews/`. Next: independent parent
+> review and QA; this task is not merge-ready merely because it is committed.
+
+## Transition and recovery
+
+- Existing local board: `board.py show` imports main-checkout legacy bytes once into the local
+  SQLite `source_bytes` snapshot without changing the Markdown. `board.py export` writes the
+  current readable snapshot under Git common dir. Use a consistent SQLite backup (or export)
+  when transferring a clone; Git does not synchronize live rows or reviewer reports.
+- On integration of this branch, tracked `docs/BOARD.md` is deleted from the integration checkout;
+  a previously initialized SQLite database retains the live rows. **Before the one-time human
+  integration**, stop board writers and run from this bootstrap worktree:
+  `python3 .opencode/skills/board/scripts/board.py pre-merge-check`, then
+  `python3 .opencode/skills/board/scripts/board.py export`. The check imports a missing database
+  from the main-checkout source, verifies its `source_bytes` match, refuses a missing/changed
+  source, and writes/prints the SQLite, byte-exact legacy backup and current Markdown export
+  paths in Git common dir. The second command refreshes the export. Do not proceed if either
+  fails. Review the handoff, then run the absolute `finalize` command printed by
+  `worktree.py handoff --board BOARD-124` from the clean `opencode` base checkout in a real TTY;
+  it uses this bootstrap worktree's script, not the base's old relative script. After integration,
+  a new clone with no local board initializes empty. The still-tracked blank project template is
+  not historical state.
+- `board.py:cmd_pre_merge_check` (effectful filesystem/SQLite), `write_export` (effectful atomic
+  bytes/text snapshot) preserve the import and byte backup; `worktree.py:cmd_handoff` (effectful)
+  prints the absolute shell-quoted control script and target main checkout for app/control repos.
+  `ledger.py:main` (effectful CLI) validates `BOARD-[0-9]+` before Git or ledger I/O.
+- `worktree.py:cmd_finalize` (effectful Git/SQLite) performs clean preflight, typed terminal
+  confirmation and resumable integration. `confirm_finalize` (effectful TTY stdin/stderr) cannot
+  establish identity against a process sharing the same OS user. Failed merge abort is scoped
+  to `MERGE_HEAD` created during this call and unchanged pre-merge HEAD; otherwise inspect
+  manually. `ledger.py:main` (effectful Git discovery) defaults to common-dir local reviews;
+  `parse_ledger`/`render_ledger` (pure) retain historical Fix-row fields for old records.
+- Verification: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'`;
+  parent independently reviews evidence before marking Pending Merge.
+- Focused terminal-confirmation correction: `python3 -m unittest discover -s
+  .opencode/skills/git-worktree/scripts -p 'test_handoff.py'` passed 24 tests in 12.083s.
+
+> **Session Notes — BOARD-124 lifecycle slice, 2026-11-12**
+> `feat/sqlite-board-bootstrap` now makes create/resume refuse env errors; failed create records
+> a Blocked partial worktree rather than losing its ownership. Human-only `finalize --board ID`
+> checks Pending Merge, clean correct branch and base, committed work and conflict preflight;
+> merges only from the configured base main checkout, retains a recovery record and retries
+> interrupted teardown. Handoff offers only that command after its readiness gate. Next: parent
+> independently reviews tests and governance before offering the task branch for human merge.
+
+## Lifecycle slice inventory
+
+- `env.py:inside_worktrees` (effectful filesystem), `write_file` (effectful atomic 0600 write),
+  `sync_into` (effectful source validation, Git tracked-file check, exclude, provision) reject
+  symlinks and tracked destinations. Only `.env` and `.env.local` from the main checkout copy.
+- `worktree.py:provision_env`, `cmd_create`, `cmd_resume` (effectful) fail closed on env errors;
+  `cmd_finalize` (effectful) is a human-only CLI entry point. Pending Merge is a human/reviewer
+  certification: QA and verification evidence is not machine-readable; finalize prints this
+  limitation and must never be called by an agent. Recovery journal is stored in the Git common
+  directory's `cleanup-wt/` before merge, with branch tip and base identity; no secret contents.
+- Conflict preflight reports paths and competing edits; resolve in the original task worktree.
+  No merge or cleanup on preflight conflict. After a successful integration, ancestry is checked;
+  cleanup removes env copies, worktree and branch, then updates SQLite board. Interrupted cleanup
+  reruns from the journal. Multi-repo rows remain Pending Merge while another entry is recorded.
+- Tests: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'`.
+  First run: 19 tests, 2 failures from stale Markdown fixture mutations; changed them to
+  update scratch SQLite. Second run: 19 tests, OK (9.198s). A final source-only tightening
+  withholds finalize guidance for a row already marked Merged and avoids marking a multi-repo
+  row Merged during legacy cleanup; these last edits were not rerun within the two-attempt cap.
+
+> **Session Notes — SQLite board core slice, 2026-11-12**
+> Worktree `feat/sqlite-board-bootstrap` implements the first data slice only. The live board is
+> `<git-common-dir>/factory-board.sqlite3`; first initialization imports existing main-checkout
+> `docs/BOARD.md` once and retains source bytes in the database without writing that file.
+> `board.py export` writes `<git-common-dir>/factory-board-export.md` on demand. `--file` is a
+> read-only Markdown fixture; board viewer default reads SQLite. `worktree.py` remains unchanged
+> and uses the compatible `read_table`/`write_atomic` API. Conflicting cell edits refuse rather
+> than overwrite; distinct rows/cells merge under `BEGIN IMMEDIATE`. The old tracked Markdown
+> remains in this branch to avoid removing a possibly newer integration-checkout board on merge.
+> Later slices must reconcile legacy tracking, lifecycle governance and human-only finalization.
+
+## SQLite board core inventory
+
+- `board.py:initialize_board`, `database_path`, `connect`, `live_database`, `read_table`,
+  `write_atomic`, `write_export` are **effectful**: Git discovery, SQLite read/write or local
+  export. `parse_table`, `merge_board_changes`, `cell_texts`, `replace_cell` are **pure**.
+- Schema: one `board` row (`id=1`, Markdown snapshot, original import bytes, revision); no
+  runtime files in the checkout. WAL and busy timeout serialize concurrent writers. First
+  import validates the old table; malformed UTF-8/table fails closed without changing source.
+- CLI `show`/`lanes` read current SQLite state; `add`, `note`, `set-status`, `set-field`,
+  `add-column`, `remove` update SQLite; `export` writes a readable Markdown snapshot in the
+  common Git directory. The viewer discovers per-clone control/project databases and reads
+  live rows via `read_table`. Existing template starter is unchanged.
+- In this transition the documented worktree lifecycle still uses its original calls and
+  independently retains its old governance wording. No application data model or env vars.
+- Verification: `python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'`.
+  This slice does not run the full lifecycle suite; parent must review before any merge.
+
 > **Session Notes — BOARD-123 handoff gates, 2026-11-11**
 > Branch `fix/gate-merge-handoffs-on-finished-clean-worktrees`, worktree of the same slug.
 > Extended `cmd_handoff` and approved factory/template §B11 policy; derived commands/skill align.

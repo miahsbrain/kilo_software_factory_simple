@@ -164,4 +164,5 @@ Never push. Never merge into `main`. Never create a pull request. Never amend an
 
 Changed files, verification command and result, assumptions, blockers, limitations, and which
 documents need updating (`docs/HANDOVER.md`, `docs/BUSINESS-LOGIC.md`, `docs/API_CONTRACTS.md`,
-`docs/changelog/`). Do not edit `docs/BOARD.md` — the orchestrator owns the board.
+`docs/changelog/`). Do not edit the local SQLite board — the orchestrator owns its rows.
+Review findings return to this builder in the same task worktree. Never invoke human-only `finalize`.

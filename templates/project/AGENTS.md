@@ -104,7 +104,7 @@ software factory that produced the copy is a different repository, and it never 
 | | Factory repository | This repository (a project) |
 |---|---|---|
 | Holds | `AGENTS.md`, `.opencode/`, `.devcontainer/`, `opencode.jsonc`, `docs/`, `templates/` | `AGENTS.md`, `.opencode/`, `DOMAIN.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/`, `apps/` |
-| Board | `docs/BOARD.md` — factory work only | `docs/BOARD.md` — project work only |
+| Board | Git-common-dir SQLite — factory work only | Git-common-dir SQLite — project work only |
 | Decisions | `docs/DECISIONS.md`, ADR-001… | `docs/DECISIONS.md`, ADR-100… |
 | Changelog | `docs/changelog/` — the harness | `docs/changelog/` — the product |
 
@@ -126,8 +126,8 @@ On starting a conversation or being awakened, determine whether this is the fact
 by checking for: `DOMAIN.md`, `docs/PROJECT_STATE.md`, `CHANGELOG.md`, `ROADMAP.md`.
 
 **In a factory repository** (`DOMAIN.md` and `ROADMAP.md` are absent), the work is harness
-maintenance. Read `docs/PROJECT_STRUCTURE.md`, `docs/PROJECT_STATE.md`, `docs/BOARD.md` and
-`docs/DECISIONS.md`.
+maintenance. Read `docs/PROJECT_STRUCTURE.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md`
+and the live board with `board.py show`.
 
 ### Existing project
 
@@ -343,7 +343,7 @@ UI evidence is the exception: OpenCode's built-in browser owns capture and revie
 | Every change gets a worktree with a feature-named path and branch | `.opencode/skills/git-worktree/scripts/worktree.py` |
 | Deletion only inside the worktree; worktree paths confined to `.opencode/worktrees/` | `.opencode/skills/git-worktree/scripts/guard.py` |
 | The board is edited by lane and cell, never hand-written | `.opencode/skills/board/scripts/board.py` |
-| A finding is actionable before it becomes a board row | `.opencode/skills/qa-review/scripts/check-finding.py` |
+| A finding is actionable before returning to the original builder | `.opencode/skills/qa-review/scripts/check-finding.py` |
 | Git commands that change history or the remote are classified before they run | `.opencode/skills/git-worktree/scripts/guard.py check-git` |
 | The permission map and the policy file cannot drift apart | `.opencode/skills/git-worktree/scripts/guard.py check-policy` |
 | An app repo's guard rails match the control repo's | `.opencode/skills/git-worktree/scripts/guard.py sync` |
@@ -473,8 +473,8 @@ Three rules. They apply to the architect and to every builder.
    start.
 
 The same three rules govern the **QA↔fix loop** for a row: the loop is capped at 3 rounds, a
-repeat finding escalates the existing row to `Blocked` instead of opening another, and the ledger
-in `docs/reviews/<task-id>-ledger.md` is the only state carried between rounds.
+repeat finding blocks the original row instead of opening another, and the ledger under
+`<git-common-dir>/reviews/` is the only state carried between rounds.
 
 ### Task chunking rule
 
@@ -747,8 +747,8 @@ each file genuinely needs its own short reference. Do not turn them into impleme
 | `docs/ARCHITECTURE.md` | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap |
 | `docs/BUSINESS-LOGIC.md` | Every business rule as question → answer (see B2) |
 | `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, built-in browser QA spec |
-| `docs/reviews/*.md` | QA and UI/UX review reports — one per task, produced by the reviewer agents |
-| `docs/BOARD.md` | Work tracking board (see B3) |
+| `<git-common-dir>/reviews/*.md` | Local QA and UI/UX reports and ledger, outside task worktrees |
+| `<git-common-dir>/factory-board.sqlite3` | Local live board; Markdown is export only (see B3) |
 | `docs/STACK.md` | Stack, package managers, dev/verification commands, ports, database, auth |
 | `docs/PROJECT_STATE.md` | Current phase, progress, active task, next step |
 | `docs/DECISIONS.md` | Append-only, ultra-concise approved architectural decisions |
@@ -795,7 +795,7 @@ a follow-up task.
 | New env var / config key | `docs/ENVIRONMENT.md` |
 | New or changed API endpoint | `docs/API_CONTRACTS.md` |
 | Any change at all | `docs/changelog/` (new entry) |
-| Lane transitions | `docs/BOARD.md` status — written by the **orchestrator in the main checkout only** (§B3) |
+| Lane transitions | SQLite board status — orchestrator through `board.py` (§B3) |
 
 ### Changelog format (`docs/changelog/CHANGELOG.md`, newest first)
 
@@ -847,25 +847,20 @@ both the plain-English rule and the technical detail. For every rule:
 Cover: domain rules, validation rules, permission rules, state transitions, calculations, side
 effects, integrations, failure/retry behaviour.
 
-## B3. `docs/BOARD.md` — the board is the only state
+## B3. Local SQLite board — the board is the only state
 
-The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+The live board is `<git-common-dir>/factory-board.sqlite3`, shared by worktrees and local to
+one clone. Only the orchestrator edits rows through `board.py`; the human-only finalize command
+owns its integration transition. `docs/BOARD.md` is a one-time legacy import source, not live
+state. `board.py export` generates Markdown under the Git common directory. Never edit or commit
+that snapshot. Import a local legacy board once, preserving original bytes in SQLite; a fresh
+clone without a local board starts empty, never seeded from Git history. Back up SQLite with a
+consistent backup or use `board.py export` before moving clones.
 
-**The board is the CLI's view of the worktrees.** `git worktree list` shows the worktrees;
-`docs/BOARD.md` shows what each one is doing and who owns it. The board row's
-`Branch/Worktree` column is the link between them.
-
-- **Single writer: the orchestrator, in the main checkout.** Only the orchestrator session
-  (working in the repo root) edits `docs/BOARD.md`.
-- **Worktree branches never edit `docs/BOARD.md`.** A builder inside a worktree updates the
-  scope docs (`HANDOVER.md`, `BUSINESS-LOGIC.md`, `ARCHITECTURE.md`, `DECISIONS.md`,
-  `changelog/`) and reports its status; the orchestrator writes the board.
-- **Why:** the main checkout's board stays current during in-flight work, and parallel
-  worktrees can never conflict on the board file.
-- **After the user merges a branch**, the orchestrator marks the local row `Merged`.
-  Board changes never need a Git commit.
-- **If a worktree needs to record its own lane transition**, it does so in the changelog entry
-  and in its report — not in the board file.
+**The board is the CLI's view of the worktrees.** `git worktree list` shows worktrees;
+`board.py show` shows rows. Builders and reviewers never edit the board. In-task QA findings
+return to the original builder in the same worktree, not automatic Fix rows; only independently
+approved distinct defects become separate tasks.
 
 Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Branch/Worktree | Notes`
 
@@ -890,7 +885,7 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Bra
 
 ### Board rules
 
-- **The board is the source of truth.** Re-read `docs/BOARD.md` at the start of every session and
+- **The board is the source of truth.** Use `board.py show` at the start of every session and
   at the start of every task. A row's status must match reality; fix the row before starting work.
 - **The board is edited with the script**, never by hand:
 
@@ -932,7 +927,7 @@ worktree.
 
 ### Rules
 
-1. **Board first.** Pick the task from `docs/BOARD.md`. If it is not on the board, **add the row
+1. **Board first.** Pick the task from `board.py show`. If it is not on the board, **add the row
    first** — work not on the board is unsanctioned work.
 2. **One worktree per task.** Never mix two features in one worktree. Never work directly in the
    main checkout for application changes.
@@ -949,7 +944,7 @@ worktree.
      and the worktree can never drift apart.
 4. **Create it with the script, from the board row:**
 
-       python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
+       python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X
 
    The script reads the row, derives the type and slug, creates
    `.opencode/worktrees/<slug>/` on branch `<type>/<slug>`, writes the row's `Branch/Worktree` and
@@ -964,7 +959,7 @@ worktree.
 6. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
    happens there. The worktree must contain the code change **and** the matching scope-doc
    updates (§B1) so it can be reviewed as one self-contained unit.
-   **Never edit `docs/BOARD.md` from a worktree** — the orchestrator owns the live board (§B3).
+   **Never edit the live board from a builder worktree** — the orchestrator owns its rows (§B3).
 7. **Three lanes, in order.** For meaningful work the board drives lanes:
    - **Build** — implement the change in the worktree, smallest safe diff, run the verification
      command, update the docs.
@@ -976,12 +971,13 @@ worktree.
    UI changes still require the browser, accessibility and unslop gates in §B4.2.
 8. **Merge gate.** A worktree is only offered for merge when: the verification command passed,
    QA produced evidence, the review found no blocking issue, and the documentation is updated.
-9. **Pending merge means human approval is required.** When the work is ready, the orchestrator
-   sets the board row to `Pending Merge` and **asks the user to review and merge**. The merge
-   target is the human's choice — `main` or a feature branch. Never merge into any branch on your
-   own initiative, never push, never open a PR (§B11).
-10. **After the merge**, the orchestrator marks the row `Merged` in the main checkout, and the
-    worktree is cleaned up by the human (or by the agent once the branch is confirmed merged).
+9. **Pending merge means human approval is required.** The orchestrator sets `Pending Merge`
+   after QA and independent review. Agents never merge or invoke `finalize`; the human runs
+   `worktree.py finalize` from the target base checkout on a real terminal and types board ID,
+   base, branch and exact tip. No unattended bypass is permitted.
+10. **After integration**, the human command coordinates merge, cleanup and board transition.
+    Conflicts are resolved in the task worktree and re-reviewed; an initiated failed merge is
+    aborted when safe. This is a policy/deterrence gate, not absolute same-identity isolation.
 
 ### Board lanes
 
@@ -1025,27 +1021,24 @@ met**, proven by evidence. The lanes repeat until then.
         │                              │                 │
         │                        findings                │
         │                              ▼                 │
-        │                    fix rows (Type: Fix)       │
+        │                same builder/worktree          │
         │                              │                 │
         └──────────────────────────────┴─── re-verify ───┘
 ```
 
 **The rules that make it a loop, not a pipeline:**
 
-1. **A row cannot reach `Pending Merge` while any Fix row it spawned is open.** Every finding
-   becomes a Fix row with `Blocked by: BOARD-xxx`. The original row waits.
-2. **Every Fix row runs the same three lanes.** A fix is not trusted because it looks right. It
-   goes through QA with the finding's acceptance criteria, then review. A fix that fixes the
-   symptom but breaks the flow is caught here.
-3. **After the Fix rows merge, the original row is re-verified.** The QA lane re-runs against the
-   merged result — the criterion that failed must now pass, and nothing around it may have
-   regressed. Only then can the original row go to `Pending Merge`.
+1. **An in-task finding returns the same row to `In Progress`.** The original builder corrects
+   it in the existing worktree; no Fix row, second worktree or intermediate merge is created.
+2. **The corrected task repeats QA and independent review.** The failing criterion and adjacent
+   behavior must pass on the same branch before `Pending Merge`.
+3. **Separate approved defects are separate tasks.** Only a genuinely independent defect with
+   its own decision and acceptance criteria gets a new Fix row and worktree.
 4. **The loop is bounded at 3 rounds.** A row gets at most three QA↔fix rounds. When the third
    round still fails, the row moves to `Blocked` with what was tried and the question the human
    needs to answer. There is no fourth round.
-5. **A repeat finding is not a new finding.** Every finding carries a fingerprint. When a
-   fingerprint is filed twice, the **existing** row is escalated to `Blocked` — a second row is
-   never opened, because that is the loop.
+5. **A repeat finding is not a new task.** A repeated fingerprint blocks the original row;
+   do not create another row for the same complaint.
 6. **A red critical path is an immediate `Blocked` row.** Money, data loss, auth, and security
    flows are never retried silently.
 7. **The loop ends on the spec, not on the diff.** "The builder wrote the code" is not a stopping
@@ -1053,8 +1046,8 @@ met**, proven by evidence. The lanes repeat until then.
 
 ### The ledger
 
-The state of a row's rounds lives in one short file, `docs/reviews/<task-id>-ledger.md`: the
-round number, the findings filed, the Fix row IDs, the Fix rows merged since, and the stop reason.
+The state of a row's rounds lives in `<git-common-dir>/reviews/<task-id>-ledger.md`: the
+round number, findings, same-worktree corrections and stop reason.
 The ledger is the **only** thing carried between rounds — a reviewer that watched the last edits
 grades intent, not pixels, so **each round's review is done by a fresh reviewer** that reads the
 ledger and the current screenshots.
@@ -1063,8 +1056,7 @@ Use the script to keep it honest:
 
 ```bash
 python3 .opencode/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
-python3 .opencode/skills/qa-review/scripts/ledger.py finding --task-id BOARD-005 --fingerprint "..." --evidence <file> --fix-row BOARD-010
-python3 .opencode/skills/qa-review/scripts/ledger.py merged --task-id BOARD-005 --fix-row BOARD-010
+python3 .opencode/skills/qa-review/scripts/ledger.py finding --task-id BOARD-005 --fingerprint "..." --evidence <file>
 python3 .opencode/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 ```
 
@@ -1080,8 +1072,8 @@ cap is reached and the row still fails, the row moves to `Blocked` with a summar
 tried and the question the human needs to answer. A fourth round is never opened.
 
 **The ledger.** Each round's state lives in one short file per row:
-`docs/reviews/<task-id>-ledger.md`. It holds the round number, the findings filed in that round,
-the Fix row IDs created, the Fix rows merged since, and the stop reason when it stops.
+`<git-common-dir>/reviews/<task-id>-ledger.md`. It holds the round number, findings,
+corrections in the existing worktree and the stop reason when it stops.
 
 The ledger is the **only** thing carried between rounds. A reviewer that watched the last edits
 grades intent, not pixels, so **each round's review must be done by a fresh reviewer** that reads
@@ -1092,8 +1084,7 @@ The script owns the ledger:
 ```bash
 python3 .opencode/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
 python3 .opencode/skills/qa-review/scripts/ledger.py finding  --task-id BOARD-005 \
-    --fingerprint "bug|functional|/x|export-button" --evidence <path> --fix-row BOARD-010
-python3 .opencode/skills/qa-review/scripts/ledger.py merged   --task-id BOARD-005 --fix-row BOARD-010
+    --fingerprint "bug|functional|/x|export-button" --evidence <path>
 python3 .opencode/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-005 --reason "..."
 python3 .opencode/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
 ```
@@ -1112,20 +1103,8 @@ python3 .opencode/skills/qa-review/scripts/check-finding.py --body-file <finding
 It prints the fingerprint on stdout, in a form that can be pasted into a board row. Pass
 `--fingerprint <value>` to override the derived value.
 
-`board.py add --fingerprint <value>` refuses a `Fix` row whose fingerprint is already open. The
-refusal names the existing row and prints the command that updates it:
-
-```bash
-python3 .opencode/skills/board/scripts/board.py add --id BOARD-010 --task "..." --type Fix \
-    --status Ready --priority P2 --risk "🟡 medium — one line" --blocked-by BOARD-005 \
-    --fingerprint "bug|functional|/x|export-button" --note "..."
-```
-
-A repeat finding updates the existing row's notes instead of creating a new one:
-
-```bash
-python3 .opencode/skills/board/scripts/board.py note BOARD-010 --value "<the new evidence>"
-```
+Record findings in the local ledger and the original row's notes. `board.py add --fingerprint`
+remains for independently approved defects, not in-task review corrections.
 
 **The stop conditions.** The loop stops when any of these fires — whichever comes first:
 
@@ -1133,10 +1112,10 @@ python3 .opencode/skills/board/scripts/board.py note BOARD-010 --value "<the new
 |---|---|
 | **The round cap is reached** (3 rounds done, row still failing) | The row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round is opened. |
 | **A critical path is red** (money, data loss, auth, security) | The row is `Blocked` immediately. It is never retried silently. |
-| **The same fingerprint is filed twice** | The existing row is escalated to `Blocked` rather than a new one opening. |
+| **The same fingerprint is filed twice** | The original task is escalated to `Blocked` rather than a new one opening. |
 | **The human says stop** | The row is `Blocked` with the human's reason recorded in the ledger's stop reason. |
 
-A finding that repeats three times is a `Blocked` row, not a fourth attempt. The same finding
+A finding that repeats is a `Blocked` row, not another task. The same finding
 failing the same way three times means the approach is wrong, not the implementation. Park it,
 write down what was tried, and ask the human.
 
@@ -1190,7 +1169,8 @@ reason on one line.
 - If several worktrees depend on the same contract, schema, or file layout, settle that shared
   shape on the base branch **before** fanning out.
 - Never delete a worktree that holds unmerged or dirty work. Preserve it and report it.
-- Clean up a worktree only after its row reaches `Merged`.
+- Use human-only `finalize` to integrate and clean up a Pending Merge worktree; legacy `cleanup`
+  applies to work already merged into the base. Never remove unmerged or dirty work.
 - Never create, move, or use a worktree outside `.opencode/worktrees/`.
 
 ### Guard rules (enforced by the guard script, not by discipline)
@@ -1244,8 +1224,8 @@ stays in `In Review` or bounces to `In Progress` — it does not become `Pending
 5. The documentation set is updated for the change (§B1).
 6. The worktree is clean — nothing uncommitted.
 
-The user performs the merge, into `main` or a feature branch. The agent never merges, pushes, or
-opens a PR.
+The human runs `finalize` into the configured base (or an approved feature branch). The agent
+never merges, pushes, or opens a PR.
 
 ## B4.1 Writing standard
 
@@ -1308,12 +1288,10 @@ historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser w
   Screenshot and `files.get` results provide server-local paths; desktop file IDs are not paths.
   Transfer desktop-owned captures with the built-in browser, then store the returned bytes under
   the canonical path. Never assume desktop and server filesystems are shared.
-  **Review reports and the ledger are documents, not artifacts.** They stay where documents live:
-  `docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
-  `docs/reviews/<task-id>-ledger.md`.
+  **Review reports and ledger live outside task worktrees:** `<git-common-dir>/reviews/`.
 - **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
-  recording what was checked and expected vs actual. Commit `notes.md` and small component shots;
-  leave full-page captures out of git.
+  recording what was checked and expected vs actual. Reviewers leave this main-checkout evidence
+  uncommitted and do not edit the task worktree; leave full-page captures out of git.
 - **Check:** keyboard focus and focus trapping, contrast, accessible names, tap target size
   (≥24×24 CSS px), console errors, unexpected network failures, horizontal overflow at 320px,
   and whether the screen matches the approved gallery (tokens, states, density).
@@ -1334,14 +1312,14 @@ independent of the builder's claims:
 
 | Agent | Role | Output |
 |---|---|---|
-| `qa-reviewer` | Verifies behavior against the acceptance criteria; uses the built-in browser for UI | `docs/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
-| `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `docs/reviews/<task-id>-ui.md` |
+| `qa-reviewer` | Verifies behavior against acceptance criteria; uses built-in browser for UI | `<git-common-dir>/reviews/<task-id>-qa.md` + canonical artifacts |
+| `ui-critic` | Judges against anti-slop rules and approved gallery | `<git-common-dir>/reviews/<task-id>-ui.md` |
 
 Both are read-only against application code. They report; they do not fix.
 
-### Review submission → board rows
+### Review submission → same task worktree
 
-A review finding is a **bug-fix unit of work**, so it becomes a board row.
+A finding against the task being built returns to its original builder in the same worktree.
 
 1. The reviewer writes the finding file and **validates it** — a finding that names no expected
    behavior, no repro, or no evidence is refused:
@@ -1351,29 +1329,16 @@ A review finding is a **bug-fix unit of work**, so it becomes a board row.
 
    Exit 66 means the finding is too weak to act on. Fix the body, do not bypass the check.
    Exit 0 prints the finding's **fingerprint** on stdout, ready to be pasted into the board row.
-2. The **orchestrator** creates one board row per validated finding, with the script:
-
-       python3 .opencode/skills/board/scripts/board.py add --id BOARD-00X --task "<one line>" \
-           --type Fix --status Ready --priority P2 --risk "🟡 medium — <blast radius>" \
-           --blocked-by "BOARD-xxx" --fingerprint "<kind|category|route|subject>" \
-           --note "<expected vs actual, repro, evidence path>"
-
-   - `Type: Fix`
-   - `Status: Ready` (or `Blocked` if the finding needs a product decision)
-   - `Priority` from the finding severity
-   - `Risk` from the blast radius of the defect
-   - `Blocked by: BOARD-xxx` — the row that produced the finding
-   - `Fingerprint` — from `check-finding.py`; the row carries it so a repeat is recognisable
-   - `Notes` — the finding text: expected, actual, repro, evidence path
-   - A fingerprint that is already open is **refused**. The refusal names the existing row and
-     prints the command that updates it: `board.py note <ID> --value "<the new evidence>"`.
+2. The **orchestrator** records the validated finding in the original row's notes and local
+   ledger; moves that row to `In Progress`; delegates a correction to its original builder in
+   the same worktree. Do not create a Fix row or new worktree for an in-task finding.
 3. The reviewed row's status depends on the verdict:
    - **FAIL** → the reviewed row returns to `In Progress` with the failing findings restated.
    - **PASS** → the reviewed row may proceed to `Pending Merge`.
-4. The new `Fix` rows are picked up in the normal order: `/decide` → worktree → build → QA →
-   review → `Pending Merge`.
+4. Corrections are re-verified and reviewed against the original acceptance criteria. A genuinely
+   independent defect may be separately scoped and approved as a new Fix task.
 
-The reviewers never edit `docs/BOARD.md`. The orchestrator writes every row, so the board keeps a
+The reviewers never edit the board. The orchestrator writes every row, so the board keeps a
 single writer.
 
 ## B4.3 Anti-slop visual rules
@@ -1403,7 +1368,7 @@ At the end of every session, or when asked to hand over:
 
 1. Re-read `docs/HANDOVER.md` and fix anything now inaccurate.
 2. Add a changelog entry for anything changed this session that is not yet recorded.
-3. Update `docs/BOARD.md`: move rows to their true status, fill in branch columns. **The
+3. Update the SQLite board through `board.py`: move rows to their true status, fill in branch columns. **The
    orchestrator does this in the main checkout. A builder in a worktree reports its lane status
    instead of editing the board** (§B3).
 4. Update `docs/PROJECT_STATE.md`: current phase, progress, active task, next step.
@@ -1414,8 +1379,8 @@ At the end of every session, or when asked to hand over:
    SHA and diff command without implying merge readiness.
 8. **End the report with the hand-off block.** For work in a worktree, print the block from
    `python3 .opencode/skills/git-worktree/scripts/worktree.py handoff --board <ID>`.
-   Apply §B11's merge-guidance gate; a refused handoff supplies review commands and blockers,
-   never a manually added merge or teardown command.
+   Apply §B11's merge-guidance gate; a refused handoff supplies review commands and blockers.
+   Agents never invoke the human-only finalize command.
 
 ## B6. Reuse before creation (hard rule)
 
@@ -1611,8 +1576,8 @@ the user. `opencode.jsonc` carries the permission map generated from it, and
 
 The guard adds three context checks a keyword list cannot see: **no commit on
 `main`/`master`/`base`**, **no branch switch inside a worktree**, and **no raw
-`git worktree remove`** — use `worktree.py cleanup`, which checks that the branch is merged and
-the tree is clean.
+`git worktree remove`** — the human uses `worktree.py finalize` for integration and cleanup;
+legacy `cleanup` checks that the branch is already merged and the tree is clean.
 
 Run the guard before any git command that changes history or the remote:
 
@@ -1637,14 +1602,13 @@ Work lands on a branch. A human reviews it and decides where it goes:
 - The agent finishes the work, commits it on the worktree branch, and sets the board row to
   `Pending Merge`. That state means **waiting for human approval to merge**.
 - The agent reports the worktree path, the branch, the commits, and the diff command.
-- The human reviews, then merges into `main` or into a feature branch:
-
-      git merge --no-ff <type>/<feature-slug> -m "merge: <feature-slug>"
-
-- Then the human (or the agent, once the branch is confirmed merged) cleans up:
-
-      git worktree remove .opencode/worktrees/<feature-slug>
-      git branch -d <type>/<feature-slug>
+- The human reviews, then runs the `human-only finalize` command printed by `handoff` in the
+  target base checkout on a real terminal. For app work surfaces, copy its absolute control-script
+  path and `--repo <id>`; the app checkout has no relative harness script. For control-repo tasks,
+  `python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X` works
+  from the control base checkout. Type the exact displayed board ID, base, branch and full tip.
+  No unattended bypass flag exists. This is a local policy/deterrence gate, not an absolute
+  security boundary against the same OS identity.
 
 The agent stops at `Pending Merge`. It does not merge, does not push, and does not open a PR.
 
@@ -1653,10 +1617,10 @@ The agent stops at `Pending Merge`. It does not merge, does not push, and does n
 | Question | Answer |
 |---|---|
 | What worktrees exist? | `git worktree list` |
-| What changed in mine? | `git -C .opencode/worktrees/<slug> status` and `git -C .opencode/worktrees/<slug> diff main` |
-| What is on my branch? | `git -C .opencode/worktrees/<slug> log --oneline main..HEAD` |
-| Is it mergeable? | `git -C .opencode/worktrees/<slug> merge-base --is-ancestor main HEAD && echo "no conflicts expected"` |
-| Clean it up after merge | `git worktree remove .opencode/worktrees/<slug>` and `git branch -d <branch>` |
+| What changed in mine? | `git -C .opencode/worktrees/<slug> status` and `git -C .opencode/worktrees/<slug> diff <configured-base>` |
+| What is on my branch? | `git -C .opencode/worktrees/<slug> log --oneline <configured-base>..HEAD` |
+| Is it up to date with base? | `git -C .opencode/worktrees/<slug> merge-base --is-ancestor <configured-base> HEAD && echo "base is ancestor"` |
+| Integrate and clean up | Human copies the `handoff` finalize command (absolute control-script path and `--repo <id>` for apps) into the target base checkout; legacy `cleanup --board <ID> --apply` is only for already-merged work |
 | Which row owns it? | The board row's `Branch/Worktree` column |
 
 Worktrees live under `.opencode/worktrees/<feature-slug>/` and are git-ignored. The full procedure is
@@ -1673,6 +1637,6 @@ the `git-worktree` skill at `.opencode/skills/git-worktree/SKILL.md`.
 - [ ] `docs/DECISIONS.md` updated if a decision was made.
 - [ ] `docs/API_CONTRACTS.md` / `docs/ENVIRONMENT.md` / `docs/RISKS.md` updated as applicable.
 - [ ] `docs/changelog/` entry written.
-- [ ] `docs/BOARD.md` row updated (orchestrator, main checkout).
+- [ ] SQLite board row updated through `board.py` (orchestrator).
 - [ ] `docs/PROJECT_STATE.md` updated.
-- [ ] Board row is `Pending Merge` and the user has been asked to inspect and merge into `main`.
+- [ ] Board row is `Pending Merge` and the user has been asked to inspect and run human-only `finalize` into the configured base.

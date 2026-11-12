@@ -5,13 +5,15 @@ an agent needs. Do not guess commands.
 
 ## What the factory is made of
 
-No application runtime, no database. The factory is Markdown rules, agent definitions, and
-Python scripts that run on the standard library alone. The one build step is the board UI's
+No application runtime. The board uses standard-library SQLite in the Git common directory;
+the factory otherwise uses Markdown rules, agent definitions, and Python scripts. The one build step is the board UI's
 Tailwind stylesheet, and it produces a committed file — the viewer itself needs no Node.
 
 | Piece | Version | Where |
 |---|---|---|
 | Python | 3.9+ | every script under `.opencode/skills/*/scripts/` |
+| SQLite | Python `sqlite3` | `<git-common-dir>/factory-board.sqlite3`, one per clone; WAL and 10s busy timeout |
+| Local review records | Markdown | `<git-common-dir>/reviews/`, outside task worktrees |
 | OpenCode | V2 | `opencode.jsonc`, `.opencode/agents/`, `.opencode/commands/`, five discoverable skills |
 | Node.js | 22 | the dev container, the Playwright MCP, the Tailwind build |
 | Playwright | the global install in the dev container | retained historical/test tooling, not UI QA |
@@ -38,6 +40,17 @@ npm --prefix .opencode/skills/board/ui run build
 # Show the board
 python3 .opencode/skills/board/scripts/board.py show
 
+# Generate a readable Markdown snapshot in the Git common directory (prints its path)
+python3 .opencode/skills/board/scripts/board.py export
+
+# One-time bootstrap only: run from the BOARD-124 worktree BEFORE human merge
+# Stop board writers; verifies legacy import and prints byte-exact backup path
+python3 .opencode/skills/board/scripts/board.py pre-merge-check
+
+# Human-only integration, from target base checkout on a real terminal
+# Requires typed board ID, base, branch and full tip; agents never invoke it.
+python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
+
 # Board refresh regressions (temporary fixture trees, no live server)
 python3 .opencode/skills/board/scripts/test_board_serve.py
 
@@ -52,6 +65,12 @@ python3 .opencode/skills/git-worktree/scripts/test_env.py
 
 # Focused handoff gates (isolated temporary repositories inside the task worktree)
 python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_handoff.py'
+
+# Lifecycle and TTY/conflict regressions (temporary repositories only)
+python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'
+
+# Ledger path-validation regressions (temporary directories only)
+python3 -m unittest discover -s .opencode/skills/qa-review/scripts -p 'test_ledger.py'
 
 # Security adapter boundary tests (temporary dummy repositories only)
 node --test .opencode/plugins/factory-guard/guard.test.mjs

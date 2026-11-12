@@ -4,9 +4,8 @@
     board_serve.py [--port 15180] [--host 127.0.0.1] [--open]
                    [--file PATH] [--refresh 60]
 
-Serves a single-page HTML dashboard of docs/BOARD.md plus the live git
-worktrees. Startup creates only the current control board when absent.
-Every request reads fresh data and never writes files.
+Serves a dashboard of the per-clone SQLite board plus live git worktrees.
+Startup initializes only the current control board. Requests read fresh data.
 
 Endpoints:
     GET /                     the HTML dashboard
@@ -65,8 +64,7 @@ GIT_TIMEOUT = 5
 DEFAULT_PORT = 15180
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_REFRESH = 60
-BOARD_READ_HINT = (" Check that the board path (--file or docs/BOARD.md) "
-                   "exists and is a valid board table.")
+BOARD_READ_HINT = (" Check the SQLite board or the explicit --file fixture.")
 # Inline favicon: the page stays offline and makes no favicon request.
 FAVICON = ("data:image/svg+xml,"
            "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E"
@@ -134,14 +132,25 @@ def discover_boards(root):
         boards.append(("project", os.path.join(root, "docs", "BOARD.md")))
         parent = os.path.dirname(root)
         if (os.path.exists(os.path.join(parent, ".opencode"))
-                and os.path.exists(os.path.join(parent, "docs", "BOARD.md"))):
+                and board_available(parent)):
             boards.append(("harness", os.path.join(parent, "docs", "BOARD.md")))
     else:
         boards.append(("harness", os.path.join(root, "docs", "BOARD.md")))
-        child = os.path.join(root, "project", "docs", "BOARD.md")
-        if os.path.exists(child):
-            boards.append(("project", child))
-    return [(label, path) for label, path in boards if os.path.exists(path)]
+        child = os.path.join(root, "project")
+        if os.path.isfile(os.path.join(child, "DOMAIN.md")) and board_available(child):
+            boards.append(("project", os.path.join(child, "docs", "BOARD.md")))
+        elif os.path.exists(os.path.join(child, "docs", "BOARD.md")):
+            boards.append(("project", os.path.join(child, "docs", "BOARD.md")))
+    return boards
+
+
+def board_available(root):
+    board, _ = load_helpers()
+    try:
+        return (os.path.isfile(os.path.join(root, "docs", "BOARD.md"))
+                or os.path.isfile(board.database_path(root)))
+    except OSError:
+        return False
 
 
 def read_rows(board, path):
@@ -1623,7 +1632,7 @@ def main(argv):
                         help="address to bind (default: %s)" % DEFAULT_HOST)
     parser.add_argument("--open", action="store_true",
                         help="open the dashboard in the default browser")
-    parser.add_argument("--file", help="board file (default: docs/BOARD.md in the repo root)")
+    parser.add_argument("--file", help="read-only Markdown fixture (default: SQLite board)")
     parser.add_argument("--refresh", type=int, default=DEFAULT_REFRESH,
                         help="auto-refresh interval in seconds (default: %d)" % DEFAULT_REFRESH)
     args = parser.parse_args(argv)
@@ -1636,7 +1645,7 @@ def main(argv):
     else:
         try:
             board.initialize_board(root)
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             print("cannot initialize board: %s" % exc, file=sys.stderr)
             return 1
         paths = None

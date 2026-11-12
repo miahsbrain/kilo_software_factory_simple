@@ -3,6 +3,69 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Correct interactive finalize confirmation
+**Type:** Fix
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `worktree.py` confirmation, `test_handoff.py`, git-worktree skill, HANDOVER and this log.
+**Why:** The human's stdin was a TTY, but opening `/dev/tty` raised `io.UnsupportedOperation` and refused finalize.
+**Impact:** Prompt via TTY stderr and read one line from TTY stdin; fail closed on non-TTY, EOF, mismatch or stream errors. Exact four-value challenge and post-confirmation base recheck stay intact. No bypass flag or agent-run integration. Catalogue: python-pro, cli-developer.
+**Verification:** `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_handoff.py'` passed: 24 tests in 12.083s. Parent independent review pending.
+
+## [2026-11-12] Correct bootstrap finalize instructions
+**Type:** Docs
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `.opencode/skills/git-worktree/SKILL.md`, `docs/HANDOVER.md` and this log.
+**Why:** The ready handoff prints an absolute bootstrap-script finalize command; older instructions incorrectly required manual merge and cleanup.
+**Impact:** Preserve pre-merge import and byte-exact backup, then direct the human to review and run the printed command from the clean base checkout in a real TTY. No runtime change.
+**Verification:** File review and `git diff --check` only. Catalogue: code-documenter.
+
+## [2026-11-12] Clarify app work-surface finalize path
+**Type:** Docs
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `.opencode/skills/git-worktree/SKILL.md`, `AGENTS.md`, `templates/project/AGENTS.md` and this log.
+**Why:** Relative control-script examples fail when copied into an app work surface without the harness.
+**Impact:** App handoff guidance uses the printed absolute control-script path and `--repo <id>`; relative examples remain valid for the control checkout only. No runtime change.
+**Verification:** File review and `git diff --check` only. Catalogue: code-documenter.
+
+## [2026-11-12] Guard bootstrap import and local review paths
+**Type:** Fix
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `board.py`, `worktree.py`, `ledger.py`, adjacent regression tests, git-worktree skill, HANDOVER, STACK and this log.
+**Why:** An uninitialized database could lose tracked legacy rows on merge; app handoff pointed to a nonexistent relative script; ledger IDs allowed path traversal.
+**Impact:** Human pre-merge check creates/verifies local import and byte-exact backup before legacy deletion; handoff uses absolute control script; invalid ledger IDs refuse before I/O. Fresh clones remain empty. Reuses board importer/export writer and handoff command; new adjacent ledger tests cover input safety. Catalogue: python-pro, cli-developer, secure-code-guardian/input-validation.
+**Verification:** Board suite 24 OK (rerun after export-path refinement); handoff suite 24 OK; ledger suite 2 OK. `git diff --check` passed. Temporary repositories/directories only; parent independent review required.
+
+## [2026-11-12] Align bootstrap lifecycle and review guidance
+**Type:** Docs
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `AGENTS.md`, `templates/project/AGENTS.md`, `.opencode/skills/git-worktree/SKILL.md`, `.opencode/commands/ui.md`.
+**Why:** Remove stale second-worktree, automatic Fix-row, raw teardown, main-target and review-artifact commit instructions; identify the one-time human-managed bootstrap integration while the base checkout still has old tooling.
+**Impact:** Guidance only; no tooling behavior change. Normal tasks use human-only finalize; this bootstrap requires human manual merge and cleanup after approval.
+**Verification:** File review and `git diff --check` only.
+
+## [2026-11-12] Complete local-board and human-gate migration
+**Type:** Fix
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `worktree.py`, `test_handoff.py`, `ledger.py`, root/template rules, agent/skill/command guidance, `docs/BOARD.md` index, structure/stack/decisions/handover.
+**Why:** Prevent unattended integration and conflicted main checkout; remove tracked historical board state and automatic Fix-worktree fanout.
+**Impact:** Local SQLite board and reviewer records stay outside Git; Markdown is generated export. Human typed-TTY gate is policy deterrence, not same-identity security. Existing board bytes and import snapshot preserved; fresh clone starts empty. In-task findings reuse the task worktree.
+**Verification:** Lifecycle suite in isolated temporary repositories; independent parent review still required.
+
+## [2026-11-12] Gate env provisioning and add human-only finalization
+**Type:** Feature
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `worktree.py`, `env.py`, lifecycle tests, HANDOVER and this log.
+**Why:** Reuse existing board/Git/env lifecycle adapters; fail closed on unsafe env sources and destinations and replace raw merge guidance with a single human operation. New `cmd_finalize` is needed for ordered preflight, merge, recovery and teardown.
+**Impact:** Partial failed creations remain owned and Blocked. Finalize preflights conflicts and records branch tip before integration; never runs automatically. Pending Merge certifies review evidence that cannot be independently parsed by the CLI. Skills: python-pro, cli-developer, secure-code-guardian.
+**Verification:** Two allowed suite runs: first 19 tests/2 stale-fixture failures; second 19 tests OK (9.198s) after fixing scratch SQLite mutation. Subsequent small guidance/legacy-cleanup tightening is unverified and needs independent review before the row advances.
+
+## [2026-11-12] Move the live board core to SQLite
+**Type:** Feature
+**Board:** bootstrap slice | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `board.py`, `board_serve.py`, focused board tests, `.gitignore`, STACK, PROJECT_STRUCTURE, HANDOVER, PROJECT_STATE and this log.
+**Why:** Keep board state local to a clone and shared across its worktrees without dirtying tracked Markdown. Reused the existing board parser, command handlers, `read_table`/`write_atomic` lifecycle adapter and read-only viewer; added only SQLite storage, three-way cell merge and export. No new module or external dependency. Catalogue: python-pro (standard library), sql-pro (database design), cli-developer (argparse).
+**Impact:** First default read imports the old main-board bytes once, without deleting or modifying them. SQLite holds authoritative state thereafter; `board.py export` generates a Markdown file in the Git common directory. Concurrent disjoint changes merge; overlapping changes refuse. Existing tracked board remains until a separate safe untracking slice; no project repo or integration checkout edits. Reversible with preserved import bytes and export.
+
 ## [2026-11-11] Record independent handoff-gate review PASS
 **Type:** Docs
 **Board:** BOARD-123 | **Branch:** fix/gate-merge-handoffs-on-finished-clean-worktrees

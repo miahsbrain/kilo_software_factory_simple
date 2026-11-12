@@ -1,16 +1,18 @@
 ---
 name: board
-description: Read and update the live work board at docs/BOARD.md — add rows, move lanes, set fields — without hand-editing the markdown table. Use whenever work is planned, started, reviewed, or finished.
+description: Read and update the live SQLite board — add rows, move lanes, set fields — with board.py. Markdown is a generated export.
 ---
 
 # Board
 
-The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+The live board is `<git-common-dir>/factory-board.sqlite3`, local to this clone and shared across
+worktrees. Only the orchestrator edits rows through `board.py`; the human-only finalize command
+owns its successful integration transition. `docs/BOARD.md` is a one-time legacy import source,
+not a live board. `board.py export` generates Markdown in the common directory on request.
 
-The CLI and viewer share missing-board startup initialization, using the nearest repo-map
-marker and Git's main-checkout mapping. Existing boards, including malformed boards, are never
-replaced. Explicit `--file` paths are not initialized. Bootstrap refuses symlink docs/board paths
-and publishes a complete empty table exclusively, so concurrent startups cannot overwrite rows.
+First use imports an existing local main-checkout legacy board once and keeps its original bytes
+as a SQLite snapshot; a fresh clone without that file starts empty. Never import a historical
+Git-tracked board into a fresh clone. Back up SQLite consistently or export before moving clones.
 Viewer requests stay read-only and never initialize another registered project's board.
 
 - **Worktree branches never edit the board.** A builder reports its lane status; the orchestrator
@@ -27,8 +29,8 @@ Viewer requests stay read-only and never initialize another registered project's
 python3 .opencode/skills/board/scripts/board.py --help
 ```
 
-Python 3.9+, standard library only. It rewrites the file atomically and refuses to touch it when
-the table cannot be parsed.
+Python 3.9+, standard library only. SQLite transactions merge disjoint cell edits and reject
+overlapping edits; an explicit Markdown export is a snapshot, not a second source of truth.
 
 | Command | Does |
 |---|---|
@@ -39,6 +41,7 @@ the table cannot be parsed.
 | `board.py set-field <ID> --field <field> --value "<value>"` | change one cell |
 | `board.py remove <ID>` | delete a row |
 | `board.py lanes` | count rows per lane |
+| `board.py export` | generate Markdown snapshot in Git common directory |
 
 The columns are:
 
@@ -123,8 +126,8 @@ python3 .opencode/skills/board/scripts/board.py set-status BOARD-005 "In Progres
 python3 .opencode/skills/board/scripts/board.py set-status BOARD-005 "In Review"
 python3 .opencode/skills/board/scripts/board.py set-status BOARD-005 "Pending Merge"
 
-# 4. after the human merges
-python3 .opencode/skills/board/scripts/board.py set-status BOARD-005 "Merged"
+# 4. human-only finalize coordinates merge, cleanup and Merged lane from base checkout
+python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-005
 ```
 
 When the worktree exists, record it:
@@ -136,26 +139,18 @@ python3 .opencode/skills/board/scripts/board.py set-field BOARD-005 \
 
 ---
 
-## 5. Findings become rows
+## 5. Findings stay in the task
 
-A QA or UI/UX finding is a **bug-fix unit of work**. The reviewer reports it; the orchestrator
-creates the row:
-
-- `Type: Fix`
-- `Status: Ready` — or `Blocked` when the finding needs a product decision
-- `Priority` from the finding severity
-- `Risk` from the blast radius of the defect
-- `Blocked by: BOARD-xxx` — the row that produced the finding
-- `Notes` — expected, actual, repro, evidence path
-
-A FAIL verdict sends the reviewed row back to `In Progress` with the findings restated. A PASS
-lets it proceed to `Pending Merge`.
+A QA or UI/UX finding on the current task sends its row back to `In Progress`. Record evidence
+in the local ledger and row notes; resume the same builder in the existing worktree, then repeat
+QA and review. Do not create a Fix row or a second worktree for in-task corrections. A distinct,
+independently approved defect may be scoped as a separate Fix task.
 
 ---
 
 ## 6. See it live
 
-The markdown table is the source of truth, but it is hard to scan. The **factory board console**
+SQLite is the source of truth. The **factory board console**
 renders it as a dense, keyboard-first dashboard you can open in a browser:
 
 ```bash

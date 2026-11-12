@@ -10,11 +10,13 @@ Every change in this factory happens in an isolated git worktree. The worktree c
 
 This is **CLI only**: plain `git`, no extension, no `gh`, no browser, no pull requests.
 
-The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+The live board is local SQLite under the Git common directory, shared by all worktrees. Only the
+orchestrator updates rows through `board.py`; `docs/BOARD.md` is a legacy import source and
+Markdown exports are generated snapshots. The human-only finalize command owns merge cleanup.
 
 Board CLI/viewer startup owns missing-board initialization. Worktree lifecycle commands resolve
-the control repo by its repo-map marker, not board presence. Cleanup's final local row update
-does not dirty Git and requires no commit.
+the control repo by its repo-map marker, not board presence. Finalize's local row update does not
+dirty Git and requires no commit; legacy cleanup handles work already merged into the base.
 
 **The script does the mechanics. You supply the intent.** Do not hand-run `git worktree add` when
 the script can do it — the script is where the naming rules and the refusals live.
@@ -25,7 +27,7 @@ the script can do it — the script is where the naming rules and the refusals l
 
 | Script | Does |
 |---|---|
-| `.opencode/skills/git-worktree/scripts/worktree.py` | create · resume · discard · handoff · list · verify · cleanup |
+| `.opencode/skills/git-worktree/scripts/worktree.py` | create · resume · discard · handoff · list · verify · finalize (human only) · legacy cleanup |
 | `.opencode/skills/git-worktree/scripts/env.py` | sync · status · clean — the env files of a worktree |
 | `.opencode/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · install-hooks · policy |
 
@@ -56,11 +58,11 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py create --board <BOARD-
 
 The script refuses when the row does not exist, when the branch or directory already exists, or
 when the row's type is unknown. It never deletes anything. It writes the board row in the **main
-checkout**, so the live board always points at the running worktree.
+    SQLite board**, so the live board always points at the running worktree.
 
-**When the row already has a live worktree, `create` refuses** and prints the three ways
-forward: `resume` the worktree, `discard` it, or create with `--slug <other-slug>`. A second
-worktree for one row is never created.
+**When the row already has a live worktree, `create` refuses**: `resume` or `discard` that
+worktree. `--slug <other-slug>` cannot bypass this refusal; a second worktree for one row is
+never created.
 
 **When the slug directory is already taken by another row's worktree, `create` refuses too**,
 with a different message: it names the slug directory, the row that owns it when the board
@@ -329,8 +331,8 @@ git -C .opencode/worktrees/<slug> status
 git -C .opencode/worktrees/<slug> diff
 ```
 
-- Do not edit files in the main checkout. The only exception is `docs/BOARD.md`, which the
-  orchestrator writes in the main checkout.
+- Do not edit files in the main checkout. The orchestrator updates only the local SQLite board
+  through `board.py`.
 - Do not `git checkout` another branch inside the worktree.
 - Do not `git merge` the base branch in unless the task needs it; resolve conflicts inside the
   worktree. Never use `git stash` — stashes are shared across worktrees.
@@ -408,7 +410,7 @@ A worktree is ready for handoff only when:
 
 ## 8. Hand off for human approval
 
-The agent **never** merges.
+The agent **never** merges or invokes `finalize`.
 
 For an unfinished or blocked handoff, apply the §B11 checkpoint policy from section 6 and
 report the SHA, diff command and outstanding work. The orchestrator keeps blocked work `Blocked`.
@@ -430,7 +432,7 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py handoff --board <BOARD
 That prints the worktree path, branch, base, diff and log commands. It never runs a mutating
 Git command. It rechecks the live board status, branch identity, staged/unstaged/untracked
 changes, commit count and ancestry with checked Git results. A clean `Pending Merge` branch
-with commits ahead gets merge and teardown commands (exit 0 / `OK`). Other unfinished states,
+with commits ahead gets a human-only finalize command (exit 0 / `OK`). Other unfinished states,
 missing information or Git failures get blockers, no merge or teardown (exit 1 / `REFUSED`).
 `Pending Merge` records the orchestrator's completed verification/review gates; the script does
 not run those checks or infer them from cleanliness. Every worktree session ends with this block.
@@ -441,49 +443,70 @@ Only after those gates pass, the ready block looks like this:
 board:    BOARD-00X
 worktree: <path>/.opencode/worktrees/<slug>
 branch:   <type>/<slug>
-base:     main
+base:     <configured-base>
 
 diff:
-  git -C <path>/.opencode/worktrees/<slug> diff main
+  git -C <path>/.opencode/worktrees/<slug> diff <configured-base>
 log:
-  git -C <path>/.opencode/worktrees/<slug> log --oneline main..HEAD
-merge (run by the human, in the main checkout):
-  git merge --no-ff <type>/<slug> -m "merge: <slug>"
-after the merge, remove the worktree and delete the branch:
-  python3 .opencode/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
-or, by hand:
-  git worktree remove <path>/.opencode/worktrees/<slug>
-  git branch -d <type>/<slug>
+  git -C <path>/.opencode/worktrees/<slug> log --oneline <configured-base>..HEAD
+human-only finalize (run from target base checkout in a real terminal):
+  python3 '<absolute-control-script-path>' finalize --board BOARD-00X [--repo <id>]
 ```
 
-The teardown is the last section: it names the row, so one command removes the worktree and
-deletes the branch.
+Finalize requires interactive stdin and stderr and a typed board ID, base, branch and full tip;
+the challenge is printed to stderr and one line is read from stdin. It does not open `/dev/tty`,
+which failed even when the invoking shell's stdin was a TTY. It checks clean worktrees and
+preflights conflicts, then coordinates merge, cleanup and board update. Non-interactive use is
+refused with no bypass flag. Same-identity code can bypass this local policy/deterrence gate;
+it is not an OS security boundary. Conflicts are reported per path and resolved in the task
+worktree before re-review; an initiated merge is aborted on failure when safe.
 
-When a clean branch is already merged into the base, the block retains review/cleanup guidance
-and prints a `git show --stat` line instead of a merge command. Dirty or unknown Git state still
-refuses teardown. This already-merged path does not require `Pending Merge` or commits ahead.
+When a clean branch is already merged into the base, the block prints a `git show --stat` line
+and offers the same human-only finalize command for resumable cleanup. Dirty or unknown state
+still refuses it.
 
-Only after rechecking the same readiness gates, the human may use the same commands by hand:
+For an app repository, copy the entire `human-only finalize` command from `handoff`, including
+the shell-quoted absolute control-script path and `--repo <id>`. Run it from the app repository's
+main checkout in a real terminal. The app work surface has no harness, so a relative script path
+there will not work. Only after rechecking the same readiness gates, the human may use the
+following relative examples **from the control checkout only**:
 
 ```bash
 # review
 python3 .opencode/skills/git-worktree/scripts/worktree.py list
-git -C .opencode/worktrees/<slug> diff main
-git -C .opencode/worktrees/<slug> log --oneline main..HEAD
+git -C .opencode/worktrees/<slug> diff <configured-base>
+git -C .opencode/worktrees/<slug> log --oneline <configured-base>..HEAD
 
-# merge — run by the human, in the main checkout
-git merge --no-ff <type>/<slug> -m "merge: <slug>"
-
-# cleanup — run by the human, after the merge
-python3 .opencode/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
+# integrate a control-repo task — human only, from the control base checkout in a real terminal
+python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
 ```
 
-The merge target is the human's call: `main`, or a feature branch when the work is part of a
-larger feature.
+The configured base is `opencode` for factory tasks; project repositories use their own
+configured base. A separately approved feature branch may be the target for a larger feature.
+
+**One-time bootstrap handoff:** before this branch is integrated, the main checkout still has
+the old `worktree.py`; do not use its relative script path for `finalize`. After review and
+human approval, stop board writers and run the following **in this bootstrap worktree, before
+integration**, while the main checkout still has its legacy `docs/BOARD.md`:
+
+```bash
+python3 .opencode/skills/board/scripts/board.py pre-merge-check
+python3 .opencode/skills/board/scripts/board.py export
+```
+
+The first command initializes a missing local SQLite database from the main checkout's legacy
+board and checks the imported bytes against the source. It refuses missing/malformed or changed
+source, and prints the database, byte-exact backup and current readable export paths under the Git
+common directory. The second command refreshes and prints that export path. Confirm both succeed,
+then review the handoff and run the **absolute `finalize` command printed by**
+`worktree.py handoff --board BOARD-124` from the clean `opencode` base checkout in a real TTY.
+The printed command uses this bootstrap worktree's script, not the base checkout's old relative
+script. Do not restore rows from Git history in a fresh clone. This bootstrap exception does not
+apply to later tasks.
 
 ---
 
-## 9. Clean up
+## 9. Legacy cleanup for already-merged work
 
 ```bash
 python3 .opencode/skills/git-worktree/scripts/worktree.py cleanup <slug>           # dry run
@@ -491,11 +514,12 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply
 python3 .opencode/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
 ```
 
+Use human-only `finalize` for a normal Pending Merge task. Legacy `cleanup` is for a branch
+already merged into the base, not a substitute for the approval and integration gate.
 `--board` is the alternative to the slug: it takes the worktree from the row's
 `Branch/Worktree` cell, the same way `resume` and `discard` do, and it clears that cell when
 the worktree is gone. Give a slug or `--board`, never both and never neither — either mistake
-is a usage error. The teardown the hand-off block names is the `--board` form, because the row
-is what the human holds.
+is a usage error. The normal hand-off block names `finalize`, not this legacy teardown.
 
 `cleanup --board` owns the lane for the row it tears down: a successful cleanup puts the row in
 `Merged` and clears the cell, in the same write. The slug form of `cleanup` cannot know the
@@ -516,7 +540,7 @@ unmerged work.**
 | `fatal: invalid reference: HEAD` | The repository has no commits | The base branch needs one commit before any worktree exists |
 | `branch ... is already checked out` | The branch already has a worktree | Use a new branch, or clean up the old worktree first |
 | `worktree.py create` refuses | The slug, branch, or directory already exists | Pick another slug, or clean up first |
-| `worktree.py create` refuses with resume / discard / new slug | The row already has a live worktree | `resume` it, `discard` it, or create with `--slug` — never a second worktree |
+| `worktree.py create` refuses with resume / discard | The row already has a live worktree | `resume` or `discard` that row; `--slug` cannot bypass the live-worktree refusal |
 | `worktree.py create` refuses with new slug / discard <other row> | The slug directory is taken by another row's worktree | Create with `--slug`, or discard that other row's worktree with its own row id |
 | `worktree.py resume` refuses | The row has no live worktree | `create` one, or `discard` the stale entry first |
 | `worktree.py discard` refuses | The worktree is dirty or holds commits the base does not have | Commit or hand the work over first; unmerged work is never deleted |
@@ -535,5 +559,6 @@ unmerged work.**
 - The board row is the work item; the worktree is where it happens; the row records the path.
 - The builder agents (`frontend-dev`, `backend-dev`, `mobile-dev`) work inside the worktree.
 - The reviewer agents (`qa-reviewer`, `ui-critic`) run against the worktree state and report
-  findings; the orchestrator turns findings into `Type: Fix` board rows.
+  findings; the orchestrator returns in-task findings to the same builder and worktree. Only
+  independently approved defects become separate `Type: Fix` tasks.
 - The root `AGENTS.md` owns the rules. This skill is the executable procedure for them.

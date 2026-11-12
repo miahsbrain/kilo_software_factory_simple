@@ -23,7 +23,7 @@ handover format. Any UI verification or review follows §B4.2's built-in-browser
 
 - Read-only against application code. The only files you write are `docs/handover/**` and, when a
   unit is missing from it, `docs/PROJECT_STRUCTURE.md`.
-- Do not edit `docs/BOARD.md` — the orchestrator owns the board.
+- Do not edit the local SQLite board — the orchestrator owns its rows. Markdown is generated export.
 - Never write application source, and never "fix" what you read. A defect you find is recorded in
   the handover's Known issues, not patched.
 
@@ -105,4 +105,4 @@ kind is unclear, say why in the row rather than guessing silently.
 - The known issues and open questions you recorded.
 - Which documents need updating that you did not touch.
 
-Never push. Never merge into `main`. Never create a pull request. Never edit `docs/BOARD.md`.
+Never push, merge, invoke human-only `finalize` or create a pull request. Never edit the SQLite board.

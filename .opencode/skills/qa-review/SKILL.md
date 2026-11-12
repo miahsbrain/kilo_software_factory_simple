@@ -1,6 +1,6 @@
 ---
 name: qa-review
-description: Verify a change against its acceptance criteria, using OpenCode's built-in browser for UI evidence, and file each finding as a board row. Use for the QA lane of any frontend or API change, or when the user says "QA review", "verify this", or "run QA".
+description: Verify a change against acceptance criteria with browser evidence for UI; return in-task findings to the same builder worktree.
 ---
 
 # QA Review
@@ -24,7 +24,7 @@ test tools are historical/not UI QA; historical evidence is preserved.
 | Script | Does |
 |---|---|
 | `.opencode/skills/qa-review/scripts/browser-review.mjs` | historical capture tool, retained unchanged; not used for UI verification/review |
-| `.opencode/skills/qa-review/scripts/check-finding.py` | validates a finding body before it becomes a board row, and prints its fingerprint |
+| `.opencode/skills/qa-review/scripts/check-finding.py` | validates a finding body and prints its fingerprint |
 | `.opencode/skills/qa-review/scripts/ledger.py` | tracks the bounded QA/fix rounds of one row |
 
 Finding validation and round tracking still use their scripts. Browser evidence does not.
@@ -93,9 +93,8 @@ Keep route/viewport/theme groups separate and name round captures so comparisons
 Retain historical artifacts. Commit `notes.md` and small component shots; keep full-page captures
 out of git. Do not create empty logs or summaries that imply unobserved checks passed.
 
-**Review reports and the ledger are documents, not artifacts.** They stay where documents live:
-`docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
-`docs/reviews/<task-id>-ledger.md`.
+**Review reports and the ledger live outside task worktrees:**
+`<git-common-dir>/reviews/<task-id>-qa.md`, `-ui.md`, and `-ledger.md`.
 
 Per route, viewport, and scheme:
 
@@ -216,40 +215,13 @@ same thing produces the same value. Pass `--fingerprint <value>` to override the
 
 ---
 
-## 6. File the findings on the board
+## 6. Return findings to the existing task
 
-A validated finding becomes a **board row of type `Fix`**:
-
-- `Status: Ready` — or `Blocked` when the finding needs a product decision
-- `Priority` from the severity: `high` → `P1`, `medium` → `P2`, `low` → `P3`
-- `Risk` from the blast radius of the defect
-- `Blocked by: BOARD-xxx` — the row that produced the finding
-- `Fingerprint` — the value `check-finding.py` printed
-- `Notes` — expected, actual, repro, evidence path
-
-```bash
-python3 .opencode/skills/board/scripts/board.py add \
-  --id BOARD-006 --task "Export button stays enabled during the request" --type Fix \
-  --status Ready --priority P2 \
-  --risk "🟡 medium — one endpoint is unreachable while the request runs" \
-  --blocked-by "BOARD-005" \
-  --fingerprint "bug|functional|/settings/export-button-stays-enabled" \
-  --note "Expected: button disabled during request. Actual: stays enabled, user can double-submit. Repro: /settings -> Export. Evidence: artifacts/web/qa/2026-10-29/BOARD-005/settings/1440x900/light/1440x900-light.png"
-```
-
-**A duplicate fingerprint is refused.** When the fingerprint is already open on another row, the
-script refuses the add, names the existing row and its status, and prints the command that
-updates it. A repeat finding updates the existing row's notes instead of opening a new row:
-
-```bash
-python3 .opencode/skills/board/scripts/board.py note BOARD-006 --value "<the new evidence>"
-```
-
-The same fingerprint filed twice escalates the existing row to `Blocked` rather than a new row
-opening.
-
-**The board is written by the orchestrator in the main checkout.** A reviewer working in a
-worktree reports its findings; the orchestrator creates the rows.
+The reviewer records validated findings in the local report and ledger without modifying app
+code. The orchestrator updates the original SQLite row's notes and moves it to `In Progress`;
+the original builder corrects it in the same worktree. A repeated fingerprint blocks the row;
+no new Fix row or worktree is created for in-task review. A distinct independently approved
+defect may be scoped as a separate task.
 
 ---
 
@@ -257,9 +229,8 @@ worktree reports its findings; the orchestrator creates the rows.
 
 A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
 
-Each round's state lives in one short file per row: `docs/reviews/<task-id>-ledger.md`. It holds
-the round number, the findings filed in that round, the Fix row IDs created, the Fix rows merged
-since, and the stop reason when it stops.
+Each round's state lives in `<git-common-dir>/reviews/<task-id>-ledger.md`. It holds the round
+number, findings, same-worktree corrections and stop reason.
 
 The ledger is the **only** thing carried between rounds. **Each round's review must be done by a
 fresh reviewer** that reads the ledger and the current screenshots — not the previous reviewer's
@@ -269,8 +240,7 @@ reasoning.
 python3 .opencode/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
 python3 .opencode/skills/qa-review/scripts/ledger.py finding  --task-id BOARD-005 \
     --fingerprint "bug|functional|/settings/export-button-stays-enabled" \
-    --evidence artifacts/web/qa/2026-10-29/BOARD-005/finding-1.md --fix-row BOARD-006
-python3 .opencode/skills/qa-review/scripts/ledger.py merged   --task-id BOARD-005 --fix-row BOARD-006
+    --evidence artifacts/web/qa/2026-10-29/BOARD-005/finding-1.md
 python3 .opencode/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-005 --reason "..."
 python3 .opencode/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
 ```
@@ -283,7 +253,7 @@ python3 .opencode/skills/qa-review/scripts/ledger.py status   --task-id BOARD-00
 |---|---|
 | Round cap reached (3 rounds, row still failing) | Row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round. |
 | A critical path is red (money, data loss, auth, security) | Row is `Blocked` immediately. Never retried silently. |
-| The same fingerprint is filed twice | The existing row is escalated to `Blocked` rather than a new one opening. |
+| The same fingerprint is filed twice | The original row is escalated to `Blocked`; no new row opens. |
 | The human says stop | Row is `Blocked` with the reason recorded in the ledger's stop reason. |
 
 ---

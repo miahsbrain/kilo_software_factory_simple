@@ -105,12 +105,13 @@ def env_names(repo):
 def row_cells(repo, board_id):
     """The cells of one board row, as a list of strings."""
     path = os.path.join(repo, "docs", "BOARD.md")
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            stripped = line.strip()
-            if stripped.startswith("| %s " % board_id):
-                return [cell.strip() for cell in stripped.strip("|").split("|")]
-    return []
+    script = os.path.join(repo, ".opencode", "skills", "board", "scripts", "board.py")
+    spec = importlib.util.spec_from_file_location("scratch_board", script)
+    board = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(board)
+    table, error = board.read_table(path)
+    index = board.row_by_id(table, board_id) if table is not None else None
+    return board.cell_texts(table["lines"], index) if index is not None else []
 
 
 def row_state(repo, board_id):
@@ -206,19 +207,17 @@ def main():
         os.unlink(planted)
     os.symlink(link_target, planted)
     code, out, err = call(env_script, "sync", "--worktree", worktree)
-    check(code == 0, "sync failed on a planted symlink: %s%s" % (out, err))
+    check(code != 0, "sync accepted a planted symlink: %s%s" % (out, err))
     with open(link_target, encoding="utf-8") as fh:
         check(fh.read() == "untouched\n", "the copy was written through the symlink")
-    check(not os.path.islink(planted), "the planted symlink was not replaced by a regular file")
-    if os.path.isfile(planted) and not os.path.islink(planted):
-        mode = stat.S_IMODE(os.stat(planted).st_mode)
-        check(mode == 0o600, "the copy over a symlink has mode %o, expected 600" % mode)
+    check(os.path.islink(planted), "the planted symlink was changed")
+    os.unlink(planted)
 
     code, out, err = call(worktree_script, "resume", "--board", "BOARD-900")
     check(code == 0, "resume failed: %s%s" % (out, err))
     check(os.path.isdir(worktree), "resume removed the worktree")
-    with open(os.path.join(repo, "docs", "BOARD.md"), encoding="utf-8") as fh:
-        check("In Progress" in fh.read(), "resume did not put the row back in progress")
+    check(row_state(repo, "BOARD-900")[0] == "In Progress",
+          "resume did not put the row back in progress")
     for name in env_names(repo):
         check(os.path.isfile(os.path.join(worktree, name)),
               "resume did not re-provision %s" % name)
@@ -238,9 +237,8 @@ def main():
     check(not os.path.exists(worktree), "discard --apply left the worktree behind")
     _, branches, _ = git(repo, "branch", "--list")
     check(slug not in branches, "discard --apply left the branch behind")
-    with open(os.path.join(repo, "docs", "BOARD.md"), encoding="utf-8") as fh:
-        check(".opencode/worktrees/%s" % slug not in fh.read(),
-              "discard did not clear the row's worktree cell")
+    check(row_state(repo, "BOARD-900")[1] in ("-", ""),
+          "discard did not clear the row's worktree cell")
 
     code, out, err = call(worktree_script, "list")
     check(code == 0, "list failed: %s%s" % (out, err))
@@ -338,18 +336,12 @@ def handoff(repo, worktree_script, call, check):
     check(worktree in out, "the block does not name the worktree path")
     check("feat/hand-off-a-worktree" in out, "the block does not name the branch")
     diff_at = out.find("diff %s" % "main")
-    merge_at = out.find("git merge --no-ff feat/hand-off-a-worktree")
+    merge_at = out.find("finalize --board BOARD-904")
     check(diff_at != -1, "the block has no diff command")
     check(merge_at != -1, "the block has no merge command")
     check(diff_at < merge_at, "the merge command comes before the diff command")
     check("log --oneline main..HEAD" in out, "the block has no log command")
-    teardown_at = out.find("after the merge, remove the worktree and delete the branch:")
-    check(teardown_at != -1, "the block has no teardown section")
-    check("cleanup --board BOARD-904 --apply" in out,
-          "the block does not name the cleanup --board command")
-    check("git worktree remove %s" % worktree in out, "the block has no manual worktree remove")
-    check("git branch -d feat/hand-off-a-worktree" in out, "the block has no manual branch delete")
-    check(teardown_at > merge_at, "the teardown comes before the merge command")
+    check("git merge --no-ff" not in out, "the block names a raw merge")
 
     git(repo, "merge", "--no-ff", "feat/hand-off-a-worktree", "-m", "merge: hand-off-a-worktree")
 
@@ -372,9 +364,8 @@ def cleanup_merged(repo, worktree_script, call, check):
     check(not os.path.exists(worktree), "cleanup --board left the worktree behind")
     _, branches, _ = git(repo, "branch", "--list")
     check(slug not in branches, "cleanup --board left the branch behind")
-    with open(os.path.join(repo, "docs", "BOARD.md"), encoding="utf-8") as fh:
-        check(".opencode/worktrees/%s" % slug not in fh.read(),
-              "cleanup --board did not clear the row's worktree cell")
+    check(row_state(repo, "BOARD-904")[1] in ("-", ""),
+          "cleanup --board did not clear the row's worktree cell")
 
 
 def cleanup_by_board(repo, worktree_script, call, check):
