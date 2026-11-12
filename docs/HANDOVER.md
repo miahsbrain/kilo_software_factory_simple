@@ -1,10 +1,16 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-146 plan projection validation, 2026-11-12**
+> Accepted repository IDs now reject CR/LF before any write; generated normalized Markdown must
+> parse and retain the canonical row-ID sequence before persistence. The focused scratch test class
+> passed 2 tests in 0.096s. No live board or migration was touched. Next: independent review of this
+> correction.
+
 > **Session Notes — BOARD-146 HTTP snapshot consistency, 2026-11-12**
-> The read-only SQLite adapter now holds one explicit read transaction across each payload's related
+> The read-only SQLite adapter holds one explicit read transaction across each payload's related
 > selects. Scratch WAL interleavings cover cancellation between queue/history reads and human
 > finalization between active projection/details. The focused API class passed 7 tests in 0.529s.
-> No live board/migration was touched. Next: human inspection after independent review of this fix.
+> No live board/migration was touched.
 
 > **Session Notes — BOARD-146 normalized storage and rebase, 2026-11-12**
 > BOARD-146 adds normalized planned items, criteria, active work, and terminal history with an
@@ -726,9 +732,10 @@ Chunk 1 reuses these existing boundaries:
 | Symbol | File | Responsibility | Kind |
 |---|---|---|---|
 | `board.py` | `.opencode/skills/board/scripts/board.py` | Reads and updates the clone-local SQLite board; generates a Markdown export on demand. | effectful (SQLite, file I/O) |
-| `validate_plan_batch(items, existing_ids)` | `.opencode/skills/board/scripts/board.py:315` | Validates a full accepted JSON batch, resolves temporary dependencies and allocates consecutive IDs without I/O or input mutation. | pure |
-| `accept_plan_batch(path, items)` / `transition_plan_item(path, board_id, action)` | `.opencode/skills/board/scripts/board.py:432`, `:490` | Atomically inserts ordered canonical items/criteria or changes queue/active/terminal references; refuses before normalized migration. | effectful (SQLite) |
-| `plan_rows(path, view)` / `format_plan_items(items, view)` | `.opencode/skills/board/scripts/board.py:459`, `:525` | Reads queue/history ordered by queue or stable display position; formats the CLI view. | effectful read / pure format |
+| `validate_plan_batch(items, existing_ids)` | `.opencode/skills/board/scripts/board.py:320` | Validates a full accepted JSON batch, including single-line repository IDs, resolves temporary dependencies and allocates consecutive IDs without I/O or input mutation. | pure |
+| `normalized_markdown(connection, markdown, active_only=False)` | `.opencode/skills/board/scripts/board.py:223` | Renders the canonical projection and verifies it parses with the same row-ID sequence before callers persist or return it. | effectful read (SQLite connection passed explicitly) |
+| `accept_plan_batch(path, items)` / `transition_plan_item(path, board_id, action)` | `.opencode/skills/board/scripts/board.py:437`, `:506` | Atomically inserts ordered canonical items/criteria or changes queue/active/terminal references; refuses before normalized migration. | effectful (SQLite) |
+| `plan_rows(path, view)` / `format_plan_items(items, view)` | `.opencode/skills/board/scripts/board.py:498`, `:545` | Reads queue/history ordered by queue or stable display position; formats the CLI view. | effectful read / pure format |
 | `normalized_plan_rows(connection, view)` | `.opencode/skills/board/scripts/board.py:464` | Reads canonical active, queue or history items and ordered criteria using the caller's connection; shared by CLI and the read-only API's snapshot transaction. | effectful read (SQLite connection passed explicitly) |
 | `write_connection_snapshot(connection, markdown, revision, allow_completion=False)` | `.opencode/skills/board/scripts/board.py:418` | Keeps normalized state and the compatibility Markdown snapshot aligned in the caller's transaction. | effectful (SQLite) |
 | `clear_row_worktree(...)` | `.opencode/skills/git-worktree/scripts/worktree.py:1412` | Clears a worktree cell through the board adapter; successful human finalization records completed history in the existing transaction. | effectful (Git, SQLite) |
@@ -843,6 +850,11 @@ stories, Notes and criterion proofs; normalized active `/api/board` fields; unch
 project row shape; sanitized unavailable/unmigrated/fixture/project-root 503 responses; GET/HEAD
 status, headers and body behavior; and unchanged DB/WAL and tracked files. It passed 5 tests in
 0.302s.
+
+`python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedProjectionValidationTests`
+uses a scratch SQLite board. It verifies CR/LF repository IDs refuse atomically without changing
+canonical tables, Markdown or revision; valid repository IDs produce a parseable projection; and a
+malformed generated projection is refused before persistence. It passed 2 tests in 0.096s.
 
 ## 11. Known issues and risks
 

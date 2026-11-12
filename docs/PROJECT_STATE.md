@@ -1,13 +1,11 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-146 HTTP snapshot consistency (2026-11-12)
+## Current session — BOARD-146 plan projection validation (2026-11-12)
 
-- Fixed the API consistency finding by holding an explicit read transaction across related SQLite
-  selects. Deterministic scratch WAL interleavings cover cancellation during queue/history and
-  finalization during active projection/details.
-- The focused command in `docs/STACK.md` passed 7 tests in 0.529s. No live board or migration was
-  touched; prior lifecycle/full suites were not rerun. Next: human inspection after independent
-  review of this fix.
+- Accepted repository IDs now reject CR/LF before persistence; generated normalized projections
+  must parse and retain the canonical row-ID sequence. The targeted command in `docs/STACK.md`
+  passed 2 scratch tests in 0.096s. No live board or migration was touched; prior suites were not
+  rerun. Next: independent review of this correction.
 
 ## Previous session — BOARD-146 CLI lifecycle (2026-11-12)
 

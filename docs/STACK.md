@@ -95,6 +95,9 @@ python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedLifecycle
 # BOARD-146 read-only planned-work HTTP API regressions (scratch repositories only)
 python3 .opencode/skills/board/scripts/test_board_serve.py PlannedWorkApiTests
 
+# BOARD-146 planned repository-ID/projection validation regressions (scratch SQLite only)
+python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedProjectionValidationTests
+
 # Create the worktree for a board row
 python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X
 

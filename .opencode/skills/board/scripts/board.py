@@ -249,7 +249,14 @@ def normalized_markdown(connection, markdown, active_only=False):
     lines.extend(table_rows)
     lines.extend(parsed["lines"][parsed["rows"][-1] + 1:] if parsed["rows"] else
                  parsed["lines"][parsed["header"] + 2:])
-    return "\n".join(lines)
+    projection = "\n".join(lines)
+    validated, error = parse_table(projection)
+    if validated is None:
+        raise ValueError("generated normalized board projection is invalid: %s" % error)
+    projected_ids = [cell_texts(validated["lines"], index)[0] for index in validated["rows"]]
+    if projected_ids != [row[0] for row in rows]:
+        raise ValueError("generated normalized board projection does not match canonical items")
+    return projection
 
 
 def sync_normalized(connection, markdown, allow_completion=False):
@@ -365,8 +372,10 @@ def validate_plan_batch(items, existing_ids):
             raise PlanValidationError("item %d has duplicate dependencies" % (index + 1))
         repos = item.get("repos", [])
         if not isinstance(repos, list) or any(
-                not isinstance(repo, str) or not repo.strip() or "," in repo for repo in repos):
-            raise PlanValidationError("item %d repos must be an array of repository IDs" % (index + 1))
+                not isinstance(repo, str) or not repo.strip() or "," in repo or
+                any(char in repo for char in "\n\r") for repo in repos):
+            raise PlanValidationError(
+                "item %d repos must be an array of single-line repository IDs" % (index + 1))
         if len(repos) != len(set(repos)):
             raise PlanValidationError("item %d has duplicate repository IDs" % (index + 1))
         notes = item.get("notes", "")

@@ -433,5 +433,65 @@ class PlannedLifecycleTests(unittest.TestCase):
                 (2,))
 
 
+class PlannedProjectionValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="board-plan-validation-")
+        self.addCleanup(self.temp.cleanup)
+        self.path = str(Path(self.temp.name) / "factory-board.sqlite3")
+        markdown = NormalizedBoardMigrationTests.make_markdown()
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("CREATE TABLE board (id INTEGER PRIMARY KEY, markdown TEXT NOT NULL, "
+                               "source_bytes BLOB, revision INTEGER NOT NULL)")
+            connection.execute("INSERT INTO board VALUES (1, ?, NULL, 0)", (markdown,))
+        board.migrate_normalized(self.path, apply=True)
+
+    def draft(self, key, task):
+        return PlannedLifecycleTests.draft(key, task)
+
+    def state_snapshot(self):
+        with board.connect(self.path) as connection:
+            return (
+                connection.execute("SELECT markdown, revision FROM board").fetchall(),
+                connection.execute("SELECT * FROM planned_items ORDER BY id").fetchall(),
+                connection.execute("SELECT * FROM acceptance_criteria "
+                                   "ORDER BY plan_item_id, position").fetchall(),
+                connection.execute("SELECT * FROM active_work ORDER BY plan_item_id").fetchall(),
+            )
+
+    def test_cr_and_lf_repository_ids_refuse_atomically(self):
+        for line_break in ("\r", "\n"):
+            with self.subTest(line_break=repr(line_break)):
+                item = self.draft("repo", "Repository validation")
+                item["repos"] = ["control" + line_break + "api"]
+                before = self.state_snapshot()
+                with self.assertRaises(board.PlanValidationError):
+                    board.accept_plan_batch(self.path, [item])
+                self.assertEqual(self.state_snapshot(), before)
+
+    def test_valid_projection_parses_and_malformed_projection_is_not_persisted(self):
+        item = self.draft("valid", "Valid repository projection")
+        item["repos"] = ["control", "api"]
+        accepted = board.accept_plan_batch(self.path, [item])[0]
+        with board.connect(self.path) as connection:
+            markdown, revision = connection.execute(
+                "SELECT markdown, revision FROM board WHERE id=1").fetchone()
+            parsed, error = board.parse_table(markdown)
+            self.assertIsNone(error)
+            row_index = board.row_by_id(parsed, accepted["id"])
+            self.assertEqual(board.cell_texts(parsed["lines"], row_index)[
+                board.field_index(parsed, "repos")], "control,api")
+
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("UPDATE planned_items SET repos=? WHERE id=?",
+                               ("control\nbroken", accepted["id"]))
+
+        before = self.state_snapshot()
+        with self.assertRaisesRegex(ValueError, "generated normalized board projection is invalid"):
+            with board.connect(self.path) as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                board.persist_normalized_projection(connection)
+        self.assertEqual(self.state_snapshot(), before)
+
+
 if __name__ == "__main__":
     unittest.main()
