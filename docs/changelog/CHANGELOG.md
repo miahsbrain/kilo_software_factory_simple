@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Record BOARD-151 independent QA and current handover
+**Type:** Docs
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Replace superseded blocked/unverified session prose with current evidence; implementation history remains in this log.
+**Impact:** Independent round-1 QA/security review PASS at `af1701dd14fd82c9256534c649f57de2011ee175`; architect found no blocking source issue. Reviewer command `node --test .opencode/plugins/factory-guard/guard.test.mjs` exited 0, 5/5, 7881.501101ms. Report: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-151/qa.md`. Loaded native save failed with `Factory guard refused operation; narrow the path or use the board workflow` (no exit code); user approved one-time shell persistence by architect. Actual live engine/new guard activation remains unproven until integration/reload; adapter role decisions are simulated. Docs-only file review, no test rerun. Next is human inspection/finalize after orchestrator checks clean tip and live Pending Merge.
+
 ## [2026-11-12] Preserve native deny ordering and verify BOARD-151
 **Type:** Fix
 **Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions

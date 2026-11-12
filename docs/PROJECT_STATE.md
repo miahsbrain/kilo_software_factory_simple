@@ -3,21 +3,17 @@
 ## Current session — BOARD-151 shared QA artifact guard (2026-11-12)
 
 - Branch `fix/fix-shared-qa-artifact-guard-permissions`, worktree
-  `.opencode/worktrees/fix-shared-qa-artifact-guard-permissions/` holds an unverified narrow
-  primary QA artifact exception and disposable adapter regressions. Native role permissions,
-  shell policy and permanent rules are unchanged.
-- Blocked verification: prior documented test run exited 1 (0/5 passed). Correction: hardcoded
-  `/tmp/opencode` is forbidden, not an environment needing access repair. Fixtures now use unique
-  prefixes inside this task worktree; Python subprocess cwd is explicitly this worktree.
-  No test rerun, outside-path access, deletes or live artifact writes during this correction.
-- Approved six-deny synchronization into `policy.native` and script regeneration completed;
-  policy/config equality now passes. Shell rules and per-agent permissions remain unchanged.
-- The prior role failure led to explicitly approved generation ordering correction: native rules
-  now follow generic shell/edit rules. Shell semantics, approval ask and agent exceptions are retained.
-- Explicitly approved further verification passed: `node --test .opencode/plugins/factory-guard/guard.test.mjs`,
-  exit 0, 5/5 tests, 8146.249618ms. Canonical boundaries, role denials and ordering regressions pass.
-- Repo-local scratch directories are retained under narrow root-anchored test-prefix ignores;
-  no fixture bytes staged or deleted. Next: independent QA/review; not yet merge-ready.
+  `.opencode/worktrees/fix-shared-qa-artifact-guard-permissions/`. Source candidate
+  `af1701dd14fd82c9256534c649f57de2011ee175` passed independent round-1 QA and security/code review;
+  architect review found no blocking source issue. Reviewer test command exited 0: 5/5, 7881.501101ms.
+- Evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-151/qa.md`.
+  Existing guard/resolver functions are reused; native role rules and shell semantics are unchanged.
+- Loaded guard refused native report save: `Factory guard refused operation; narrow the path or use the board workflow`
+  (no exit code). User-approved one-time shell persistence let the architect save the canonical report.
+  Configured role simulation uses the actual adapter; live permission-engine behavior and loaded
+  guard/config activation require post-integration reload/verification, not a claim of live success.
+- Scratch fixtures remain repository-local, ignored and uncommitted. Next: human inspection/finalize
+  once the orchestrator verifies the clean tip and live Pending Merge row. No merge has been claimed.
 
 ## Current session — BOARD-150 planning CLI database resolution (2026-11-12)
 

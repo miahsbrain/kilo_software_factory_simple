@@ -1,27 +1,21 @@
 # HANDOVER — software factory
 
 > **Session Notes — BOARD-151 shared QA artifact guard, 2026-11-12**
-> Unverified implementation on `fix/fix-shared-qa-artifact-guard-permissions` in
-> `.opencode/worktrees/fix-shared-qa-artifact-guard-permissions/` extends effectful
-> `cmd_check_file` (`.opencode/skills/git-worktree/scripts/guard.py:498`) with the existing
-> `state.primary_checkout` authority. Canonical primary QA outputs still pass through file policy
-> and unchanged native role permissions; ordinary edits remain linked-worktree-only.
-> Disposable adapter tests cover canonical boundaries and preservation of configured role effects.
-> One authorized test run exited 1 with 0/5 passed. Correction: fixtures hardcoded forbidden
-> outside-repository `/tmp/opencode`; this was not an environment needing access repair.
-> Fixture prefixes now resolve inside this task worktree using the repo-local `test_handoff.py`
-> precedent. All subprocess working directories are explicit and in-worktree; no cleanup/deletes
-> or test rerun occurred. No outside paths were accessed during the correction.
-> Approved synchronization added the six existing config denies to `policy.native` (not `edit`)
-> and regenerated config with `guard.py check-policy --write`. Policy equality now passes.
-> The prior 4/5 run exposed native denies preceding the blanket edit allow. User approved correcting
-> `generated_permission` (`.opencode/skills/git-worktree/scripts/guard.py:758`) to emit native
-> restrictions after generic shell/edit rules. Config was regenerated; agent rules are unchanged.
-> The explicitly approved further run passed 5/5 in 8146.249618ms (exit 0), including configured
-> role denials, canonical boundaries and generation ordering. No additional test run occurred.
-> Scratch fixtures remain inside this worktree; root-anchored `/factory-guard-test-*/` and
-> `/factory-hook-test-*/` ignores retain disposable bytes without staging them. Nothing was deleted.
-> Next: independent QA/review of the committed change. Builder verification is green, not merge approval.
+> Source candidate `af1701dd14fd82c9256534c649f57de2011ee175` passed independent round-1 QA
+> and security/code review; architect review found no blocking source issue. Reviewer command
+> `node --test .opencode/plugins/factory-guard/guard.test.mjs` exited 0: 5/5, 7881.501101ms.
+> Evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-151/qa.md`.
+> On `fix/fix-shared-qa-artifact-guard-permissions` in
+> `.opencode/worktrees/fix-shared-qa-artifact-guard-permissions/`, effectful `cmd_check_file`
+> (`.opencode/skills/git-worktree/scripts/guard.py:498`) reuses existing `state.primary_checkout`;
+> `generated_permission` (`.opencode/skills/git-worktree/scripts/guard.py:758`) preserves native
+> restrictions after generic rules. Native role rules and shell semantics are unchanged.
+> Native report save under the loaded guard failed: `Factory guard refused operation; narrow the path or use the board workflow`
+> (no exit code). The user approved one-time shell persistence; the architect saved the report above.
+> Role tests simulate configured decisions through the actual adapter. Live permission-engine behavior
+> and new loaded guard/config activation remain unproven until post-integration reload/verification.
+> Repo-local scratch fixtures remain ignored and uncommitted. Earlier attempts remain in the engineering log.
+> Next: human inspection/finalize once the orchestrator verifies the clean tip and live Pending Merge row.
 
 > **Session Notes — BOARD-150 planning CLI database resolution, 2026-11-12**
 > On `fix/fix-planning-cli-database-resolution` in `.opencode/worktrees/fix-planning-cli-database-resolution/`,
