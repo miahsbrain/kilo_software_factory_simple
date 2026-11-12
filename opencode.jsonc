@@ -5,46 +5,22 @@
     "frontend-dev": { "permissions": [
       { "action": "edit", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
       { "action": "edit", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
+      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
     ] },
     "backend-dev": { "permissions": [
       { "action": "edit", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
       { "action": "edit", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
+      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
     ] },
     "mobile-dev": { "permissions": [
       { "action": "edit", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
       { "action": "edit", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
+      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
     ] },
     "general": { "permissions": [
       { "action": "edit", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
       { "action": "edit", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "write", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" },
-      { "action": "patch", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
+      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
     ] },
     "qa-reviewer": { "permissions": [
       { "action": "edit", "resource": "*", "effect": "deny" },
@@ -56,41 +32,13 @@
       { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/ui.md", "effect": "deny" },
       { "action": "edit", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "deny" },
       { "action": "edit", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "deny" },
-      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "deny" },
-      { "action": "write", "resource": "*", "effect": "deny" },
-      { "action": "write", "resource": "artifacts/*/qa/*/*/**", "effect": "allow" },
-      { "action": "write", "resource": "**/artifacts/*/qa/*/*/**", "effect": "allow" },
-      { "action": "write", "resource": "/**/artifacts/*/qa/*/*/**", "effect": "allow" },
-      { "action": "write", "resource": "artifacts/*/qa/*/*/ui.md", "effect": "deny" },
-      { "action": "write", "resource": "**/artifacts/*/qa/*/*/ui.md", "effect": "deny" },
-      { "action": "write", "resource": "/**/artifacts/*/qa/*/*/ui.md", "effect": "deny" },
-      { "action": "write", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "deny" },
-      { "action": "write", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "deny" },
-      { "action": "write", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "deny" },
-      { "action": "patch", "resource": "*", "effect": "deny" },
-      { "action": "patch", "resource": "artifacts/*/qa/*/*/**", "effect": "allow" },
-      { "action": "patch", "resource": "**/artifacts/*/qa/*/*/**", "effect": "allow" },
-      { "action": "patch", "resource": "/**/artifacts/*/qa/*/*/**", "effect": "allow" },
-      { "action": "patch", "resource": "artifacts/*/qa/*/*/ui.md", "effect": "deny" },
-      { "action": "patch", "resource": "**/artifacts/*/qa/*/*/ui.md", "effect": "deny" },
-      { "action": "patch", "resource": "/**/artifacts/*/qa/*/*/ui.md", "effect": "deny" },
-      { "action": "patch", "resource": "artifacts/*/qa/*/*/builder/**", "effect": "deny" },
-      { "action": "patch", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "deny" },
-      { "action": "patch", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "deny" }
+      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/builder/**", "effect": "deny" }
     ] },
     "ui-critic": { "permissions": [
       { "action": "edit", "resource": "*", "effect": "deny" },
       { "action": "edit", "resource": "artifacts/*/qa/*/*/ui.md", "effect": "allow" },
       { "action": "edit", "resource": "**/artifacts/*/qa/*/*/ui.md", "effect": "allow" },
-      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/ui.md", "effect": "allow" },
-      { "action": "write", "resource": "*", "effect": "deny" },
-      { "action": "write", "resource": "artifacts/*/qa/*/*/ui.md", "effect": "allow" },
-      { "action": "write", "resource": "**/artifacts/*/qa/*/*/ui.md", "effect": "allow" },
-      { "action": "write", "resource": "/**/artifacts/*/qa/*/*/ui.md", "effect": "allow" },
-      { "action": "patch", "resource": "*", "effect": "deny" },
-      { "action": "patch", "resource": "artifacts/*/qa/*/*/ui.md", "effect": "allow" },
-      { "action": "patch", "resource": "**/artifacts/*/qa/*/*/ui.md", "effect": "allow" },
-      { "action": "patch", "resource": "/**/artifacts/*/qa/*/*/ui.md", "effect": "allow" }
+      { "action": "edit", "resource": "/**/artifacts/*/qa/*/*/ui.md", "effect": "allow" }
     ] }
   },
   "mcp": {
@@ -430,18 +378,6 @@
     { "action": "edit", "resource": ".factory-state/reviews/*-ledger.md", "effect": "deny" },
     { "action": "edit", "resource": "**/.factory-state/reviews/*-ledger.md", "effect": "deny" },
     { "action": "edit", "resource": "/**/.factory-state/reviews/*-ledger.md", "effect": "deny" },
-    { "action": "write", "resource": "artifacts/**", "effect": "deny" },
-    { "action": "write", "resource": "**/artifacts/**", "effect": "deny" },
-    { "action": "write", "resource": "/**/artifacts/**", "effect": "deny" },
-    { "action": "write", "resource": ".factory-state/reviews/*-ledger.md", "effect": "deny" },
-    { "action": "write", "resource": "**/.factory-state/reviews/*-ledger.md", "effect": "deny" },
-    { "action": "write", "resource": "/**/.factory-state/reviews/*-ledger.md", "effect": "deny" },
-    { "action": "patch", "resource": "artifacts/**", "effect": "deny" },
-    { "action": "patch", "resource": "**/artifacts/**", "effect": "deny" },
-    { "action": "patch", "resource": "/**/artifacts/**", "effect": "deny" },
-    { "action": "patch", "resource": ".factory-state/reviews/*-ledger.md", "effect": "deny" },
-    { "action": "patch", "resource": "**/.factory-state/reviews/*-ledger.md", "effect": "deny" },
-    { "action": "patch", "resource": "/**/.factory-state/reviews/*-ledger.md", "effect": "deny" },
     { "action": "edit", "resource": ".opencode/plugins/*", "effect": "ask" },
     { "action": "edit", "resource": ".opencode/skills/git-worktree/scripts/*", "effect": "ask" },
     { "action": "edit", "resource": "opencode.json*", "effect": "ask" },
