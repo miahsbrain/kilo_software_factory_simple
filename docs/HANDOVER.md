@@ -7,9 +7,18 @@
 > `state.primary_checkout` authority. Canonical primary QA outputs still pass through file policy
 > and unchanged native role permissions; ordinary edits remain linked-worktree-only.
 > Disposable adapter tests cover canonical boundaries and preservation of configured role effects.
-> One authorized test run exited 1: fixture creation hit `EACCES` under `/tmp/opencode`; the existing
-> generated-policy equality assertion also failed. No tests passed, no live artifacts were written.
-> Next: orchestrator resolves test-directory access and policy drift before authorizing another run.
+> One authorized test run exited 1 with 0/5 passed. Correction: fixtures hardcoded forbidden
+> outside-repository `/tmp/opencode`; this was not an environment needing access repair.
+> Fixture prefixes now resolve inside this task worktree using the repo-local `test_handoff.py`
+> precedent. All subprocess working directories are explicit and in-worktree; no cleanup/deletes
+> or test rerun occurred. No outside paths were accessed during the correction.
+> Read-only diagnosis: configured permissions have 142 rules, generated policy 136. Only configured
+> indices 64–69 (zero-based) differ: edit denies for `artifacts/**`, `**/artifacts/**`,
+> `/**/artifacts/**`, `.factory-state/reviews/*-ledger.md`,
+> `**/.factory-state/reviews/*-ledger.md`, `/**/.factory-state/reviews/*-ledger.md`.
+> All remaining rules match in order. Policy/config are unchanged. Recommendation awaiting approval:
+> add those six denies to canonical policy at the corresponding position, preserving role overrides.
+> Next: orchestrator obtains policy correction approval and authorizes verification.
 > Independent QA/review remain outstanding; this checkpoint is not merge-ready.
 
 > **Session Notes — BOARD-150 planning CLI database resolution, 2026-11-12**

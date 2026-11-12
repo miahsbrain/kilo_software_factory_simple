@@ -11,7 +11,7 @@ const scripts = '.opencode/skills/git-worktree/scripts'
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, stdio: 'pipe' })
 
 async function fixture() {
-  const root = await mkdtemp('/tmp/opencode/factory-guard-')
+  const root = await mkdtemp(path.join(source, 'factory-guard-test-'))
   await mkdir(path.join(root, scripts), { recursive: true })
   await mkdir(path.join(root, '.opencode/policies'), { recursive: true })
   for (const name of ['guard.py', 'worktree.py', 'scope.py'])
@@ -63,7 +63,7 @@ test('canonical boundaries on real temporary linked worktrees', async () => {
 })
 
 test('runtime wrappers reject protected search before native execution; hooks retain gates', async () => {
-  const root = await mkdtemp('/tmp/opencode/factory-hook-')
+  const root = await mkdtemp(path.join(source, 'factory-hook-test-'))
   await writeFile(path.join(root, '.env'), 'DUMMY_ONLY=placeholder\n')
   const wrappers = new Map()
   const hooks = new Map()
@@ -104,7 +104,7 @@ assert m['default_agent']=='architect' and m['model']=='fixture/model'
 assert 'playwright' in m['mcp']['servers'] and 'custom' in m['mcp']['servers']
 assert 'plugins' in g.SYNC_SLICE
 print('policy and runtime merge passed')`
-  const output = execFileSync('python3', ['-c', code, path.join(source, scripts, 'guard.py'), path.join(source, '.opencode/policies/git-policy.json'), path.join(source, 'opencode.jsonc')], { encoding: 'utf8' })
+  const output = execFileSync('python3', ['-c', code, path.join(source, scripts, 'guard.py'), path.join(source, '.opencode/policies/git-policy.json'), path.join(source, 'opencode.jsonc')], { cwd: source, encoding: 'utf8' })
   assert.match(output, /passed/)
   const policy = JSON.parse(await readFile(path.join(source, '.opencode/policies/git-policy.json'), 'utf8'))
   assert.ok(policy.blocked_tools.includes('opencode_worktree_create'))
@@ -151,7 +151,7 @@ test('real adapter preserves configured role decisions for shared QA artifacts',
   const configCode = `import importlib.util,json,sys
 spec=importlib.util.spec_from_file_location('guard',sys.argv[1]);g=importlib.util.module_from_spec(spec);spec.loader.exec_module(g)
 c,_=g.load_config(sys.argv[2]);print(json.dumps(c))`
-  const config = JSON.parse(execFileSync('python3', ['-c', configCode, path.join(source, scripts, 'guard.py'), path.join(source, 'opencode.jsonc')], { encoding: 'utf8' }))
+  const config = JSON.parse(execFileSync('python3', ['-c', configCode, path.join(source, scripts, 'guard.py'), path.join(source, 'opencode.jsonc')], { cwd: source, encoding: 'utf8' }))
   // Seed the hook with ordered native-rule decisions; the adapter must never promote them.
   const nativeEffect = (agent, resource) => {
     let effect = 'ask'

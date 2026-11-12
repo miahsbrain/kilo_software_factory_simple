@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Keep BOARD-151 fixtures in the task worktree and diagnose policy drift
+**Type:** Fix
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `.opencode/plugins/factory-guard/guard.test.mjs`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Correct forbidden outside-repository fixture paths, not repair external access. Reuse repo-local scratch placement from `test_handoff.py`; set Python subprocess cwd explicitly. No new tooling, dependencies or deletes.
+**Impact:** No tests rerun. Read-only comparison found 142 config rules vs 136 generated: config-only edit denies for `artifacts/**`, `**/artifacts/**`, `/**/artifacts/**`, `.factory-state/reviews/*-ledger.md`, `**/.factory-state/reviews/*-ledger.md`, `/**/.factory-state/reviews/*-ledger.md` at zero-based indices 64–69; all other rules match in order. Policy/config unchanged. Recommend approval to add the six denies to canonical policy, retaining native role overrides. Verification and independent review remain outstanding.
+
 ## [2026-11-12] Checkpoint shared QA artifact guard exception
 **Type:** Fix
 **Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions

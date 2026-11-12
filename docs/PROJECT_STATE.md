@@ -6,11 +6,16 @@
   `.opencode/worktrees/fix-shared-qa-artifact-guard-permissions/` holds an unverified narrow
   primary QA artifact exception and disposable adapter regressions. Native role permissions,
   shell policy and permanent rules are unchanged.
-- Blocked verification: `node --test .opencode/plugins/factory-guard/guard.test.mjs` exited 1
-  (0/5 passed): `/tmp/opencode` fixture `mkdtemp` returned `EACCES`; the pre-existing generated
-  permission equality assertion failed too. No retry, environment repair or live artifact writes.
-- Next: orchestrator resolves environment access and policy drift, authorizes another check,
-  then performs independent QA/review. Not merge-ready. Earlier sessions below are historical.
+- Blocked verification: prior documented test run exited 1 (0/5 passed). Correction: hardcoded
+  `/tmp/opencode` is forbidden, not an environment needing access repair. Fixtures now use unique
+  prefixes inside this task worktree; Python subprocess cwd is explicitly this worktree.
+  No test rerun, outside-path access, deletes or live artifact writes during this correction.
+- Exact read-only mismatch: config 142 rules vs generated 136; config-only edit denies at zero-based
+  indices 64–69: `artifacts/**`, `**/artifacts/**`, `/**/artifacts/**`,
+  `.factory-state/reviews/*-ledger.md`, `**/.factory-state/reviews/*-ledger.md`,
+  `/**/.factory-state/reviews/*-ledger.md`. Every other rule matches in order. Policy/config unchanged.
+- Next: approve adding these six denies to canonical policy (recommended; retain role overrides),
+  then authorize verification and independent QA/review. Not merge-ready; earlier sessions historical.
 
 ## Current session — BOARD-150 planning CLI database resolution (2026-11-12)
 
