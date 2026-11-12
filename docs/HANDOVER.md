@@ -5,8 +5,8 @@
 > The live board is clone-local SQLite; the dashboard is read-only and shows lanes, branches and
 > worktrees. BOARD-130 remains Blocked after its three-round cap; its task-local artifact change is
 > not integrated. The docs-only review found no blocking issue; the handover conflict markers are
-> tracked as BOARD-144, blocked by BOARD-130. `git diff --check` passed. Next: commit and hand off
-> BOARD-131 for human inspection.
+> tracked as BOARD-144, blocked by BOARD-130. Plan commit `3d0cecc` is on the task branch.
+> `git diff --check` passed. Next: confirm a clean handoff state, then request human inspection.
 > The factory-dev role was approved in principle; exact rules and permission entry remain pending
 > A9 approval. `docs/HANDOVER.md` still has conflict markers in its Testing section; BOARD-144 is
 > blocked by BOARD-130 until artifact guidance can be reconciled.

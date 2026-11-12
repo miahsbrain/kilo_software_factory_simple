@@ -10,8 +10,8 @@
   `.opencode/worktrees/plan-factory-implementation-backlog` on
   `docs/plan-factory-implementation-backlog`.
 - BOARD-130 remains Blocked; no fourth QA round is authorized. BOARD-131 passed docs-only review
-  and `git diff --check`; no application tests were needed. Next: commit BOARD-131 and request
-  human review.
+  and `git diff --check`; its plan commit is `3d0cecc`. No application tests were needed. Next:
+  confirm a clean handoff state and request human review.
 
 ## Previous session — BOARD-126 registered-repo feed reviewed (2026-11-12)
 
