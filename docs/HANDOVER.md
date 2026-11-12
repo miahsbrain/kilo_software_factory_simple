@@ -6,11 +6,11 @@
 > active-only traditional board views. Worktree completion now updates normalized rows in its
 > existing transaction; direct completion refuses worktree-bearing and Pending Merge items.
 > Updated the approved `/api/planned-work` contract only; HTTP implementation remains deferred.
-> Lifecycle tests use scratch SQLite. No live board/migration was touched. The one focused command
-> in `docs/STACK.md` ran 5 tests and failed at
-> `.opencode/skills/board/scripts/test_board_normalized.py:294`: missing optional `notes` expected
-> `''`, but actual stored value was `'-'`. No verification attempts remain in this chunk. Next:
-> preserve this WIP for review and request a corrective attempt before chunk 2.
+> Lifecycle tests use scratch SQLite. No live board/migration was touched. The focused retry
+> documented in `docs/STACK.md` passed: 5 tests in 0.382s. Missing Notes are canonical `""` and
+> render as `-` only in Markdown; supplied Notes and the empty canonical value survive unrelated
+> compatibility edits. The previous failed run was not repeated beyond this approved retry. Next:
+> commit the correction locally as WIP for independent review; HTTP remains the next chunk.
 
 > **Session Notes — BOARD-146 normalized storage and rebase, 2026-11-12**
 > BOARD-146 adds normalized planned items, criteria, active work, and terminal history with an

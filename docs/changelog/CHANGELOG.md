@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Keep empty planned Notes canonical
+**Type:** Fix
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/test_board_normalized.py`, `docs/BUSINESS-LOGIC.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Store omitted planned Notes as an empty string while rendering `-` only in the Markdown compatibility view.
+**Impact:** Focused retry `python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedLifecycleTests` passed (5 tests, 0.382s); it also verifies unrelated field edits preserve the canonical empty value.
+
 ## [2026-11-12] Add normalized board planning lifecycle
 **Type:** Feature
 **Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board

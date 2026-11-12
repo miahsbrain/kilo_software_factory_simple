@@ -25,9 +25,9 @@
 
 - **Rule name:** Accept planned work atomically
 - **Plain English:** A preview is not persisted until the user explicitly accepts it; accepting a subset keeps that subset's preview order and assigns IDs only then.
-- **Technical detail:** `validate_plan_batch()` validates the full JSON array and resolves temporary `key` references in `blocked_by` to existing or newly assigned Board IDs without I/O. `accept_plan_batch()` runs under `BEGIN IMMEDIATE`, allocates after the largest retained numeric `BOARD-###` ID, inserts ordered `planned_items` and unchecked `acceptance_criteria`, and refreshes the compatibility projection in one transaction.
-- **Source:** `.opencode/skills/board/scripts/board.py` (`validate_plan_batch`, `accept_plan_batch`, `persist_normalized_projection`)
-- **Edge cases:** Empty/malformed batches, invalid items, repeated keys, duplicate/missing/unknown dependency references, and any invalid criterion refuse the entire batch. Failed acceptance rolls back all inserts and does not consume IDs.
+- **Technical detail:** `validate_plan_batch()` validates the full JSON array and resolves temporary `key` references in `blocked_by` to existing or newly assigned Board IDs without I/O. `accept_plan_batch()` runs under `BEGIN IMMEDIATE`, allocates after the largest retained numeric `BOARD-###` ID, inserts ordered `planned_items` and unchecked `acceptance_criteria`, and refreshes the compatibility projection in one transaction. Missing `notes` is stored canonically as `""`; Markdown displays that empty value as `-`. Compatibility writes preserve the canonical value when the display placeholder is unchanged, and preserve explicitly supplied non-empty Notes.
+- **Source:** `.opencode/skills/board/scripts/board.py:367`, `:398`, `:245` (`validate_plan_batch`, `sync_normalized`, `normalized_markdown`, `accept_plan_batch`)
+- **Edge cases:** Empty/malformed batches, invalid items, repeated keys, duplicate/missing/unknown dependency references, and any invalid criterion refuse the entire batch. Failed acceptance rolls back all inserts and does not consume IDs. Unrelated field edits must not persist the display placeholder as the canonical Notes value.
 - **Example:** Draft keys `core` then `client`, with `client` blocked by `core`, are accepted as consecutive Board IDs and the dependency is stored using the assigned `core` ID.
 
 - **Rule name:** Promote and finish canonical planned items

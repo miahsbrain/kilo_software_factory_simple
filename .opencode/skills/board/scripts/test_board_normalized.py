@@ -297,6 +297,24 @@ class PlannedLifecycleTests(unittest.TestCase):
                 "SELECT verified, proof FROM acceptance_criteria WHERE plan_item_id='BOARD-152' "
                 "ORDER BY position").fetchall(), [(0, None), (0, None)])
 
+        with board.connect(self.path) as connection:
+            markdown = connection.execute("SELECT markdown FROM board WHERE id=1").fetchone()[0]
+            projection = board.normalized_markdown(connection, markdown)
+        projected, error = board.parse_table(projection)
+        self.assertIsNone(error)
+        row = board.row_by_id(projected, "BOARD-153")
+        self.assertEqual(board.cell_texts(projected["lines"], row)[
+            board.field_index(projected, "notes")], "-")
+        with patch.object(board, "live_database", return_value=self.path), \
+                patch.object(board, "database_path", return_value=self.path), \
+                patch.object(board, "note_uncommitted"):
+            self.assertEqual(board.cmd_set_field(SimpleNamespace(id="BOARD-153", field="risk",
+                                                                  value="🟢 low — reviewed"),
+                                                 "fixture.md"), board.OK)
+        with board.connect(self.path) as connection:
+            self.assertEqual(connection.execute(
+                "SELECT notes FROM planned_items WHERE id='BOARD-153'").fetchone(), ("",))
+
     def test_transition_commands_refuse_duplicates_and_never_reuse_ids(self):
         before = self.state_snapshot()
         self.assertEqual(self.run_cli(["plan", "complete", "BOARD-146"])[0], board.REFUSED)

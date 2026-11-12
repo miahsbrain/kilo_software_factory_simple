@@ -5,11 +5,10 @@
 - Added atomic plan acceptance, queue/history views, promotion, completion and cancellation. The
   active board remains active-only; worktree finalization updates normalized state transactionally.
   The approved `/api/planned-work` contract is documented, but HTTP implementation is deferred.
-- No live board or migration was touched. The focused lifecycle command documented in
-  `docs/STACK.md` ran 5 tests and failed at
-  `.opencode/skills/board/scripts/test_board_normalized.py:294`: missing optional `notes` expected
-  `''`, actual `'-'`. No verification attempts remain in this chunk. Next: commit as WIP and request
-  a corrective attempt before chunk 2.
+- No live board or migration was touched. The focused retry documented in `docs/STACK.md` passed:
+  5 tests in 0.382s. Missing Notes are canonical `""` and render as `-` only in Markdown; the empty
+  canonical value survives unrelated compatibility edits. Next: commit the correction locally as
+  WIP for independent review; HTTP remains the next chunk.
 
 ## Previous session — BOARD-146 rebase alignment (2026-11-12)
 

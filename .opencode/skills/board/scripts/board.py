@@ -242,7 +242,7 @@ def normalized_markdown(connection, markdown, active_only=False):
             raise ValueError("planned item %s has no lifecycle reference" % board_id)
         fields = {"ID": board_id, "Task": task, "Type": item_type, "Status": status,
                   "Priority": priority, "Risk": risk, "Blocked by": blocked_by,
-                  "Repos": repos, "Branch/Worktree": branch or "-", "Notes": notes}
+                  "Repos": repos, "Branch/Worktree": branch or "-", "Notes": notes or "-"}
         table_rows.append("| " + " | ".join(fields.get(header, "-").replace("|", "\\|")
                                              for header in headers) + " |")
     lines = list(parsed["lines"][:parsed["header"] + 2])
@@ -258,7 +258,7 @@ def sync_normalized(connection, markdown, allow_completion=False):
         raise ValueError(error)
     headers = [cell.strip() for cell in header_cells(parsed)]
     existing = {row[0]: row[1:] for row in connection.execute("""SELECT p.id, p.queue_position,
-        p.terminal_outcome, p.display_position, a.status, a.branch_worktree
+        p.terminal_outcome, p.display_position, a.status, a.branch_worktree, p.notes
         FROM planned_items p LEFT JOIN active_work a ON a.plan_item_id=p.id""")}
     seen = set()
     for line_index in parsed["rows"]:
@@ -270,7 +270,12 @@ def sync_normalized(connection, markdown, allow_completion=False):
         status = values.get("Status", "")
         if board_id not in existing:
             raise ValueError("new planned items must be created with 'board.py plan accept'")
-        queue, terminal, _item_display, active_status, _active_branch = existing[board_id]
+        queue, terminal, _item_display, active_status, _active_branch, current_notes = existing[board_id]
+        notes = values.get("Notes", "")
+        if notes == (current_notes or "-"):
+            notes = current_notes
+        elif notes == "-":
+            notes = ""
         if queue is not None:
             if status != "Backlog":
                 raise ValueError("queued items require 'board.py plan promote' to become active")
@@ -296,9 +301,9 @@ def sync_normalized(connection, markdown, allow_completion=False):
                            (values.get("Task", ""), values.get("Type", ""),
                             values.get("Priority", ""), values.get("Risk", ""),
                             values.get("Blocked by", ""), values.get("Repos", ""),
-                            values.get("Notes", ""), board_id))
+                             notes, board_id))
     for board_id in existing.keys() - seen:
-        queue, terminal, _display, active_status, _branch = existing[board_id]
+        queue, terminal, _display, active_status, _branch, _notes = existing[board_id]
         if terminal is not None:
             continue
         if queue is None and active_status is None:
@@ -395,7 +400,7 @@ def validate_plan_batch(items, existing_ids):
             "risk": item["risk"],
             "blocked_by": ",".join(dependencies) if dependencies else "- None.",
             "repos": ",".join(item.get("repos", [])) or "-",
-            "notes": item.get("notes", "-"),
+            "notes": item.get("notes", ""),
             "user_story": item["user_story"],
             "acceptance_criteria": item["acceptance_criteria"],
         })
