@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Clarify QA artifact permission boundary
+**Type:** Docs
+**Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts
+**Changed:** `AGENTS.md`
+**Why:** Align the factory rule with the approved native file-tool permission boundary.
+**Impact:** These rules constrain file tools only; shell remains trusted-agent authority, not blocked by this map.
+
 ## [2026-11-12] Move QA reports into shared task artifacts
 **Type:** Chore
 **Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts
