@@ -495,8 +495,9 @@ Three rules. They apply to the architect and to every builder.
    start.
 
 The same three rules govern the **QA↔fix loop** for a row: the loop is capped at 10 rounds, a
-repeat finding blocks the original row instead of opening another, and the ledger under
-`<primary-checkout>/.factory-state/reviews/` is the only state carried between rounds.
+repeat finding blocks the original row instead of opening another, and the ledger at
+`<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` is the only state carried between
+rounds. Reports and evidence live separately in the shared task artifact directory.
 
 ### Task chunking rule
 
@@ -778,7 +779,8 @@ each file genuinely needs its own short reference. Do not turn them into impleme
 | `docs/ARCHITECTURE.md` | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap |
 | `docs/BUSINESS-LOGIC.md` | Every business rule as question → answer (see B2) |
 | `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, built-in browser QA spec |
-| `<primary-checkout>/.factory-state/reviews/*.md` | Local QA and UI/UX reports and ledger, outside task worktrees |
+| `artifacts/<scope>/qa/<date>/<task-id>/` | Shared QA/UI reports and evidence, outside task worktrees |
+| `<primary-checkout>/.factory-state/reviews/*-ledger.md` | Local bounded-loop ledger, outside task worktrees |
 | `<primary-checkout>/.factory-state/factory-board.sqlite3` | Local live board; Markdown is export only (see B3) |
 | `docs/STACK.md` | Stack, package managers, dev/verification commands, ports, database, auth |
 | `docs/PROJECT_STATE.md` | Current phase, progress, active task, next step |
@@ -880,7 +882,7 @@ effects, integrations, failure/retry behaviour.
 
 ## B3. Local SQLite board — the board is the only state
 
-Clone-local factory runtime state must live at `<primary-checkout>/.factory-state/`, outside Git metadata and shared across linked worktrees. It contains the live board database, generated exports, QA ledgers/reports, and worktree-cleanup recovery journals/backups. Add `.factory-state/` to `.gitignore`. Scripts resolve the primary checkout from Git’s absolute common-directory path and fail closed if they cannot; they never fall back to storing runtime state in the Git common directory or the current worktree. Migration copies and verifies existing state at the new location; the original source remains untouched until you explicitly approve cleanup. Git-native metadata such as `.git/info/exclude` is not runtime state and may be written only for ignore rules.
+Clone-local factory runtime state must live at `<primary-checkout>/.factory-state/`, outside Git metadata and shared across linked worktrees. It contains the live board database, generated exports, QA ledgers, and worktree-cleanup recovery journals/backups. QA/UI reports and evidence instead live under the main checkout's `artifacts/<scope>/qa/<date>/<task-id>/`. Add `.factory-state/` to `.gitignore`. Scripts resolve the primary checkout from Git’s absolute common-directory path and fail closed if they cannot; they never fall back to storing runtime state in the Git common directory or the current worktree. Migration copies and verifies existing state at the new location; the original source remains untouched until you explicitly approve cleanup. Git-native metadata such as `.git/info/exclude` is not runtime state and may be written only for ignore rules.
 
 The live board is `<primary-checkout>/.factory-state/factory-board.sqlite3`, shared by all worktrees of a clone. Only the orchestrator edits rows through `board.py`; the human-only `worktree.py finalize` coordinates integration and its final row transition. `docs/BOARD.md` is a legacy import source, not live state. `board.py export` writes a generated Markdown snapshot in `.factory-state`; never edit that snapshot or commit it. On first use import the existing main checkout's local legacy board once, preserving its bytes in SQLite. A fresh clone without a local board starts empty; never restore historical rows from Git history or a template. Back up the SQLite file with a consistent SQLite backup or use `board.py export` before moving clones.
 
@@ -1325,7 +1327,7 @@ Keep all written output in the same plain, verifiable style:
 
 All UI verification and UI/UX review must use OpenCode’s built-in browser. Load the browser skill first. Use actual interactions, screenshots, DOM measurements, console and network observations as evidence. Do not use Playwright, browser MCP alternatives, or `browser-review.mjs` for UI verification or review.
 
-Store browser evidence under `artifacts/<scope>/qa/<date>/<task-id>/` and record the route, viewport, theme, steps, expected result and observed result. Never claim an unchecked criterion passed. If browser access or a required measurement is unavailable, report the limitation and hold the affected criterion. Gallery approval, independent review, accessibility and unslop gates remain mandatory.
+Store new reports and evidence under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` in the primary checkout, outside task worktrees. QA owns `qa.md` and QA evidence; the UI critic owns `ui.md`; builders own only `builder/`. These rules constrain file tools only; shell remains trusted-agent authority, not blocked by this map. Record route, viewport, theme, steps, expected result and observed result. The ledger alone stays at `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and may be changed only through `ledger.py`. Never claim an unchecked criterion passed. If browser access or a required measurement is unavailable, report the limitation and hold the affected criterion. Gallery approval, independent review, accessibility and unslop gates remain mandatory.
 
 This replaces earlier scripted UI capture directions, including scope-level directions. Existing
 capture scripts and Playwright test tools remain historical/not UI QA; do not delete them or
@@ -1341,6 +1343,9 @@ historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser w
           qa/
             <YYYY-MM-DD>/
               <task-id>/            # BOARD-005
+                qa.md                    # QA report
+                ui.md                    # UI/UX critique and unslop audit
+                builder/                 # builder-owned evidence
                 <route-slug>/
                   <viewport>/
                     <scheme>/      # light | dark
@@ -1355,8 +1360,11 @@ historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser w
   Screenshot and `files.get` results provide server-local paths; desktop file IDs are not paths.
   Transfer desktop-owned captures with the built-in browser, then store the returned bytes under
   the canonical path. Never assume desktop and server filesystems are shared.
-  **Review reports and the ledger are local evidence, outside the task worktree:**
-  `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md`, `-ui.md` and `-ledger.md`.
+  **Reports and evidence are shared artifacts, outside the task worktree:**
+  `<primary-checkout>/artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`. QA writes `qa.md` and evidence;
+  UI critique writes `ui.md`; builders write only under `builder/`. Only the ledger stays in
+  `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`, updated only through
+  `ledger.py` and never concurrently.
 - **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
   recording what was checked and expected vs actual. Reviewers leave this main-checkout evidence
   uncommitted and do not edit the task worktree; leave full-page captures out of git.
@@ -1383,8 +1391,8 @@ independent of the builder's claims:
 
 | Agent | Role | Output |
 |---|---|---|
-| `qa-reviewer` | Verifies behavior against the acceptance criteria; uses the built-in browser for UI | `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
-| `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `<primary-checkout>/.factory-state/reviews/<task-id>-ui.md` |
+| `qa-reviewer` | Verifies behavior against the acceptance criteria; uses the built-in browser for UI | `qa.md` and QA evidence under `artifacts/<scope>/qa/<date>/<task-id>/` |
+| `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `ui.md` under `artifacts/<scope>/qa/<date>/<task-id>/` |
 
 Both are read-only against application code. They report; they do not fix.
 

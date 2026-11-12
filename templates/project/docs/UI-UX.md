@@ -275,6 +275,9 @@ artifacts/
     qa/
       <YYYY-MM-DD>/
         <task-id>/            # BOARD-005
+          qa.md                    # QA report
+          ui.md                    # UI/UX critique and unslop audit
+          builder/                 # builder-owned evidence
           <route-slug>/
             <viewport>/
               <scheme>/        # light | dark
@@ -291,12 +294,15 @@ Store the returned browser files under this path in the **main checkout**, inclu
 reviews. Retain historical evidence. Logs and summaries describe actual observations, not
 automatically generated results or unchecked passes.
 
-Review reports and the ledger are **documents, not artifacts**. They stay where documents live:
-`docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
-`docs/reviews/<task-id>-ledger.md`.
+New QA/UI reports and evidence are shared artifacts outside task worktrees. All agents may read
+them; QA owns `qa.md` and QA evidence, the UI critic owns `ui.md`, and builders own only `builder/`.
+The ledger alone remains at `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and is
+updated only through `ledger.py`, serially. Follow root `AGENTS.md` §B4.4: at most 10 QA↔fix
+rounds; round 10 is last, and a still-failing row is blocked. The immediate stop conditions remain
+in force.
 
-Commit `notes.md` and small component shots. Keep full-page captures out of git unless the team
-wants a visual record — they are large and churn.
+Shared task artifacts remain in the main checkout and uncommitted. Keep full-page captures out of
+git unless the team wants a visual record — they are large and churn.
 
 ### Checks
 

@@ -3,6 +3,34 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Record BOARD-149 final review handoff
+**Type:** Docs
+**Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`
+**Why:** Record that the docs-only follow-up passed architect review and user inspection is next.
+**Impact:** Documentation only; task behavior and status are unchanged.
+
+## [2026-11-12] Update BOARD-149 review handoff
+**Type:** Docs
+**Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`
+**Why:** Record the round-2 QA result and remaining review/human integration steps.
+**Impact:** Documentation only; task behavior and status are unchanged.
+
+## [2026-11-12] Clarify QA artifact permission boundary
+**Type:** Docs
+**Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts
+**Changed:** `AGENTS.md`
+**Why:** Align the factory rule with the approved native file-tool permission boundary.
+**Impact:** These rules constrain file tools only; shell remains trusted-agent authority, not blocked by this map.
+
+## [2026-11-12] Move QA reports into shared task artifacts
+**Type:** Chore
+**Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts
+**Changed:** QA/UI instructions, native edit/write/patch role permissions, project templates and scopes, UI-UX guidance, handover, project state and decisions; copied BOARD-146 QA report to its approved artifact path.
+**Why:** Keep reports/evidence with task artifacts while reserving `.factory-state/reviews/` for bounded-loop ledgers.
+**Impact:** New report paths and role-specific file-tool permissions; shell remains trusted-agent authority. Ledger location, 10-round cap and stop conditions remain unchanged. Historical reports remain untouched.
+
 ## [2026-11-12] Correct ledger invalid-ID test mock
 **Type:** Fix
 **Board:** BOARD-145 | **Branch:** chore/raise-qa-review-loop-limit-to-ten

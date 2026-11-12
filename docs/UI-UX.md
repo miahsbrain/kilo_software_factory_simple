@@ -117,8 +117,8 @@ lives there, once.
 **It is mandatory.** Every UI change runs the unslop procedure — direction, full sign audit,
 nine passes and checklist — in the same review round as the QA capture. The report records the
 direction and one line per sign. It is not a second opinion to skip when time is short. The
-`/unslop` command runs the whole procedure and writes the audit to
-`<primary-checkout>/.factory-state/reviews/<task-id>-unslop.md`.
+`/unslop` command runs the whole procedure and records its audit in `ui.md` under
+`<primary-checkout>/artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`.
 
 ---
 
@@ -292,6 +292,9 @@ artifacts/
     qa/
       <YYYY-MM-DD>/
         <task-id>/            # BOARD-005
+          qa.md                    # QA report
+          ui.md                    # UI/UX critique and unslop audit
+          builder/                 # builder-owned evidence
           <route-slug>/
             <viewport>/
               <scheme>/        # light | dark
@@ -308,12 +311,13 @@ Store the returned browser files under this path in the **main checkout**, inclu
 reviews. Retain historical evidence. Logs and summaries describe actual observations, not
 automatically generated results or unchecked passes.
 
-Review reports and the ledger are **runtime records, not artifacts**. They live outside task worktrees:
-`<primary-checkout>/.factory-state/reviews/<task-id>-qa.md`, `-ui.md`, and
-`-ledger.md`.
+New QA/UI reports and evidence are shared artifacts outside task worktrees. QA writes `qa.md` and
+QA evidence; the UI critic writes `ui.md`; builders write only under `builder/`. The ledger alone
+remains a runtime record at `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and is
+updated only through `ledger.py`, never concurrently.
 
-Commit `notes.md` and small component shots. Keep full-page captures out of git unless the team
-wants a visual record — they are large and churn.
+Shared task artifacts remain in the main checkout and uncommitted. Keep full-page captures out of
+git unless the team wants a visual record — they are large and churn.
 
 ### Checks
 

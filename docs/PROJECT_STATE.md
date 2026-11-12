@@ -1,6 +1,16 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-145 QA↔fix cap update (2026-11-12)
+## Current session — BOARD-149 QA report artifacts (2026-11-12)
+
+- New QA/UI reports and evidence use `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA owns
+  `qa.md` and QA evidence, UI critique owns `ui.md`, and builders own `builder/`. The bounded-loop
+  ledger remains under `<primary-checkout>/.factory-state/reviews/` and changes only through
+  `ledger.py`; the 10-round cap and stop conditions are unchanged. BOARD-146's QA report was copied
+  byte-for-byte to its approved artifact path; the source remains untouched. Round-2 QA: PASS.
+  The docs-only follow-up passed architect review. Next: the user inspects the worktree and runs
+  the human-only finalize command.
+
+## Previous session — BOARD-145 QA↔fix cap update (2026-11-12)
 
 - Approved policy and ledger cap is 10 rounds. Round 10 is last; a still-failing row moves to
   `Blocked` with what was tried and the question for the human. Critical-path failures, repeated

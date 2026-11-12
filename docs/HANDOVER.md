@@ -1,5 +1,15 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-149 QA artifacts, 2026-11-12**
+> New QA/UI reports and evidence live in the shared main-checkout directory
+> `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA writes `qa.md`, UI critique writes `ui.md`,
+> builders write only under `builder/`. The ledger remains at
+> `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and is updated only through
+> `ledger.py`, serially. Native edit/write/patch permissions constrain file tools only; shell
+> remains trusted-agent authority. BOARD-146's QA report was copied byte-for-byte to its task
+> artifact directory; its original remains. Round-2 QA: PASS. The docs-only follow-up passed
+> architect review. Next: the user inspects the worktree and runs the human-only finalize command.
+
 > **Session Notes — BOARD-145 QA↔fix round cap, 2026-11-12**
 > Raised the new QA↔fix loop cap to 10. The ledger opens round 10 and refuses round 11;
 > focused boundary tests use a temporary ledger directory. Critical-path, repeated-fingerprint,
@@ -675,8 +685,10 @@ Chunk 1 reuses these existing boundaries:
   project/app defaults stay unchanged. `repo_root()` (effectful) uses Git's main checkout.
 - `board_serve.worktree_state()` (effectful filesystem/Git inspection) reuses registry resolution,
   repository validation, worktree parsing and base selection for per-repository state.
-- Native read/edit path rules remain; grep/glob target-path and automatic context enforcement
-  are pending the limited guard plugin. Legacy bootstrap is not accepted by steady-state guards.
+- Native read/edit/write/patch path rules constrain file tools; shell remains trusted-agent
+  authority. Grep/glob target-path and automatic context enforcement are pending the limited guard
+  plugin. These rules are not an absolute security boundary. Legacy bootstrap is not accepted by
+  steady-state guards.
 
 | Symbol | File | Responsibility | Kind |
 |---|---|---|---|
@@ -707,7 +719,8 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 | Artefact | Where | What it holds |
 |---|---|---|
 | The board | `<primary-checkout>/.factory-state/factory-board.sqlite3` | Clone-local authoritative task state; one row per unit. `docs/BOARD.md` is a legacy import source only. |
-| Review reports and ledgers | `<primary-checkout>/.factory-state/reviews/` | Clone-local QA/UI reports, unslop audits, and round ledgers. |
+| QA/UI reports and evidence | `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` | Shared main-checkout artifacts: `qa.md`, `ui.md`, QA evidence, and builder-owned evidence under `builder/`. |
+| QA round ledger | `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` | Clone-local bounded-loop state, updated only through `ledger.py`, never concurrently. |
 | Worktree recovery | `<primary-checkout>/.factory-state/cleanup-wt/<repo-id>/` | Recovery TSVs, patches, and finalize journals, separated by repository identity. |
 | The decisions | `docs/DECISIONS.md` | Append-only ADR table, ADR-001 onward. |
 | The changelog | `docs/changelog/CHANGELOG.md` | The engineering log, newest first, one section per change. |
@@ -719,7 +732,7 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 The board's lanes are the state machine of the factory:
 `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged`, plus `Blocked`
 and `Dropped`. In-task QA findings return to the same row and worktree; the review loop is capped
-at three rounds. Full rules in `AGENTS.md` §B4.
+at 10 rounds. Full rules in `AGENTS.md` §B4.
 
 ## 7. Public interfaces
 

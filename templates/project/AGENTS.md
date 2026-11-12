@@ -473,9 +473,10 @@ Three rules. They apply to the architect and to every builder.
    Changing the thing you are measuring invalidates the measurement and sends you back to the
    start.
 
-The same three rules govern the **QA↔fix loop** for a row: the loop is capped at 3 rounds, a
-repeat finding blocks the original row instead of opening another, and the ledger under
-`<git-common-dir>/reviews/` is the only state carried between rounds.
+The same three rules govern the **QA↔fix loop** for a row: the loop is capped at 10 rounds, a
+repeat finding blocks the original row instead of opening another, and the ledger at
+`<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` is the only state carried between
+rounds. Reports and evidence live separately in the shared task artifact directory.
 
 ### Task chunking rule
 
@@ -748,7 +749,8 @@ each file genuinely needs its own short reference. Do not turn them into impleme
 | `docs/ARCHITECTURE.md` | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap |
 | `docs/BUSINESS-LOGIC.md` | Every business rule as question → answer (see B2) |
 | `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, built-in browser QA spec |
-| `<git-common-dir>/reviews/*.md` | Local QA and UI/UX reports and ledger, outside task worktrees |
+| `artifacts/<scope>/qa/<date>/<task-id>/` | Shared QA/UI reports and evidence, outside task worktrees |
+| `<primary-checkout>/.factory-state/reviews/*-ledger.md` | Local bounded-loop ledger, outside task worktrees |
 | `<git-common-dir>/factory-board.sqlite3` | Local live board; Markdown is export only (see B3) |
 | `docs/STACK.md` | Stack, package managers, dev/verification commands, ports, database, auth |
 | `docs/PROJECT_STATE.md` | Current phase, progress, active task, next step |
@@ -789,7 +791,7 @@ a follow-up task.
 | New/changed state machine or transition | `docs/HANDOVER.md` (state transitions), `docs/BUSINESS-LOGIC.md` |
 | New/changed business rule | `docs/BUSINESS-LOGIC.md`, `DOMAIN.md` if user-facing |
 | New/changed UI component, token, or visual rule | `docs/UI-UX.md` (gallery, tokens, anti-slop findings) |
-| New/changed UI evidence capture | `artifacts/<scope>/qa/<date>/<task-id>/notes.md` (canonical artifacts folder) |
+| New/changed UI evidence capture | `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` (canonical artifacts folder) |
 | Architectural change or new decision | `docs/ARCHITECTURE.md`, `docs/DECISIONS.md` |
 | Approved implementation decision | `docs/DECISIONS.md` (append-only, with the date) |
 | New dependency | `docs/ARCHITECTURE.md` (reason), `docs/HANDOVER.md` |
@@ -1035,9 +1037,9 @@ met**, proven by evidence. The lanes repeat until then.
    behavior must pass on the same branch before `Pending Merge`.
 3. **Separate approved defects are separate tasks.** Only a genuinely independent defect with
    its own decision and acceptance criteria gets a new Fix row and worktree.
-4. **The loop is bounded at 3 rounds.** A row gets at most three QA↔fix rounds. When the third
+4. **The loop is bounded at 10 rounds.** A row gets at most ten QA↔fix rounds. When the tenth
    round still fails, the row moves to `Blocked` with what was tried and the question the human
-   needs to answer. There is no fourth round.
+   needs to answer. There is no eleventh round.
 5. **A repeat finding is not a new task.** A repeated fingerprint blocks the original row;
    do not create another row for the same complaint.
 6. **A red critical path is an immediate `Blocked` row.** Money, data loss, auth, and security
@@ -1047,13 +1049,13 @@ met**, proven by evidence. The lanes repeat until then.
 
 ### The ledger
 
-The state of a row's rounds lives in `<git-common-dir>/reviews/<task-id>-ledger.md`: the
+The state of a row's rounds lives in `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`: the
 round number, findings, same-worktree corrections and stop reason.
 The ledger is the **only** thing carried between rounds — a reviewer that watched the last edits
 grades intent, not pixels, so **each round's review is done by a fresh reviewer** that reads the
 ledger and the current screenshots.
 
-Use the script to keep it honest:
+Use the script to keep it honest. Update the ledger only through `ledger.py`, never concurrently:
 
 ```bash
 python3 .opencode/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
@@ -1068,12 +1070,12 @@ python3 .opencode/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 A QA finding can come back, get fixed, and come back again. The loop is bounded by a **round cap**
 and a **ledger**, and duplicate findings are recognised by a **fingerprint**.
 
-**The round cap.** A row may go through **at most 3** QA↔fix rounds. Round 3 is the last. When the
+**The round cap.** A row may go through **at most 10** QA↔fix rounds. Round 10 is the last. When the
 cap is reached and the row still fails, the row moves to `Blocked` with a summary of what was
-tried and the question the human needs to answer. A fourth round is never opened.
+tried and the question the human needs to answer. An eleventh round is never opened.
 
 **The ledger.** Each round's state lives in one short file per row:
-`<git-common-dir>/reviews/<task-id>-ledger.md`. It holds the round number, findings,
+`<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`. It holds the round number, findings,
 corrections in the existing worktree and the stop reason when it stops.
 
 The ledger is the **only** thing carried between rounds. A reviewer that watched the last edits
@@ -1090,7 +1092,7 @@ python3 .opencode/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-00
 python3 .opencode/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
 ```
 
-`next-round` refuses to open round 4. That refusal is the cap.
+`next-round` refuses to open round 11. That refusal is the cap.
 
 **The fingerprint.** A finding gets a deterministic fingerprint derived from what it is about —
 `kind|category|route|subject` — so the same complaint about the same thing produces the same
@@ -1111,7 +1113,7 @@ remains for independently approved defects, not in-task review corrections.
 
 | Stop condition | What happens |
 |---|---|
-| **The round cap is reached** (3 rounds done, row still failing) | The row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round is opened. |
+| **The round cap is reached** (10 rounds done, row still failing) | The row moves to `Blocked` with a summary of what was tried and the question the human must answer. No eleventh round is opened. |
 | **A critical path is red** (money, data loss, auth, security) | The row is `Blocked` immediately. It is never retried silently. |
 | **The same fingerprint is filed twice** | The original task is escalated to `Blocked` rather than a new one opening. |
 | **The human says stop** | The row is `Blocked` with the human's reason recorded in the ledger's stop reason. |
@@ -1259,7 +1261,7 @@ Keep all written output in the same plain, verifiable style:
 
 All UI verification and UI/UX review must use OpenCode’s built-in browser. Load the browser skill first. Use actual interactions, screenshots, DOM measurements, console and network observations as evidence. Do not use Playwright, browser MCP alternatives, or `browser-review.mjs` for UI verification or review.
 
-Store browser evidence under `artifacts/<scope>/qa/<date>/<task-id>/` and record the route, viewport, theme, steps, expected result and observed result. Never claim an unchecked criterion passed. If browser access or a required measurement is unavailable, report the limitation and hold the affected criterion. Gallery approval, independent review, accessibility and unslop gates remain mandatory.
+Store new reports and evidence under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` in the primary checkout, outside task worktrees. All agents may read artifacts and the ledger; QA owns `qa.md` and QA evidence, the UI critic owns `ui.md`, and builders own only `builder/`. Native OpenCode edit/write/patch permissions mirror these roles; they constrain file tools only, while shell remains trusted-agent authority. Record route, viewport, theme, steps, expected result and observed result. The ledger alone stays at `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and may be changed only through `ledger.py`, serially. The bounded loop allows at most 10 rounds, with round 10 last; if still failing, block the row. Keep the critical-path, repeated-fingerprint, and human-stop conditions. Never claim an unchecked criterion passed. If browser access or a required measurement is unavailable, report the limitation and hold the affected criterion. Gallery approval, independent review, accessibility and unslop gates remain mandatory.
 
 This replaces earlier scripted UI capture directions, including scope-level directions. Existing
 capture scripts and Playwright test tools remain historical/not UI QA; do not delete them or
@@ -1275,6 +1277,9 @@ historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser w
           qa/
             <YYYY-MM-DD>/
               <task-id>/            # BOARD-005
+                qa.md                    # QA report
+                ui.md                    # UI/UX critique and unslop audit
+                builder/                 # builder-owned evidence
                 <route-slug>/
                   <viewport>/
                     <scheme>/      # light | dark
@@ -1289,7 +1294,11 @@ historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser w
   Screenshot and `files.get` results provide server-local paths; desktop file IDs are not paths.
   Transfer desktop-owned captures with the built-in browser, then store the returned bytes under
   the canonical path. Never assume desktop and server filesystems are shared.
-  **Review reports and ledger live outside task worktrees:** `<git-common-dir>/reviews/`.
+  **Reports and evidence are shared artifacts, outside task worktrees:**
+  `<primary-checkout>/artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`. QA writes `qa.md` and evidence;
+  UI critique writes `ui.md`; builders write only under `builder/`. Only the ledger stays in
+  `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`, updated only through
+  `ledger.py` and never concurrently.
 - **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
   recording what was checked and expected vs actual. Reviewers leave this main-checkout evidence
   uncommitted and do not edit the task worktree; leave full-page captures out of git.
@@ -1313,8 +1322,8 @@ independent of the builder's claims:
 
 | Agent | Role | Output |
 |---|---|---|
-| `qa-reviewer` | Verifies behavior against acceptance criteria; uses built-in browser for UI | `<git-common-dir>/reviews/<task-id>-qa.md` + canonical artifacts |
-| `ui-critic` | Judges against anti-slop rules and approved gallery | `<git-common-dir>/reviews/<task-id>-ui.md` |
+| `qa-reviewer` | Verifies behavior against acceptance criteria; uses built-in browser for UI | `qa.md` and QA evidence under `artifacts/<scope>/qa/<date>/<task-id>/` |
+| `ui-critic` | Judges against anti-slop rules and approved gallery | `ui.md` under `artifacts/<scope>/qa/<date>/<task-id>/` |
 
 Both are read-only against application code. They report; they do not fix.
 
