@@ -4,11 +4,14 @@
 
 - Branch `fix/fix-planning-cli-database-resolution`, worktree `.opencode/worktrees/fix-planning-cli-database-resolution/`.
   All plan commands reuse canonical live-database resolution; real CLI regressions cover legacy
-  preservation, no phantom Markdown database and `--file` refusal. The documented BOARD-150 check
-  passed 7 tests in 2.621s; next action: independent review of this worktree.
-- Architect reports the live migration completed with 20 items (13 queued, 2 active, 5 history).
-  Human removal of the accidental empty primary `docs/BOARD.md` remains blocked by primary-checkout
-  protection. Builder has not changed live state, legacy sources, backups or evidence.
+  preservation, no phantom Markdown database and `--file` refusal. QA round 1 passed (builder 7 tests
+  in 2.621s, reviewer 7 in 2.626s); architect review found no blocker. Evidence:
+  `artifacts/factory/qa/2026-11-12/BOARD-150/qa.md` in the primary checkout.
+- Architect verified corrected live CLI queue/history and retention of all 20 original migrated
+  records (13 queued, 2 active, 5 history); BOARD-150 adds one active item only. Human cleanup is
+  complete: primary `docs/BOARD.md` was absent at 22:31; no database, backup or evidence was deleted.
+  Historical sessions below predate this verified migration and cleanup.
+- Next: human inspection/finalize, then BOARD-147 dashboard work after merge.
 
 ## Previous session — BOARD-146 round-four review (2026-11-12)
 

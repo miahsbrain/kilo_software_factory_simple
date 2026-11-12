@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Record BOARD-150 QA and completed human cleanup
+**Type:** Docs
+**Board:** BOARD-150 | **Branch:** fix/fix-planning-cli-database-resolution
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Replace pending review/cleanup status with current evidence; earlier entries remain historical.
+**Impact:** QA round 1 PASS (`artifacts/factory/qa/2026-11-12/BOARD-150/qa.md`); builder 7 tests in 2.621s, reviewer 7 in 2.626s; architect review found no blocker. Corrected live CLI queue/history retained all 20 original migrated records (13 queued, 2 active, 5 history); BOARD-150 adds one active only. Human removed the accidental primary `docs/BOARD.md` (absent at 22:31); no database, backup or evidence was deleted. Human inspection/finalize is next, then BOARD-147 dashboard work after merge. Documentation only; no further tests run.
+
 ## [2026-11-12] Resolve plan CLI commands to the canonical SQLite database
 **Type:** Fix
 **Board:** BOARD-150 | **Branch:** fix/fix-planning-cli-database-resolution

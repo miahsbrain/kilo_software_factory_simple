@@ -5,10 +5,13 @@
 > effectful `board.py:main` (`.opencode/skills/board/scripts/board.py:1436`) resolves every plan
 > dispatch through existing `live_database` before calling the SQLite lifecycle handlers.
 > Subprocess regressions cover all six commands, absent/preserved legacy source and read-only fixtures.
-> The documented BOARD-150 check passed 7 tests in 2.621s. Next: independent review of this worktree.
-> Architect reports live migration already succeeded (20 items: 13 queued, 2 active, 5 history).
-> The accidental empty primary `docs/BOARD.md` remains: primary-checkout protection blocked cleanup;
-> only the human may remove it. This change touches no live database, migration source or backups.
+> QA round 1 passed: builder 7 tests in 2.621s, reviewer 7 in 2.626s; architect review found no blocker.
+> Evidence: `artifacts/factory/qa/2026-11-12/BOARD-150/qa.md` in the primary checkout.
+> Architect verified corrected live CLI queue/history: all 20 migrated original records remain
+> (13 queued, 2 active, 5 history); BOARD-150 adds one active item only.
+> Human cleanup is complete: primary `docs/BOARD.md` was absent at 22:31. No database, backup or
+> evidence was deleted. Earlier session notes below describe historical, not current, migration state.
+> Next: human inspection/finalize, then BOARD-147 dashboard work after merge.
 
 > **Session Notes — BOARD-146 round-four review, 2026-11-12**
 > Independent QA round 4 passed at `03b90fc`; architect review found no blocker. Results: migration
