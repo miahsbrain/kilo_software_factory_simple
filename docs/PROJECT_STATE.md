@@ -14,7 +14,8 @@
 - Assigned `fix/repair-finalize-after-worktree-removal` fixes SQLite row update when the
   invoking script is deleted with its worktree. Durable recovery validation and replay
   retain branch/base identity; TTY prompt now requires exactly `yes` after target details.
-- Next: parent independent QA/review. Agents never run finalize against the live base.
+- Focused scratch-repository suite passed 32 tests; independent review passed. Next: human
+  inspection and finalize from the `opencode` checkout. Agents never run live finalize.
 
 ## Current session — SQLite migration corrective slice (2026-11-12)
 

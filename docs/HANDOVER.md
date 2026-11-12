@@ -29,7 +29,8 @@
 > control-repo discovery when the running script is removed with its task worktree. A
 > validated, fsynced Git-common-dir recovery record precedes merge/teardown; retry after
 > removal clears the row without re-merging. Other repos remain Pending Merge.
-> Next: parent independent review; agents do not invoke real finalize or merge.
+> Focused scratch-repository suite passed 32 tests; independent review passed. Next: human
+> inspection and finalize from the `opencode` checkout. Agents do not merge or finalize.
 
 ## BOARD-125 lifecycle inventory
 
