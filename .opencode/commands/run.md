@@ -31,23 +31,23 @@ references under `AGENTS.md` §A7, and report skills used or that none matched.
    - UI artifacts land in the one canonical folder at the repository root:
      `artifacts/<scope>/qa/<date>/<task-id>/`. Record route, viewport, theme, steps, expected and
      observed results; transfer browser captures using server-local paths, not desktop paths.
-    - Review reports and ledger stay under `<primary-checkout>/.factory-state/reviews/`, outside
-      task worktrees.
-    - A row may go through at most 10 QA↔fix rounds. Round 10 is the last. If it still fails, move
-      the row to `Blocked` with what was tried and the question for the human; do not open an
-      eleventh round. Each round's review is done by a fresh reviewer that reads
-      `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and current screenshots, not
-      the previous reviewer's reasoning. The ledger script opens and closes rounds:
-      `python3 .opencode/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005`.
-    - Findings are deduplicated by fingerprint (`kind|category|route|subject`). Record them in
-      the ledger and original row notes. Reuse the same builder and worktree; never open an
-      automatic Fix row for an in-task finding. A distinct defect needs independent approval.
-    - Pass → continue to Review.
-    - Fail → row back to `In Progress` with the expected-vs-actual and the failing repro.
-      Never mark an unchecked criterion as done.
-    - Stop conditions: round cap reached, a critical path red (money, data loss, auth, security —
-      immediate `Blocked`), the same fingerprint filed twice (the existing row is escalated to
-      `Blocked`), or the human says stop.
+   - Review reports and ledger stay under `<primary-checkout>/.factory-state/reviews/`, outside
+     task worktrees.
+   - A row may go through at most 10 QA↔fix rounds. Round 10 is the last. If it still fails, move
+     the row to `Blocked` with what was tried and the question for the human; do not open an
+     eleventh round. Each round's review is done by a fresh reviewer that reads
+     `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and current screenshots, not
+     the previous reviewer's reasoning. The ledger script opens and closes rounds:
+     `python3 .opencode/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005`.
+   - Findings are deduplicated by fingerprint (`kind|category|route|subject`). Record them in
+     the ledger and original row notes. Reuse the same builder and worktree; never open an
+     automatic Fix row for an in-task finding. A distinct defect needs independent approval.
+   - Pass → continue to Review.
+   - Fail → row back to `In Progress` with the expected-vs-actual and the failing repro.
+     Never mark an unchecked criterion as done.
+   - Stop conditions: round cap reached, a critical path red (money, data loss, auth, security —
+     immediate `Blocked`), the same fingerprint filed twice (the existing row is escalated to
+     `Blocked`), or the human says stop.
 4. **Review** — read the diff and the acceptance criteria first, form your own hypotheses, then
    compare against the builder's summary (§A8). Re-run the exact verification command the QA
    lane used. Any blocking finding → row back to `In Progress` with the finding restated.
