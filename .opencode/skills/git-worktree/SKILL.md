@@ -450,7 +450,7 @@ diff:
 log:
   git -C <path>/.opencode/worktrees/<slug> log --oneline <configured-base>..HEAD
 human-only finalize (run from target base checkout in a real terminal):
-  python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
+  python3 '<absolute-control-script-path>' finalize --board BOARD-00X [--repo <id>]
 ```
 
 Finalize requires typed board ID, base, branch and full tip; it checks clean worktrees and
@@ -463,7 +463,11 @@ When a clean branch is already merged into the base, the block prints a `git sho
 and offers the same human-only finalize command for resumable cleanup. Dirty or unknown state
 still refuses it.
 
-Only after rechecking the same readiness gates, the human may use the same commands by hand:
+For an app repository, run that absolute control-repo script while your terminal is in the
+app repository's main checkout. `handoff` prints the actual shell-quoted script path and target
+checkout, even when the app repository contains no harness. Do not replace it with a relative
+path inside the app checkout. Only after rechecking the same readiness gates, the human may use
+the same commands by hand:
 
 ```bash
 # review
@@ -480,9 +484,22 @@ configured base. A separately approved feature branch may be the target for a la
 
 **One-time bootstrap handoff:** before this branch is integrated, the main checkout still has
 the old `worktree.py` and cannot run its `finalize` command. After review and human approval,
-the human must manually merge `feat/sqlite-board-bootstrap` into `opencode`, then handle its
+the human must run the following **in this bootstrap worktree, before the merge**, while the
+main checkout still has its legacy `docs/BOARD.md` (stop board writers first):
+
+```bash
+python3 .opencode/skills/board/scripts/board.py pre-merge-check
+python3 .opencode/skills/board/scripts/board.py export
+```
+
+The first command initializes a missing local SQLite database from the main checkout's legacy
+board and checks the imported bytes against the source. It refuses missing/malformed or changed
+source, and prints the database, byte-exact backup and current readable export paths under the Git
+common directory. The second command refreshes and prints that export path. Confirm both succeed before
+the human manually merges `feat/sqlite-board-bootstrap` into `opencode`, then handle its
 worktree cleanup and local board transition. Do not run the old main-checkout script as if it
-were the new finalize gate; this bootstrap exception does not apply to later tasks.
+were the new finalize gate; do not restore rows from Git history in a fresh clone. This bootstrap
+exception does not apply to later tasks.
 
 ---
 

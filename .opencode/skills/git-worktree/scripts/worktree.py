@@ -61,6 +61,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -1058,12 +1059,13 @@ def cmd_handoff(args, cwd):
         print("show:")
         print("  git -C %s show --stat %s..%s" % (path, base, branch))
         print("the branch is already merged into %s; there is nothing to merge" % base)
-        print("human recovery: python3 .opencode/skills/git-worktree/scripts/worktree.py "
-              "finalize --board %s%s" % (args.board, " --repo " + repo_id if args.repo else ""))
+        print("human recovery (run from %s):" % shlex.quote(target))
     else:
-        print("human-only finalize (run from the main checkout after review):")
-        print("  python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board %s%s"
-              % (args.board, " --repo " + repo_id if args.repo else ""))
+        print("human-only finalize (run from %s after review):" % shlex.quote(target))
+    print("  python3 %s finalize --board %s%s" % (
+        shlex.quote(os.path.join(script_root(), ".opencode", "skills", "git-worktree",
+                                 "scripts", "worktree.py")), shlex.quote(args.board),
+        " --repo " + shlex.quote(repo_id) if args.repo else ""))
     return OK
 
 

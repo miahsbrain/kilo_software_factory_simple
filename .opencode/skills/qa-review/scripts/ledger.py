@@ -28,6 +28,7 @@ MAX_ROUNDS = 3
 FIELDS = ("Findings", "Corrections", "Stop reason")
 LEGACY_FIELDS = ("Fix rows", "Fix rows merged")
 ROUND_RE = re.compile(r"^## Round (\d+)\s*$")
+TASK_ID_RE = re.compile(r"BOARD-[0-9]+\Z")
 
 
 def ledger_path(ledger_dir, task_id):
@@ -223,6 +224,9 @@ def main(argv):
     args = parser.parse_args(argv)
     if not args.command:
         parser.print_help()
+        return USAGE
+    if not TASK_ID_RE.fullmatch(args.task_id):
+        print("invalid --task-id: expected BOARD-[0-9]+", file=sys.stderr)
         return USAGE
     if args.ledger_dir is None:
         result = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],

@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Guard bootstrap import and local review paths
+**Type:** Fix
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `board.py`, `worktree.py`, `ledger.py`, adjacent regression tests, git-worktree skill, HANDOVER, STACK and this log.
+**Why:** An uninitialized database could lose tracked legacy rows on merge; app handoff pointed to a nonexistent relative script; ledger IDs allowed path traversal.
+**Impact:** Human pre-merge check creates/verifies local import and byte-exact backup before legacy deletion; handoff uses absolute control script; invalid ledger IDs refuse before I/O. Fresh clones remain empty. Reuses board importer/export writer and handoff command; new adjacent ledger tests cover input safety. Catalogue: python-pro, cli-developer, secure-code-guardian/input-validation.
+**Verification:** Board suite 24 OK (rerun after export-path refinement); handoff suite 24 OK; ledger suite 2 OK. `git diff --check` passed. Temporary repositories/directories only; parent independent review required.
+
 ## [2026-11-12] Align bootstrap lifecycle and review guidance
 **Type:** Docs
 **Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap

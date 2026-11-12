@@ -394,6 +394,47 @@ class BoardBootstrapTests(unittest.TestCase):
         self.git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
                  "commit", "-m", "fixture")
 
+    def test_pre_merge_check_imports_missing_db_and_preserves_legacy_bytes(self):
+        main = self.root / "main"
+        self.repository(main)
+        legacy = main / "docs/BOARD.md"
+        legacy.parent.mkdir()
+        source = (b"| ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Branch/Worktree | Notes |\r\n"
+                  b"|---|---|---|---|---|---|---|---|---|---|\r\n"
+                  b"| BOARD-001 | old | Fix | Ready | P2 | low | None. | control | - | note |\r\n")
+        legacy.write_bytes(source)
+        db = Path(self.board.database_path(str(main)))
+        self.assertFalse(db.exists())
+        script = str(Path(__file__).with_name("board.py").resolve())
+        result = subprocess.run([sys.executable, script, "pre-merge-check"], cwd=main,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(db.exists())
+        self.assertEqual(legacy.read_bytes(), source)
+        self.assertEqual(db.with_name(self.board.LEGACY_BACKUP_NAME).read_bytes(), source)
+        self.assertIn(str(db.with_name(self.board.LEGACY_BACKUP_NAME)), result.stdout)
+        self.assertEqual(db.with_name(self.board.EXPORT_NAME).read_bytes(), source)
+        self.assertIn(str(db.with_name(self.board.EXPORT_NAME)), result.stdout)
+        with self.board.connect(str(db)) as connection:
+            self.assertEqual(connection.execute("SELECT source_bytes FROM board").fetchone()[0], source)
+
+        legacy.write_bytes(source.replace(b"old", b"new"))
+        result = subprocess.run([sys.executable, script, "pre-merge-check"], cwd=main,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("differs from its SQLite import", result.stderr)
+        self.assertEqual(db.with_name(self.board.LEGACY_BACKUP_NAME).read_bytes(), source)
+
+    def test_pre_merge_check_missing_legacy_refuses_without_creating_empty_db(self):
+        main = self.root / "main"
+        self.repository(main)
+        script = str(Path(__file__).with_name("board.py").resolve())
+        result = subprocess.run([sys.executable, script, "pre-merge-check"], cwd=main,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("pre-merge check refused", result.stderr)
+        self.assertFalse(Path(self.board.database_path(str(main))).exists())
+
     def test_import_once_preserves_source_bytes_and_main_status(self):
         main = self.root / "main"
         self.repository(main)

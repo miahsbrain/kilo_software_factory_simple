@@ -2,6 +2,7 @@
 import contextlib
 import io
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import tempfile
@@ -63,6 +64,22 @@ class HandoffTests(unittest.TestCase):
         self.assertNotIn("git merge --no-ff", out)
         self.assertNotIn("cleanup --board", out)
         self.assertIn("log --oneline main..HEAD", out)
+        command = next(line.strip() for line in out.splitlines() if " finalize --board " in line)
+        self.assertEqual(shlex.split(command), ["python3", self.script, "finalize", "--board", "BOARD-904"])
+
+    def test_app_repo_handoff_uses_control_script_from_target_checkout(self):
+        target = Path(self.repo, "apps", "app with spaces")
+        target.mkdir(parents=True)
+        self.args.repo = "app"
+        with patch.object(worktree, "resolve_repo", return_value=(str(target), None)), \
+                patch.object(worktree, "live_row_worktree", return_value=(self.path, "feat/hand-off-a-worktree")):
+            code, out, err = self.handoff()
+        self.assertEqual(code, worktree.OK, err)
+        self.assertIn("run from '%s'" % target, out)
+        command = next(line.strip() for line in out.splitlines() if " finalize --board " in line)
+        self.assertEqual(shlex.split(command), ["python3", self.script, "finalize", "--board",
+                                                 "BOARD-904", "--repo", "app"])
+        self.assertFalse((target / ".opencode/skills/git-worktree/scripts/worktree.py").exists())
 
     def test_untracked_changes_withhold_merge(self):
         test_env.write(os.path.join(self.path, "untracked.txt"), "new\n")

@@ -43,6 +43,10 @@ python3 .opencode/skills/board/scripts/board.py show
 # Generate a readable Markdown snapshot in the Git common directory (prints its path)
 python3 .opencode/skills/board/scripts/board.py export
 
+# One-time bootstrap only: run from the BOARD-124 worktree BEFORE human merge
+# Stop board writers; verifies legacy import and prints byte-exact backup path
+python3 .opencode/skills/board/scripts/board.py pre-merge-check
+
 # Human-only integration, from target base checkout on a real terminal
 # Requires typed board ID, base, branch and full tip; agents never invoke it.
 python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
@@ -64,6 +68,9 @@ python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_h
 
 # Lifecycle and TTY/conflict regressions (temporary repositories only)
 python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'
+
+# Ledger path-validation regressions (temporary directories only)
+python3 -m unittest discover -s .opencode/skills/qa-review/scripts -p 'test_ledger.py'
 
 # Security adapter boundary tests (temporary dummy repositories only)
 node --test .opencode/plugins/factory-guard/guard.test.mjs

@@ -1,5 +1,11 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-124 independent QA corrections, 2026-11-12**
+> Existing `feat/sqlite-board-bootstrap` worktree now supplies a pre-merge legacy import/byte
+> backup check, shell-quoted absolute control-script handoff for app repos, and strict ledger IDs.
+> Focused board 24, handoff 24, ledger 2 tests pass; parent review remains open.
+> Next: parent independent QA/review in this same worktree; no merge or finalize by agents.
+
 > **Session Notes — SQLite migration corrective slice, 2026-11-12**
 > Worktree `feat/sqlite-board-bootstrap` keeps the live board in Git-common-dir SQLite.
 > Factory `docs/BOARD.md` is untracked on this task branch; its on-disk bytes and preexisting
@@ -17,9 +23,19 @@
   current readable snapshot under Git common dir. Use a consistent SQLite backup (or export)
   when transferring a clone; Git does not synchronize live rows or reviewer reports.
 - On merge of this branch, tracked `docs/BOARD.md` is deleted from the integration checkout;
-  a previously initialized SQLite database retains the live rows. Before merging, verify a
-  local board import/export or backup. After merge, a new clone with no local board initializes
+  a previously initialized SQLite database retains the live rows. **Before the one-time human
+  merge**, stop board writers and run from this bootstrap worktree:
+  `python3 .opencode/skills/board/scripts/board.py pre-merge-check`, then
+  `python3 .opencode/skills/board/scripts/board.py export`. The check imports a missing database
+  from the main-checkout source, verifies its `source_bytes` match, refuses a missing/changed
+  source, and writes/prints the SQLite, byte-exact legacy backup and current Markdown export
+  paths in Git common dir. The second command refreshes the export. Do not merge if either fails; after merge,
+  a new clone with no local board initializes
   empty. The still-tracked blank project template is not historical state.
+- `board.py:cmd_pre_merge_check` (effectful filesystem/SQLite), `write_export` (effectful atomic
+  bytes/text snapshot) preserve the import and byte backup; `worktree.py:cmd_handoff` (effectful)
+  prints the absolute shell-quoted control script and target main checkout for app/control repos.
+  `ledger.py:main` (effectful CLI) validates `BOARD-[0-9]+` before Git or ledger I/O.
 - `worktree.py:cmd_finalize` (effectful Git/SQLite) performs clean preflight, typed terminal
   confirmation and resumable integration. `confirm_finalize` (effectful `/dev/tty` input) cannot
   establish identity against a process sharing the same OS user. Failed merge abort is scoped

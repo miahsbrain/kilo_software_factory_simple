@@ -47,6 +47,7 @@ import threading
 BOARD_PATH = os.path.join("docs", "BOARD.md")
 DATABASE_NAME = "factory-board.sqlite3"
 EXPORT_NAME = "factory-board-export.md"
+LEGACY_BACKUP_NAME = "factory-board-legacy-backup.md"
 _snapshots = threading.local()
 TYPES = ["Feature", "Fix", "Chore", "Docs", "Research"]
 STATUSES = ["Backlog", "Ready", "In Progress", "In Review", "Pending Merge",
@@ -109,6 +110,42 @@ def initialize_board(root: str) -> str:
                 raise ValueError(error)
             connection.execute("INSERT INTO board VALUES (1, ?, ?, 0)", (content, source))
     return path
+
+
+def cmd_pre_merge_check(root):
+    """Verify the legacy import and retain its exact bytes before the human merge."""
+    source_path = os.path.join(root, BOARD_PATH)
+    try:
+        info = os.lstat(source_path)
+        if not stat.S_ISREG(info.st_mode):
+            raise OSError("refusing non-regular legacy board: %s" % source_path)
+        with open(source_path, "rb") as stream:
+            source = stream.read()
+        parsed, error = parse_table(source.decode("utf-8"), source_path)
+        if parsed is None:
+            raise ValueError(error)
+        db = database_path(root)
+        initialize_board(root)
+        with connect(db) as connection:
+            row = connection.execute("SELECT source_bytes, markdown FROM board WHERE id = 1").fetchone()
+        if row is None or row[0] is None or row[0] != source:
+            raise ValueError("legacy board differs from its SQLite import (or was never imported); "
+                             "stop board writers and reconcile before merging")
+        backup = os.path.join(os.path.dirname(db), LEGACY_BACKUP_NAME)
+        export = os.path.join(os.path.dirname(db), EXPORT_NAME)
+        write_export(backup, source)
+        with open(backup, "rb") as stream:
+            if stream.read() != source:
+                raise OSError("legacy byte backup verification failed: %s" % backup)
+        write_export(export, row[1])
+    except (OSError, UnicodeError, ValueError, sqlite3.Error) as exc:
+        print("pre-merge check refused: %s" % exc, file=sys.stderr)
+        return REFUSED
+    print("legacy import verified: %s" % source_path)
+    print("SQLite board: %s" % db)
+    print("byte-exact legacy backup: %s" % backup)
+    print("current board export: %s" % export)
+    return OK
 
 
 def database_path(root):
@@ -727,6 +764,7 @@ def main(argv):
 
     sub.add_parser("lanes", help="count rows per status lane")
     sub.add_parser("export", help="write a Markdown snapshot to the Git common directory")
+    sub.add_parser("pre-merge-check", help="verify and back up the legacy board before its one-time merge")
 
     args = parser.parse_args(argv)
     if not args.command:
@@ -735,6 +773,8 @@ def main(argv):
     if args.file and args.command not in ("show", "lanes"):
         print("--file is read-only; use the default SQLite board for mutations", file=sys.stderr)
         return REFUSED
+    if args.command == "pre-merge-check":
+        return cmd_pre_merge_check(control_root(os.getcwd()))
     try:
         path = args.file if args.file else initialize_board(control_root(os.getcwd()))
     except (OSError, UnicodeError, ValueError, sqlite3.Error) as exc:
@@ -785,8 +825,8 @@ def main(argv):
 def write_export(destination, content):
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(destination), prefix=".board-export.")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            stream.write(content)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(content if isinstance(content, bytes) else content.encode("utf-8"))
         os.replace(tmp, destination)
     finally:
         if os.path.exists(tmp):
