@@ -93,8 +93,8 @@ Passing the anti-slop rules is not enough — the result also has to serve the u
 The QA lane captures evidence through `.opencode/skills/qa-review/scripts/browser-review.mjs`, which
 computes the canonical path itself: `artifacts/mobile/qa/<date>/<task-id>/` in the **main
 checkout**. The task directory holds `notes.md` with what was checked and the expected vs actual
-result. Review reports stay in `docs/reviews/<task-id>-qa.md` and
-`docs/reviews/<task-id>-ui.md` — those are documents, not artifacts.
+result. Review reports stay in `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md` and
+`-ui.md` — those are documents, not artifacts.
 
 ## Production expectations
 

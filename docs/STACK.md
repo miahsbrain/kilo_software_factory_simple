@@ -5,15 +5,15 @@ an agent needs. Do not guess commands.
 
 ## What the factory is made of
 
-No application runtime. The board uses standard-library SQLite in the Git common directory;
+No application runtime. The board uses standard-library SQLite in clone-local `.factory-state`;
 the factory otherwise uses Markdown rules, agent definitions, and Python scripts. The one build step is the board UI's
 Tailwind stylesheet, and it produces a committed file — the viewer itself needs no Node.
 
 | Piece | Version | Where |
 |---|---|---|
 | Python | 3.9+ | every script under `.opencode/skills/*/scripts/` |
-| SQLite | Python `sqlite3` | `<git-common-dir>/factory-board.sqlite3`, one per clone; WAL and 10s busy timeout |
-| Local review records | Markdown | `<git-common-dir>/reviews/`, outside task worktrees |
+| SQLite | Python `sqlite3` | `<primary-checkout>/.factory-state/factory-board.sqlite3`, one per clone; WAL and 10s busy timeout |
+| Local review records | Markdown | `<primary-checkout>/.factory-state/reviews/`, outside task worktrees |
 | OpenCode | V2 | `opencode.jsonc`, `.opencode/agents/`, `.opencode/commands/`, five discoverable skills |
 | Node.js | 22 | the dev container, the Playwright MCP, the Tailwind build |
 | Playwright | the global install in the dev container | retained historical/test tooling, not UI QA |
@@ -40,8 +40,14 @@ npm --prefix .opencode/skills/board/ui run build
 # Show the board
 python3 .opencode/skills/board/scripts/board.py show
 
-# Generate a readable Markdown snapshot in the Git common directory (prints its path)
+# Generate a readable Markdown snapshot in `.factory-state` (prints its path)
 python3 .opencode/skills/board/scripts/board.py export
+
+# Resolve the clone-local runtime-state path, or explicitly migrate old Git-metadata state.
+# Stop all legacy database writers first; migration snapshots DB/WAL/SHM read-only and never removes source.
+python3 .opencode/skills/runtime-state/scripts/state.py path
+python3 .opencode/skills/runtime-state/scripts/state.py migrate
+python3 .opencode/skills/runtime-state/scripts/state.py migrate --apply
 
 # One-time bootstrap only: run from the BOARD-124 worktree BEFORE human merge
 # Stop board writers; verifies legacy import and prints byte-exact backup path
@@ -72,6 +78,9 @@ python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*
 
 # Ledger path-validation regressions (temporary directories only)
 python3 -m unittest discover -s .opencode/skills/qa-review/scripts -p 'test_ledger.py'
+
+# Read-only SQLite WAL snapshots and atomic migration regressions (temporary repositories only)
+python3 -m unittest discover -s .opencode/skills/runtime-state/scripts -p 'test_*.py'
 
 # Security adapter boundary tests (temporary dummy repositories only)
 node --test .opencode/plugins/factory-guard/guard.test.mjs

@@ -36,7 +36,8 @@ class BoardRefreshTests(unittest.TestCase):
         previous_state = viewer.Handler.state
         self.addCleanup(setattr, viewer.Handler, "state", previous_state)
         self.write_board(self.factory, "Factory task")
-        (self.root / ".gitignore").write_text("/project/\n", encoding="utf-8")
+        (self.root / ".gitignore").write_text(
+            "/project/\n/.factory-state/\n", encoding="utf-8")
 
     def write_board(self, path, task):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -50,8 +51,9 @@ class BoardRefreshTests(unittest.TestCase):
         project = self.root / "project"
         project.mkdir()
         subprocess.run(["git", "init", "-q", "-b", "main", str(project)], check=True)
+        (project / ".gitignore").write_text("/.factory-state/\n", encoding="utf-8")
         self.write_board(self.project, "Independent task")
-        subprocess.run(["git", "-C", str(project), "add", "docs/BOARD.md"], check=True)
+        subprocess.run(["git", "-C", str(project), "add", ".gitignore", "docs/BOARD.md"], check=True)
         subprocess.run(["git", "-C", str(project), "-c", "user.name=Fixture",
                         "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"], check=True)
         self.worktree.is_git_repo = Mock(side_effect=lambda target: target == str(project))
@@ -610,7 +612,7 @@ class BoardBootstrapTests(unittest.TestCase):
         marker = root / ".opencode/repos.json"
         marker.parent.mkdir(exist_ok=True)
         marker.write_text('{"control":"."}\n')
-        (root / ".gitignore").write_text("/.opencode/worktrees/\n")
+        (root / ".gitignore").write_text("/.opencode/worktrees/\n/.factory-state/\n")
         self.git(root, "add", ".opencode/repos.json", ".gitignore")
         self.git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
                  "commit", "-m", "fixture")
@@ -656,6 +658,44 @@ class BoardBootstrapTests(unittest.TestCase):
         self.assertIn("pre-merge check refused", result.stderr)
         self.assertFalse(Path(self.board.database_path(str(main))).exists())
 
+    def test_legacy_runtime_state_blocks_board_bootstrap_before_empty_database(self):
+        main = self.root / "main"
+        self.repository(main)
+        legacy_database = main / ".git/factory-board.sqlite3"
+        with sqlite3.connect(legacy_database) as connection:
+            connection.execute("CREATE TABLE legacy_state (value TEXT)")
+        script = str(Path(__file__).with_name("board.py").resolve())
+        result = subprocess.run([sys.executable, script, "show"], cwd=main,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, self.board.REFUSED)
+        self.assertIn("run .opencode/skills/runtime-state/scripts/state.py migrate first",
+                      result.stderr)
+        self.assertFalse((main / ".factory-state").exists())
+
+    def test_unverified_target_database_does_not_bypass_board_command_guard(self):
+        main = self.root / "main"
+        self.repository(main)
+        with sqlite3.connect(main / ".git/factory-board.sqlite3") as connection:
+            connection.execute("CREATE TABLE legacy_state (value TEXT)")
+        target = main / ".factory-state/factory-board.sqlite3"
+        target.parent.mkdir()
+        target.write_bytes(b"unverified target")
+        script = str(Path(__file__).with_name("board.py").resolve())
+        result = subprocess.run([sys.executable, script, "show"], cwd=main,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, self.board.REFUSED)
+        self.assertIn("complete verified destination", result.stderr)
+        self.assertEqual(target.read_bytes(), b"unverified target")
+
+    def test_clean_clone_board_command_initializes_normally(self):
+        main = self.root / "fresh"
+        self.repository(main)
+        script = str(Path(__file__).with_name("board.py").resolve())
+        result = subprocess.run([sys.executable, script, "show"], cwd=main,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((main / ".factory-state/factory-board.sqlite3").is_file())
+
     def test_import_once_preserves_source_bytes_and_main_status(self):
         main = self.root / "main"
         self.repository(main)
@@ -697,7 +737,7 @@ class BoardBootstrapTests(unittest.TestCase):
         output = subprocess.run([sys.executable, script, "export"], cwd=linked, capture_output=True)
         self.assertEqual(output.returncode, 0, output.stderr)
         export = Path(output.stdout.decode().strip())
-        self.assertEqual(export.parent, main / ".git")
+        self.assertEqual(export.parent, main / ".factory-state")
         self.assertIn("BOARD-001", export.read_text())
         self.assertEqual(self.git(main, "status", "--porcelain"), "")
 

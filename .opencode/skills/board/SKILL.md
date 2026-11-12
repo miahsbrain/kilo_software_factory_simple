@@ -5,13 +5,16 @@ description: Read and update the live SQLite board — add rows, move lanes, set
 
 # Board
 
-The live board is `<git-common-dir>/factory-board.sqlite3`, local to this clone and shared across
-worktrees. Only the orchestrator edits rows through `board.py`; the human-only finalize command
+The live board is `<primary-checkout>/.factory-state/factory-board.sqlite3`, local to this clone and shared across
+worktrees. Scripts resolve the primary checkout from Git's absolute common-dir path and fail closed if it cannot be verified. Only the orchestrator edits rows through `board.py`; the human-only finalize command
 owns its successful integration transition. `docs/BOARD.md` is a one-time legacy import source,
-not a live board. `board.py export` generates Markdown in the common directory on request.
+not a live board. `board.py export` generates Markdown in `.factory-state/` on request.
 
 First use imports an existing local main-checkout legacy board once and keeps its original bytes
-as a SQLite snapshot; a fresh clone without that file starts empty. Never import a historical
+as a SQLite snapshot. If legacy runtime data remains in Git metadata while the new database is
+absent, normal board commands fail closed unless the atomic migration-completion manifest confirms
+the complete snapshot was installed and its expected items remain; run the explicit runtime-state
+migration first. A fresh clone with no legacy runtime state starts empty. Never import a historical
 Git-tracked board into a fresh clone. Back up SQLite consistently or export before moving clones.
 Viewer requests stay read-only and never initialize another registered project's board.
 
@@ -41,7 +44,7 @@ overlapping edits; an explicit Markdown export is a snapshot, not a second sourc
 | `board.py set-field <ID> --field <field> --value "<value>"` | change one cell |
 | `board.py remove <ID>` | delete a row |
 | `board.py lanes` | count rows per lane |
-| `board.py export` | generate Markdown snapshot in Git common directory |
+| `board.py export` | generate Markdown snapshot in `.factory-state/` |
 
 The columns are:
 

@@ -94,7 +94,9 @@ Retain historical artifacts. Commit `notes.md` and small component shots; keep f
 out of git. Do not create empty logs or summaries that imply unobserved checks passed.
 
 **Review reports and the ledger live outside task worktrees:**
-`<git-common-dir>/reviews/<task-id>-qa.md`, `-ui.md`, and `-ledger.md`.
+`<primary-checkout>/.factory-state/reviews/<task-id>-qa.md`, `-ui.md`, and `-ledger.md`.
+Default ledger writers fail closed while Git-metadata runtime state remains and the new board
+database is absent; run the explicit runtime-state migration before writing reports or ledgers.
 
 Per route, viewport, and scheme:
 
@@ -229,7 +231,7 @@ defect may be scoped as a separate task.
 
 A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
 
-Each round's state lives in `<git-common-dir>/reviews/<task-id>-ledger.md`. It holds the round
+Each round's state lives in `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`. It holds the round
 number, findings, same-worktree corrections and stop reason.
 
 The ledger is the **only** thing carried between rounds. **Each round's review must be done by a

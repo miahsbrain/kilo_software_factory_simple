@@ -1,15 +1,13 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-131 plan reviewed, 2026-11-12**
-> `docs/FACTORY_ROADMAP.md` now records the approved scope and 13 granular SQLite backlog rows.
-> The live board is clone-local SQLite; the dashboard is read-only and shows lanes, branches and
-> worktrees. BOARD-130 remains Blocked after its three-round cap; its task-local artifact change is
-> not integrated. The docs-only review found no blocking issue; the handover conflict markers are
-> tracked as BOARD-144, blocked by BOARD-130. Plan commit `3d0cecc` is on the task branch.
-> `git diff --check` passed. Next: confirm a clean handoff state, then request human inspection.
-> The factory-dev role was approved in principle; exact rules and permission entry remain pending
-> A9 approval. `docs/HANDOVER.md` still has conflict markers in its Testing section; BOARD-144 is
-> blocked by BOARD-130 until artifact guidance can be reconciled.
+> **Session Notes — BOARD-148 runtime state migration applied, 2026-11-12**
+> The verified snapshot is installed at `.factory-state/`; the original `.git/` state remains
+> untouched and cleanup was not approved or performed. `state.py path` resolves to the new store,
+> and `board.py show` reads the migrated board. Runtime-state tests passed 13/13, board tests 35/35,
+> and the user-run handoff suite passed 34/34 after the final fixture correction. Independent QA
+> returned PASS, and all four acceptance proofs are recorded on BOARD-148. Next: the human inspects
+> and finalizes the branch after the guarded handoff. No cleanup of the original `.git/` state was
+> approved or performed.
 
 > **Session Notes — BOARD-126 ready for human inspection, 2026-11-12**
 > Registered repositories appear in the read-only feeds. `/api/repo-candidates` lists
@@ -161,28 +159,25 @@
 > historical tracked rows. Human-only finalize requires a real TTY and typed board ID, base,
 > branch and full tip; merge preflight reports conflict paths/types, and a failed initiated merge
 > is aborted if safe. QA/UI findings now return to the original builder in the same worktree;
-> reviewer reports and ledger belong under `<git-common-dir>/reviews/`. Next: independent parent
+> reviewer reports and ledger belong under `<primary-checkout>/.factory-state/reviews/`. Next: independent parent
 > review and QA; this task is not merge-ready merely because it is committed.
 
 ## Transition and recovery
 
-- Existing local board: `board.py show` imports main-checkout legacy bytes once into the local
-  SQLite `source_bytes` snapshot without changing the Markdown. `board.py export` writes the
-  current readable snapshot under Git common dir. Use a consistent SQLite backup (or export)
-  when transferring a clone; Git does not synchronize live rows or reviewer reports.
-- On integration of this branch, tracked `docs/BOARD.md` is deleted from the integration checkout;
-  a previously initialized SQLite database retains the live rows. **Before the one-time human
-  integration**, stop board writers and run from this bootstrap worktree:
-  `python3 .opencode/skills/board/scripts/board.py pre-merge-check`, then
-  `python3 .opencode/skills/board/scripts/board.py export`. The check imports a missing database
-  from the main-checkout source, verifies its `source_bytes` match, refuses a missing/changed
-  source, and writes/prints the SQLite, byte-exact legacy backup and current Markdown export
-  paths in Git common dir. The second command refreshes the export. Do not proceed if either
-  fails. Review the handoff, then run the absolute `finalize` command printed by
-  `worktree.py handoff --board BOARD-124` from the clean `opencode` base checkout in a real TTY;
-  it uses this bootstrap worktree's script, not the base's old relative script. After integration,
-  a new clone with no local board initializes empty. The still-tracked blank project template is
-  not historical state.
+- The live board, generated exports, legacy backup, review reports/ledgers, and cleanup recovery
+  records live under `<primary-checkout>/.factory-state/`, shared across linked worktrees. Board
+  initialization refuses to create an empty database while legacy Git-metadata state remains;
+  a fresh clone with no legacy runtime state initializes normally.
+- Stop every writer to the legacy SQLite database before migration. The migration copies the
+  database and any WAL/SHM files read-only into private staging, checks source metadata/content
+  stability, then runs SQLite backup and integrity verification against the staged copy only.
+  Migrate explicitly with `python3 .opencode/skills/runtime-state/scripts/state.py migrate` to
+  review the plan, then `python3 .opencode/skills/runtime-state/scripts/state.py migrate --apply`
+  to install a complete snapshot atomically without deleting the source.
+  The snapshot includes `.migration-complete.json`, which normal board/review/recovery writers
+  validate while legacy files remain. Any partial or non-identical existing destination is refused.
+  `board.py export` writes the
+  current Markdown snapshot under `.factory-state/`; Git does not synchronize live rows or reports.
 - `board.py:cmd_pre_merge_check` (effectful filesystem/SQLite), `write_export` (effectful atomic
   bytes/text snapshot) preserve the import and byte backup; `worktree.py:cmd_handoff` (effectful)
   prints the absolute shell-quoted control script and target main checkout for app/control repos.
@@ -191,7 +186,7 @@
   confirmation and resumable integration. `confirm_finalize` (effectful TTY stdin/stderr) cannot
   establish identity against a process sharing the same OS user. Failed merge abort is scoped
   to `MERGE_HEAD` created during this call and unchanged pre-merge HEAD; otherwise inspect
-  manually. `ledger.py:main` (effectful Git discovery) defaults to common-dir local reviews;
+  manually. `ledger.py:main` (effectful Git discovery) defaults to primary-checkout `.factory-state/reviews/`;
   `parse_ledger`/`render_ledger` (pure) retain historical Fix-row fields for old records.
 - Verification: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'`;
   parent independently reviews evidence before marking Pending Merge.
@@ -214,8 +209,8 @@
 - `worktree.py:provision_env`, `cmd_create`, `cmd_resume` (effectful) fail closed on env errors;
   `cmd_finalize` (effectful) is a human-only CLI entry point. Pending Merge is a human/reviewer
   certification: QA and verification evidence is not machine-readable; finalize prints this
-  limitation and must never be called by an agent. Recovery journal is stored in the Git common
-  directory's `cleanup-wt/` before merge, with branch tip and base identity; no secret contents.
+  limitation and must never be called by an agent. Recovery journal is stored in
+  `.factory-state/cleanup-wt/<repo-id>/` before merge, with branch tip and base identity; no secret contents.
 - Conflict preflight reports paths and competing edits; resolve in the original task worktree.
   No merge or cleanup on preflight conflict. After a successful integration, ancestry is checked;
   cleanup removes env copies, worktree and branch, then updates SQLite board. Interrupted cleanup
@@ -665,6 +660,7 @@ Chunk 1 reuses these existing boundaries:
 | Symbol | File | Responsibility | Kind |
 |---|---|---|---|
 | `board.py` | `.opencode/skills/board/scripts/board.py` | Reads and updates the clone-local SQLite board; generates a Markdown export on demand. | effectful (SQLite, file I/O) |
+| `state.py` | `.opencode/skills/runtime-state/scripts/state.py` | Resolves the primary checkout from Git's absolute common-dir path; `migrate` dry-runs or copies and verifies legacy runtime files without deleting sources. | effectful (Git, filesystem) |
 | `board_serve.py` | `.opencode/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
 | `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1704` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
 | `worktree_state()` | `.opencode/skills/board/scripts/board_serve.py:171` | Reloads the existing registry and enumerates control/project via `load_repos`, `resolve_repo`, `is_git_repo`, `list_worktrees`, `default_base` and `git_out`. Omits absent/uninitialized projects. Each entry adds `repo` and `base`; existing array and fields stay intact. Main detection and counts use only that repository. Invalid maps flow through existing payload exception handling. | effectful (filesystem, Git); entry construction is deterministic from results |
@@ -676,12 +672,12 @@ Gallery regression inventory: `test_board_serve.py:211` adds five tests for defa
 unique DOM IDs and tab/panel links, duplicate task IDs across boards, isolated counts/worktrees,
 error/empty/escaped output, default worktree markup compatibility, shared handler contracts and
 gallery-only layout/CSS themes. These do not execute JS or prove browser behavior.
-| `worktree.py` | `.opencode/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, `discard` removes one, `discard --force --yes` destroys one after writing a recovery copy, `handoff` prints the hand-off block, `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, `discard` sets `Ready`. | effectful (git, filesystem) |
+| `worktree.py` | `.opencode/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, `discard` removes one, `discard --force --yes` destroys one after writing a recovery copy in clone-local runtime state, `handoff` prints the hand-off block, `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, `discard` sets `Ready`. | effectful (git, filesystem) |
 | `env.py` | `.opencode/skills/git-worktree/scripts/env.py` | Copies the two local env files from a repository's main checkout into a worktree, excludes them from git, and removes them again. Never prints a value. | effectful (filesystem, git exclude) |
 | `test_env.py` | `.opencode/skills/git-worktree/scripts/test_env.py` | Self-test for the env provisioning and the worktree reuse rules, in a throwaway repository under a temp directory. | effectful (filesystem, git) |
 | `guard.py` | `.opencode/skills/git-worktree/scripts/guard.py` | The guard rails and the sync that carries them into an app repository. | effectful (git, filesystem) |
 | `check-finding.py` | `.opencode/skills/qa-review/scripts/check-finding.py` | Validates a finding and derives its fingerprint. | pure |
-| `ledger.py` | `.opencode/skills/qa-review/scripts/ledger.py` | The round ledger of a row. | effectful (file I/O) |
+| `ledger.py` | `.opencode/skills/qa-review/scripts/ledger.py` | The round ledger of a row under `<primary-checkout>/.factory-state/reviews/`; fails closed when the state path cannot be resolved. | effectful (file I/O) |
 | `browser-review.mjs` | `.opencode/skills/qa-review/scripts/browser-review.mjs` | Historical capture tool; not UI verification/review. Source unchanged. | effectful (browser, filesystem) |
 | `snapshot.mjs` | `.opencode/skills/unslop/scripts/snapshot.mjs` | Saves a live page or a local file as one standalone HTML file with its assets inlined, and saves a screenshot next to it. Resolves Playwright and chromium the same way the QA script does. | effectful (browser, filesystem) |
 
@@ -689,7 +685,9 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 
 | Artefact | Where | What it holds |
 |---|---|---|
-| The board | `<git-common-dir>/factory-board.sqlite3` | Clone-local authoritative task state; one row per unit. `docs/BOARD.md` is a legacy import source only. |
+| The board | `<primary-checkout>/.factory-state/factory-board.sqlite3` | Clone-local authoritative task state; one row per unit. `docs/BOARD.md` is a legacy import source only. |
+| Review reports and ledgers | `<primary-checkout>/.factory-state/reviews/` | Clone-local QA/UI reports, unslop audits, and round ledgers. |
+| Worktree recovery | `<primary-checkout>/.factory-state/cleanup-wt/<repo-id>/` | Recovery TSVs, patches, and finalize journals, separated by repository identity. |
 | The decisions | `docs/DECISIONS.md` | Append-only ADR table, ADR-001 onward. |
 | The changelog | `docs/changelog/CHANGELOG.md` | The engineering log, newest first, one section per change. |
 | The repo map | `.opencode/repos.json` | Repo id → path, relative to this repository's root. |
@@ -709,7 +707,7 @@ The local dashboard exposes read-only HTTP on loopback port 15180: `GET /api/boa
 endpoint. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
 `verify`, `cleanup`) and `env.py` (`sync`, `status`, `clean`). `discard` takes `--apply`, `--force`
 and `--yes`: `--force` alone prints the destruction plan, and `--force --yes` acts after writing a
-recovery copy under the repository's `cleanup-wt/` folder. `handoff --board <ID>` prints review
+recovery copy under `<primary-checkout>/.factory-state/cleanup-wt/<repo-id>/`. `handoff --board <ID>` prints review
 commands and changes nothing. Merge/teardown guidance requires the live §B11 readiness gate;
 refused handoffs show blockers only after review commands (see BOARD-123 contract above).
 `cleanup` takes the worktree either as a slug or as `--board <ID>`, which

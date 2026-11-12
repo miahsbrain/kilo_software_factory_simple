@@ -104,7 +104,7 @@ a separate git repository that copies the harness in and owns the copy from then
 | | Factory repository | Project repository |
 |---|---|---|
 | Holds | `AGENTS.md`, `.opencode/`, `.devcontainer/`, `opencode.jsonc`, `docs/`, `templates/` | `AGENTS.md`, `.opencode/`, `DOMAIN.md`, `ROADMAP.md`, `CHANGELOG.md`, `docs/`, `apps/` |
-| Board | Git-common-dir SQLite — factory work only | Git-common-dir SQLite — project work only |
+| Board | `<primary-checkout>/.factory-state/factory-board.sqlite3` — factory work only | Git-common-dir SQLite — project work only |
 | Decisions | `docs/DECISIONS.md`, ADR-001… | `docs/DECISIONS.md`, ADR-100… |
 | Changelog | `docs/changelog/` — the harness | `docs/changelog/` — the product |
 
@@ -496,7 +496,7 @@ Three rules. They apply to the architect and to every builder.
 
 The same three rules govern the **QA↔fix loop** for a row: the loop is capped at 3 rounds, a
 repeat finding blocks the original row instead of opening another, and the ledger under
-`<git-common-dir>/reviews/` is the only state carried between rounds.
+`<primary-checkout>/.factory-state/reviews/` is the only state carried between rounds.
 
 ### Task chunking rule
 
@@ -778,8 +778,8 @@ each file genuinely needs its own short reference. Do not turn them into impleme
 | `docs/ARCHITECTURE.md` | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap |
 | `docs/BUSINESS-LOGIC.md` | Every business rule as question → answer (see B2) |
 | `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, built-in browser QA spec |
-| `<git-common-dir>/reviews/*.md` | Local QA and UI/UX reports and ledger, outside task worktrees |
-| `<git-common-dir>/factory-board.sqlite3` | Local live board; Markdown is export only (see B3) |
+| `<primary-checkout>/.factory-state/reviews/*.md` | Local QA and UI/UX reports and ledger, outside task worktrees |
+| `<primary-checkout>/.factory-state/factory-board.sqlite3` | Local live board; Markdown is export only (see B3) |
 | `docs/STACK.md` | Stack, package managers, dev/verification commands, ports, database, auth |
 | `docs/PROJECT_STATE.md` | Current phase, progress, active task, next step |
 | `docs/DECISIONS.md` | Append-only, ultra-concise approved architectural decisions |
@@ -880,14 +880,9 @@ effects, integrations, failure/retry behaviour.
 
 ## B3. Local SQLite board — the board is the only state
 
-The live board is `<git-common-dir>/factory-board.sqlite3`, shared by all worktrees of a clone.
-Only the orchestrator edits rows through `board.py`; the human-only `worktree.py finalize`
-coordinates integration and its final row transition. `docs/BOARD.md` is a legacy import source,
-not live state. `board.py export` writes a generated Markdown snapshot in the Git common directory;
-never edit that snapshot or commit it. On first use import the existing main checkout's local
-legacy board once, preserving its bytes in SQLite. A fresh clone without a local board starts
-empty; never restore historical rows from Git history or a template. Back up the SQLite file
-with a consistent SQLite backup or use `board.py export` before moving clones.
+Clone-local factory runtime state must live at `<primary-checkout>/.factory-state/`, outside Git metadata and shared across linked worktrees. It contains the live board database, generated exports, QA ledgers/reports, and worktree-cleanup recovery journals/backups. Add `.factory-state/` to `.gitignore`. Scripts resolve the primary checkout from Git’s absolute common-directory path and fail closed if they cannot; they never fall back to storing runtime state in the Git common directory or the current worktree. Migration copies and verifies existing state at the new location; the original source remains untouched until you explicitly approve cleanup. Git-native metadata such as `.git/info/exclude` is not runtime state and may be written only for ignore rules.
+
+The live board is `<primary-checkout>/.factory-state/factory-board.sqlite3`, shared by all worktrees of a clone. Only the orchestrator edits rows through `board.py`; the human-only `worktree.py finalize` coordinates integration and its final row transition. `docs/BOARD.md` is a legacy import source, not live state. `board.py export` writes a generated Markdown snapshot in `.factory-state`; never edit that snapshot or commit it. On first use import the existing main checkout's local legacy board once, preserving its bytes in SQLite. A fresh clone without a local board starts empty; never restore historical rows from Git history or a template. Back up the SQLite file with a consistent SQLite backup or use `board.py export` before moving clones.
 
 **The board is the CLI's view of the worktrees.** `git worktree list` shows the worktrees;
 `board.py show` shows what each one is doing and who owns it. The `Branch/Worktree` column
@@ -1044,7 +1039,7 @@ worktree.
     afterwards. A refusal changes nothing on the board.
     A human may destroy work that `discard` refuses, in two steps: `--force` alone prints the
     destruction plan and never acts, and `--force --yes` acts after writing a recovery patch and
-    a recovery TSV under the repository's `cleanup-wt/` folder.
+    a recovery TSV under `.factory-state/cleanup-wt/<repo-id>/`.
 
 ### Board lanes
 
@@ -1113,7 +1108,7 @@ met**, proven by evidence. The lanes repeat until then.
 
 ### The ledger
 
-The state of a row's rounds lives in `<git-common-dir>/reviews/<task-id>-ledger.md`: the
+The state of a row's rounds lives in `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`: the
 round number, findings, same-worktree corrections and stop reason.
 The ledger is the **only** thing carried between rounds — a reviewer that watched the last edits
 grades intent, not pixels, so **each round's review is done by a fresh reviewer** that reads the
@@ -1139,7 +1134,7 @@ cap is reached and the row still fails, the row moves to `Blocked` with a summar
 tried and the question the human needs to answer. A fourth round is never opened.
 
 **The ledger.** Each round's state lives in one short file per row:
-`<git-common-dir>/reviews/<task-id>-ledger.md`. It holds the round number, findings,
+`<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`. It holds the round number, findings,
 corrections in the existing worktree and the stop reason when it stops.
 
 The ledger is the **only** thing carried between rounds. A reviewer that watched the last edits
@@ -1361,7 +1356,7 @@ historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser w
   Transfer desktop-owned captures with the built-in browser, then store the returned bytes under
   the canonical path. Never assume desktop and server filesystems are shared.
   **Review reports and the ledger are local evidence, outside the task worktree:**
-  `<git-common-dir>/reviews/<task-id>-qa.md`, `-ui.md` and `-ledger.md`.
+  `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md`, `-ui.md` and `-ledger.md`.
 - **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
   recording what was checked and expected vs actual. Reviewers leave this main-checkout evidence
   uncommitted and do not edit the task worktree; leave full-page captures out of git.
@@ -1388,8 +1383,8 @@ independent of the builder's claims:
 
 | Agent | Role | Output |
 |---|---|---|
-| `qa-reviewer` | Verifies behavior against the acceptance criteria; uses the built-in browser for UI | `<git-common-dir>/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
-| `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `<git-common-dir>/reviews/<task-id>-ui.md` |
+| `qa-reviewer` | Verifies behavior against the acceptance criteria; uses the built-in browser for UI | `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
+| `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `<primary-checkout>/.factory-state/reviews/<task-id>-ui.md` |
 
 Both are read-only against application code. They report; they do not fix.
 

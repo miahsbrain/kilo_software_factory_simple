@@ -29,7 +29,7 @@ touches nothing there.
 discard --force relaxes that refusal in two steps: --force alone prints the
 destruction plan and never acts, and --force --yes acts after writing a
 recovery copy — the uncommitted changes as a patch, and the lost commit shas
-in the recovery TSV, both under <git-common-dir>/cleanup-wt/.
+in the repository-scoped factory state cleanup directory.
 
 handoff prints review commands for a row. Merge guidance requires Pending Merge,
 a clean worktree and committed work ahead of base; failed checks refuse guidance.
@@ -47,7 +47,7 @@ ahead of base.
 cleanup is a dry run by default. --apply removes the worktree and deletes the
 branch, but refuses when the branch has commits that are not reachable from the
 base or when the worktree is dirty. Unmerged work is never deleted. Every run
-writes a recovery TSV to <git-common-dir>/cleanup-wt/<timestamp>.tsv.
+writes a recovery TSV to <factory-state>/cleanup-wt/<repo-id>/<timestamp>.tsv.
 
 cleanup takes the worktree either as a slug or as the board row that owns it:
 cleanup --board BOARD-00X resolves the row's Branch/Worktree cell. Exactly one
@@ -95,6 +95,15 @@ def git(cwd, *args, timeout=60):
 def git_out(cwd, *args):
     code, out, _ = git(cwd, *args)
     return out if code == 0 else None
+
+
+def common_dir(cwd):
+    """Return Git's absolute common directory, or None when it cannot be resolved."""
+    common = git_out(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if not common or not os.path.isabs(common):
+        return None
+    common = os.path.realpath(common)
+    return common if os.path.isdir(common) else None
 
 
 def git_raw(cwd, *args, timeout=60):
@@ -160,6 +169,20 @@ def script_root():
     """The repo root that holds this script, whatever the cwd is."""
     return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                         "..", "..", "..", ".."))
+
+
+def factory_state_root(control):
+    state_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                              "../../runtime-state/scripts/state.py"))
+    spec = importlib.util.spec_from_file_location("factory_runtime_state", state_file)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.ensure_runtime_ready(control)
+    return module.state_root(control)
+
+
+def recovery_directory(control, repo_id):
+    return os.path.join(factory_state_root(control), "cleanup-wt", repo_id)
 
 
 def load_repos(root):
@@ -372,13 +395,6 @@ def slugify(title):
     if len(slug) > MAX_SLUG_LEN:
         slug = drop_trailing_stopwords("-".join(slug.split("-")[:6]))
     return slug
-
-
-def common_dir(cwd):
-    out = git_out(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    if not out:
-        out = git_out(cwd, "rev-parse", "--git-common-dir")
-    return os.path.abspath(out) if out else None
 
 
 def list_worktrees(cwd):
@@ -697,7 +713,7 @@ def removal_refusal(path, branch, base):
     return refusal_reason(dirty, shas, branch, base)
 
 
-def recovery_patch(path, common, dirty, stamp):
+def recovery_patch(path, directory, dirty, stamp):
     """(patch path, error). The uncommitted changes as a patch, or None when clean.
 
     Untracked files are added with intent-to-add, so `git diff HEAD` carries
@@ -705,11 +721,9 @@ def recovery_patch(path, common, dirty, stamp):
     """
     if not dirty:
         return None, None
-    if not common:
-        return None, "cannot find the repository's common git directory"
-    target = os.path.join(common, "cleanup-wt", stamp + ".patch")
-    if not os.path.realpath(target).startswith(os.path.realpath(common) + os.sep):
-        return None, "refused: the patch path %s is outside %s" % (target, common)
+    target = os.path.join(directory, stamp + ".patch")
+    if not os.path.realpath(target).startswith(os.path.realpath(directory) + os.sep):
+        return None, "refused: the patch path %s is outside %s" % (target, directory)
     _, untracked, _ = git_raw(path, "ls-files", "--others", "--exclude-standard")
     for name in [line.strip() for line in untracked.splitlines() if line.strip()]:
         git(path, "add", "-N", "--", name)
@@ -802,7 +816,7 @@ def cmd_discard(args, cwd):
         return REFUSED
     sha = git_out(path, "rev-parse", "HEAD") or ""
     repo = repo_of_path(path) or target
-    common = common_dir(repo)
+    recovery_dir = recovery_directory(root, repo_id)
     base, base_err = resolve_base(repo, args.base)
     if base_err:
         print(base_err, file=sys.stderr)
@@ -846,7 +860,7 @@ def cmd_discard(args, cwd):
     if reason is not None and not forced:
         rows.append({"when": now, "kind": "worktree", "name": branch or "(detached)", "sha": sha,
                      "path": path, "action": "keep", "reason": reason})
-    tsv = recovery_tsv(common, rows) if common else None
+    tsv = recovery_tsv(recovery_dir, rows)
 
     print("worktree: %s" % path)
     print("branch:   %s" % (branch or "(detached)"))
@@ -871,7 +885,7 @@ def cmd_discard(args, cwd):
     patch = None
     if forced:
         stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        patch, err = recovery_patch(path, common, dirty, stamp)
+        patch, err = recovery_patch(path, recovery_dir, dirty, stamp)
         if err:
             print(err, file=sys.stderr)
             print("refused: the recovery copy could not be written; nothing was deleted")
@@ -1117,8 +1131,11 @@ def cmd_finalize(args, cwd):
         # check-ref-format prints the branch name on success.
         print("refused: invalid recorded branch", file=sys.stderr)
         return REFUSED
-    common = common_dir(repo)
-    journal = os.path.join(common, "cleanup-wt", "finalize-%s-%s.json" % (args.board, repo_id))
+    recovery_dir = recovery_directory(control, repo_id)
+    journal = os.path.join(recovery_dir, "finalize-%s.json" % args.board)
+    legacy_journal = os.path.join(recovery_dir, "finalize-%s-%s.json" % (args.board, repo_id))
+    if not os.path.lexists(journal) and os.path.lexists(legacy_journal):
+        journal = legacy_journal
     existing = None
     if os.path.exists(journal):
         try:
@@ -1380,9 +1397,9 @@ def cmd_verify(args, cwd):
     return OK
 
 
-def recovery_tsv(common, rows):
+def recovery_tsv(directory, rows):
     stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    path = os.path.join(common, "cleanup-wt", stamp + ".tsv")
+    path = os.path.join(directory, stamp + ".tsv")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as fh:
         fh.write("when\tkind\tname\tsha\tpath\taction\treason\n")
@@ -1482,7 +1499,16 @@ def cmd_cleanup(args, cwd):
     branch = board_branch or (git_out(path, "rev-parse", "--abbrev-ref", "HEAD") or "")
     sha = git_out(path, "rev-parse", "HEAD") or ""
     repo = repo_of_path(path) or root
-    common = common_dir(repo)
+    repos, repos_error = load_repos(control)
+    if repos is None:
+        print(repos_error, file=sys.stderr)
+        return REFUSED
+    repo_id = next((key for key, rel in repos.items()
+                    if os.path.realpath(os.path.join(control, rel)) == os.path.realpath(repo)), None)
+    if repo_id is None:
+        print("refused: cannot identify worktree repository in repo map", file=sys.stderr)
+        return REFUSED
+    recovery_dir = recovery_directory(control, repo_id)
     base, base_err = resolve_base(repo, args.base)
     if base_err:
         print(base_err, file=sys.stderr)
@@ -1504,7 +1530,7 @@ def cmd_cleanup(args, cwd):
     if reason is not None:
         rows.append({"when": now, "kind": "worktree", "name": branch or "(detached)", "sha": sha,
                      "path": path, "action": "keep", "reason": reason})
-    tsv = recovery_tsv(common, rows) if common else None
+    tsv = recovery_tsv(recovery_dir, rows)
 
     print("worktree: %s" % os.path.abspath(path))
     print("branch:   %s" % (branch or "(detached)"))

@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Move runtime state outside Git metadata
+**Type:** Feature
+**Board:** BOARD-148 | **Branch:** chore/move-clone-local-state-out-of-git-metadata
+**Changed:** runtime-state resolver/migration CLI, board/worktree/QA state consumers, regression fixtures, rules, and factory docs.
+**Why:** Keep clone-local mutable state outside `.git` while sharing it across linked worktrees.
+**Impact:** Runtime paths use `<primary-checkout>/.factory-state/`. The verified snapshot was installed atomically after stopping legacy DB writers; SQLite integrity and source stability were checked. The original `.git/` state remains untouched; cleanup was not approved or performed. Default writers refuse unverified destinations.
+**Verification:** `state.py migrate` dry-run previewed five state items; `state.py migrate --apply` reported `migration verified and installed atomically; source remains untouched`. Runtime-state suite: 13 tests passed; board suite: 35 passed; handoff suite: 34 passed (user-run after the final fixture correction).
+
 ## [2026-11-12] Plan factory implementation backlog
 **Type:** Docs
 **Board:** BOARD-131 | **Branch:** docs/plan-factory-implementation-backlog

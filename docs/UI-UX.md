@@ -118,7 +118,7 @@ lives there, once.
 nine passes and checklist — in the same review round as the QA capture. The report records the
 direction and one line per sign. It is not a second opinion to skip when time is short. The
 `/unslop` command runs the whole procedure and writes the audit to
-`docs/reviews/<task-id>-unslop.md`.
+`<primary-checkout>/.factory-state/reviews/<task-id>-unslop.md`.
 
 ---
 
@@ -308,9 +308,9 @@ Store the returned browser files under this path in the **main checkout**, inclu
 reviews. Retain historical evidence. Logs and summaries describe actual observations, not
 automatically generated results or unchecked passes.
 
-Review reports and the ledger are **documents, not artifacts**. They stay where documents live:
-`docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
-`docs/reviews/<task-id>-ledger.md`.
+Review reports and the ledger are **runtime records, not artifacts**. They live outside task worktrees:
+`<primary-checkout>/.factory-state/reviews/<task-id>-qa.md`, `-ui.md`, and
+`-ledger.md`.
 
 Commit `notes.md` and small component shots. Keep full-page captures out of git unless the team
 wants a visual record — they are large and churn.

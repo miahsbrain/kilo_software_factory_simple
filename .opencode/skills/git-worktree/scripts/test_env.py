@@ -61,7 +61,12 @@ def make_repo(base):
             if name.endswith(".py"):
                 shutil.copyfile(os.path.join(REPO_SCRIPTS, group, "scripts", name),
                                 os.path.join(target, name))
+    state_scripts = os.path.join(repo, ".opencode", "skills", "runtime-state", "scripts")
+    os.makedirs(state_scripts)
+    shutil.copyfile(os.path.join(REPO_SCRIPTS, "runtime-state", "scripts", "state.py"),
+                    os.path.join(state_scripts, "state.py"))
     write(os.path.join(repo, ".opencode", "repos.json"), '{\n  "control": "."\n}\n')
+    write(os.path.join(repo, ".gitignore"), "/.factory-state/\n/.opencode/worktrees/\n")
     write(os.path.join(repo, "docs", "BOARD.md"), (
         "| ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | "
         "Branch/Worktree | Notes |\n"
@@ -558,12 +563,12 @@ def force_dirty(repo, worktree_script, base, call, check):
     _, branches, _ = git(repo, "branch", "--list")
     check(slug not in branches, "--force --yes left the branch behind")
 
-    _, common, _ = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    patches = [name for name in os.listdir(os.path.join(common, "cleanup-wt"))
+    recovery = os.path.join(repo, ".factory-state", "cleanup-wt", "control")
+    patches = [name for name in os.listdir(recovery)
                if name.endswith(".patch")]
     check(len(patches) == 1, "expected one recovery patch, found %d" % len(patches))
     if patches:
-        patch_path = os.path.join(common, "cleanup-wt", patches[0])
+        patch_path = os.path.join(recovery, patches[0])
         check(patch_path in out, "the output does not print the patch path")
         with open(patch_path, encoding="utf-8") as fh:
             patch = fh.read()
@@ -595,13 +600,13 @@ def force_unmerged(repo, worktree_script, call, check):
     _, branches, _ = git(repo, "branch", "--list")
     check(slug not in branches, "--force --yes left the branch behind")
 
-    _, common, _ = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    tsvs = [name for name in os.listdir(os.path.join(common, "cleanup-wt"))
+    recovery = os.path.join(repo, ".factory-state", "cleanup-wt", "control")
+    tsvs = [name for name in os.listdir(recovery)
             if name.endswith(".tsv")]
     check(bool(tsvs), "no recovery TSV was written")
     found = False
     for name in tsvs:
-        with open(os.path.join(common, "cleanup-wt", name), encoding="utf-8") as fh:
+        with open(os.path.join(recovery, name), encoding="utf-8") as fh:
             if commit_sha in fh.read():
                 found = True
     check(found, "the recovery TSV does not hold the commit sha")

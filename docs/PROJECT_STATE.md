@@ -1,5 +1,16 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-148 clone-local state migration tooling (2026-11-12)
+
+- BOARD-148 is in `.opencode/worktrees/move-clone-local-state-out-of-git-metadata` on
+  `chore/move-clone-local-state-out-of-git-metadata`. The verified snapshot is installed at
+  `.factory-state/`; the original `.git/` state remains untouched, and cleanup was not approved
+  or performed. `state.py path` and `board.py show` resolve to the new state.
+- Verification: runtime-state suite passed 13 tests; board suite passed 35; handoff suite passed
+  34 (run by the user after the final fixture correction). Independent QA returned PASS, and all
+  four acceptance proofs are recorded on BOARD-148. Next: the human inspects and finalizes the
+  branch after the guarded handoff.
+
 ## Current session — BOARD-131 factory backlog plan reviewed (2026-11-12)
 
 - The approved factory scope is a read-only board/worktree/branch dashboard, SQLite as the task
@@ -80,7 +91,7 @@
 - `feat/sqlite-board-bootstrap` remains in the same worktree. `docs/BOARD.md` is untracked on
   the task branch only; disk bytes and SQLite import snapshot remain. Root/template rules,
   specialist agents, scripts and derived commands now route in-task findings back to the same
-  worktree and keep reviewer reports/ledger in Git common-dir `reviews/`.
+  worktree and keep reviewer reports/ledger under `<primary-checkout>/.factory-state/reviews/`.
 - Human-only finalize requires a real TTY and typed board/base/branch/tip. Conflict preflight
   reports path/cause; a failed merge initiated by the command is aborted when safe. The gate
   deters unintended invocation but cannot isolate processes sharing one OS identity.
@@ -90,9 +101,10 @@
 
 ## Current session — SQLite board core slice (2026-11-12)
 
-- `feat/sqlite-board-bootstrap` in its assigned worktree moves default board reads/mutations
-  to per-clone SQLite in the Git common directory, with one-time legacy import and manual
-  Markdown export. `worktree.py` and permanent rules remain unchanged in this first slice.
+- The factory board's configured runtime location is
+  `<primary-checkout>/.factory-state/factory-board.sqlite3`, with one-time legacy import and
+  manual Markdown export. Existing Git-metadata state remains untouched until the explicitly
+  approved dry-run/apply migration is run; the original SQLite core work is historical.
 - Legacy tracked Markdown remains untouched; human migration/merge and follow-up lifecycle
   governance are not done. Parent reviews tests and decides next sequential slice.
 

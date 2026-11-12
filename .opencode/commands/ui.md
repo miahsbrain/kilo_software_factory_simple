@@ -25,11 +25,11 @@ Do not use Playwright, browser MCP alternatives or `browser-review.mjs` for UI v
 
        python3 .opencode/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 
-   The ledger lives at `<git-common-dir>/reviews/<task-id>-ledger.md`.
+    The ledger lives at `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`.
 4. **Store artifacts** under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` with a
    `notes.md` recording route, viewport, theme, steps, expected and observed results. Reviewers
    leave main-checkout artifacts uncommitted and do not edit the task worktree. Review reports stay in
-   `<git-common-dir>/reviews/<task-id>-qa.md` and `-ui.md`, outside the task worktree.
+    `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md` and `-ui.md`, outside the task worktree.
 5. **Check** and report findings as expected-vs-actual:
    - keyboard focus, visible focus ring, focus trapping in dialogs
    - contrast, accessible names on controls, alt text
