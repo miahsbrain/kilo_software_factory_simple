@@ -1,5 +1,25 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-146 round-four review, 2026-11-12**
+> Independent QA round 4 passed at `03b90fc`; architect review found no blocker. Results: migration
+> suite 42 tests (user-reported), lifecycle 5, HTTP 7, and projection validation 2. No live
+> migration has run. Next: human inspection and finalize; then run the explicit migration dry-run
+> and, separately, apply only with approval.
+
+> **Session Notes — BOARD-146 HTTP snapshot consistency, 2026-11-12**
+> The read-only SQLite adapter holds one explicit read transaction across each payload's related
+> selects. Scratch WAL interleavings cover cancellation between queue/history reads and human
+> finalization between active projection/details. The focused API class passed 7 tests in 0.529s.
+> No live board/migration was touched.
+
+> **Session Notes — BOARD-146 normalized storage and rebase, 2026-11-12**
+> BOARD-146 adds normalized planned items, criteria, active work, and terminal history with an
+> explicit migration and compatibility CLI. Same-line checklists retain separate verification and
+> proof; `remove` cancels while retaining history. The user reports the suite passed 42 tests in
+> 3.139s; it was not rerun for this alignment. Rebased onto local `opencode` at `1ca043a`;
+> BOARD-149 artifact policy and BOARD-146 schema/docs are retained with unique ADR-099/100/101.
+> No live board or migration was run.
+
 > **Session Notes — BOARD-149 QA artifacts, 2026-11-12**
 > New QA/UI reports and evidence live in the shared main-checkout directory
 > `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA writes `qa.md`, UI critique writes `ui.md`,
@@ -263,20 +283,39 @@
 > remains in this branch to avoid removing a possibly newer integration-checkout board on merge.
 > Later slices must reconcile legacy tracking, lifecycle governance and human-only finalization.
 
-## SQLite board core inventory
+## SQLite board inventory
 
 - `board.py:initialize_board`, `database_path`, `connect`, `live_database`, `read_table`,
-  `write_atomic`, `write_export` are **effectful**: Git discovery, SQLite read/write or local
-  export. `parse_table`, `merge_board_changes`, `cell_texts`, `replace_cell` are **pure**.
-- Schema: one `board` row (`id=1`, Markdown snapshot, original import bytes, revision); no
-  runtime files in the checkout. WAL and busy timeout serialize concurrent writers. First
-  import validates the old table; malformed UTF-8/table fails closed without changing source.
-- CLI `show`/`lanes` read current SQLite state; `add`, `note`, `set-status`, `set-field`,
-  `add-column`, `remove` update SQLite; `export` writes a readable Markdown snapshot in the
-  common Git directory. The viewer discovers per-clone control/project databases and reads
-  live rows via `read_table`. Existing template starter is unchanged.
-- In this transition the documented worktree lifecycle still uses its original calls and
-  independently retains its old governance wording. No application data model or env vars.
+  `write_atomic`, `write_export`, `accept_plan_batch`, `plan_rows`, `transition_plan_item` are
+  **effectful**: Git discovery, SQLite read/write or local export. `parse_table`,
+  `merge_board_changes`, `validate_plan_batch`, `format_plan_items`, `cell_texts`, `replace_cell`
+  are **pure**.
+- Schema: `board` retains the original imported Markdown/source bytes and revision as the
+  compatibility snapshot. The explicit normalized schema adds `planned_items` (Board ID and
+  non-lifecycle fields, optional `user_story`, `queue_position`, terminal outcome and
+  `display_position`), `acceptance_criteria` (ordered text, verification and proof), and
+  `active_work` (approved active status and nullable branch/worktree). Queue positions and
+  per-item criterion positions are unique; SQLite foreign keys and transactions protect writes.
+  Migration is never automatic: dry-run is read-only; `--apply` makes a consistent backup first,
+  then applies transactional DDL and data conversion. Existing Notes stay verbatim; explicit
+  checklist entries/proofs are copied to criteria rows, including separate same-line entries
+  delimited by `; - [ ]`. A following proof line applies to the final checklist on that line.
+- Before normalized migration, the existing Markdown snapshot remains the CLI source. After
+  migration, `read_table` renders a compatibility projection from normalized rows and
+  `write_atomic` updates normalized state in the same SQLite transaction. Historical status
+  mapping: Backlog→queue; Ready/In Progress/In Review/Pending Merge/Blocked→active work;
+  Merged→completed; Dropped→cancelled. `display_position` preserves current table order.
+  `board.py remove <ID>` cancels normalized items rather than deleting them: active/queue references
+  are removed, terminal outcome becomes cancelled, and the item, criteria and Notes remain.
+- CLI `show`/`lanes` read active SQLite state; `add`, `note`, `set-status`, `set-field`, `remove`
+  update SQLite; `plan accept`, `queue`, `history`, `promote`, `complete`, and `cancel` manage
+  normalized lifecycle state; `export` writes an active-only Markdown snapshot. After migration,
+  show/lanes/export exclude queued and terminal rows; internal compatibility reads retain all rows.
+  Existing template starter is unchanged.
+- Worktree finalization calls `write_connection_snapshot()` from `clear_row_worktree()` in the
+  finalizer transaction. This maps `Merged` to completed history and preserves canonical criteria.
+  `plan complete` refuses when a worktree is recorded or status is `Pending Merge`; only human
+  finalize completes those rows.
 - Verification: `python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'`.
   This slice does not run the full lifecycle suite; parent must review before any merge.
 
@@ -663,11 +702,11 @@ node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127
 |---|---|
 | `AGENTS.md` | The rule set, read by every agent at the start of a task. |
 | `.opencode/commands/*.md` | Slash commands that package the workflow. |
-| `.opencode/skills/board/scripts/board.py` | The clone-local SQLite board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`, `export`. |
+| `.opencode/skills/board/scripts/board.py` | The clone-local SQLite board's only writer. `show`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `export`, normalized migration, `plan accept/queue/history/promote/complete/cancel`; legacy `add` and `add-column` are refused after normalization. |
 | `.opencode/skills/board/scripts/board_serve.py` | The read-only factory board console on port 15180. Server-rendered, offline, standard library at runtime: a three-column dashboard shell (lane/filter sidebar, KPI strip, segmented flow meter, dense lane panel, sticky worktrees rail), search and status/type/priority filters with URL state, parsed Notes checklists, branch copy, and `j`/`k`/`/`/`Enter`/`Esc` keyboard control. Serves `/static/board.css` and the two self-hosted Geist fonts. `/api/board` retains its shape; `/api/worktrees` retains its array/fields and adds `repo` and `base` metadata. |
 | `.opencode/skills/board/ui/` | The Tailwind v4 source for the console (`package.json`, `src/app.css`); `npm --prefix .opencode/skills/board/ui run build` writes the committed `static/board.css`. |
 | `.opencode/skills/board/static/` | The committed stylesheet and the Geist Sans/Mono variable fonts with their SIL OFL licence. |
-| `.opencode/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, `discard` (`--force`, `--yes`), `handoff`, `list`, `verify`, `cleanup` (by slug or by `--board`). The teardown commands set the row's lane: `cleanup --board` sets `Merged`, `discard --board` sets `Ready`. |
+| `.opencode/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, `discard` (`--force`, `--yes`), `handoff`, `list`, `verify`, `cleanup` (by slug or by `--board`). The teardown commands set the row's lane: `cleanup --board` sets `Merged`, `discard --board` sets `Ready`; both update normalized state through the board adapter. |
 | `.opencode/skills/git-worktree/scripts/env.py` | Provisions the local env files of a worktree. `sync`, `status`, `clean`. |
 | `.opencode/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.opencode/skills/git-worktree/scripts/scope.py` | The generated pointer a work surface carries, and the local exclude rule that keeps it out of every commit. |
@@ -693,9 +732,18 @@ Chunk 1 reuses these existing boundaries:
 | Symbol | File | Responsibility | Kind |
 |---|---|---|---|
 | `board.py` | `.opencode/skills/board/scripts/board.py` | Reads and updates the clone-local SQLite board; generates a Markdown export on demand. | effectful (SQLite, file I/O) |
+| `validate_plan_batch(items, existing_ids)` | `.opencode/skills/board/scripts/board.py:320` | Validates a full accepted JSON batch, including single-line repository IDs, resolves temporary dependencies and allocates consecutive IDs without I/O or input mutation. | pure |
+| `normalized_markdown(connection, markdown, active_only=False)` | `.opencode/skills/board/scripts/board.py:223` | Renders the canonical projection and verifies it parses with the same row-ID sequence before callers persist or return it. | effectful read (SQLite connection passed explicitly) |
+| `accept_plan_batch(path, items)` / `transition_plan_item(path, board_id, action)` | `.opencode/skills/board/scripts/board.py:437`, `:506` | Atomically inserts ordered canonical items/criteria or changes queue/active/terminal references; refuses before normalized migration. | effectful (SQLite) |
+| `plan_rows(path, view)` / `format_plan_items(items, view)` | `.opencode/skills/board/scripts/board.py:498`, `:545` | Reads queue/history ordered by queue or stable display position; formats the CLI view. | effectful read / pure format |
+| `normalized_plan_rows(connection, view)` | `.opencode/skills/board/scripts/board.py:464` | Reads canonical active, queue or history items and ordered criteria using the caller's connection; shared by CLI and the read-only API's snapshot transaction. | effectful read (SQLite connection passed explicitly) |
+| `write_connection_snapshot(connection, markdown, revision, allow_completion=False)` | `.opencode/skills/board/scripts/board.py:418` | Keeps normalized state and the compatibility Markdown snapshot aligned in the caller's transaction. | effectful (SQLite) |
+| `clear_row_worktree(...)` | `.opencode/skills/git-worktree/scripts/worktree.py:1412` | Clears a worktree cell through the board adapter; successful human finalization records completed history in the existing transaction. | effectful (Git, SQLite) |
 | `state.py` | `.opencode/skills/runtime-state/scripts/state.py` | Resolves the primary checkout from Git's absolute common-dir path; `migrate` dry-runs or copies and verifies legacy runtime files without deleting sources. | effectful (Git, filesystem) |
 | `board_serve.py` | `.opencode/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
-| `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1704` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
+| `readonly_board_connection(board, root)` / `read_control_rows(...)` | `.opencode/skills/board/scripts/board_serve.py:167`, `:212` | Opens an existing board using the safe read-only SQLite policy and holds one explicit transaction across related selects. Normalized factory rows use active-only projection and canonical story/criteria; request handling never initializes or migrates. | effectful (filesystem, SQLite read) |
+| `planned_item_payload(item, view)` | `.opencode/skills/board/scripts/board_serve.py:256` | Maps canonical queue/history rows to current board field names and adds queue position or terminal outcome. | pure |
+| `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:142`, `:1753` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. `/api/planned-work` is factory-control-only and reads queue/history through the read-only boundary. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
 | `worktree_state()` | `.opencode/skills/board/scripts/board_serve.py:171` | Reloads the existing registry and enumerates control/project via `load_repos`, `resolve_repo`, `is_git_repo`, `list_worktrees`, `default_base` and `git_out`. Omits absent/uninitialized projects. Each entry adds `repo` and `base`; existing array and fields stay intact. Main detection and counts use only that repository. Invalid maps flow through existing payload exception handling. | effectful (filesystem, Git); entry construction is deterministic from results |
 | `wb_scope_default()` / `wb_scope_tabs()` / `wb_scope_content()` | `.opencode/skills/board/scripts/board_serve.py:1449`, `:1456`, `:1470` | Pure reusable selection fallback, tablist and scoped content presenters; map harness to control worktrees and reuse existing counts/panels/lanes/cards/rail. Gallery only; asset authored, browser review pending. | pure |
 | `gallery_scope_fixtures()` / `build_gallery_html()` | `.opencode/skills/board/scripts/board_serve.py:1494`, `:1519` | Pure labelled fixtures and gallery composition; identical BOARD-001 IDs are separated by board keys. No live data or second task store. | pure |
@@ -729,16 +777,20 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 
 ## 6. States and state transitions
 
-The board's lanes are the state machine of the factory:
-`Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged`, plus `Blocked`
-and `Dropped`. In-task QA findings return to the same row and worktree; the review loop is capped
-at 10 rounds. Full rules in `AGENTS.md` §B4.
+The board lifecycle is normalized: queued items have a unique `queue_position`; promotion clears
+it and creates one active-work reference at `Ready`. Active statuses are `Ready`, `In Progress`,
+`In Review`, `Pending Merge`, and `Blocked`. Completion/cancellation remove the active reference
+and set a retained terminal outcome. Worktree-bearing and Pending Merge items complete only via
+human finalization. In-task QA findings return to the same row and worktree; the review loop is
+capped at 10 rounds. Full rules in `AGENTS.md` §B4.
 
 ## 7. Public interfaces
 
 The local dashboard exposes read-only HTTP on loopback port 15180: `GET /api/board`,
-`GET /api/worktrees` and `GET /api/repo-candidates`. It has no session view, dispatch or write
-endpoint. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
+`GET /api/worktrees`, `GET /api/repo-candidates` and factory-only `GET /api/planned-work`. Planned
+work reads queue/history through a read-only SQLite connection; `HEAD` returns matching status and
+headers without a body. The dashboard has no session view, dispatch or write endpoint. The board
+CLI includes the `plan` lifecycle commands. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
 `verify`, `cleanup`) and `env.py` (`sync`, `status`, `clean`). `discard` takes `--apply`, `--force`
 and `--yes`: `--force` alone prints the destruction plan, and `--force --yes` acts after writing a
 recovery copy under `<primary-checkout>/.factory-state/cleanup-wt/<repo-id>/`. `handoff --board <ID>` prints review
@@ -791,6 +843,18 @@ interaction or timer evidence. BOARD-119 reuses actual registry, Git parsing and
 mocked Git results; covers changed registry paths, same-name branches across repositories,
 per-repo main/base/counts/dirty state, missing/uninitialized project, SHA/count fallback, additive
 endpoint keys and existing malformed/invalid registry handling. No live Git calls.
+
+`python3 .opencode/skills/board/scripts/test_board_serve.py PlannedWorkApiTests` uses scratch Git
+repositories and SQLite only. It verifies queue/history order and active exclusion; legacy NULL
+stories, Notes and criterion proofs; normalized active `/api/board` fields; unchanged registered
+project row shape; sanitized unavailable/unmigrated/fixture/project-root 503 responses; GET/HEAD
+status, headers and body behavior; and unchanged DB/WAL and tracked files. It passed 5 tests in
+0.302s.
+
+`python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedProjectionValidationTests`
+uses a scratch SQLite board. It verifies CR/LF repository IDs refuse atomically without changing
+canonical tables, Markdown or revision; valid repository IDs produce a parseable projection; and a
+malformed generated projection is refused before persistence. It passed 2 tests in 0.096s.
 
 ## 11. Known issues and risks
 

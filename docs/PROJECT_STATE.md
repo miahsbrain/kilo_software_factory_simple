@@ -1,6 +1,29 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-149 QA report artifacts (2026-11-12)
+## Current session — BOARD-146 round-four review (2026-11-12)
+
+- Independent QA round 4 passed at `03b90fc`; architect review found no blocker. Results: migration
+  suite 42 tests (user-reported), lifecycle 5, HTTP 7, and projection validation 2. No live
+  migration has run. Next: human inspection and finalize, followed by an explicit migration dry-run
+  and separately approved apply.
+
+## Previous session — BOARD-146 CLI lifecycle (2026-11-12)
+
+- Added atomic plan acceptance, queue/history views, promotion, completion and cancellation. The
+  active board remains active-only; worktree finalization updates normalized state transactionally.
+- The lifecycle retry documented in `docs/STACK.md` passed 5 tests in 0.382s. Missing Notes are
+  canonical `""` and render as `-` only in Markdown; the empty canonical value survives unrelated
+  compatibility edits. Commit `32597b1` records the correction.
+
+## Previous session — BOARD-146 rebase alignment (2026-11-12)
+
+- BOARD-146 normalized storage, compatibility CLI, explicit migration, checklist parsing and
+  cancellation history are retained. The user reports the board suite passed 42 tests in 3.139s;
+  it was not rerun for this alignment. Rebased onto local `opencode` at `1ca043a`; conflict
+  resolution retained BOARD-149 artifact policy and unique ADR-099/100/101. No live migration or
+  board modification.
+
+## Previous session — BOARD-149 QA report artifacts (2026-11-12)
 
 - New QA/UI reports and evidence use `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA owns
   `qa.md` and QA evidence, UI critique owns `ui.md`, and builders own `builder/`. The bounded-loop
@@ -10,7 +33,7 @@
   The docs-only follow-up passed architect review. Next: the user inspects the worktree and runs
   the human-only finalize command.
 
-## Previous session — BOARD-145 QA↔fix cap update (2026-11-12)
+## Earlier session — BOARD-145 QA↔fix cap update (2026-11-12)
 
 - Approved policy and ledger cap is 10 rounds. Round 10 is last; a still-failing row moves to
   `Blocked` with what was tried and the question for the human. Critical-path failures, repeated

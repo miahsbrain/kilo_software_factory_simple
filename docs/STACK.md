@@ -43,6 +43,32 @@ python3 .opencode/skills/board/scripts/board.py show
 # Generate a readable Markdown snapshot in `.factory-state` (prints its path)
 python3 .opencode/skills/board/scripts/board.py export
 
+# Preview normalized board migration (read-only; default)
+python3 .opencode/skills/board/scripts/board.py migrate-normalized
+
+# Apply only after reviewing the preview; creates a consistent .pre-normalized.bak backup
+python3 .opencode/skills/board/scripts/board.py migrate-normalized --apply
+
+# List the queue and retained completion/cancellation history
+python3 .opencode/skills/board/scripts/board.py plan queue
+python3 .opencode/skills/board/scripts/board.py plan history
+
+# Accept an explicitly approved JSON batch from stdin; temporary keys support batch dependencies
+python3 .opencode/skills/board/scripts/board.py plan accept <<'JSON'
+[{"key":"export","task":"Export planned work","type":"Feature","priority":"P2",
+  "risk":"🟡 medium — scoped","user_story":"As an operator, I can export accepted work",
+  "acceptance_criteria":["The export contains the accepted items","The order matches the queue"],
+  "blocked_by":[],"repos":["control"],"notes":""}]
+JSON
+
+# Promote queued work; complete/cancel active work or cancel queued work
+python3 .opencode/skills/board/scripts/board.py plan promote BOARD-00X
+python3 .opencode/skills/board/scripts/board.py plan complete BOARD-00X
+python3 .opencode/skills/board/scripts/board.py plan cancel BOARD-00X
+
+# On normalized state remove cancels while retaining history, criteria and Notes.
+# Migration stores each semicolon-separated checkbox and explicit proof separately.
+
 # Resolve the clone-local runtime-state path, or explicitly migrate old Git-metadata state.
 # Stop all legacy database writers first; migration snapshots DB/WAL/SHM read-only and never removes source.
 python3 .opencode/skills/runtime-state/scripts/state.py path
@@ -60,8 +86,17 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD
 # Board refresh regressions (temporary fixture trees, no live server)
 python3 .opencode/skills/board/scripts/test_board_serve.py
 
-# Board bootstrap/migration and viewer regressions (temporary repositories only)
+# Board bootstrap, normalized migration and viewer regressions (temporary repositories only)
 python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'
+
+# BOARD-146 planned-work lifecycle regressions (scratch SQLite databases only)
+python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedLifecycleTests
+
+# BOARD-146 read-only planned-work HTTP API regressions (scratch repositories only)
+python3 .opencode/skills/board/scripts/test_board_serve.py PlannedWorkApiTests
+
+# BOARD-146 planned repository-ID/projection validation regressions (scratch SQLite only)
+python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedProjectionValidationTests
 
 # Create the worktree for a board row
 python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X

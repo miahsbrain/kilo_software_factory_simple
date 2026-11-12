@@ -163,29 +163,81 @@ def board_available(root):
         return False
 
 
+@contextlib.contextmanager
+def readonly_board_connection(board, root):
+    db = board.database_path(root)
+    try:
+        info = os.lstat(db)
+    except FileNotFoundError:
+        raise FileNotFoundError("Board not initialized")
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError("cannot read the board")
+    wal = os.path.exists(db + "-wal")
+    shm = os.path.exists(db + "-shm")
+    if wal != shm:
+        raise ValueError("cannot read the board")
+    # Immutable reads avoid creating WAL sidecars on a fully checkpointed board.
+    uri = "file:%s?mode=ro%s" % (quote(db, safe="/"), "" if wal else "&immutable=1")
+    with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
+        connection.execute("BEGIN")
+        try:
+            yield connection
+        finally:
+            connection.rollback()
+
+
 def read_secondary_table(board, path, root):
     """Read an existing registered SQLite board without invoking board initialization."""
     try:
-        db = board.database_path(root)
-        try:
-            info = os.lstat(db)
-        except FileNotFoundError:
-            return None, "Board not initialized"
-        if not stat.S_ISREG(info.st_mode):
-            return None, "cannot read the board"
-        wal = os.path.exists(db + "-wal")
-        shm = os.path.exists(db + "-shm")
-        if wal != shm:
-            return None, "cannot read the board"
-        # Immutable reads avoid creating WAL sidecars on a fully checkpointed board.
-        uri = "file:%s?mode=ro%s" % (quote(db, safe="/"), "" if wal else "&immutable=1")
-        with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
+        with readonly_board_connection(board, root) as connection:
             row = connection.execute("SELECT markdown FROM board WHERE id = 1").fetchone()
         if row is None:
             return None, "cannot read the board"
         return board.parse_table(row[0], path)
+    except FileNotFoundError:
+        return None, "Board not initialized"
     except (OSError, ValueError, sqlite3.Error):
         return None, "cannot read the board"
+
+
+def rows_from_table(board, table):
+    rows = []
+    for index in table["rows"]:
+        cells = board.cell_texts(table["lines"], index)
+        if len(cells) < len(COLUMNS):
+            cells = cells + [""] * (len(COLUMNS) - len(cells))
+        row = dict(zip(COLUMNS, cells))
+        row["Notes"] = " ".join(row["Notes"].split())
+        row["Notes raw"] = cells[COLUMNS.index("Notes")]
+        rows.append(row)
+    return rows
+
+
+def read_control_rows(board, path, root, factory_control):
+    try:
+        with readonly_board_connection(board, root) as connection:
+            snapshot = connection.execute(
+                "SELECT markdown FROM board WHERE id = 1").fetchone()
+            if snapshot is None:
+                return [], "cannot read the board"
+            markdown = snapshot[0]
+            active_items = {}
+            if board.normalized_enabled(connection) and factory_control:
+                markdown = board.normalized_markdown(connection, markdown, active_only=True)
+                active_items = {item["id"]: item for item in
+                                board.normalized_plan_rows(connection, "active")}
+            table, error = board.parse_table(markdown, path)
+            if table is None:
+                return [], error
+            rows = rows_from_table(board, table)
+        for row in rows:
+            item = active_items.get(row["ID"])
+            if item is not None:
+                row["user_story"] = item["user_story"]
+                row["acceptance_criteria"] = item["acceptance_criteria"]
+        return rows, None
+    except (OSError, ValueError, sqlite3.Error):
+        return [], "cannot read the board"
 
 
 def read_rows(board, path, secondary_root=None):
@@ -195,16 +247,7 @@ def read_rows(board, path, secondary_root=None):
     if table is None:
         return [], (err or "cannot read the board") + ("" if err == "Board not initialized"
                                                      else BOARD_READ_HINT)
-    rows = []
-    for i in table["rows"]:
-        cells = board.cell_texts(table["lines"], i)
-        if len(cells) < len(COLUMNS):
-            cells = cells + [""] * (len(COLUMNS) - len(cells))
-        row = dict(zip(COLUMNS, cells))
-        row["Notes"] = " ".join(row["Notes"].split())
-        row["Notes raw"] = cells[COLUMNS.index("Notes")]
-        rows.append(row)
-    return rows, None
+    return rows_from_table(board, table), None
 
 
 def lane_map(rows):
@@ -212,6 +255,29 @@ def lane_map(rows):
     for row in rows:
         lanes.setdefault(row["Status"], []).append(row["ID"])
     return lanes
+
+
+def planned_item_payload(item, view):
+    payload = {
+        "ID": item["id"],
+        "Task": item["task"],
+        "Type": item["type"],
+        "Status": item["status"],
+        "Priority": item["priority"],
+        "Risk": item["risk"],
+        "Blocked by": item["blocked_by"],
+        "Repos": item["repos"],
+        "Branch/Worktree": item["branch_worktree"] or "-",
+        "Notes": item["notes"],
+        "Notes raw": item["notes"],
+        "user_story": item["user_story"],
+        "acceptance_criteria": item["acceptance_criteria"],
+    }
+    if view == "queue":
+        payload["queue_position"] = item["queue_position"]
+    else:
+        payload["terminal_outcome"] = item["terminal_outcome"]
+    return payload
 
 
 def worktree_state(worktree, root):
@@ -1636,6 +1702,15 @@ class Handler(BaseHTTPRequestHandler):
                 print("[REPO] Candidate scan failed - directory unavailable", file=sys.stderr)
                 self.send_json(503, {"error": "Repository candidates unavailable."})
             return
+        if path == "/api/planned-work":
+            try:
+                payload = self.state["planned_work_payload"]()
+            except (OSError, ValueError, sqlite3.Error):
+                print("[BOARD] Planned work unavailable", file=sys.stderr)
+                self.send_json(503, {"error": "Planned work unavailable."})
+            else:
+                self.send_json(200, payload)
+            return
         if path == "/static/board.css":
             self.send_file(STATIC_ROOT / "board.css", "text/css; charset=utf-8")
             return
@@ -1658,10 +1733,15 @@ class Handler(BaseHTTPRequestHandler):
         self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
 
 
-def board_states(board, paths, secondary_roots=None):
+def board_states(board, paths, secondary_roots=None, control_root=None, factory_control=False):
     states = []
     for label, path in paths:
-        rows, error = read_rows(board, path, (secondary_roots or {}).get(path))
+        if control_root and os.path.abspath(path) == os.path.abspath(board_file(None, control_root)):
+            rows, error = read_control_rows(board, path, control_root, factory_control)
+            if error and error != "Board not initialized":
+                error += BOARD_READ_HINT
+        else:
+            rows, error = read_rows(board, path, (secondary_roots or {}).get(path))
         lanes = lane_map(rows)
         states.append({
             "label": label,
@@ -1682,8 +1762,30 @@ def build_payloads(board, worktree, paths, root):
                             for repo_id, target in registered_repos(worktree, root)
                             if repo_id != "control" and worktree.is_git_repo(target)}
                            if paths is None else {})
+        factory_control = paths is None and not os.path.isfile(os.path.join(root, "DOMAIN.md"))
         return {
-            "boards": board_states(board, current_paths, secondary_roots),
+            "boards": board_states(board, current_paths, secondary_roots,
+                                   root if paths is None else None, factory_control),
+            "generated_at": now(),
+        }
+
+    def planned_work_payload():
+        if paths is not None or os.path.isfile(os.path.join(root, "DOMAIN.md")):
+            raise ValueError("factory control board is unavailable")
+        controls = [target for repo_id, target in registered_repos(worktree, root)
+                    if repo_id == "control"]
+        if len(controls) != 1 or os.path.realpath(controls[0]) != os.path.realpath(root):
+            raise ValueError("factory control board is unavailable")
+        with readonly_board_connection(board, root) as connection:
+            if connection.execute("SELECT 1 FROM board WHERE id=1").fetchone() is None:
+                raise ValueError("factory board is unavailable")
+            if not board.normalized_enabled(connection):
+                raise ValueError("normalized planned work is unavailable")
+            queue = board.normalized_plan_rows(connection, "queue")
+            history = board.normalized_plan_rows(connection, "history")
+        return {
+            "queue": [planned_item_payload(item, "queue") for item in queue],
+            "history": [planned_item_payload(item, "history") for item in history],
             "generated_at": now(),
         }
 
@@ -1708,7 +1810,7 @@ def build_payloads(board, worktree, paths, root):
             error = "could not read the board: %s%s" % (exc, BOARD_READ_HINT)
         return build_html(states, state, now(), error, Handler.state["refresh"], root=root)
 
-    return board_payload, worktree_payload, candidate_payload, html_page
+    return board_payload, worktree_payload, candidate_payload, planned_work_payload, html_page
 
 
 def now():
@@ -1743,12 +1845,13 @@ def main(argv):
             return 1
         paths = None
 
-    board_payload, worktree_payload, candidate_payload, html_page = build_payloads(
+    board_payload, worktree_payload, candidate_payload, planned_work_payload, html_page = build_payloads(
         board, worktree, paths, root)
     Handler.state = {
         "board_payload": board_payload,
         "worktree_payload": worktree_payload,
         "candidate_payload": candidate_payload,
+        "planned_work_payload": planned_work_payload,
         "html": html_page,
         "gallery": build_gallery_html,
         "refresh": max(1, args.refresh),

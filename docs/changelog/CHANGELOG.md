@@ -3,6 +3,62 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Record BOARD-146 round-four review
+**Type:** Docs
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Record the independent QA pass, architect review and verification totals before human integration.
+**Impact:** Documentation only. No live migration has run; migration dry-run and separately approved apply remain after human inspection/finalize.
+
+## [2026-11-12] Reject multiline repository IDs in planned items
+**Type:** Fix
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/test_board_normalized.py`, `docs/STACK.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Prevent repository IDs from splitting compatibility rows and reject malformed generated projections before persistence.
+**Impact:** Focused command `python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedProjectionValidationTests` passed 2 tests in 0.096s. No live data was touched.
+
+## [2026-11-12] Keep planned-work payloads on one snapshot
+**Type:** Fix
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board_serve.py`, `.opencode/skills/board/scripts/test_board_serve.py`, `docs/ARCHITECTURE.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Prevent related normalized reads from combining different committed lifecycle states.
+**Impact:** The read-only adapter now holds an explicit SQLite read transaction. The focused API class passed 7 tests in 0.529s.
+
+## [2026-11-12] Add read-only planned-work API
+**Type:** Feature
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/board_serve.py`, `.opencode/skills/board/scripts/test_board_serve.py`, `docs/API_CONTRACTS.md`, `docs/STACK.md`, `docs/ARCHITECTURE.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Serve canonical queue/history and structured active criteria through safe read-only SQLite access.
+**Impact:** Focused command `python3 .opencode/skills/board/scripts/test_board_serve.py PlannedWorkApiTests` passed 5 tests in 0.302s. No live board/migration or dependency changes.
+
+## [2026-11-12] Record BOARD-146 lifecycle fix handoff
+**Type:** Docs
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Record the committed Notes correction and the next independent-review step.
+**Impact:** Documentation only.
+
+## [2026-11-12] Keep empty planned Notes canonical
+**Type:** Fix
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/test_board_normalized.py`, `docs/BUSINESS-LOGIC.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Store omitted planned Notes as an empty string while rendering `-` only in the Markdown compatibility view.
+**Impact:** Focused retry `python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedLifecycleTests` passed (5 tests, 0.382s); it also verifies unrelated field edits preserve the canonical empty value.
+
+## [2026-11-12] Add normalized board planning lifecycle
+**Type:** Feature
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/test_board_normalized.py`, `.opencode/skills/board/SKILL.md`, `.opencode/skills/git-worktree/scripts/worktree.py`, `docs/ARCHITECTURE.md`, `docs/API_CONTRACTS.md`, `docs/BUSINESS-LOGIC.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/STACK.md`
+**Why:** Add explicit JSON-batch acceptance and transactional queue/active/history lifecycle while retaining the existing active-board CLI and human-finalize gate.
+**Impact:** Lifecycle behavior added; HTTP remains contract-only. Verification `python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedLifecycleTests` ran 5 tests and failed at test line 294 because missing notes stored `'-'` instead of expected `''`; no retry was made.
+
+## [2026-11-12] Align BOARD-146 docs after rebase
+**Type:** Docs
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Preserve BOARD-149 artifact policy and retain BOARD-146 decisions under unique ADR numbers after rebasing onto `opencode`.
+**Impact:** Documentation only; no board state or application behavior changed. User-reported board suite result was not rerun.
+
 ## [2026-11-12] Record BOARD-149 final review handoff
 **Type:** Docs
 **Board:** BOARD-149 | **Branch:** chore/move-qa-reports-to-task-artifacts
@@ -30,6 +86,26 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Changed:** QA/UI instructions, native edit/write/patch role permissions, project templates and scopes, UI-UX guidance, handover, project state and decisions; copied BOARD-146 QA report to its approved artifact path.
 **Why:** Keep reports/evidence with task artifacts while reserving `.factory-state/reviews/` for bounded-loop ledgers.
 **Impact:** New report paths and role-specific file-tool permissions; shell remains trusted-agent authority. Ledger location, 10-round cap and stop conditions remain unchanged. Historical reports remain untouched.
+## [2026-11-12] Preserve checklist details and cancelled history
+**Type:** Fix
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/test_board_normalized.py`, board architecture/decision/business-logic/handover/stack/project-state docs.
+**Why:** Extract multiple semicolon-separated Notes checkboxes independently and retain normalized items when removed through the compatibility CLI.
+**Impact:** Each criterion keeps its own verification/proof; remove records cancellation without deleting canonical history. Verification was not run because the approved suite attempts are exhausted.
+
+## [2026-11-12] Correct normalized migration fixture count
+**Type:** Fix
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/test_board_normalized.py`, `docs/PROJECT_STATE.md`, `docs/HANDOVER.md`
+**Why:** Match the apply-result assertion to the fixture's 22 rows after three status-mapping cases were added.
+**Impact:** Test expectation only; not rerun because the prescribed verification attempts are exhausted.
+
+## [2026-11-12] Normalize planned and active board storage
+**Type:** Feature
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, normalized migration tests, board architecture/decision/stack/handover/business-logic/project-state documentation.
+**Why:** Separate planned queue, active work, criteria and terminal history while retaining existing board CLI behavior.
+**Impact:** Explicit `migrate-normalized` dry-run and `--apply` migration added. Applying creates a consistent backup through a separate read-only connection while holding the writer lock, verifies snapshot content/revision, then migrates transactionally. No live database was migrated; no planning lifecycle commands or endpoint added.
 
 ## [2026-11-12] Correct ledger invalid-ID test mock
 **Type:** Fix

@@ -37,14 +37,20 @@ overlapping edits; an explicit Markdown export is a snapshot, not a second sourc
 
 | Command | Does |
 |---|---|
-| `board.py show [ID]` | print all rows, or one row |
-| `board.py add --id ... --task ... --type ... --status ... --priority ... --risk ...` | append a row |
-| `board.py add-column --name <Col> [--after "<Col>"]` | insert a column into the table |
-| `board.py set-status <ID> "<status>"` | change one cell: the status |
-| `board.py set-field <ID> --field <field> --value "<value>"` | change one cell |
-| `board.py remove <ID>` | delete a row |
-| `board.py lanes` | count rows per lane |
-| `board.py export` | generate Markdown snapshot in `.factory-state/` |
+| `board.py show [ID]` | print active rows, or one active row, after normalized migration |
+| `board.py plan accept` | atomically accept a JSON array from stdin and assign IDs |
+| `board.py plan queue` | list queued items in queue order |
+| `board.py plan history` | list completed/cancelled items in display order |
+| `board.py plan promote <ID>` | promote queued work to `Ready` |
+| `board.py plan complete <ID>` | retain active work as completed history |
+| `board.py plan cancel <ID>` | retain queued or active work as cancelled history |
+| `board.py add --id ...` | append a legacy row only before normalized migration |
+| `board.py add-column --name <Col> [--after "<Col>"]` | insert a column only before normalized migration |
+| `board.py set-status <ID> "<status>"` | change an active item to another active status |
+| `board.py set-field <ID> --field <field> --value "<value>"` | change one permitted field |
+| `board.py remove <ID>` | cancel and retain a normalized item |
+| `board.py lanes` | count active rows per lane |
+| `board.py export` | generate an active-only Markdown snapshot in `.factory-state/` |
 
 The columns are:
 
@@ -78,60 +84,75 @@ exists, and refuses when a row has a different cell count from the header.
 
 ## 2. Lanes
 
-`Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged`
-plus `Blocked` (parked for a human) and `Dropped` (abandoned).
+Queued plans are stored in `planned_items` with `queue_position`; they are not active work.
+Promotion creates one `active_work` reference with status `Ready`. Active work uses
+`Ready` → `In Progress` → `In Review` → `Pending Merge`, plus `Blocked` (parked for a human).
+Completed and cancelled items remain in history and are not active.
 
 | Lane | Meaning |
 |---|---|
-| `Backlog` | Identified, not started |
-| `Ready` | Scoped, has acceptance criteria, can be picked up |
+| `Backlog` | Queued plan, ordered by `queue_position`; not active |
+| `Ready` | Promoted plan with one active-work reference |
 | `In Progress` | Worktree exists, Build lane running |
 | `In Review` | Build done, QA and Review lanes running |
 | `Pending Merge` | Green. **Waiting for human approval to merge** |
-| `Merged` | The user merged it; the worktree can be cleaned up |
+| `Merged` | Compatibility label for completed history; human finalize owns successful integration |
 | `Blocked` | Parked for a human: needs a decision, unclear scope, or duplicate |
-| `Dropped` | Abandoned; the reason is recorded |
+| `Dropped` | Compatibility label for cancelled history; the reason is retained |
 
 Types: `Feature` `Fix` `Chore` `Docs` `Research`.
 
 ---
 
-## 3. A row before it leaves `Backlog`
+## 3. A plan before acceptance
 
 Every row carries:
 
+- **User story** — required for newly accepted plans; legacy rows without one stay blank.
 - **Acceptance criteria** — 2–5 checkable items, each verifiable by a test or an observable step.
-  A task with no checkable criteria is not ready to build.
+  New plans cannot be accepted without them.
   A **Feature** row also carries a reuse criterion — which existing code was extended, or the
   reason there was none to extend.
 - **Risk** — `🟢 low` / `🟡 medium` / `🔴 high` plus one line of reasoning.
-- **Blocked by** — board IDs it depends on, or exactly `- None.`
-- **Notes** — the acceptance criteria and any context, so the next agent can pick it up cold.
+- **Blocked by** — existing Board IDs or temporary keys in the same accepted batch.
+- **Notes** — retain context verbatim; criteria are stored separately after migration.
+
+### Planning before persistence
+- Before a feature plan is persisted, present a conversation preview with each item’s user story, 2–5 checkable acceptance criteria, dependencies, priority, risk, and order.
+- Persist nothing until the user explicitly accepts the whole proposal or a selected subset. Persist only accepted items, preserving their preview order.
+- The planned item is canonical. Promotion creates one active-work reference to it; only promoted items appear in Active. Completion or cancellation removes that reference and retains the planned item in history.
 
 ---
 
 ## 4. The flow
 
 ```bash
-# 1. read the board before anything
+# 1. read active work and the queue/history before anything
 python3 .opencode/skills/board/scripts/board.py show
+python3 .opencode/skills/board/scripts/board.py plan queue
 
-# 2. add the row before starting work
-python3 .opencode/skills/board/scripts/board.py add \
-  --id BOARD-005 --task "Add the export endpoint" --type Feature --status Ready \
-  --priority P2 --risk "🟡 medium — one new endpoint, one new consumer" \
-  --blocked-by "None." --branch-worktree "-" \
-  --note "- [ ] POST /api/export returns a CSV
-- [ ] the export is covered by a test"
+# 2. after explicit user acceptance, persist the selected preview batch
+python3 .opencode/skills/board/scripts/board.py plan accept <<'JSON'
+[{"key":"export","task":"Add the export endpoint","type":"Feature","priority":"P2",
+  "risk":"🟡 medium — one new endpoint, one new consumer",
+  "user_story":"As an operator, I can export the board",
+  "acceptance_criteria":["POST /api/export returns a CSV","The export is covered by a test"],
+  "blocked_by":[],"repos":["control"],"notes":""}]
+JSON
 
-# 3. move it as the work advances
-python3 .opencode/skills/board/scripts/board.py set-status BOARD-005 "In Progress"
-python3 .opencode/skills/board/scripts/board.py set-status BOARD-005 "In Review"
-python3 .opencode/skills/board/scripts/board.py set-status BOARD-005 "Pending Merge"
+# 3. promote queued work, then move only among active statuses
+python3 .opencode/skills/board/scripts/board.py plan promote BOARD-00X
+python3 .opencode/skills/board/scripts/board.py set-status BOARD-00X "In Progress"
+python3 .opencode/skills/board/scripts/board.py set-status BOARD-00X "In Review"
+python3 .opencode/skills/board/scripts/board.py set-status BOARD-00X "Pending Merge"
 
 # 4. human-only finalize coordinates merge, cleanup and Merged lane from base checkout
 python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-005
 ```
+
+`board.py remove <ID>` is cancellation, not deletion. `plan complete` and `plan cancel` retain the
+canonical item, criteria and terminal outcome. After normalized migration, `add-column` is refused
+because the SQLite schema is fixed; use `plan accept` for every new item.
 
 When the worktree exists, record it:
 
