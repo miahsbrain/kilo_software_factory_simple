@@ -1,5 +1,13 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-126 ready for human inspection, 2026-11-12**
+> Registered repositories appear in the read-only feeds. `/api/repo-candidates` lists
+> unregistered names at two levels under `/projects` through no-follow directory handles.
+> Independent boards are read without initialization; an absent board reports
+> `Board not initialized`. The current-state board suite passed 32 tests, and independent
+> review passed. `feat/expose-registered-repos-and-safe-candidates` awaits human integration;
+> next build slice is the React/Tailwind component gallery, then its approval before screens.
+
 > **Session Notes — BOARD-126 approved WAL read semantics, 2026-11-12**
 > Current-data reads of an active WAL board may change transient metadata in an existing
 > SQLite `-shm` file. The test now preserves the no-new-sidecar, unchanged DB/WAL, unchanged

@@ -1,6 +1,16 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-126 WAL test clarification (2026-11-12)
+## Current session — BOARD-126 registered-repo feed reviewed (2026-11-12)
+
+- Registered-repo APIs and no-follow candidate discovery are committed on
+  `feat/expose-registered-repos-and-safe-candidates`. Read-only secondary SQLite reads
+  report an uninitialized board without creating it. Human-approved active-WAL reads may
+  update transient existing `-shm` metadata.
+- Current-state board suite: `python3 -m unittest discover -s .opencode/skills/board/scripts
+  -p 'test_board*.py'` passed 32 tests; independent review PASS. Next: human inspection
+  and integration before the React gallery slice.
+
+## Earlier BOARD-126 WAL test clarification (2026-11-12)
 
 - Human approved transient `-shm` metadata changes on active-WAL reads, not DB/WAL writes or
   board/sidecar creation. Scoped test assertion and contract/ADR updated; server unchanged.

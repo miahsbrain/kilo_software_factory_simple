@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Verify registered-repository read boundary
+**Type:** Docs
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `docs/PROJECT_STATE.md`, `docs/HANDOVER.md`, this log.
+**Why:** Record current-state suite and independent review after the API/security corrections.
+**Impact:** None; no runtime change. The earlier failed attempts remain recorded below.
+**Verification:** Board suite 32 tests OK on `ec15b3d`; independent review PASS.
+
 ## [2026-11-12] Clarify active-WAL read verification
 **Type:** Test
 **Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
