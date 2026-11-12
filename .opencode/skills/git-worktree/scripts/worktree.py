@@ -1430,15 +1430,12 @@ def clear_row_worktree(board, board_file, table, index, root, path, status=None,
         lines[index] = board.replace_cell(lines[index], branch_index, merged or "-")
         if status:
             lines[index] = board.replace_cell(lines[index], STATUS_INDEX, status)
+        allow_completion = status == "Merged"
         if connection is None:
-            board.write_atomic(board_file, lines)
+            board.write_atomic(board_file, lines, allow_completion=allow_completion)
         else:
-            proposed = "\n".join(lines)
-            parsed, error = board.parse_table(proposed, board_file)
-            if parsed is None:
-                raise ValueError(error)
-            connection.execute("UPDATE board SET markdown = ?, revision = ? WHERE id = 1",
-                               (proposed, revision + 1))
+            board.write_connection_snapshot(connection, "\n".join(lines), revision,
+                                            allow_completion=allow_completion)
     except Exception as exc:
         return False, str(exc)
     return True, ""

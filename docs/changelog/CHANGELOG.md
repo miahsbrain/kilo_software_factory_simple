@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Add normalized board planning lifecycle
+**Type:** Feature
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/test_board_normalized.py`, `.opencode/skills/board/SKILL.md`, `.opencode/skills/git-worktree/scripts/worktree.py`, `docs/ARCHITECTURE.md`, `docs/API_CONTRACTS.md`, `docs/BUSINESS-LOGIC.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/STACK.md`
+**Why:** Add explicit JSON-batch acceptance and transactional queue/active/history lifecycle while retaining the existing active-board CLI and human-finalize gate.
+**Impact:** Lifecycle behavior added; HTTP remains contract-only. Verification `python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedLifecycleTests` ran 5 tests and failed at test line 294 because missing notes stored `'-'` instead of expected `''`; no retry was made.
+
 ## [2026-11-12] Align BOARD-146 docs after rebase
 **Type:** Docs
 **Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board

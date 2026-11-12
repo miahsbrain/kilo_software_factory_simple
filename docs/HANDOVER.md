@@ -1,5 +1,17 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-146 CLI lifecycle, 2026-11-12**
+> Added explicitly accepted plan batches with generated IDs, dependency-key resolution and
+> transactional validation; added queue/history/promotion/completion/cancellation commands and
+> active-only traditional board views. Worktree completion now updates normalized rows in its
+> existing transaction; direct completion refuses worktree-bearing and Pending Merge items.
+> Updated the approved `/api/planned-work` contract only; HTTP implementation remains deferred.
+> Lifecycle tests use scratch SQLite. No live board/migration was touched. The one focused command
+> in `docs/STACK.md` ran 5 tests and failed at
+> `.opencode/skills/board/scripts/test_board_normalized.py:294`: missing optional `notes` expected
+> `''`, but actual stored value was `'-'`. No verification attempts remain in this chunk. Next:
+> preserve this WIP for review and request a corrective attempt before chunk 2.
+
 > **Session Notes — BOARD-146 normalized storage and rebase, 2026-11-12**
 > BOARD-146 adds normalized planned items, criteria, active work, and terminal history with an
 > explicit migration and compatibility CLI. Same-line checklists retain separate verification and
@@ -274,8 +286,10 @@
 ## SQLite board inventory
 
 - `board.py:initialize_board`, `database_path`, `connect`, `live_database`, `read_table`,
-  `write_atomic`, `write_export` are **effectful**: Git discovery, SQLite read/write or local
-  export. `parse_table`, `merge_board_changes`, `cell_texts`, `replace_cell` are **pure**.
+  `write_atomic`, `write_export`, `accept_plan_batch`, `plan_rows`, `transition_plan_item` are
+  **effectful**: Git discovery, SQLite read/write or local export. `parse_table`,
+  `merge_board_changes`, `validate_plan_batch`, `format_plan_items`, `cell_texts`, `replace_cell`
+  are **pure**.
 - Schema: `board` retains the original imported Markdown/source bytes and revision as the
   compatibility snapshot. The explicit normalized schema adds `planned_items` (Board ID and
   non-lifecycle fields, optional `user_story`, `queue_position`, terminal outcome and
@@ -293,12 +307,15 @@
   Merged→completed; Dropped→cancelled. `display_position` preserves current table order.
   `board.py remove <ID>` cancels normalized items rather than deleting them: active/queue references
   are removed, terminal outcome becomes cancelled, and the item, criteria and Notes remain.
-- CLI `show`/`lanes` read current SQLite state; `add`, `note`, `set-status`, `set-field`,
-  `add-column`, `remove` update SQLite; `export` writes a readable Markdown snapshot in the
-  common Git directory. The viewer discovers per-clone control/project databases and reads
-  live rows via `read_table`. Existing template starter is unchanged.
-- In this transition the documented worktree lifecycle still uses its original calls and
-  independently retains its old governance wording. No application data model or env vars.
+- CLI `show`/`lanes` read active SQLite state; `add`, `note`, `set-status`, `set-field`, `remove`
+  update SQLite; `plan accept`, `queue`, `history`, `promote`, `complete`, and `cancel` manage
+  normalized lifecycle state; `export` writes an active-only Markdown snapshot. After migration,
+  show/lanes/export exclude queued and terminal rows; internal compatibility reads retain all rows.
+  Existing template starter is unchanged.
+- Worktree finalization calls `write_connection_snapshot()` from `clear_row_worktree()` in the
+  finalizer transaction. This maps `Merged` to completed history and preserves canonical criteria.
+  `plan complete` refuses when a worktree is recorded or status is `Pending Merge`; only human
+  finalize completes those rows.
 - Verification: `python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'`.
   This slice does not run the full lifecycle suite; parent must review before any merge.
 
@@ -685,11 +702,11 @@ node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127
 |---|---|
 | `AGENTS.md` | The rule set, read by every agent at the start of a task. |
 | `.opencode/commands/*.md` | Slash commands that package the workflow. |
-| `.opencode/skills/board/scripts/board.py` | The clone-local SQLite board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`, `export`. |
+| `.opencode/skills/board/scripts/board.py` | The clone-local SQLite board's only writer. `show`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `export`, normalized migration, `plan accept/queue/history/promote/complete/cancel`; legacy `add` and `add-column` are refused after normalization. |
 | `.opencode/skills/board/scripts/board_serve.py` | The read-only factory board console on port 15180. Server-rendered, offline, standard library at runtime: a three-column dashboard shell (lane/filter sidebar, KPI strip, segmented flow meter, dense lane panel, sticky worktrees rail), search and status/type/priority filters with URL state, parsed Notes checklists, branch copy, and `j`/`k`/`/`/`Enter`/`Esc` keyboard control. Serves `/static/board.css` and the two self-hosted Geist fonts. `/api/board` retains its shape; `/api/worktrees` retains its array/fields and adds `repo` and `base` metadata. |
 | `.opencode/skills/board/ui/` | The Tailwind v4 source for the console (`package.json`, `src/app.css`); `npm --prefix .opencode/skills/board/ui run build` writes the committed `static/board.css`. |
 | `.opencode/skills/board/static/` | The committed stylesheet and the Geist Sans/Mono variable fonts with their SIL OFL licence. |
-| `.opencode/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, `discard` (`--force`, `--yes`), `handoff`, `list`, `verify`, `cleanup` (by slug or by `--board`). The teardown commands set the row's lane: `cleanup --board` sets `Merged`, `discard --board` sets `Ready`. |
+| `.opencode/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, `discard` (`--force`, `--yes`), `handoff`, `list`, `verify`, `cleanup` (by slug or by `--board`). The teardown commands set the row's lane: `cleanup --board` sets `Merged`, `discard --board` sets `Ready`; both update normalized state through the board adapter. |
 | `.opencode/skills/git-worktree/scripts/env.py` | Provisions the local env files of a worktree. `sync`, `status`, `clean`. |
 | `.opencode/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.opencode/skills/git-worktree/scripts/scope.py` | The generated pointer a work surface carries, and the local exclude rule that keeps it out of every commit. |
@@ -715,6 +732,11 @@ Chunk 1 reuses these existing boundaries:
 | Symbol | File | Responsibility | Kind |
 |---|---|---|---|
 | `board.py` | `.opencode/skills/board/scripts/board.py` | Reads and updates the clone-local SQLite board; generates a Markdown export on demand. | effectful (SQLite, file I/O) |
+| `validate_plan_batch(items, existing_ids)` | `.opencode/skills/board/scripts/board.py:315` | Validates a full accepted JSON batch, resolves temporary dependencies and allocates consecutive IDs without I/O or input mutation. | pure |
+| `accept_plan_batch(path, items)` / `transition_plan_item(path, board_id, action)` | `.opencode/skills/board/scripts/board.py:432`, `:490` | Atomically inserts ordered canonical items/criteria or changes queue/active/terminal references; refuses before normalized migration. | effectful (SQLite) |
+| `plan_rows(path, view)` / `format_plan_items(items, view)` | `.opencode/skills/board/scripts/board.py:459`, `:525` | Reads queue/history ordered by queue or stable display position; formats the CLI view. | effectful read / pure format |
+| `write_connection_snapshot(connection, markdown, revision, allow_completion=False)` | `.opencode/skills/board/scripts/board.py:418` | Keeps normalized state and the compatibility Markdown snapshot aligned in the caller's transaction. | effectful (SQLite) |
+| `clear_row_worktree(...)` | `.opencode/skills/git-worktree/scripts/worktree.py:1412` | Clears a worktree cell through the board adapter; successful human finalization records completed history in the existing transaction. | effectful (Git, SQLite) |
 | `state.py` | `.opencode/skills/runtime-state/scripts/state.py` | Resolves the primary checkout from Git's absolute common-dir path; `migrate` dry-runs or copies and verifies legacy runtime files without deleting sources. | effectful (Git, filesystem) |
 | `board_serve.py` | `.opencode/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
 | `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1704` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
@@ -751,16 +773,19 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 
 ## 6. States and state transitions
 
-The board's lanes are the state machine of the factory:
-`Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged`, plus `Blocked`
-and `Dropped`. In-task QA findings return to the same row and worktree; the review loop is capped
-at 10 rounds. Full rules in `AGENTS.md` §B4.
+The board lifecycle is normalized: queued items have a unique `queue_position`; promotion clears
+it and creates one active-work reference at `Ready`. Active statuses are `Ready`, `In Progress`,
+`In Review`, `Pending Merge`, and `Blocked`. Completion/cancellation remove the active reference
+and set a retained terminal outcome. Worktree-bearing and Pending Merge items complete only via
+human finalization. In-task QA findings return to the same row and worktree; the review loop is
+capped at 10 rounds. Full rules in `AGENTS.md` §B4.
 
 ## 7. Public interfaces
 
 The local dashboard exposes read-only HTTP on loopback port 15180: `GET /api/board`,
-`GET /api/worktrees` and `GET /api/repo-candidates`. It has no session view, dispatch or write
-endpoint. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
+`GET /api/worktrees` and `GET /api/repo-candidates`. `GET /api/planned-work` is an approved
+contract only; its HTTP implementation is deferred. It has no session view, dispatch or write
+endpoint. The board CLI includes the `plan` lifecycle commands. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
 `verify`, `cleanup`) and `env.py` (`sync`, `status`, `clean`). `discard` takes `--apply`, `--force`
 and `--yes`: `--force` alone prints the destruction plan, and `--force --yes` acts after writing a
 recovery copy under `<primary-checkout>/.factory-state/cleanup-wt/<repo-id>/`. `handoff --board <ID>` prints review

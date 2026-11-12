@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Normalized board migration tests use only isolated SQLite databases."""
+import importlib.util
+import io
+import json
 import sqlite3
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -135,7 +139,7 @@ class NormalizedBoardMigrationTests(unittest.TestCase):
         with board.connect(self.path) as connection:
             self.assertEqual(connection.execute("SELECT revision FROM board WHERE id=1").fetchone(), (1,))
 
-    def test_compatibility_write_updates_active_status_worktree_and_criteria(self):
+    def test_compatibility_write_updates_active_fields_and_preserves_criteria(self):
         board.migrate_normalized(self.path, apply=True)
         with patch.object(board, "live_database", return_value=self.path), \
                 patch.object(board, "database_path", return_value=self.path):
@@ -156,7 +160,7 @@ class NormalizedBoardMigrationTests(unittest.TestCase):
             self.assertEqual(connection.execute(
                 "SELECT text, verified, proof FROM acceptance_criteria "
                 "WHERE plan_item_id='BOARD-146'").fetchall(),
-                [("Changed criterion", 1, "revised")])
+                [("Active criterion", 1, "explicit"), ("Secondary criterion", 0, "second")])
 
     def test_remove_cancels_normalized_rows_and_retains_history(self):
         board.migrate_normalized(self.path, apply=True)
@@ -220,6 +224,195 @@ class NormalizedBoardMigrationTests(unittest.TestCase):
             with board.connect(self.path) as connection:
                 connection.execute("INSERT INTO acceptance_criteria "
                                     "(plan_item_id, position, text) VALUES ('BOARD-999', 0, 'orphan')")
+
+
+class PlannedLifecycleTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="board-plan-lifecycle-")
+        self.addCleanup(self.temp.cleanup)
+        self.path = str(Path(self.temp.name) / "factory-board.sqlite3")
+        markdown = NormalizedBoardMigrationTests.make_markdown()
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("CREATE TABLE board (id INTEGER PRIMARY KEY, markdown TEXT NOT NULL, "
+                               "source_bytes BLOB, revision INTEGER NOT NULL)")
+            connection.execute("INSERT INTO board VALUES (1, ?, NULL, 0)", (markdown,))
+        board.migrate_normalized(self.path, apply=True)
+
+    @staticmethod
+    def draft(key, task, dependencies=None):
+        return {"key": key, "task": task, "type": "Feature", "priority": "P2",
+                "risk": "🟡 medium — scoped", "user_story": "As a user, I can " + task,
+                "acceptance_criteria": ["First observable result", "Second observable result"],
+                "blocked_by": dependencies or [], "repos": ["control"], "notes": "preview note"}
+
+    def state_snapshot(self):
+        with board.connect(self.path) as connection:
+            return (
+                connection.execute("SELECT markdown, revision FROM board").fetchone(),
+                connection.execute("SELECT * FROM planned_items ORDER BY id").fetchall(),
+                connection.execute("SELECT * FROM acceptance_criteria ORDER BY plan_item_id, position")
+                .fetchall(),
+                connection.execute("SELECT * FROM active_work ORDER BY plan_item_id").fetchall(),
+            )
+
+    def run_cli(self, args, stdin=""):
+        output = io.StringIO()
+        with patch.object(board, "initialize_board", return_value=self.path), \
+                patch("sys.stdin", io.StringIO(stdin)), redirect_stdout(output), \
+                redirect_stderr(io.StringIO()):
+            return board.main(args), output.getvalue()
+
+    def test_accept_is_atomic_resolves_batch_dependencies_and_preserves_order(self):
+        before = self.state_snapshot()
+        invalid = [self.draft("valid", "Valid"), self.draft("invalid", "Invalid")]
+        invalid[1]["acceptance_criteria"] = ["Only one"]
+        with self.assertRaises(board.PlanValidationError):
+            board.accept_plan_batch(self.path, invalid)
+        self.assertEqual(self.state_snapshot(), before)
+
+        batch = [
+            self.draft("core", "Core", ["BOARD-143"]),
+            self.draft("client", "Client", ["core"]),
+        ]
+        batch[1].pop("notes")
+        status, output = self.run_cli(["plan", "accept"], json.dumps(batch))
+        self.assertEqual(status, board.OK)
+        accepted = [{"key": line.split()[1], "id": line.split()[-1]}
+                    for line in output.splitlines()]
+        self.assertEqual(accepted, [{"key": "core", "id": "BOARD-152"},
+                                    {"key": "client", "id": "BOARD-153"}])
+        queued = board.plan_rows(self.path, "queue")
+        self.assertEqual([item["id"] for item in queued[-2:]], ["BOARD-152", "BOARD-153"])
+        self.assertEqual([item["queue_position"] for item in queued[-2:]], [13, 14])
+        with board.connect(self.path) as connection:
+            self.assertEqual(connection.execute(
+                "SELECT blocked_by, user_story, notes FROM planned_items WHERE id='BOARD-152'").fetchone(),
+                ("BOARD-143", "As a user, I can Core", "preview note"))
+            self.assertEqual(connection.execute(
+                "SELECT blocked_by FROM planned_items WHERE id='BOARD-153'").fetchone(),
+                ("BOARD-152",))
+            self.assertEqual(connection.execute(
+                "SELECT notes FROM planned_items WHERE id='BOARD-153'").fetchone(), ("",))
+            self.assertEqual(connection.execute(
+                "SELECT verified, proof FROM acceptance_criteria WHERE plan_item_id='BOARD-152' "
+                "ORDER BY position").fetchall(), [(0, None), (0, None)])
+
+    def test_transition_commands_refuse_duplicates_and_never_reuse_ids(self):
+        before = self.state_snapshot()
+        self.assertEqual(self.run_cli(["plan", "complete", "BOARD-146"])[0], board.REFUSED)
+        self.assertEqual(self.run_cli(["plan", "complete", "BOARD-150"])[0], board.REFUSED)
+        self.assertEqual(self.state_snapshot(), before)
+        first = board.accept_plan_batch(self.path, [self.draft("first", "First")])[0]
+        self.assertEqual(first["id"], "BOARD-152")
+        self.assertEqual(self.run_cli(["plan", "cancel", first["id"]])[0], board.OK)
+        second = board.accept_plan_batch(self.path, [self.draft("second", "Second")])[0]
+        self.assertEqual(second["id"], "BOARD-153")
+        self.assertEqual(self.run_cli(["plan", "promote", second["id"]])[0], board.OK)
+        self.assertEqual(self.run_cli(["plan", "promote", second["id"]])[0], board.REFUSED)
+        with board.connect(self.path) as connection:
+            self.assertEqual(connection.execute(
+                "SELECT queue_position, terminal_outcome FROM planned_items WHERE id='BOARD-153'").fetchone(),
+                (None, None))
+            self.assertEqual(connection.execute(
+                "SELECT status FROM active_work WHERE plan_item_id='BOARD-153'").fetchone(), ("Ready",))
+        self.assertEqual(self.run_cli(["plan", "complete", second["id"]])[0], board.OK)
+        history = board.plan_rows(self.path, "history")
+        self.assertEqual([item["id"] for item in history[-2:]], ["BOARD-152", "BOARD-153"])
+        self.assertEqual([item["terminal_outcome"] for item in history[-2:]],
+                         ["cancelled", "completed"])
+        self.assertEqual(len(history[-1]["acceptance_criteria"]), 2)
+        with board.connect(self.path) as connection:
+            self.assertIsNone(connection.execute(
+                "SELECT 1 FROM active_work WHERE plan_item_id='BOARD-153'").fetchone())
+
+    def test_compatibility_edits_preserve_queue_history_and_structured_criteria(self):
+        with patch.object(board, "live_database", return_value=self.path), \
+                patch.object(board, "database_path", return_value=self.path), \
+                patch.object(board, "note_uncommitted"):
+            self.assertEqual(board.cmd_set_status(SimpleNamespace(id="BOARD-146", status="Blocked"),
+                                                  "fixture.md"), board.OK)
+            self.assertEqual(board.cmd_set_field(SimpleNamespace(id="BOARD-146", field="notes",
+                                                                  value="edited note"),
+                                                 "fixture.md"), board.OK)
+            self.assertEqual(board.cmd_set_field(SimpleNamespace(id="BOARD-143", field="notes",
+                                                                  value="queued edit"),
+                                                 "fixture.md"), board.OK)
+            self.assertEqual(board.cmd_set_field(SimpleNamespace(id="BOARD-131", field="risk",
+                                                                  value="updated risk"),
+                                                 "fixture.md"), board.OK)
+            self.assertEqual(board.cmd_set_status(SimpleNamespace(id="BOARD-143", status="Ready"),
+                                                  "fixture.md"), board.REFUSED)
+            self.assertEqual(board.cmd_set_status(SimpleNamespace(id="BOARD-131", status="In Progress"),
+                                                  "fixture.md"), board.REFUSED)
+        with board.connect(self.path) as connection:
+            self.assertEqual(connection.execute(
+                "SELECT text, verified, proof FROM acceptance_criteria WHERE plan_item_id='BOARD-146' "
+                "ORDER BY position").fetchall(),
+                [("Active criterion", 1, "explicit"), ("Secondary criterion", 0, "second")])
+            self.assertEqual(connection.execute(
+                "SELECT notes FROM planned_items WHERE id='BOARD-146'").fetchone(), ("edited note",))
+            self.assertIsNotNone(connection.execute(
+                "SELECT queue_position FROM planned_items WHERE id='BOARD-143' "
+                "AND queue_position IS NOT NULL").fetchone())
+            self.assertEqual(connection.execute(
+                "SELECT terminal_outcome, risk FROM planned_items WHERE id='BOARD-131'").fetchone(),
+                ("completed", "updated risk"))
+
+    def test_active_views_exclude_queued_and_terminal_rows(self):
+        with patch.object(board, "live_database", return_value=self.path), \
+                patch.object(board, "database_path", return_value=self.path):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(board.cmd_show(SimpleNamespace(id=None), "fixture.md"), board.OK)
+            shown_ids = {line.split(" | ", 1)[0] for line in output.getvalue().splitlines()}
+            self.assertIn("BOARD-146", shown_ids)
+            self.assertNotIn("BOARD-143", shown_ids)
+            self.assertNotIn("BOARD-131", shown_ids)
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(board.cmd_lanes(SimpleNamespace(), "fixture.md"), board.OK)
+            lanes = output.getvalue()
+            self.assertIn("Backlog: 0", lanes)
+            self.assertIn("Merged: 0", lanes)
+            self.assertIn("total: 5", lanes)
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(board.cmd_export("fixture.md"), board.OK)
+            exported_path = Path(output.getvalue().strip())
+            exported, error = board.parse_table(exported_path.read_text())
+            self.assertIsNone(error)
+            exported_ids = {board.cell_texts(exported["lines"], index)[0]
+                            for index in exported["rows"]}
+            self.assertEqual(exported_ids, shown_ids)
+
+    def test_worktree_finalize_writer_completes_normalized_item_atomically(self):
+        script = Path(board.__file__).parents[2] / "git-worktree" / "scripts" / "worktree.py"
+        spec = importlib.util.spec_from_file_location("board_lifecycle_worktree", script)
+        worktree = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(worktree)
+        with board.connect(self.path) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            markdown, revision = connection.execute(
+                "SELECT markdown, revision FROM board WHERE id=1").fetchone()
+            parsed, error = board.parse_table(markdown)
+            self.assertIsNone(error)
+            index = board.row_by_id(parsed, "BOARD-146")
+            success, message = worktree.clear_row_worktree(
+                board, "fixture.md", parsed, index, self.temp.name,
+                str(Path(self.temp.name) / "branch" / "path"), status="Merged",
+                connection=connection, revision=revision)
+            self.assertTrue(success, message)
+        with board.connect(self.path) as connection:
+            self.assertEqual(connection.execute(
+                "SELECT terminal_outcome FROM planned_items WHERE id='BOARD-146'").fetchone(),
+                ("completed",))
+            self.assertIsNone(connection.execute(
+                "SELECT 1 FROM active_work WHERE plan_item_id='BOARD-146'").fetchone())
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM acceptance_criteria WHERE plan_item_id='BOARD-146'").fetchone(),
+                (2,))
 
 
 if __name__ == "__main__":

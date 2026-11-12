@@ -220,16 +220,17 @@ def normalized_enabled(connection):
     return all(name in tables for name in NORMALIZED_TABLES)
 
 
-def normalized_markdown(connection, markdown):
+def normalized_markdown(connection, markdown, active_only=False):
     parsed, error = parse_table(markdown)
     if parsed is None:
         raise ValueError(error)
     headers = [cell.strip() for cell in header_cells(parsed)]
+    active_filter = "WHERE a.plan_item_id IS NOT NULL" if active_only else ""
     rows = connection.execute("""SELECT p.id, p.task, p.type, p.priority, p.risk,
         p.blocked_by, p.repos, p.notes, p.display_position, p.queue_position,
         p.terminal_outcome, a.status, a.branch_worktree
         FROM planned_items p LEFT JOIN active_work a ON a.plan_item_id=p.id
-        ORDER BY p.display_position""").fetchall()
+        %s ORDER BY p.display_position""" % active_filter).fetchall()
     table_rows = []
     for row in rows:
         (board_id, task, item_type, priority, risk, blocked_by, repos, notes, _display,
@@ -251,64 +252,297 @@ def normalized_markdown(connection, markdown):
     return "\n".join(lines)
 
 
-def sync_normalized(connection, markdown):
+def sync_normalized(connection, markdown, allow_completion=False):
     parsed, error = parse_table(markdown)
     if parsed is None:
         raise ValueError(error)
     headers = [cell.strip() for cell in header_cells(parsed)]
-    existing = {row[0]: row[0] for row in connection.execute("SELECT id FROM planned_items")}
-    queue_position = connection.execute(
-        "SELECT COALESCE(MAX(queue_position), -1)+1 FROM planned_items").fetchone()[0]
-    display_position = connection.execute(
-        "SELECT COALESCE(MAX(display_position), -1)+1 FROM planned_items").fetchone()[0]
+    existing = {row[0]: row[1:] for row in connection.execute("""SELECT p.id, p.queue_position,
+        p.terminal_outcome, p.display_position, a.status, a.branch_worktree
+        FROM planned_items p LEFT JOIN active_work a ON a.plan_item_id=p.id""")}
     seen = set()
-    for source_position, line_index in enumerate(parsed["rows"]):
+    for line_index in parsed["rows"]:
         values = dict(zip(headers, cell_texts(parsed["lines"], line_index)))
         board_id = values.get("ID", "")
+        if not board_id or board_id in seen:
+            raise ValueError("duplicate or empty board ID")
         seen.add(board_id)
         status = values.get("Status", "")
-        previous = connection.execute("SELECT display_position, queue_position FROM planned_items WHERE id=?",
-                                      (board_id,)).fetchone()
-        item_display = previous[0] if previous else display_position + source_position
-        if not previous:
-            display_position += 1
-        queue = previous[1] if previous else None
-        terminal = None
-        if status == "Backlog":
-            queue = queue if queue is not None else queue_position
-            if previous is None or previous[1] is None:
-                queue_position += 1
-        elif status == "Merged":
-            queue, terminal = None, "completed"
-        elif status == "Dropped":
-            queue, terminal = None, "cancelled"
+        if board_id not in existing:
+            raise ValueError("new planned items must be created with 'board.py plan accept'")
+        queue, terminal, _item_display, active_status, _active_branch = existing[board_id]
+        if queue is not None:
+            if status != "Backlog":
+                raise ValueError("queued items require 'board.py plan promote' to become active")
+        elif active_status is not None:
+            if status == "Merged" and allow_completion:
+                connection.execute("DELETE FROM active_work WHERE plan_item_id=?", (board_id,))
+                connection.execute("UPDATE planned_items SET queue_position=NULL, "
+                                   "terminal_outcome='completed' WHERE id=?", (board_id,))
+            elif status not in OPEN_STATUSES[1:]:
+                raise ValueError("active items require plan lifecycle commands for terminal transitions")
+            else:
+                branch = values.get("Branch/Worktree", "-")
+                connection.execute("UPDATE active_work SET status=?, branch_worktree=? WHERE plan_item_id=?",
+                                   (status, None if branch == "-" else branch, board_id))
+        elif terminal is not None:
+            expected_status = "Merged" if terminal == "completed" else "Dropped"
+            if status != expected_status:
+                raise ValueError("terminal history cannot be reopened through compatibility writes")
         else:
-            queue = None
-        connection.execute("""INSERT INTO planned_items
-            (id, task, type, priority, risk, blocked_by, repos, notes, display_position,
-             queue_position, terminal_outcome)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET task=excluded.task, type=excluded.type,
-            priority=excluded.priority, risk=excluded.risk, blocked_by=excluded.blocked_by,
-            repos=excluded.repos, notes=excluded.notes, queue_position=excluded.queue_position,
-            terminal_outcome=excluded.terminal_outcome""",
-                           (board_id, values.get("Task", ""), values.get("Type", ""),
+            raise ValueError("planned item %s has no lifecycle reference" % board_id)
+        connection.execute("""UPDATE planned_items SET task=?, type=?, priority=?, risk=?,
+            blocked_by=?, repos=?, notes=? WHERE id=?""",
+                           (values.get("Task", ""), values.get("Type", ""),
                             values.get("Priority", ""), values.get("Risk", ""),
                             values.get("Blocked by", ""), values.get("Repos", ""),
-                            values.get("Notes", ""), item_display, queue, terminal))
-        connection.execute("DELETE FROM active_work WHERE plan_item_id=?", (board_id,))
-        if status in OPEN_STATUSES[1:]:
-            branch = values.get("Branch/Worktree", "-")
-            connection.execute("INSERT INTO active_work VALUES (?, ?, ?)",
-                               (board_id, status, None if branch == "-" else branch))
-        connection.execute("DELETE FROM acceptance_criteria WHERE plan_item_id=?", (board_id,))
-        for position, (text, verified, proof) in enumerate(criteria_from_notes(values.get("Notes", ""))):
-            connection.execute("INSERT INTO acceptance_criteria VALUES (?, ?, ?, ?, ?)",
-                               (board_id, position, text, int(verified), proof))
+                            values.get("Notes", ""), board_id))
     for board_id in existing.keys() - seen:
+        queue, terminal, _display, active_status, _branch = existing[board_id]
+        if terminal is not None:
+            continue
+        if queue is None and active_status is None:
+            raise ValueError("planned item %s has no lifecycle reference" % board_id)
         connection.execute("DELETE FROM active_work WHERE plan_item_id=?", (board_id,))
         connection.execute("UPDATE planned_items SET queue_position=NULL, terminal_outcome='cancelled' "
                            "WHERE id=?", (board_id,))
+
+
+class PlanValidationError(ValueError):
+    pass
+
+
+def validate_plan_batch(items, existing_ids):
+    """Validate and assign IDs to an accepted JSON batch without performing I/O."""
+    if not isinstance(items, list) or not items:
+        raise PlanValidationError("accepted batch must be a non-empty JSON array")
+    required = {"key", "task", "type", "priority", "risk", "user_story", "acceptance_criteria"}
+    allowed = required | {"blocked_by", "repos", "notes"}
+    keys = []
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise PlanValidationError("item %d must be a JSON object" % (index + 1))
+        missing = required - item.keys()
+        unknown = item.keys() - allowed
+        if missing:
+            raise PlanValidationError("item %d missing fields: %s" %
+                                      (index + 1, ", ".join(sorted(missing))))
+        if unknown:
+            raise PlanValidationError("item %d has unknown fields: %s" %
+                                      (index + 1, ", ".join(sorted(unknown))))
+        key = item["key"]
+        if not isinstance(key, str) or not key.strip() or re.fullmatch(r"BOARD-\d+", key):
+            raise PlanValidationError("item %d has an invalid temporary key" % (index + 1))
+        if key in keys:
+            raise PlanValidationError("duplicate temporary key %r" % key)
+        keys.append(key)
+        for name in ("task", "risk", "user_story"):
+            value = item[name]
+            if not isinstance(value, str) or not value.strip():
+                raise PlanValidationError("item %d requires non-empty %s" % (index + 1, name))
+        if any(char in item["task"] or char in item["risk"] for char in "\n\r|"):
+            raise PlanValidationError("task and risk must be single-line values without pipes")
+        if not isinstance(item["type"], str) or item["type"] not in TYPES:
+            raise PlanValidationError("item %d has invalid type %r" % (index + 1, item["type"]))
+        if not isinstance(item["priority"], str) or item["priority"] not in PRIORITIES:
+            raise PlanValidationError("item %d has invalid priority %r" %
+                                      (index + 1, item["priority"]))
+        criteria = item["acceptance_criteria"]
+        if not isinstance(criteria, list) or not 2 <= len(criteria) <= 5:
+            raise PlanValidationError("item %d requires 2 to 5 acceptance criteria" % (index + 1))
+        if any(not isinstance(text, str) or not text.strip() for text in criteria):
+            raise PlanValidationError("item %d criteria must be non-empty strings" % (index + 1))
+        dependencies = item.get("blocked_by", [])
+        if not isinstance(dependencies, list) or any(
+                not isinstance(ref, str) or not ref.strip() for ref in dependencies):
+            raise PlanValidationError("item %d blocked_by must be an array of references" % (index + 1))
+        if len(dependencies) != len(set(dependencies)):
+            raise PlanValidationError("item %d has duplicate dependencies" % (index + 1))
+        repos = item.get("repos", [])
+        if not isinstance(repos, list) or any(
+                not isinstance(repo, str) or not repo.strip() or "," in repo for repo in repos):
+            raise PlanValidationError("item %d repos must be an array of repository IDs" % (index + 1))
+        if len(repos) != len(set(repos)):
+            raise PlanValidationError("item %d has duplicate repository IDs" % (index + 1))
+        notes = item.get("notes", "")
+        if not isinstance(notes, str) or any(char in notes for char in "\n\r|"):
+            raise PlanValidationError("item %d notes must be a single-line value without pipes" %
+                                      (index + 1))
+
+    next_number = max((int(match.group(1)) for value in existing_ids
+                       for match in [re.fullmatch(r"BOARD-(\d+)", value)] if match), default=0) + 1
+    assigned = {key: "BOARD-%03d" % (next_number + index) for index, key in enumerate(keys)}
+    result = []
+    known_ids = set(existing_ids)
+    key_set = set(keys)
+    for item in items:
+        dependencies = []
+        for ref in item.get("blocked_by", []):
+            if ref in key_set:
+                if ref == item["key"]:
+                    raise PlanValidationError("item %r cannot depend on itself" % ref)
+                dependencies.append(assigned[ref])
+            elif ref in known_ids:
+                dependencies.append(ref)
+            else:
+                raise PlanValidationError("unknown dependency reference %r" % ref)
+        result.append({
+            "id": assigned[item["key"]],
+            "key": item["key"],
+            "task": item["task"],
+            "type": item["type"],
+            "priority": item["priority"],
+            "risk": item["risk"],
+            "blocked_by": ",".join(dependencies) if dependencies else "- None.",
+            "repos": ",".join(item.get("repos", [])) or "-",
+            "notes": item.get("notes", "-"),
+            "user_story": item["user_story"],
+            "acceptance_criteria": item["acceptance_criteria"],
+        })
+    return result
+
+
+def require_normalized(connection):
+    if not normalized_enabled(connection):
+        raise ValueError("normalized board storage is required; apply the explicit migration first")
+
+
+def persist_normalized_projection(connection):
+    markdown, revision = connection.execute(
+        "SELECT markdown, revision FROM board WHERE id=1").fetchone()
+    projection = normalized_markdown(connection, markdown)
+    connection.execute("UPDATE board SET markdown=?, revision=? WHERE id=1",
+                        (projection, revision + 1))
+
+
+def write_connection_snapshot(connection, markdown, revision, allow_completion=False):
+    current_revision = connection.execute("SELECT revision FROM board WHERE id=1").fetchone()
+    if current_revision is None or current_revision[0] != revision:
+        raise ValueError("board revision changed during the transaction")
+    parsed, error = parse_table(markdown)
+    if parsed is None:
+        raise ValueError(error)
+    if normalized_enabled(connection):
+        sync_normalized(connection, markdown, allow_completion=allow_completion)
+        markdown = normalized_markdown(connection, markdown)
+    connection.execute("UPDATE board SET markdown=?, revision=? WHERE id=1",
+                       (markdown, revision + 1))
+
+
+def accept_plan_batch(path, items):
+    with connect(path) as connection:
+        require_normalized(connection)
+        connection.execute("BEGIN IMMEDIATE")
+        existing_ids = {row[0] for row in connection.execute("SELECT id FROM planned_items")}
+        accepted = validate_plan_batch(items, existing_ids)
+        queue_position = connection.execute(
+            "SELECT COALESCE(MAX(queue_position), -1)+1 FROM planned_items").fetchone()[0]
+        display_position = connection.execute(
+            "SELECT COALESCE(MAX(display_position), -1)+1 FROM planned_items").fetchone()[0]
+        for offset, item in enumerate(accepted):
+            connection.execute("""INSERT INTO planned_items
+                (id, task, type, priority, risk, blocked_by, repos, notes, user_story,
+                 queue_position, terminal_outcome, display_position)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)""",
+                               (item["id"], item["task"], item["type"], item["priority"],
+                                item["risk"], item["blocked_by"], item["repos"], item["notes"],
+                                item["user_story"], queue_position + offset,
+                                display_position + offset))
+            connection.executemany("""INSERT INTO acceptance_criteria
+                (plan_item_id, position, text, verified, proof) VALUES (?, ?, ?, 0, NULL)""",
+                                  ((item["id"], position, text)
+                                   for position, text in enumerate(item["acceptance_criteria"])))
+        persist_normalized_projection(connection)
+        return [{"key": item["key"], "id": item["id"]} for item in accepted]
+
+
+def plan_rows(path, view):
+    if view not in ("queue", "history"):
+        raise ValueError("unknown planned-work view %r" % view)
+    with connect(path) as connection:
+        require_normalized(connection)
+        connection.execute("BEGIN")
+        order_column = "queue_position" if view == "queue" else "display_position"
+        predicate = "queue_position IS NOT NULL" if view == "queue" else "terminal_outcome IS NOT NULL"
+        rows = connection.execute("""SELECT p.id, p.task, p.type, p.priority, p.risk,
+            p.blocked_by, p.repos, p.notes, p.user_story, p.queue_position,
+            p.terminal_outcome, a.status, p.display_position
+            FROM planned_items p LEFT JOIN active_work a ON a.plan_item_id=p.id
+            WHERE %s ORDER BY p.%s""" % (predicate, order_column)).fetchall()
+        items = []
+        for row in rows:
+            criteria = connection.execute("""SELECT position, text, verified, proof
+                FROM acceptance_criteria WHERE plan_item_id=? ORDER BY position""", (row[0],)).fetchall()
+            items.append({
+                "id": row[0], "task": row[1], "type": row[2], "priority": row[3],
+                "risk": row[4], "blocked_by": row[5], "repos": row[6], "notes": row[7],
+                "user_story": row[8], "queue_position": row[9], "terminal_outcome": row[10],
+                "status": row[11] or ("Backlog" if view == "queue" else
+                                      "Merged" if row[10] == "completed" else "Dropped"),
+                "display_position": row[12], "acceptance_criteria": [
+                    {"position": criterion[0], "text": criterion[1],
+                     "verified": bool(criterion[2]), "proof": criterion[3]}
+                    for criterion in criteria],
+            })
+        return items
+
+
+def transition_plan_item(path, board_id, action):
+    with connect(path) as connection:
+        require_normalized(connection)
+        connection.execute("BEGIN IMMEDIATE")
+        row = connection.execute("""SELECT p.queue_position, p.terminal_outcome, a.status,
+            a.branch_worktree
+            FROM planned_items p LEFT JOIN active_work a ON a.plan_item_id=p.id WHERE p.id=?""",
+                                 (board_id,)).fetchone()
+        if row is None:
+            raise ValueError("no planned item with ID %s" % board_id)
+        queue_position, terminal, status, branch_worktree = row
+        if terminal is not None:
+            raise ValueError("%s is already in terminal history" % board_id)
+        if action == "promote":
+            if queue_position is None or status is not None:
+                raise ValueError("%s is not queued" % board_id)
+            connection.execute("UPDATE planned_items SET queue_position=NULL WHERE id=?", (board_id,))
+            connection.execute("INSERT INTO active_work (plan_item_id, status, branch_worktree) "
+                                "VALUES (?, 'Ready', NULL)", (board_id,))
+        elif action == "complete":
+            if status is None or queue_position is not None:
+                raise ValueError("%s is not active" % board_id)
+            if branch_worktree is not None or status == "Pending Merge":
+                raise ValueError("%s must be completed through human-only worktree finalization" %
+                                 board_id)
+            connection.execute("DELETE FROM active_work WHERE plan_item_id=?", (board_id,))
+            connection.execute("UPDATE planned_items SET terminal_outcome='completed' WHERE id=?",
+                               (board_id,))
+        elif action == "cancel":
+            if status is None and queue_position is None:
+                raise ValueError("%s has no cancellable lifecycle reference" % board_id)
+            connection.execute("DELETE FROM active_work WHERE plan_item_id=?", (board_id,))
+            connection.execute("UPDATE planned_items SET queue_position=NULL, "
+                               "terminal_outcome='cancelled' WHERE id=?", (board_id,))
+        else:
+            raise ValueError("unknown planned-work transition %r" % action)
+        persist_normalized_projection(connection)
+
+
+def format_plan_items(items, view):
+    def display_cell(value):
+        return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+    rows = []
+    for item in items:
+        criteria = "; ".join("%d: [%s] %s%s" % (
+            value["position"] + 1, "x" if value["verified"] else " ", value["text"],
+            " (Proof: %s)" % value["proof"] if value["proof"] else "")
+                              for value in item["acceptance_criteria"])
+        position = item["queue_position"] if view == "queue" else item["display_position"]
+        end = "queue_position" if view == "queue" else "display_position"
+        values = [item["id"], item["task"], item["type"], item["status"], item["priority"],
+                  item["risk"], item["blocked_by"], item["repos"], item["user_story"],
+                  criteria, item["notes"], "%s=%s" % (end, position)]
+        rows.append(" | ".join(display_cell(value) for value in values))
+    return "\n".join(rows)
 
 
 def criteria_from_notes(notes):
@@ -443,7 +677,7 @@ def live_database(path):
     return database_path(root)
 
 
-def read_table(path):
+def read_table(path, active_only=False):
     """(lines, header_index, row_indexes) for the board table, or None when it cannot be parsed."""
     try:
         db = live_database(path)
@@ -453,10 +687,11 @@ def read_table(path):
                 content, revision = connection.execute(
                     "SELECT markdown, revision FROM board WHERE id = 1").fetchone()
                 if normalized_enabled(connection):
-                    content = normalized_markdown(connection, content)
-            if not hasattr(_snapshots, "values"):
-                _snapshots.values = {}
-            _snapshots.values[db] = (content, revision)
+                    content = normalized_markdown(connection, content, active_only=active_only)
+            if not active_only:
+                if not hasattr(_snapshots, "values"):
+                    _snapshots.values = {}
+                _snapshots.values[db] = (content, revision)
         else:
             with open(path, encoding="utf-8") as stream:
                 content = stream.read()
@@ -569,7 +804,7 @@ def replace_cell(line, index, value):
     return lead + ("|" if leading_pipe else "") + "|".join(parts) + ("|" if trailing_pipe else "")
 
 
-def write_atomic(path, lines):
+def write_atomic(path, lines, allow_completion=False):
     db = live_database(path)
     if db:
         snapshot = getattr(_snapshots, "values", {}).pop(db, None)
@@ -588,7 +823,8 @@ def write_atomic(path, lines):
                 latest = normalized_markdown(connection, latest)
             merged = merge_board_changes(baseline, proposed, latest)
             if normalized_enabled(connection):
-                sync_normalized(connection, merged)
+                sync_normalized(connection, merged, allow_completion=allow_completion)
+                merged = normalized_markdown(connection, latest)
             connection.execute("UPDATE board SET markdown = ?, revision = ? WHERE id = 1",
                                (merged, revision + 1))
         return
@@ -676,6 +912,31 @@ def row_by_id(table, board_id):
     return None
 
 
+def normalized_path(path):
+    db = live_database(path)
+    if not db:
+        return None
+    with connect(db) as connection:
+        return db if normalized_enabled(connection) else None
+
+
+def normalized_state(path, board_id):
+    db = normalized_path(path)
+    if not db:
+        return None
+    with connect(db) as connection:
+        row = connection.execute("""SELECT p.queue_position, p.terminal_outcome, a.status
+            FROM planned_items p LEFT JOIN active_work a ON a.plan_item_id=p.id WHERE p.id=?""",
+                                 (board_id,)).fetchone()
+    if row is None:
+        return None
+    queue_position, terminal, status = row
+    kind = "queued" if queue_position is not None else "active" if status is not None else \
+        "terminal" if terminal is not None else "invalid"
+    return {"kind": kind, "queue_position": queue_position, "terminal_outcome": terminal,
+            "status": status}
+
+
 def reject_unsafe_value(name, value):
     if any(char in value for char in "\n\r|"):
         print("invalid %s: the value must be on one line and must not contain a pipe; "
@@ -732,7 +993,7 @@ def find_open_fingerprint(table, fingerprint):
 
 
 def cmd_show(args, path):
-    table, err = read_table(path)
+    table, err = read_table(path, active_only=True)
     if table is None:
         print(err, file=sys.stderr)
         return REFUSED
@@ -780,6 +1041,9 @@ def cmd_add(args, path):
     table, err = read_table(path)
     if table is None:
         print(err, file=sys.stderr)
+        return REFUSED
+    if normalized_path(path):
+        print("normalized planned items must be created with 'board.py plan accept'", file=sys.stderr)
         return REFUSED
     if row_by_id(table, args.id) is not None:
         print("ID %s already exists on the board" % args.id, file=sys.stderr)
@@ -832,6 +1096,9 @@ def cmd_add_column(args, path):
         print("invalid --name: the column name must be on one line and must not contain a pipe",
               file=sys.stderr)
         return INVALID
+    if normalized_path(path):
+        print("normalized board columns are fixed by the SQLite schema", file=sys.stderr)
+        return REFUSED
     table, err = read_table(path)
     if table is None:
         print(err, file=sys.stderr)
@@ -886,6 +1153,11 @@ def cmd_note(args, path):
     if index is None:
         print("no row with ID %s" % args.id, file=sys.stderr)
         return REFUSED
+    if args.escalate:
+        state = normalized_state(path, args.id)
+        if state is not None and state["kind"] != "active":
+            print("only active items can be escalated with --escalate", file=sys.stderr)
+            return REFUSED
     cells = cell_texts(table["lines"], index)
     notes_index = field_index(table, "notes")
     notes = cells[notes_index] if notes_index is not None and len(cells) > notes_index else ""
@@ -912,6 +1184,12 @@ def cmd_set_status(args, path):
     if index is None:
         print("no row with ID %s" % args.id, file=sys.stderr)
         return REFUSED
+    state = normalized_state(path, args.id)
+    if state is not None:
+        if state["kind"] != "active" or args.status not in OPEN_STATUSES[1:]:
+            print("set-status only changes an active item to another active status; use plan commands "
+                  "for lifecycle transitions", file=sys.stderr)
+            return REFUSED
     lines = list(table["lines"])
     lines[index] = replace_cell(lines[index], 3, args.status)
     note_uncommitted(path)
@@ -931,6 +1209,10 @@ def cmd_set_field(args, path):
     if index is None:
         print("no row with ID %s" % args.id, file=sys.stderr)
         return REFUSED
+    state = normalized_state(path, args.id)
+    if args.field == "branch-worktree" and state is not None and state["kind"] != "active":
+        print("branch-worktree can only be set on active items", file=sys.stderr)
+        return REFUSED
     column = field_index(table, args.field)
     if column is None:
         print("the board has no %s column; add it with 'board.py add-column --name %s'"
@@ -945,6 +1227,15 @@ def cmd_set_field(args, path):
 
 
 def cmd_remove(args, path):
+    state = normalized_state(path, args.id)
+    if state is not None:
+        try:
+            transition_plan_item(path, args.id, "cancel")
+        except (ValueError, sqlite3.Error) as exc:
+            print("cannot cancel %s: %s" % (args.id, exc), file=sys.stderr)
+            return REFUSED
+        print("cancelled %s" % args.id)
+        return OK
     table, err = read_table(path)
     if table is None:
         print(err, file=sys.stderr)
@@ -953,16 +1244,58 @@ def cmd_remove(args, path):
     if index is None:
         print("no row with ID %s" % args.id, file=sys.stderr)
         return REFUSED
+    cells = cell_texts(table["lines"], index)
+    if cells[3] in ("Merged", "Dropped"):
+        print("%s is already terminal; its history is retained" % args.id, file=sys.stderr)
+        return REFUSED
     lines = list(table["lines"])
-    del lines[index]
+    lines[index] = replace_cell(lines[index], 3, "Dropped")
     note_uncommitted(path)
     write_atomic(path, lines)
-    print("removed %s" % args.id)
+    print("cancelled %s" % args.id)
+    return OK
+
+
+def cmd_plan(args, path):
+    if args.plan_command == "accept":
+        try:
+            items = json.load(sys.stdin)
+            accepted = accept_plan_batch(path, items)
+        except json.JSONDecodeError as exc:
+            print("invalid plan JSON: %s" % exc, file=sys.stderr)
+            return INVALID
+        except PlanValidationError as exc:
+            print("invalid plan batch: %s" % exc, file=sys.stderr)
+            return INVALID
+        except (ValueError, sqlite3.Error) as exc:
+            print("plan acceptance refused: %s" % exc, file=sys.stderr)
+            return REFUSED
+        for item in accepted:
+            print("accepted %s as %s" % (item["key"], item["id"]))
+        return OK
+    if args.plan_command in ("queue", "history"):
+        try:
+            items = plan_rows(path, args.plan_command)
+        except (ValueError, sqlite3.Error) as exc:
+            print("planned-work view refused: %s" % exc, file=sys.stderr)
+            return REFUSED
+        if not items:
+            print("No %s items." % ("queued" if args.plan_command == "queue" else "historical"))
+        else:
+            print(format_plan_items(items, args.plan_command))
+        return OK
+    try:
+        transition_plan_item(path, args.id, args.plan_command)
+    except (ValueError, sqlite3.Error) as exc:
+        print("planned-work transition refused: %s" % exc, file=sys.stderr)
+        return REFUSED
+    labels = {"promote": "promoted to Ready", "complete": "completed", "cancel": "cancelled"}
+    print("%s %s" % (args.id, labels[args.plan_command]))
     return OK
 
 
 def cmd_lanes(args, path):
-    table, err = read_table(path)
+    table, err = read_table(path, active_only=True)
     if table is None:
         print(err, file=sys.stderr)
         return REFUSED
@@ -977,6 +1310,21 @@ def cmd_lanes(args, path):
     for k in sorted(others):
         print("%s: %d" % (k, counts[k]))
     print("total: %d" % len(table["rows"]))
+    return OK
+
+
+def cmd_export(path):
+    table, error = read_table(path, active_only=True)
+    if table is None:
+        print(error, file=sys.stderr)
+        return REFUSED
+    database = live_database(path)
+    if not database:
+        print("export requires the live SQLite board", file=sys.stderr)
+        return REFUSED
+    destination = os.path.join(os.path.dirname(database), EXPORT_NAME)
+    write_export(destination, "\n".join(table["lines"]))
+    print(destination)
     return OK
 
 
@@ -1027,6 +1375,17 @@ def main(argv):
     p = sub.add_parser("migrate-normalized", help="preview or apply the normalized-board migration")
     p.add_argument("--apply", action="store_true", help="create a consistent backup and migrate")
 
+    plan = sub.add_parser("plan", help="accept and manage planned work")
+    plan_sub = plan.add_subparsers(dest="plan_command", required=True)
+    plan_sub.add_parser("accept", help="accept a JSON array from stdin atomically")
+    plan_sub.add_parser("queue", help="list queued work in queue order")
+    plan_sub.add_parser("history", help="list completed and cancelled work")
+    for action, help_text in (("promote", "promote a queued item to Ready"),
+                              ("complete", "complete an active item"),
+                              ("cancel", "cancel a queued or active item")):
+        action_parser = plan_sub.add_parser(action, help=help_text)
+        action_parser.add_argument("id")
+
     sub.add_parser("lanes", help="count rows per status lane")
     sub.add_parser("export", help="write a Markdown snapshot to .factory-state")
     sub.add_parser("pre-merge-check", help="verify and back up the legacy board before its one-time merge")
@@ -1056,14 +1415,10 @@ def main(argv):
         return REFUSED
 
     if args.command == "export":
-        table, error = read_table(path)
-        if table is None:
-            print(error, file=sys.stderr)
-            return REFUSED
-        destination = os.path.join(os.path.dirname(live_database(path)), EXPORT_NAME)
-        write_export(destination, "\n".join(table["lines"]))
-        print(destination)
-        return OK
+        return cmd_export(path)
+
+    if args.command == "plan":
+        return cmd_plan(args, path)
 
     if args.command == "add":
         if args.type not in TYPES:

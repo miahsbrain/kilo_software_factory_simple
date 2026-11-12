@@ -35,14 +35,21 @@ needs. Every work surface must be registered before the factory reads its conten
 - Planned work, acceptance criteria, active work and terminal history are normalized in the same
   SQLite database. `planned_items` is canonical; `active_work` contains only promoted, nonterminal
   rows, and `acceptance_criteria` stores ordered checklist items and proof separately. Nullable
-  queue positions order backlog work; terminal outcomes retain completed/cancelled history.
+  queue positions order backlog work; terminal outcomes retain completed/cancelled history. New
+  items enter through an explicitly accepted JSON batch; validation and dependency-key resolution
+  are pure, ID assignment and insertion occur under one SQLite write transaction, and the batch is
+  all-or-nothing. Promotion creates one `Ready` active reference; completion/cancellation remove
+  it without deleting the canonical item or its criteria. Queue and history are separate CLI views.
   Existing board CLI and worktree callers retain their Markdown-table interface as a compatibility
   projection. The explicit `migrate-normalized` command previews by default and requires `--apply`
   to back up and transactionally migrate the imported snapshot; it never runs at startup.
-   Legacy Notes may contain multiple checklist criteria separated by `; - [ ]`; each checkbox,
+  Legacy Notes may contain multiple checklist criteria separated by `; - [ ]`; each checkbox,
   verification state and explicit proof is stored separately without rewriting Notes. Removing a
   normalized row through the compatibility CLI cancels it: active/queue references are cleared,
-  while the canonical item and its history are retained.
+  while the canonical item and its history are retained. After explicit migration, `show`, `lanes`,
+  and `export` expose active work only; planned queue/history use their dedicated commands. Normal
+  worktree writers update normalized state through the board compatibility API; the human finalize
+  writer records `Merged` as completed history inside its existing transaction.
 - The explicit runtime-state migration command supports dry-run and `--apply`; all legacy database
   writers must be stopped first. It copies the database and WAL/SHM files read-only into private
   staging, checks source metadata and content before and after the copy, then backs up and verifies
@@ -54,6 +61,8 @@ needs. Every work surface must be registered before the factory reads its conten
   to its isolated worktree.
 - The dashboard is read-only. It shows board state, branches and worktrees. It does not expose
   OpenCode sessions, dispatch agents, write board rows or maintain a second run-history table.
+- The approved `/api/planned-work` contract is read-only and factory-control-board-only. It exposes
+  ordered queue and terminal history, excluding active items. HTTP implementation is deferred.
 - OpenCode's architect coordinates specialist agents. The approved builder limit is two total and
   one per repository. This policy is not enforced until BOARD-133 is complete.
 - A `factory-dev` specialist is approved for control-repo board/worktree/guard tooling, but its

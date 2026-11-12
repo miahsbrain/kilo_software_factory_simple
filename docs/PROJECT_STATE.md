@@ -1,12 +1,23 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-146 rebase alignment (2026-11-12)
+## Current session — BOARD-146 CLI lifecycle (2026-11-12)
+
+- Added atomic plan acceptance, queue/history views, promotion, completion and cancellation. The
+  active board remains active-only; worktree finalization updates normalized state transactionally.
+  The approved `/api/planned-work` contract is documented, but HTTP implementation is deferred.
+- No live board or migration was touched. The focused lifecycle command documented in
+  `docs/STACK.md` ran 5 tests and failed at
+  `.opencode/skills/board/scripts/test_board_normalized.py:294`: missing optional `notes` expected
+  `''`, actual `'-'`. No verification attempts remain in this chunk. Next: commit as WIP and request
+  a corrective attempt before chunk 2.
+
+## Previous session — BOARD-146 rebase alignment (2026-11-12)
 
 - BOARD-146 normalized storage, compatibility CLI, explicit migration, checklist parsing and
   cancellation history are retained. The user reports the board suite passed 42 tests in 3.139s;
   it was not rerun for this alignment. Rebased onto local `opencode` at `1ca043a`; conflict
-  resolution retained BOARD-149 artifact policy and unique ADR-099/100/101. Do not run a live
-  migration or modify the live board.
+  resolution retained BOARD-149 artifact policy and unique ADR-099/100/101. No live migration or
+  board modification.
 
 ## Previous session — BOARD-149 QA report artifacts (2026-11-12)
 
