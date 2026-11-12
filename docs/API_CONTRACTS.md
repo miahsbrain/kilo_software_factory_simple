@@ -6,7 +6,7 @@ status and headers without a body. Responses are JSON with `Cache-Control: no-st
 
 | Method/path | Success | Notes |
 |---|---|---|
-| `GET /api/board` | `200 {"boards":[{"label":string,"path":string,"rows":[],"lanes":{},"counts":{},"error":string|null}],"generated_at":ISO-8601}` | Existing board shape retained. Labels are `harness` for the factory control repo, `project` for a project control repo or registered project, and the registered ID for other repos. Missing independent registered boards retain the per-board read error. |
+| `GET /api/board` | `200 {"boards":[{"label":string,"path":string,"rows":[],"lanes":{},"counts":{},"error":string|null}],"generated_at":ISO-8601}` | Existing board shape retained. Labels are `harness` for the factory control repo, `project` for a project control repo or registered project, and the registered ID for other repos. A registered independent Git repo without a SQLite board stays visible with `rows:[]` and `error:"Board not initialized"`; HTTP GET never imports its Markdown or initializes SQLite. |
 | `GET /api/worktrees` | `200 [{"path":string,"branch":string,"sha":string|null,"ahead":number|null,"behind":number|null,"dirty":boolean,"main":boolean,"repo":string,"base":string|null}]` | Existing array and fields retained; includes all valid Git repositories registered by ID. Existing failure behavior is an empty array. |
 | `GET /api/repo-candidates` | `200 {"candidates":[{"name":string,"relative_path":string}],"scanned_at":ISO-8601}` | Scans only directory-entry metadata and `.git` marker type at `/projects/<repo>` and `/projects/<group>/<repo>`, without symlink traversal. Sorted by distinct relative path; excludes registered paths. No contents, board, Git command or initialization for candidates. |
 

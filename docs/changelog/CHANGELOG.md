@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Prevent HTTP reads from initializing registered boards
+**Type:** Fix
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `board_serve.py`, `test_board_serve.py`, `docs/API_CONTRACTS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** The existing board reader can create SQLite when a registered independent repo lacks its board.
+**Impact:** Read-only secondary SQLite lookup; a missing board remains visible with `Board not initialized`. Only the board CLI can initialize it. No migration or new dependency. Catalogue: python-pro, api-designer, secure-code-guardian.
+**Verification:** Focused scratch check first failed on read-only SQLite WAL sidecars; corrected and second run passed 2 tests in 0.087s. Prior broad suite remains unverified; parent review pending.
+
 ## [2026-11-12] Expose registered repositories and safe candidate names
 **Type:** Feature
 **Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates

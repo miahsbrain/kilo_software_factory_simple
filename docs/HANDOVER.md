@@ -1,5 +1,25 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-126 independent board read correction, 2026-11-12**
+> The same `feat/expose-registered-repos-and-safe-candidates` worktree now reads registered
+> independent Git-repo boards from existing SQLite only. A missing database yields a visible
+> per-repo `Board not initialized` error; HTTP GET never creates it. Two focused scratch
+> regressions passed after a first sidecar-creation failure was corrected. Next: parent review
+> and full-suite verification; the prior broad suite remains unverified.
+
+## BOARD-126 read-only correction inventory
+
+- `board_serve.py:read_secondary_table` (effectful Git path lookup and read-only SQLite) uses
+  the existing `board.database_path` and `parse_table` without calling `initialize_board` or
+  `read_table`; missing DB is an explicit error. Checkpointed databases use an immutable
+  read-only connection to avoid WAL sidecars; existing WAL/SHM pairs use read-only WAL mode.
+  Incomplete pairs return a per-board read error. `read_rows`, `board_states` and
+  `build_payloads` (effectful routing/reads) select this path only for independent registered
+  Git repositories; control and explicit-file reads retain their existing behavior.
+- Scratch independent-Git fixture tests assert no SQLite DB/WAL or Git status changes on GET,
+  existing board content reads, and safe 503 for mid-scan and invalid registry errors. Focused
+  check: first run failed (read-only WAL sidecars); second run 2 tests OK after correction.
+
 > **Session Notes — BOARD-126 server/API slice, 2026-11-12**
 > In `feat/expose-registered-repos-and-safe-candidates`, the dashboard reads board and worktree
 > state for registered IDs only, and exposes metadata-only candidate names via

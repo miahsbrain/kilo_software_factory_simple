@@ -1,5 +1,15 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-126 independent read correction (2026-11-12)
+
+- High-severity review finding confirmed: `board.read_table` may initialize registered
+  independent repositories during GET. The same task branch now routes them through read-only
+  SQLite; missing DBs report `Board not initialized` in their board entry.
+- New scratch regressions cover no DB/WAL or Git status changes, existing-board reads, and
+  candidate mid-scan/registry failures. Focused check failed once because read-only SQLite
+  created WAL sidecars, then passed 2/2 after using immutable reads for checkpointed DBs.
+  Next: parent review and full-suite verification; the prior broad suite remains unverified.
+
 ## Current session — BOARD-126 registered API slice (2026-11-12)
 
 - `feat/expose-registered-repos-and-safe-candidates` lists all mapped repositories in the

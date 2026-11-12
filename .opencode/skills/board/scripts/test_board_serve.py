@@ -144,6 +144,71 @@ class BoardRefreshTests(unittest.TestCase):
         self.assertEqual((code, payload), (503, {"error": "Repository candidates unavailable."}))
         self.assertNotIn(str(self.root), log.getvalue())
 
+    def test_independent_registered_board_get_never_initializes_sqlite(self):
+        project = self.root / "project"
+        project.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(project)], check=True)
+        self.write_board(self.project, "Independent task")
+        subprocess.run(["git", "-C", str(project), "add", "docs/BOARD.md"], check=True)
+        subprocess.run(["git", "-C", str(project), "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"], check=True)
+        self.worktree.is_git_repo = Mock(side_effect=lambda target: target == str(project))
+        self.initialize()
+        db = Path(self.board.database_path(str(project)))
+
+        def git_status():
+            result = subprocess.run(["git", "-C", str(project), "status", "--porcelain",
+                                     "--untracked-files=all"], capture_output=True, text=True, check=True)
+            return result.stdout
+
+        self.assertFalse(db.exists())
+        self.assertEqual(git_status(), "")
+        with patch.object(self.board, "read_table", wraps=self.board.read_table) as read_table:
+            entry = self.request("/api/board")["boards"][1]
+            self.assertIn("Board not initialized", self.request("/") )
+        self.assertEqual(entry["label"], "project")
+        self.assertEqual(entry["rows"], [])
+        self.assertEqual(entry["error"], "Board not initialized")
+        self.assertEqual(read_table.call_count, 2)
+        self.assertTrue(all(call.args[0] == str(self.factory) for call in read_table.call_args_list))
+        self.assertEqual(list(db.parent.glob(db.name + "*")), [])
+        self.assertEqual(git_status(), "")
+
+        self.board.initialize_board(str(project))
+        before = db.read_bytes()
+        sidecars = sorted(path.name for path in db.parent.glob(db.name + "*"))
+        entry = self.request("/api/board")["boards"][1]
+        self.assertEqual([row["Task"] for row in entry["rows"]], ["Independent task"])
+        self.assertIsNone(entry["error"])
+        self.assertEqual(db.read_bytes(), before)
+        self.assertEqual(sorted(path.name for path in db.parent.glob(db.name + "*")), sidecars)
+        self.assertEqual(git_status(), "")
+
+    def test_candidate_mid_scan_failure_and_invalid_registry_are_safe(self):
+        self.initialize()
+        projects = self.root / "projects"
+        (projects / "group").mkdir(parents=True)
+        scandir = viewer.os.scandir
+
+        def fail_nested(directory):
+            if os.fspath(directory) == str(projects / "group"):
+                raise PermissionError("private path: " + str(directory))
+            return scandir(directory)
+
+        with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
+                patch.object(viewer.os, "scandir", side_effect=fail_nested), \
+                contextlib.redirect_stderr(io.StringIO()) as log:
+            code, payload = self.response("/api/repo-candidates")
+        self.assertEqual((code, payload), (503, {"error": "Repository candidates unavailable."}))
+        self.assertNotIn(str(projects), log.getvalue())
+
+        self.registry.write_text(json.dumps({"control": ".", "invalid": "../outside"}))
+        with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
+                contextlib.redirect_stderr(io.StringIO()) as log:
+            code, payload = self.response("/api/repo-candidates")
+        self.assertEqual((code, payload), (503, {"error": "Repository candidates unavailable."}))
+        self.assertNotIn(str(self.root), log.getvalue())
+
     def test_project_appears_and_disappears_after_initialization(self):
         self.initialize()
         for present in (False, True, False, True):

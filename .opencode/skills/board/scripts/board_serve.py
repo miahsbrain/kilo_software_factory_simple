@@ -20,17 +20,20 @@ Standard library only. Python 3.9+. The static CSS is built ahead of time by
 `.opencode/skills/board/ui`; the server only reads it.
 """
 import argparse
+import contextlib
 import datetime
 import html
 import importlib.util
 import json
 import os
 import re
+import sqlite3
 import stat
 import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import quote
 
 LANES = ["Backlog", "Ready", "In Progress", "In Review", "Pending Merge",
          "Merged", "Blocked", "Dropped"]
@@ -143,7 +146,8 @@ def discover_boards(root, worktree=None):
     boards = []
     for repo_id, target in registered_repos(worktree, root):
         label = ("project" if is_project else "harness") if repo_id == "control" else repo_id
-        if repo_id in ("control", "project") and repo_id != "control" and not board_available(target):
+        if (repo_id == "project" and not worktree.is_git_repo(target)
+                and not board_available(target)):
             continue
         boards.append((label, os.path.join(target, "docs", "BOARD.md")))
     return boards
@@ -158,11 +162,38 @@ def board_available(root):
         return False
 
 
-def read_rows(board, path):
+def read_secondary_table(board, path, root):
+    """Read an existing registered SQLite board without invoking board initialization."""
+    try:
+        db = board.database_path(root)
+        try:
+            info = os.lstat(db)
+        except FileNotFoundError:
+            return None, "Board not initialized"
+        if not stat.S_ISREG(info.st_mode):
+            return None, "cannot read the board"
+        wal = os.path.exists(db + "-wal")
+        shm = os.path.exists(db + "-shm")
+        if wal != shm:
+            return None, "cannot read the board"
+        # Immutable reads avoid creating WAL sidecars on a fully checkpointed board.
+        uri = "file:%s?mode=ro%s" % (quote(db, safe="/"), "" if wal else "&immutable=1")
+        with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
+            row = connection.execute("SELECT markdown FROM board WHERE id = 1").fetchone()
+        if row is None:
+            return None, "cannot read the board"
+        return board.parse_table(row[0], path)
+    except (OSError, ValueError, sqlite3.Error):
+        return None, "cannot read the board"
+
+
+def read_rows(board, path, secondary_root=None):
     """(rows, error). The board is read fresh; nothing is cached."""
-    table, err = board.read_table(path)
+    table, err = (read_secondary_table(board, path, secondary_root)
+                  if secondary_root else board.read_table(path))
     if table is None:
-        return [], (err or "cannot read the board") + BOARD_READ_HINT
+        return [], (err or "cannot read the board") + ("" if err == "Board not initialized"
+                                                     else BOARD_READ_HINT)
     rows = []
     for i in table["rows"]:
         cells = board.cell_texts(table["lines"], i)
@@ -1615,10 +1646,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
 
 
-def board_states(board, paths):
+def board_states(board, paths, secondary_roots=None):
     states = []
     for label, path in paths:
-        rows, error = read_rows(board, path)
+        rows, error = read_rows(board, path, (secondary_roots or {}).get(path))
         lanes = lane_map(rows)
         states.append({
             "label": label,
@@ -1635,8 +1666,12 @@ def build_payloads(board, worktree, paths, root):
     def board_payload():
         current_paths = paths if paths is not None else (
             discover_boards(root, worktree) or [("board", board_file(None, root))])
+        secondary_roots = ({os.path.join(target, "docs", "BOARD.md"): target
+                            for repo_id, target in registered_repos(worktree, root)
+                            if repo_id != "control" and worktree.is_git_repo(target)}
+                           if paths is None else {})
         return {
-            "boards": board_states(board, current_paths),
+            "boards": board_states(board, current_paths, secondary_roots),
             "generated_at": now(),
         }
 
