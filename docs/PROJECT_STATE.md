@@ -7,8 +7,8 @@
   The approved `/api/planned-work` contract is documented, but HTTP implementation is deferred.
 - No live board or migration was touched. The focused retry documented in `docs/STACK.md` passed:
   5 tests in 0.382s. Missing Notes are canonical `""` and render as `-` only in Markdown; the empty
-  canonical value survives unrelated compatibility edits. Next: commit the correction locally as
-  WIP for independent review; HTTP remains the next chunk.
+  canonical value survives unrelated compatibility edits. Commit `32597b1` records the correction.
+  Next: independent review, then the separately scoped HTTP chunk.
 
 ## Previous session — BOARD-146 rebase alignment (2026-11-12)
 

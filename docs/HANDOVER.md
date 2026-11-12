@@ -9,8 +9,9 @@
 > Lifecycle tests use scratch SQLite. No live board/migration was touched. The focused retry
 > documented in `docs/STACK.md` passed: 5 tests in 0.382s. Missing Notes are canonical `""` and
 > render as `-` only in Markdown; supplied Notes and the empty canonical value survive unrelated
-> compatibility edits. The previous failed run was not repeated beyond this approved retry. Next:
-> commit the correction locally as WIP for independent review; HTTP remains the next chunk.
+> compatibility edits. The previous failed run was not repeated beyond this approved retry. The
+> correction is committed as `32597b1`; next is independent review, then the separately scoped HTTP
+> chunk. No live board/migration was touched.
 
 > **Session Notes — BOARD-146 normalized storage and rebase, 2026-11-12**
 > BOARD-146 adds normalized planned items, criteria, active work, and terminal history with an

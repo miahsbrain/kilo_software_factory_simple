@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Record BOARD-146 lifecycle fix handoff
+**Type:** Docs
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Record the committed Notes correction and the next independent-review step.
+**Impact:** Documentation only.
+
 ## [2026-11-12] Keep empty planned Notes canonical
 **Type:** Fix
 **Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
