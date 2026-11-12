@@ -3,6 +3,22 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Plan factory implementation backlog
+**Type:** Docs
+**Board:** BOARD-131 | **Branch:** docs/plan-factory-implementation-backlog
+**Changed:** `docs/FACTORY_ROADMAP.md`, `docs/ARCHITECTURE.md`, `docs/RISKS.md`, factory docs index, project structure, API contract, decisions, handover, project state, README.
+**Why:** Turn the approved factory direction into small, dependency-ordered SQLite tasks and a readable roadmap.
+**Impact:** Documentation and backlog only. The dashboard remains read-only; no runtime or API behavior changed.
+**Verification:** `git diff --check` passed; live board rows reviewed with `board.py show` and generated export. Docs-only review passed; no application tests run.
+
+## [2026-11-12] Record BOARD-131 handoff state
+**Type:** Docs
+**Board:** BOARD-131 | **Branch:** docs/plan-factory-implementation-backlog
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** Record the local plan commit and the remaining human review gate.
+**Impact:** None; no runtime or backlog behavior changed.
+**Verification:** `git diff --check` passed; clean-worktree handoff check pending.
+
 ## [2026-11-12] Verify registered-repository read boundary
 **Type:** Docs
 **Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates

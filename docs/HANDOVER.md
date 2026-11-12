@@ -1,5 +1,16 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-131 plan reviewed, 2026-11-12**
+> `docs/FACTORY_ROADMAP.md` now records the approved scope and 13 granular SQLite backlog rows.
+> The live board is clone-local SQLite; the dashboard is read-only and shows lanes, branches and
+> worktrees. BOARD-130 remains Blocked after its three-round cap; its task-local artifact change is
+> not integrated. The docs-only review found no blocking issue; the handover conflict markers are
+> tracked as BOARD-144, blocked by BOARD-130. Plan commit `3d0cecc` is on the task branch.
+> `git diff --check` passed. Next: confirm a clean handoff state, then request human inspection.
+> The factory-dev role was approved in principle; exact rules and permission entry remain pending
+> A9 approval. `docs/HANDOVER.md` still has conflict markers in its Testing section; BOARD-144 is
+> blocked by BOARD-130 until artifact guidance can be reconciled.
+
 > **Session Notes — BOARD-126 ready for human inspection, 2026-11-12**
 > Registered repositories appear in the read-only feeds. `/api/repo-candidates` lists
 > unregistered names at two levels under `/projects` through no-follow directory handles.
@@ -626,7 +637,7 @@ node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127
 |---|---|
 | `AGENTS.md` | The rule set, read by every agent at the start of a task. |
 | `.opencode/commands/*.md` | Slash commands that package the workflow. |
-| `.opencode/skills/board/scripts/board.py` | The board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`. |
+| `.opencode/skills/board/scripts/board.py` | The clone-local SQLite board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`, `export`. |
 | `.opencode/skills/board/scripts/board_serve.py` | The read-only factory board console on port 15180. Server-rendered, offline, standard library at runtime: a three-column dashboard shell (lane/filter sidebar, KPI strip, segmented flow meter, dense lane panel, sticky worktrees rail), search and status/type/priority filters with URL state, parsed Notes checklists, branch copy, and `j`/`k`/`/`/`Enter`/`Esc` keyboard control. Serves `/static/board.css` and the two self-hosted Geist fonts. `/api/board` retains its shape; `/api/worktrees` retains its array/fields and adds `repo` and `base` metadata. |
 | `.opencode/skills/board/ui/` | The Tailwind v4 source for the console (`package.json`, `src/app.css`); `npm --prefix .opencode/skills/board/ui run build` writes the committed `static/board.css`. |
 | `.opencode/skills/board/static/` | The committed stylesheet and the Geist Sans/Mono variable fonts with their SIL OFL licence. |
@@ -653,7 +664,7 @@ Chunk 1 reuses these existing boundaries:
 
 | Symbol | File | Responsibility | Kind |
 |---|---|---|---|
-| `board.py` | `.opencode/skills/board/scripts/board.py` | Deterministic manipulation of the markdown board. Never writes prose. | effectful (file I/O) |
+| `board.py` | `.opencode/skills/board/scripts/board.py` | Reads and updates the clone-local SQLite board; generates a Markdown export on demand. | effectful (SQLite, file I/O) |
 | `board_serve.py` | `.opencode/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
 | `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1704` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
 | `worktree_state()` | `.opencode/skills/board/scripts/board_serve.py:171` | Reloads the existing registry and enumerates control/project via `load_repos`, `resolve_repo`, `is_git_repo`, `list_worktrees`, `default_base` and `git_out`. Omits absent/uninitialized projects. Each entry adds `repo` and `base`; existing array and fields stay intact. Main detection and counts use only that repository. Invalid maps flow through existing payload exception handling. | effectful (filesystem, Git); entry construction is deterministic from results |
@@ -678,7 +689,7 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 
 | Artefact | Where | What it holds |
 |---|---|---|
-| The board | `docs/BOARD.md` | One row per unit of factory work. The only state. |
+| The board | `<git-common-dir>/factory-board.sqlite3` | Clone-local authoritative task state; one row per unit. `docs/BOARD.md` is a legacy import source only. |
 | The decisions | `docs/DECISIONS.md` | Append-only ADR table, ADR-001 onward. |
 | The changelog | `docs/changelog/CHANGELOG.md` | The engineering log, newest first, one section per change. |
 | The repo map | `.opencode/repos.json` | Repo id → path, relative to this repository's root. |
@@ -688,13 +699,14 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 
 The board's lanes are the state machine of the factory:
 `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged`, plus `Blocked`
-and `Dropped`. A row may not reach `Pending Merge` while a `Fix` row it spawned is open, and the
-QA↔fix loop is capped at three rounds. Full rules in `AGENTS.md` §B4.
+and `Dropped`. In-task QA findings return to the same row and worktree; the review loop is capped
+at three rounds. Full rules in `AGENTS.md` §B4.
 
 ## 7. Public interfaces
 
-The factory exposes no network API. Its public surface is the file layout above and the CLI of
-the scripts. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
+The local dashboard exposes read-only HTTP on loopback port 15180: `GET /api/board`,
+`GET /api/worktrees` and `GET /api/repo-candidates`. It has no session view, dispatch or write
+endpoint. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
 `verify`, `cleanup`) and `env.py` (`sync`, `status`, `clean`). `discard` takes `--apply`, `--force`
 and `--yes`: `--force` alone prints the destruction plan, and `--force --yes` acts after writing a
 recovery copy under the repository's `cleanup-wt/` folder. `handoff --board <ID>` prints review

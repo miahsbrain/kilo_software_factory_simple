@@ -4,6 +4,10 @@ The local dashboard uses Python standard-library HTTP on loopback by default (po
 There is no authentication or write endpoint. Requests are read-only; `HEAD` returns the same
 status and headers without a body. Responses are JSON with `Cache-Control: no-store`.
 
+The dashboard is a board/worktree monitor, not an OpenCode session console. It has no session
+view, agent-dispatch operation, board-mutation route or separate run-history table. Repository
+candidate discovery remains metadata-only and does not authorize repository access.
+
 | Method/path | Success | Notes |
 |---|---|---|
 | `GET /api/board` | `200 {"boards":[{"label":string,"path":string,"rows":[],"lanes":{},"counts":{},"error":string|null}],"generated_at":ISO-8601}` | Existing board shape retained. Labels are `harness` for the factory control repo, `project` for a project control repo or registered project, and the registered ID for other repos. A registered independent Git repo without a SQLite board stays visible with `rows:[]` and `error:"Board not initialized"`; HTTP GET never imports its Markdown or initializes SQLite. |

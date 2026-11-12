@@ -164,12 +164,13 @@ The devcontainer image carries all of them, including chromium at `/usr/bin/chro
 
 ## The board
 
-`docs/BOARD.md` is the only state of the factory itself. A project has its own board, in its own
-repository, and the orchestrator of that project is the only writer of it. One row per unit of work, and a row needs acceptance
-criteria, a risk line, and a `Blocked by` before it leaves `Backlog`. It is edited by `board.py`
-in the main checkout — never by hand, and never from a worktree.
+The live board is clone-local SQLite in the Git common directory. `docs/BOARD.md` is a legacy
+import source, not live state. Each project repository has its own board. The orchestrator is the
+only writer and edits rows through `board.py`; the Markdown export is generated, never hand-edited.
+Each row needs acceptance criteria, a risk line and dependencies before it leaves `Backlog`.
 
-The read-only dashboard shows the lanes, the cards, and the running worktrees:
+The read-only dashboard shows board lanes, task cards, branches and worktrees. It does not show
+OpenCode sessions, dispatch agents or edit tasks:
 
 ```bash
 python3 .opencode/skills/board/scripts/board_serve.py --port 15180
