@@ -57,6 +57,11 @@ class BoardRefreshTests(unittest.TestCase):
         server.server_close.assert_called_once_with()
 
     def request(self, path):
+        code, body = self.response(path)
+        self.assertEqual(code, 200)
+        return body
+
+    def response(self, path):
         response = Mock()
         handler = SimpleNamespace(
             path=path, state=viewer.Handler.state,
@@ -64,8 +69,80 @@ class BoardRefreshTests(unittest.TestCase):
             send_bytes=lambda code, body, content_type: response(code, body.decode("utf-8")))
         viewer.Handler.do_GET(handler)
         code, body = response.call_args.args
-        self.assertEqual(code, 200)
-        return json.loads(body) if path.startswith("/api/") else body
+        return code, json.loads(body) if path.startswith("/api/") else body
+
+    def test_all_registered_boards_and_worktrees_keep_their_ids(self):
+        self.initialize()
+        for name in ("alpha", "beta", "gamma"):
+            target = self.root / name
+            self.write_board(target / "docs/BOARD.md", name + " task")
+            (target / ".git").mkdir()
+        self.registry.write_text(json.dumps({"control": ".", "alpha": "alpha",
+                                             "beta": "beta", "gamma": "gamma"}))
+        self.worktree.is_git_repo = Mock(return_value=True)
+        self.worktree.list_worktrees = Mock(side_effect=lambda target: [
+            {"path": target, "head": "abc1234", "branch": "main"}])
+        self.worktree.default_base = Mock(return_value="main")
+        self.worktree.git = Mock(return_value=(1, "", ""))
+        labels = [entry["label"] for entry in self.request("/api/board")["boards"]]
+        self.assertEqual(labels, ["harness", "alpha", "beta", "gamma"])
+        self.assertEqual([entry["repo"] for entry in self.request("/api/worktrees")],
+                         ["control", "alpha", "beta", "gamma"])
+        page = self.request("/")
+        for label in labels:
+            self.assertIn('data-wb-scope-tab="%s"' % label, page)
+
+    def test_registered_missing_board_reports_existing_read_error_without_creating_one(self):
+        self.initialize()
+        target = self.root / "alpha"
+        target.mkdir()
+        self.registry.write_text(json.dumps({"control": ".", "alpha": "alpha"}))
+        entry = self.request("/api/board")["boards"][1]
+        self.assertEqual(entry["label"], "alpha")
+        self.assertEqual(entry["rows"], [])
+        self.assertIn("cannot read", entry["error"])
+        self.assertFalse((target / "docs/BOARD.md").exists())
+
+    def test_candidate_scan_is_names_only_and_does_not_follow_symlinks(self):
+        self.initialize()
+        projects = self.root / "projects"
+        projects.mkdir()
+        for relative in ("group-one/shared", "group-two/shared", "registered",
+                         "group-three/linked", "plain"):
+            target = projects / relative
+            target.mkdir(parents=True)
+            if relative.endswith("linked"):
+                (target / ".git").write_text("gitdir: /private/elsewhere")
+            else:
+                (target / ".git").mkdir()
+        (projects / "group-one" / "alias").symlink_to(projects / "group-two/shared", target_is_directory=True)
+        (projects / "group-three" / "symlink-marker").mkdir()
+        (projects / "group-three" / "symlink-marker" / ".git").symlink_to(
+            projects / "plain/.git", target_is_directory=True)
+        (projects / "outside").symlink_to(self.root, target_is_directory=True)
+        (projects / "registered" / "private").mkdir()
+        (projects / "registered" / "private" / ".git").mkdir()
+        self.registry.write_text(json.dumps({"control": ".", "registered": str(projects / "registered")}))
+        with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
+                patch.object(self.board, "read_table", wraps=self.board.read_table) as board_read, \
+                patch.object(self.worktree, "git", side_effect=AssertionError("candidate Git access")):
+            payload = self.request("/api/repo-candidates")
+        self.assertEqual(set(payload), {"candidates", "scanned_at"})
+        self.assertEqual(payload["candidates"], [
+            {"name": "shared", "relative_path": "group-one/shared"},
+            {"name": "linked", "relative_path": "group-three/linked"},
+            {"name": "shared", "relative_path": "group-two/shared"},
+            {"name": "plain", "relative_path": "plain"}])
+        board_read.assert_not_called()
+        self.assertNotIn(str(projects), json.dumps(payload["candidates"]))
+
+    def test_inaccessible_candidate_root_returns_safe_503(self):
+        self.initialize()
+        with patch.object(viewer, "PROJECTS_ROOT", str(self.root / "missing")), \
+                contextlib.redirect_stderr(io.StringIO()) as log:
+            code, payload = self.response("/api/repo-candidates")
+        self.assertEqual((code, payload), (503, {"error": "Repository candidates unavailable."}))
+        self.assertNotIn(str(self.root), log.getvalue())
 
     def test_project_appears_and_disappears_after_initialization(self):
         self.initialize()
@@ -218,7 +295,7 @@ class BoardRefreshTests(unittest.TestCase):
             self.assertEqual(group[1]["branch"], "fix/shared")
             self.assertEqual(group[1]["sha"], "fedcba9")
             self.assertEqual((group[1]["ahead"], group[1]["behind"], group[1]["dirty"]), expected)
-        self.write_board(self.project, "Project task")
+        self.write_board(project / "docs/BOARD.md", "Project task")
         page = self.request("/")
         self.assertEqual(page.count('2 worktrees</span>'), 2)
         self.assertEqual(page.count('class="wb-wt"'), 4)
@@ -244,7 +321,7 @@ class BoardRefreshTests(unittest.TestCase):
                 self.assertEqual(self.request("/api/worktrees"), control)
                 page = self.request("/")
                 self.assertIn('2 worktrees</span>', page)
-                self.assertIn('0 worktrees</span>', page)
+                self.assertNotIn('data-wb-scope-tab="project"', page)
                 self.assertEqual(page.count('class="wb-wt"'), 2)
 
     def test_main_uses_real_scoped_data_and_shared_workbench(self):

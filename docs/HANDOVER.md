@@ -1,5 +1,27 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-126 server/API slice, 2026-11-12**
+> In `feat/expose-registered-repos-and-safe-candidates`, the dashboard reads board and worktree
+> state for registered IDs only, and exposes metadata-only candidate names via
+> `GET /api/repo-candidates`. Candidate scans are rooted at `/projects` and never authorize
+> repository contents. The test suite failed twice on legacy unregistered-project expectations;
+> final corrections were not rerun. Next: parent independent verification/review, then client work.
+
+## BOARD-126 server inventory
+
+- `board_serve.py:registered_repos` (effectful map read) resolves every ID through the existing
+  worktree helpers. `discover_boards`, `board_available`, `read_rows`, `worktree_state`
+  (effectful filesystem, SQLite or Git) read registered repositories without creating their boards.
+- `board_serve.py:select_candidates` (pure) excludes registered relative paths and sorts distinct
+  candidates. `scan_repo_candidates` (effectful directory metadata) checks only directories and
+  `.git` marker types two levels beneath the injected root, never following symlinks.
+- `Handler.do_GET`, `build_payloads` (effectful HTTP and request-time reads) expose the new
+  read-only endpoint. Candidate errors return 503 with no path/exception; see
+  [API_CONTRACTS.md](API_CONTRACTS.md). No new dependency, persistence or environment variable.
+- Verification: documented temporary-fixture board suite ran twice and failed on legacy
+  unregistered-project expectations (first 1 failure, second 3 failures). Final corrections
+  require parent verification; independent QA/review and client integration remain separate.
+
 > **Session Notes — BOARD-125 independent-review correction, 2026-11-12**
 > The same `fix/repair-finalize-after-worktree-removal` worktree now publishes a
 > verified, fsynced recovery temp file without replacing an existing journal. A

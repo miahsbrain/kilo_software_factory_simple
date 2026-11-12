@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Expose registered repositories and safe candidate names
+**Type:** Feature
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `board_serve.py`, `test_board_serve.py`, root/template `AGENTS.md`, `docs/API_CONTRACTS.md`, `docs/PROJECT_STRUCTURE.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** The dashboard previously showed only a control/project pair and could not safely show prospective repo names.
+**Impact:** Registered repos appear in existing read-only APIs; a separate metadata-only candidate API scans `/projects` up to two levels. No registration or candidate content access; no migration or new dependency. Catalogue: python-pro, api-designer, secure-code-guardian.
+**Verification:** Documented suite failed twice on old unregistered-project fixture expectations; corrected without a third run under the two-attempt cap. Parent independent verification/review pending.
+
 ## [2026-11-12] Hold approval lock and publish finalize recovery atomically
 **Type:** Fix
 **Board:** BOARD-125 | **Branch:** fix/repair-finalize-after-worktree-removal

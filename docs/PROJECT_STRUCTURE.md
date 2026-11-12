@@ -32,6 +32,7 @@ and is never tracked here (ADR-053).
     │   ├── HANDOVER.md               # living description of the factory as it is now
     │   ├── BOARD.md                  # untracked local legacy import only, not live state
     │   ├── DECISIONS.md              # append-only factory decisions (ADR-001…)
+    │   ├── API_CONTRACTS.md          # read-only board and candidate endpoint shapes
     │   ├── UI-UX.md                  # visual language, anti-slop rules, QA evidence spec
     │   ├── PROJECT_STATE.md          # current phase, progress, next step
     │   ├── STACK.md                  # the tools the factory needs, and the commands they run
@@ -81,6 +82,8 @@ and is never tracked here (ADR-053).
 - This integration branch is `opencode`; `main` retains Kilo. Devcontainer/security port pending.
 
 - The map in `.opencode/repos.json` is the only way into a repository. Never address one by path.
+- The dashboard's two-level `/projects` candidate scan only exposes directory names and relative
+  paths; it never reads candidate contents. Human registration in the map is required for access.
 - The factory never tracks a project. `project/` is git-ignored, and every project is its own git
   repository.
 - A project copies the harness (`AGENTS.md`, `.opencode/`, the permission map) into itself and owns

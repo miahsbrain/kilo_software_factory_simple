@@ -1,5 +1,14 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-126 registered API slice (2026-11-12)
+
+- `feat/expose-registered-repos-and-safe-candidates` lists all mapped repositories in the
+  existing board/worktree APIs, and names-only unregistered candidates at `/api/repo-candidates`.
+- Candidate discovery is not registration or authorization. No dashboard write API or client/UI
+  changes. Documented regression suite failed twice on old unregistered-project fixture
+  expectations (first: 1 failure; second: 3 failures); final fixture/scanner corrections were
+  not rerun under the two-attempt cap. Next: parent independent verification and API review.
+
 ## Current session — BOARD-125 review correction (2026-11-12)
 
 - Returned to Build on the existing `fix/repair-finalize-after-worktree-removal`
