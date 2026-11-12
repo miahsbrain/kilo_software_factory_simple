@@ -1,5 +1,13 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-124 terminal confirmation correction, 2026-11-12**
+> In `feat/sqlite-board-bootstrap`, `confirm_finalize` uses TTY stdin and stderr rather than
+> opening `/dev/tty`, which raised `io.UnsupportedOperation` on the human's interactive host.
+> The exact board/base/branch/full-tip challenge and post-confirmation base recheck remain;
+> non-TTY, EOF, mismatch and stream failures refuse. Focused handoff suite: 24 tests, OK.
+> Next: independent parent QA/review;
+> agents do not run human finalize or merge.
+
 > **Session Notes — BOARD-124 independent QA corrections, 2026-11-12**
 > Existing `feat/sqlite-board-bootstrap` worktree now supplies a pre-merge legacy import/byte
 > backup check, shell-quoted absolute control-script handoff for app repos, and strict ledger IDs.
@@ -40,13 +48,15 @@
   prints the absolute shell-quoted control script and target main checkout for app/control repos.
   `ledger.py:main` (effectful CLI) validates `BOARD-[0-9]+` before Git or ledger I/O.
 - `worktree.py:cmd_finalize` (effectful Git/SQLite) performs clean preflight, typed terminal
-  confirmation and resumable integration. `confirm_finalize` (effectful `/dev/tty` input) cannot
+  confirmation and resumable integration. `confirm_finalize` (effectful TTY stdin/stderr) cannot
   establish identity against a process sharing the same OS user. Failed merge abort is scoped
   to `MERGE_HEAD` created during this call and unchanged pre-merge HEAD; otherwise inspect
   manually. `ledger.py:main` (effectful Git discovery) defaults to common-dir local reviews;
   `parse_ledger`/`render_ledger` (pure) retain historical Fix-row fields for old records.
 - Verification: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'`;
   parent independently reviews evidence before marking Pending Merge.
+- Focused terminal-confirmation correction: `python3 -m unittest discover -s
+  .opencode/skills/git-worktree/scripts -p 'test_handoff.py'` passed 24 tests in 12.083s.
 
 > **Session Notes — BOARD-124 lifecycle slice, 2026-11-12**
 > `feat/sqlite-board-bootstrap` now makes create/resume refuse env errors; failed create records

@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Correct interactive finalize confirmation
+**Type:** Fix
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `worktree.py` confirmation, `test_handoff.py`, git-worktree skill, HANDOVER and this log.
+**Why:** The human's stdin was a TTY, but opening `/dev/tty` raised `io.UnsupportedOperation` and refused finalize.
+**Impact:** Prompt via TTY stderr and read one line from TTY stdin; fail closed on non-TTY, EOF, mismatch or stream errors. Exact four-value challenge and post-confirmation base recheck stay intact. No bypass flag or agent-run integration. Catalogue: python-pro, cli-developer.
+**Verification:** `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_handoff.py'` passed: 24 tests in 12.083s. Parent independent review pending.
+
 ## [2026-11-12] Correct bootstrap finalize instructions
 **Type:** Docs
 **Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap

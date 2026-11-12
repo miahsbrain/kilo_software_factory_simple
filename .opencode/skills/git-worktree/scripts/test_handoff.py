@@ -226,29 +226,56 @@ class HandoffTests(unittest.TestCase):
         self.assertTrue(Path(self.path).is_dir())
         self.assertEqual(self.board_cells()[3], "Pending Merge")
         tip = self.git("rev-parse", "HEAD")
+        expected = "BOARD-904 main feat/hand-off-a-worktree %s" % tip
 
-        class Terminal(io.StringIO):
-            def __init__(self, answer):
-                super().__init__()
-                self.answer = answer
+        class TtyStream(io.StringIO):
+            def __init__(self, value="", *, tty=True, failure=None):
+                super().__init__(value)
+                self.tty = tty
+                self.failure = failure
 
             def isatty(self):
-                return True
+                return self.tty
 
             def readline(self):
-                return self.answer
+                if self.failure:
+                    raise self.failure
+                return super().readline()
 
-            def close(self):
-                self.prompt = self.getvalue()
-                super().close()
+        for answer, accepted in (("no\n", False), (expected + "\n", True),
+                                 (expected + "\r\n", True), ("", False),
+                                 (expected, False), (expected + "\n\n", True)):
+            with self.subTest(answer=answer):
+                stdin, stderr = TtyStream(answer), TtyStream()
+                with patch.object(worktree.sys, "stdin", stdin), patch.object(worktree.sys, "stderr", stderr):
+                    self.assertIs(worktree.confirm_finalize("BOARD-904", "main",
+                        "feat/hand-off-a-worktree", tip), accepted)
+                self.assertIn(expected, stderr.getvalue())
+                self.assertEqual(stdin.readline(), "\n" if answer.endswith("\n\n") else "")
 
-        for answer, accepted in (("no\n", False),
-                                 ("BOARD-904 main feat/hand-off-a-worktree %s\n" % tip, True)):
-            terminal = Terminal(answer)
-            with patch("builtins.open", return_value=terminal):
-                self.assertIs(worktree.confirm_finalize("BOARD-904", "main",
-                    "feat/hand-off-a-worktree", tip), accepted)
-            self.assertIn(tip, terminal.prompt)
+        for stdin_tty, stderr_tty in ((False, True), (True, False)):
+            with self.subTest(stdin_tty=stdin_tty, stderr_tty=stderr_tty):
+                stdin, stderr = TtyStream(expected + "\n", tty=stdin_tty), TtyStream(tty=stderr_tty)
+                with patch.object(worktree.sys, "stdin", stdin), patch.object(worktree.sys, "stderr", stderr):
+                    self.assertFalse(worktree.confirm_finalize("BOARD-904", "main",
+                        "feat/hand-off-a-worktree", tip))
+                self.assertNotIn(expected, stderr.getvalue())
+                self.assertEqual(stdin.readline(), expected + "\n")
+
+        for failure in (OSError("read failed"), UnicodeError("invalid input"), KeyboardInterrupt()):
+            with self.subTest(failure=type(failure).__name__):
+                stdin, stderr = TtyStream(failure=failure), TtyStream()
+                with patch.object(worktree.sys, "stdin", stdin), patch.object(worktree.sys, "stderr", stderr):
+                    self.assertFalse(worktree.confirm_finalize("BOARD-904", "main",
+                        "feat/hand-off-a-worktree", tip))
+                self.assertIn("confirmation interrupted or unavailable", stderr.getvalue())
+
+        stdin, stderr = TtyStream(expected + "\n"), TtyStream()
+        with patch.object(worktree.sys, "stdin", stdin), patch.object(worktree.sys, "stderr", stderr), \
+                patch.object(stderr, "flush", side_effect=OSError("write failed")):
+            self.assertFalse(worktree.confirm_finalize("BOARD-904", "main",
+                "feat/hand-off-a-worktree", tip))
+        self.assertEqual(stdin.readline(), expected + "\n")
 
     def test_failed_merge_aborts_only_own_merge_and_preserves_task(self):
         original = worktree.git

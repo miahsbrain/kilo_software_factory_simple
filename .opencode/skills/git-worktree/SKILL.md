@@ -453,7 +453,9 @@ human-only finalize (run from target base checkout in a real terminal):
   python3 '<absolute-control-script-path>' finalize --board BOARD-00X [--repo <id>]
 ```
 
-Finalize requires typed board ID, base, branch and full tip; it checks clean worktrees and
+Finalize requires interactive stdin and stderr and a typed board ID, base, branch and full tip;
+the challenge is printed to stderr and one line is read from stdin. It does not open `/dev/tty`,
+which failed even when the invoking shell's stdin was a TTY. It checks clean worktrees and
 preflights conflicts, then coordinates merge, cleanup and board update. Non-interactive use is
 refused with no bypass flag. Same-identity code can bypass this local policy/deterrence gate;
 it is not an OS security boundary. Conflicts are reported per path and resolved in the task

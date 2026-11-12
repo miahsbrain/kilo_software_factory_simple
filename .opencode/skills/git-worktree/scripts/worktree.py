@@ -1231,21 +1231,23 @@ def cmd_finalize(args, cwd):
 
 
 def confirm_finalize(board_id, base, branch, tip):
-    """Require a local terminal and a typed binding to this exact merge target."""
+    """Require interactive streams and a typed binding to this exact merge target."""
     expected = "%s %s %s %s" % (board_id, base, branch, tip)
     try:
-        with open("/dev/tty", "r+", encoding="utf-8") as terminal:
-            if not terminal.isatty():
-                print("refused: finalize requires a real interactive terminal", file=sys.stderr)
-                return False
-            terminal.write("Human-only finalize. This is a local policy gate, not an OS security boundary.\n"
-                           "Type exactly to confirm: %s\n> " % expected)
-            terminal.flush()
-            answer = terminal.readline().rstrip("\r\n")
-    except OSError:
-        print("refused: finalize requires a real interactive terminal", file=sys.stderr)
+        if not sys.stdin.isatty() or not sys.stderr.isatty():
+            print("refused: finalize requires a real interactive terminal", file=sys.stderr)
+            return False
+        sys.stderr.write("Human-only finalize. This is a local policy gate, not an OS security boundary.\n"
+                         "Type exactly to confirm: %s\n> " % expected)
+        sys.stderr.flush()
+        answer = sys.stdin.readline()
+    except (OSError, UnicodeError, KeyboardInterrupt):
+        try:
+            print("refused: finalize confirmation interrupted or unavailable", file=sys.stderr)
+        except (OSError, UnicodeError):
+            pass
         return False
-    if answer != expected:
+    if not answer.endswith("\n") or answer[:-1].removesuffix("\r") != expected:
         print("refused: confirmation did not match board, base, branch and tip", file=sys.stderr)
         return False
     return True
