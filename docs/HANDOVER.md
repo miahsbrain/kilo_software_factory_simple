@@ -1,5 +1,22 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-151 shared QA artifact guard, 2026-11-12**
+> Source candidate `af1701dd14fd82c9256534c649f57de2011ee175` passed independent round-1 QA
+> and security/code review; architect review found no blocking source issue. Reviewer command
+> `node --test .opencode/plugins/factory-guard/guard.test.mjs` exited 0: 5/5, 7881.501101ms.
+> Evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-151/qa.md`.
+> On `fix/fix-shared-qa-artifact-guard-permissions` in
+> `.opencode/worktrees/fix-shared-qa-artifact-guard-permissions/`, effectful `cmd_check_file`
+> (`.opencode/skills/git-worktree/scripts/guard.py:498`) reuses existing `state.primary_checkout`;
+> `generated_permission` (`.opencode/skills/git-worktree/scripts/guard.py:758`) preserves native
+> restrictions after generic rules. Native role rules and shell semantics are unchanged.
+> Native report save under the loaded guard failed: `Factory guard refused operation; narrow the path or use the board workflow`
+> (no exit code). The user approved one-time shell persistence; the architect saved the report above.
+> Role tests simulate configured decisions through the actual adapter. Live permission-engine behavior
+> and new loaded guard/config activation remain unproven until post-integration reload/verification.
+> Repo-local scratch fixtures remain ignored and uncommitted. Earlier attempts remain in the engineering log.
+> Next: human inspection/finalize once the orchestrator verifies the clean tip and live Pending Merge row.
+
 > **Session Notes — BOARD-150 planning CLI database resolution, 2026-11-12**
 > On `fix/fix-planning-cli-database-resolution` in `.opencode/worktrees/fix-planning-cli-database-resolution/`,
 > effectful `board.py:main` (`.opencode/skills/board/scripts/board.py:1436`) resolves every plan

@@ -1,5 +1,20 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-151 shared QA artifact guard (2026-11-12)
+
+- Branch `fix/fix-shared-qa-artifact-guard-permissions`, worktree
+  `.opencode/worktrees/fix-shared-qa-artifact-guard-permissions/`. Source candidate
+  `af1701dd14fd82c9256534c649f57de2011ee175` passed independent round-1 QA and security/code review;
+  architect review found no blocking source issue. Reviewer test command exited 0: 5/5, 7881.501101ms.
+- Evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-151/qa.md`.
+  Existing guard/resolver functions are reused; native role rules and shell semantics are unchanged.
+- Loaded guard refused native report save: `Factory guard refused operation; narrow the path or use the board workflow`
+  (no exit code). User-approved one-time shell persistence let the architect save the canonical report.
+  Configured role simulation uses the actual adapter; live permission-engine behavior and loaded
+  guard/config activation require post-integration reload/verification, not a claim of live success.
+- Scratch fixtures remain repository-local, ignored and uncommitted. Next: human inspection/finalize
+  once the orchestrator verifies the clean tip and live Pending Merge row. No merge has been claimed.
+
 ## Current session — BOARD-150 planning CLI database resolution (2026-11-12)
 
 - Branch `fix/fix-planning-cli-database-resolution`, worktree `.opencode/worktrees/fix-planning-cli-database-resolution/`.

@@ -3,6 +3,41 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Record BOARD-151 independent QA and current handover
+**Type:** Docs
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Replace superseded blocked/unverified session prose with current evidence; implementation history remains in this log.
+**Impact:** Independent round-1 QA/security review PASS at `af1701dd14fd82c9256534c649f57de2011ee175`; architect found no blocking source issue. Reviewer command `node --test .opencode/plugins/factory-guard/guard.test.mjs` exited 0, 5/5, 7881.501101ms. Report: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-151/qa.md`. Loaded native save failed with `Factory guard refused operation; narrow the path or use the board workflow` (no exit code); user approved one-time shell persistence by architect. Actual live engine/new guard activation remains unproven until integration/reload; adapter role decisions are simulated. Docs-only file review, no test rerun. Next is human inspection/finalize after orchestrator checks clean tip and live Pending Merge.
+
+## [2026-11-12] Preserve native deny ordering and verify BOARD-151
+**Type:** Fix
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `.opencode/skills/git-worktree/scripts/guard.py`, `.opencode/plugins/factory-guard/guard.test.mjs`, script-generated `opencode.jsonc`, `.gitignore`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Approved ordering correction extends existing `generated_permission`: native restrictions now follow generic shell/edit rules, so blanket allow cannot override artifact/ledger denies. Existing regression checks preserve base shell/edit order, approval ask and configured role exceptions.
+**Impact:** Approved further `node --test .opencode/plugins/factory-guard/guard.test.mjs` run passed 5/5, exit 0, 8146.249618ms. No shell/agent rules changed. Scratch fixtures remain repository-local, retained under root-anchored `/factory-guard-test-*/` and `/factory-hook-test-*/` ignores; no deletes or fixture commits. Independent QA/review remain pending; builder verification is not merge approval.
+
+## [2026-11-12] Checkpoint native deny synchronization with ordering blocker
+**Type:** Fix
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `.opencode/policies/git-policy.json`, script-generated `opencode.jsonc`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Approved addition of six existing config artifact/ledger edit denies to `policy.native` avoids applying role-independent Python `file_effect` denials. Reused `guard.py check-policy --write`; no hand edits to generated config, shell or agent rules.
+**Impact:** Final authorized test run exited 1: 4/5 passed, 4437.727463ms. Policy equality passes; role regression fails at `guard.test.mjs:184`: `frontend-dev: qa.md`, `'allow' !== 'deny'`. Native denies precede and are overridden by the generated blanket edit allow. Security blocker; no third run, workaround or cleanup. Recommend approval to order native denies after base edit rules while retaining role overrides. Repo-local scratch fixtures retained; independent QA/review pending, not merge-ready.
+
+## [2026-11-12] Keep BOARD-151 fixtures in the task worktree and diagnose policy drift
+**Type:** Fix
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `.opencode/plugins/factory-guard/guard.test.mjs`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Correct forbidden outside-repository fixture paths, not repair external access. Reuse repo-local scratch placement from `test_handoff.py`; set Python subprocess cwd explicitly. No new tooling, dependencies or deletes.
+**Impact:** No tests rerun. Read-only comparison found 142 config rules vs 136 generated: config-only edit denies for `artifacts/**`, `**/artifacts/**`, `/**/artifacts/**`, `.factory-state/reviews/*-ledger.md`, `**/.factory-state/reviews/*-ledger.md`, `/**/.factory-state/reviews/*-ledger.md` at zero-based indices 64–69; all other rules match in order. Policy/config unchanged. Recommend approval to add the six denies to canonical policy, retaining native role overrides. Verification and independent review remain outstanding.
+
+## [2026-11-12] Checkpoint shared QA artifact guard exception
+**Type:** Fix
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `.opencode/skills/git-worktree/scripts/guard.py`, `.opencode/plugins/factory-guard/guard.test.mjs`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Existing `cmd_check_file` rejected canonical primary evidence writes; extend it and the existing disposable adapter fixtures rather than duplicate primary resolution or role authority. No new files or dependencies.
+**Impact:** Unverified narrow location exception; native role permissions and shell policy unchanged. One documented test command exited 1, 0/5 passed: fixture `mkdtemp` failed with `EACCES` under `/tmp/opencode`, and the existing generated-policy equality assertion failed. No live data mutation or retry; blocked pending orchestrator decision and independent review.
+
 ## [2026-11-12] Record BOARD-150 QA and completed human cleanup
 **Type:** Docs
 **Board:** BOARD-150 | **Branch:** fix/fix-planning-cli-database-resolution

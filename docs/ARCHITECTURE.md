@@ -32,6 +32,11 @@ needs. Every work surface must be registered before the factory reads its conten
   primary checkout. Only bounded-loop ledgers live in `.factory-state/reviews/`; update them through
   `ledger.py`. Cleanup recovery journals and backups live in `.factory-state/cleanup-wt/<repo-id>/`
   to keep repository identities separate.
+- The native-file guard's QA edit exception uses the existing runtime-state primary-checkout
+  resolver, not a path substring or worktree-list authority. Only canonical non-symlink outputs
+  under `artifacts/{web,api,mobile,factory}/qa/YYYY-MM-DD/<task>/` qualify; traversal, hidden
+  components and nested/foreign repositories do not. This removes only the worktree-location
+  gate: file policy and OpenCode role-specific permissions still apply. Shell policy is unchanged.
 - Planned work, acceptance criteria, active work and terminal history are normalized in the same
   SQLite database. `planned_items` is canonical; `active_work` contains only promoted, nonterminal
   rows, and `acceptance_criteria` stores ordered checklist items and proof separately. Nullable
