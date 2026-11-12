@@ -1,10 +1,10 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-146 plan projection validation, 2026-11-12**
-> Accepted repository IDs now reject CR/LF before any write; generated normalized Markdown must
-> parse and retain the canonical row-ID sequence before persistence. The focused scratch test class
-> passed 2 tests in 0.096s. No live board or migration was touched. Next: independent review of this
-> correction.
+> **Session Notes — BOARD-146 round-four review, 2026-11-12**
+> Independent QA round 4 passed at `03b90fc`; architect review found no blocker. Results: migration
+> suite 42 tests (user-reported), lifecycle 5, HTTP 7, and projection validation 2. No live
+> migration has run. Next: human inspection and finalize; then run the explicit migration dry-run
+> and, separately, apply only with approval.
 
 > **Session Notes — BOARD-146 HTTP snapshot consistency, 2026-11-12**
 > The read-only SQLite adapter holds one explicit read transaction across each payload's related

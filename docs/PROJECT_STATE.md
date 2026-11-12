@@ -1,11 +1,11 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-146 plan projection validation (2026-11-12)
+## Current session — BOARD-146 round-four review (2026-11-12)
 
-- Accepted repository IDs now reject CR/LF before persistence; generated normalized projections
-  must parse and retain the canonical row-ID sequence. The targeted command in `docs/STACK.md`
-  passed 2 scratch tests in 0.096s. No live board or migration was touched; prior suites were not
-  rerun. Next: independent review of this correction.
+- Independent QA round 4 passed at `03b90fc`; architect review found no blocker. Results: migration
+  suite 42 tests (user-reported), lifecycle 5, HTTP 7, and projection validation 2. No live
+  migration has run. Next: human inspection and finalize, followed by an explicit migration dry-run
+  and separately approved apply.
 
 ## Previous session — BOARD-146 CLI lifecycle (2026-11-12)
 
