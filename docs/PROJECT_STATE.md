@@ -6,8 +6,9 @@
   `qa.md` and QA evidence, UI critique owns `ui.md`, and builders own `builder/`. The bounded-loop
   ledger remains under `<primary-checkout>/.factory-state/reviews/` and changes only through
   `ledger.py`; the 10-round cap and stop conditions are unchanged. BOARD-146's QA report was copied
-  byte-for-byte to its approved artifact path; the source remains untouched. Next: finish review of
-  the BOARD-149 worktree before offering it for human integration.
+  byte-for-byte to its approved artifact path; the source remains untouched. Round-2 QA: PASS.
+  Final architect review of this docs-only update is pending; after review, the user should inspect
+  the worktree and use the human-only finalize command.
 
 ## Previous session — BOARD-145 QA↔fix cap update (2026-11-12)
 
