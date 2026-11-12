@@ -35,11 +35,12 @@ class LedgerTaskIdTests(unittest.TestCase):
             for task_id in ("../../outside", "BOARD-12/../../outside", "BOARD-1/../2",
                             "BOARD-", "BOARD-1.md", "BOARD-１２", "BOARD-1\n"):
                 with self.subTest(task_id=task_id), \
-                        patch.object(ledger.subprocess, "run", side_effect=AssertionError("git access")), \
+                        patch.object(ledger.importlib.util, "spec_from_file_location",
+                                    side_effect=AssertionError("runtime-state lookup")), \
                         patch.object(ledger, "read_ledger", side_effect=AssertionError("file access")), \
+                        patch.object(ledger, "write_ledger", side_effect=AssertionError("file access")), \
                         contextlib.redirect_stderr(io.StringIO()) as errors:
-                    self.assertEqual(ledger.main(["--ledger-dir", folder, "next-round",
-                                                  "--task-id", task_id]), ledger.USAGE)
+                    self.assertEqual(ledger.main(["next-round", "--task-id", task_id]), ledger.USAGE)
                     self.assertIn("expected BOARD-[0-9]+", errors.getvalue())
             self.assertEqual(list(Path(folder).iterdir()), [])
 
@@ -48,6 +49,33 @@ class LedgerTaskIdTests(unittest.TestCase):
             self.assertEqual(ledger.main(["--ledger-dir", folder, "next-round", "--task-id", "BOARD-124"]),
                              ledger.OK)
             self.assertEqual([entry.name for entry in Path(folder).iterdir()], ["BOARD-124-ledger.md"])
+
+
+class LedgerRoundLimitTests(unittest.TestCase):
+    def test_round_ten_opens_and_round_eleven_is_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for _ in range(10):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(ledger.main(["--ledger-dir", folder, "next-round",
+                                                  "--task-id", "BOARD-145"]), ledger.OK)
+
+            with contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()) as errors:
+                self.assertEqual(ledger.main(["--ledger-dir", folder, "next-round",
+                                              "--task-id", "BOARD-145"]), ledger.REFUSED)
+            self.assertIn("round cap of 10 is reached", errors.getvalue())
+            self.assertIn("what was tried and the question for the human", errors.getvalue())
+            text = Path(folder, "BOARD-145-ledger.md").read_text(encoding="utf-8")
+            self.assertIn("Round cap: 10.", text)
+            self.assertIn("## Round 10", text)
+            self.assertNotIn("## Round 11", text)
+
+    def test_status_reports_ten_round_cap(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(ledger.main(["--ledger-dir", folder, "status",
+                                              "--task-id", "BOARD-145"]), ledger.OK)
+            self.assertIn("rounds used: 0 of 10", output.getvalue())
 
 
 if __name__ == "__main__":

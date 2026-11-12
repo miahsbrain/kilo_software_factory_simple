@@ -19,7 +19,9 @@ Do not use Playwright, browser MCP alternatives or `browser-review.mjs` for UI v
    report the limitation and hold the affected criterion without fallback.
    Transfer desktop-owned captures with the built-in browser; screenshot/`files.get` results
    supply server-local paths. Never assume a shared desktop/server filesystem.
-3. **Check the round ledger** — a row goes through at most 3 QA↔fix rounds, and each round's
+3. **Check the round ledger** — a row may go through at most 10 QA↔fix rounds. Round 10 is the
+   last. If it still fails, move the row to `Blocked` with what was tried and the question for the
+   human; do not open an eleventh round. Each round's
    review is done by a fresh reviewer who reads the ledger, not the previous reviewer's
    reasoning:
 
@@ -54,8 +56,8 @@ Do not use Playwright, browser MCP alternatives or `browser-review.mjs` for UI v
    blocks the original row. Only an independently approved defect gets a separate Fix task.
 8. **Verdict**: a frontend row cannot leave `In Review` until QA and independent critique are
    green and the unslop audit is recorded. Gallery approval and accessibility gates remain
-   mandatory. Any finding returns the row to `In Progress` with the finding restated. The round cap
-   is 3 — when it is reached and the row still fails, the row moves to `Blocked` with a summary
-   of what was tried and the question the human must answer.
+   mandatory. Any finding returns the row to `In Progress` with the finding restated. If round 10
+   still fails, move the row to `Blocked` with what was tried and the question for the human; do
+   not open an eleventh round.
 
 Report in this order: what was done, what is proven, what is not done and why, next action.

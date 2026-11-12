@@ -26,7 +26,8 @@ and follow §B4.2 and `.opencode/skills/qa-review/SKILL.md` for built-in-browser
 
 ## The bounded loop
 
-A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
+A row may go through at most 10 QA↔fix rounds. Round 10 is the last. If it still fails, move the
+row to `Blocked` with what was tried and the question for the human; do not open an eleventh round.
 
 The state of each round lives in `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` —
 the round number, findings, corrections in the same worktree and stop reason.
