@@ -1,7 +1,6 @@
 # Factory implementation roadmap
 
-**Updated:** 2026-11-12  
-**Planning row:** BOARD-131  
+**Updated:** 2026-11-12 · **Planning row:** BOARD-131
 **State source:** the clone-local SQLite board is authoritative. This file is the readable plan and acceptance-criteria index; check `board.py show` for live status.
 
 ## Goal and approved scope
@@ -40,7 +39,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-143 — Add a scoped factory-dev specialist
 
-**Status:** Backlog · **Type:** Chore · **Priority:** P1 · **Owner:** architect  
+**Status:** Backlog · **Type:** Chore · **Priority:** P1 · **Owner:** architect
+
 **Start with:** `.opencode/agents/architect.md`, `opencode.jsonc` and a proposed new `.opencode/agents/factory-dev.md`.
 
 - [ ] Present the exact new agent definition and permission entry for A9 approval before editing either permanent rule/config file.
@@ -50,7 +50,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-132 — Add guarded one-pass worktree commit command
 
-**Status:** Backlog · **Type:** Chore · **Priority:** P1 · **Blocked by:** BOARD-143 · **Owner:** factory-dev  
+**Status:** Backlog · **Type:** Chore · **Priority:** P1 · **Blocked by:** BOARD-143 · **Owner:** factory-dev
+
 **Start with:** `.opencode/skills/git-worktree/scripts/worktree.py`, `guard.py`, lifecycle tests and `SKILL.md`.
 
 - [ ] Accept a board ID and explicit commit message only for the row's live task worktree and recorded branch; refuse protected or mismatched branches.
@@ -60,7 +61,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-133 — Enforce builder concurrency limits
 
-**Status:** Backlog · **Type:** Chore · **Priority:** P1 · **Blocked by:** BOARD-132 · **Owner:** factory-dev  
+**Status:** Backlog · **Type:** Chore · **Priority:** P1 · **Blocked by:** BOARD-132 · **Owner:** factory-dev
+
 **Start with:** `worktree.py`, board transaction helpers and lifecycle tests.
 
 - [ ] Admit at most two rows in `In Progress` across the factory.
@@ -70,7 +72,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-140 — Rehearse concurrent worktree admission
 
-**Status:** Backlog · **Type:** Research · **Priority:** P1 · **Blocked by:** BOARD-133 · **Owner:** architect + QA reviewer  
+**Status:** Backlog · **Type:** Research · **Priority:** P1 · **Blocked by:** BOARD-133 · **Owner:** architect + QA reviewer
+
 **Start with:** the concurrency tests and the documented worktree workflow.
 
 - [ ] Run two independent admissions in parallel and confirm both records point to the right repository, branch and worktree.
@@ -81,7 +84,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-134 — Align project layout rules with the approved repo model
 
-**Status:** Backlog · **Type:** Docs · **Priority:** P1 · **Owner:** architect + docs-writer  
+**Status:** Backlog · **Type:** Docs · **Priority:** P1 · **Owner:** architect + docs-writer
+
 **Start with:** `AGENTS.md`, `templates/project/AGENTS.md`, `docs/PROJECT_STRUCTURE.md`, `.opencode/repos.json` and `README.md`.
 
 - [ ] Show exact proposed edits to permanent rule files and wait for the A9 approval before changing them.
@@ -91,7 +95,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-135 — Write the project onboarding guide
 
-**Status:** Backlog · **Type:** Docs · **Priority:** P1 · **Blocked by:** BOARD-134 · **Owner:** docs-writer  
+**Status:** Backlog · **Type:** Docs · **Priority:** P1 · **Blocked by:** BOARD-134 · **Owner:** docs-writer
+
 **Start with:** `README.md`, `docs/PROJECT_STRUCTURE.md`, `templates/project/README.md` and `guard.py` usage.
 
 - [ ] Document copying the project skeleton into its own repository and registering the repo ID.
@@ -101,7 +106,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-136 — Align project starter board documentation with SQLite
 
-**Status:** Backlog · **Type:** Docs · **Priority:** P1 · **Owner:** docs-writer  
+**Status:** Backlog · **Type:** Docs · **Priority:** P1 · **Owner:** docs-writer
+
 **Start with:** `templates/project/docs/HANDOVER.md`, `PROJECT_STRUCTURE.md` and `README.md`.
 
 - [ ] Say the live board is clone-local SQLite in the Git common directory.
@@ -111,7 +117,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-137 — Smoke-test project registration and template sync
 
-**Status:** Backlog · **Type:** Chore · **Priority:** P1 · **Blocked by:** BOARD-134, BOARD-135, BOARD-136 · **Owner:** factory-dev  
+**Status:** Backlog · **Type:** Chore · **Priority:** P1 · **Blocked by:** BOARD-134, BOARD-135, BOARD-136 · **Owner:** factory-dev
+
 **Start with:** existing `guard.py` and its repo-map/sync tests; use a temporary Git repository.
 
 - [ ] Copy the project template into a disposable repository and register it by ID.
@@ -123,7 +130,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-138 — Create a factory board-console memory map
 
-**Status:** Backlog · **Type:** Docs · **Priority:** P2 · **Owner:** docs-writer  
+**Status:** Backlog · **Type:** Docs · **Priority:** P2 · **Owner:** docs-writer
+
 **Start with:** `.opencode/agents/docs-writer.md`, `docs/HANDOVER.md` and `board_serve.py` plus its tests.
 
 - [ ] Add `docs/handover/README.md` and one `board-console.md` unit map.
@@ -133,7 +141,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-139 — Rehearse board backup and restore
 
-**Status:** Backlog · **Type:** Research · **Priority:** P2 · **Owner:** factory-dev  
+**Status:** Backlog · **Type:** Research · **Priority:** P2 · **Owner:** factory-dev
+
 **Start with:** `board.py`, `docs/STACK.md` and SQLite's existing Python standard-library support.
 
 - [ ] Back up and restore a temporary WAL database without touching the live board.
@@ -143,7 +152,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-141 — Rehearse two-repository builder concurrency
 
-**Status:** Backlog · **Type:** Research · **Priority:** P1 · **Blocked by:** BOARD-130, BOARD-133, BOARD-137 · **Owner:** architect + specialist builders  
+**Status:** Backlog · **Type:** Research · **Priority:** P1 · **Blocked by:** BOARD-130, BOARD-133, BOARD-137 · **Owner:** architect + specialist builders
+
 **Start with:** the repo map, `worktree.py`, `/run` and the registered-repo tests.
 
 - [ ] Use two independently registered repository IDs and two non-overlapping Ready tasks; if two suitable repos are not registered, stop and ask rather than reading candidates.
@@ -153,7 +163,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-142 — Run one end-to-end factory task rehearsal
 
-**Status:** Backlog · **Type:** Research · **Priority:** P1 · **Blocked by:** BOARD-130, BOARD-132, BOARD-133, BOARD-137, BOARD-141 · **Owner:** architect + QA reviewer + UI critic when UI is involved  
+**Status:** Backlog · **Type:** Research · **Priority:** P1 · **Blocked by:** BOARD-130, BOARD-132, BOARD-133, BOARD-137, BOARD-141 · **Owner:** architect + QA reviewer + UI critic when UI is involved
+
 **Start with:** `.opencode/commands/run.md`, board/worktree scripts and the approved task-local evidence path.
 
 - [ ] Take one scoped task from Ready through build, QA, independent review and Pending Merge.
@@ -163,7 +174,8 @@ Board statuses below are the planning snapshot for 2026-11-12. Live status and o
 
 #### BOARD-144 — Reconcile the factory handover inventory
 
-**Status:** Backlog · **Type:** Docs · **Priority:** P1 · **Blocked by:** BOARD-130 · **Owner:** docs-writer  
+**Status:** Backlog · **Type:** Docs · **Priority:** P1 · **Blocked by:** BOARD-130 · **Owner:** docs-writer
+
 **Start with:** `docs/HANDOVER.md`, `AGENTS.md`, `docs/API_CONTRACTS.md`, `docs/STACK.md` and `docs/PROJECT_STRUCTURE.md`.
 
 - [ ] Remove the literal merge-conflict markers in the Testing section without changing historical session records.
