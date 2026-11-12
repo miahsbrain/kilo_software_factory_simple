@@ -1,5 +1,17 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-151 shared QA artifact guard, 2026-11-12**
+> Unverified implementation on `fix/fix-shared-qa-artifact-guard-permissions` in
+> `.opencode/worktrees/fix-shared-qa-artifact-guard-permissions/` extends effectful
+> `cmd_check_file` (`.opencode/skills/git-worktree/scripts/guard.py:498`) with the existing
+> `state.primary_checkout` authority. Canonical primary QA outputs still pass through file policy
+> and unchanged native role permissions; ordinary edits remain linked-worktree-only.
+> Disposable adapter tests cover canonical boundaries and preservation of configured role effects.
+> One authorized test run exited 1: fixture creation hit `EACCES` under `/tmp/opencode`; the existing
+> generated-policy equality assertion also failed. No tests passed, no live artifacts were written.
+> Next: orchestrator resolves test-directory access and policy drift before authorizing another run.
+> Independent QA/review remain outstanding; this checkpoint is not merge-ready.
+
 > **Session Notes — BOARD-150 planning CLI database resolution, 2026-11-12**
 > On `fix/fix-planning-cli-database-resolution` in `.opencode/worktrees/fix-planning-cli-database-resolution/`,
 > effectful `board.py:main` (`.opencode/skills/board/scripts/board.py:1436`) resolves every plan

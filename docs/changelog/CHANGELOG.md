@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Checkpoint shared QA artifact guard exception
+**Type:** Fix
+**Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
+**Changed:** `.opencode/skills/git-worktree/scripts/guard.py`, `.opencode/plugins/factory-guard/guard.test.mjs`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Existing `cmd_check_file` rejected canonical primary evidence writes; extend it and the existing disposable adapter fixtures rather than duplicate primary resolution or role authority. No new files or dependencies.
+**Impact:** Unverified narrow location exception; native role permissions and shell policy unchanged. One documented test command exited 1, 0/5 passed: fixture `mkdtemp` failed with `EACCES` under `/tmp/opencode`, and the existing generated-policy equality assertion failed. No live data mutation or retry; blocked pending orchestrator decision and independent review.
+
 ## [2026-11-12] Record BOARD-150 QA and completed human cleanup
 **Type:** Docs
 **Board:** BOARD-150 | **Branch:** fix/fix-planning-cli-database-resolution

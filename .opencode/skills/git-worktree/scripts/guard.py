@@ -502,15 +502,39 @@ def cmd_check_file(kind, path, cwd, ctx):
     if lexical != resolved and not under(resolved, os.path.realpath(cwd)):
         return DENIED
     if kind == "edit":
-        if not ctx or not ctx["linked"] or not is_linked_worktree(cwd):
+        if not ctx:
             return DENIED
-        if not under(lexical, ctx["top"]) or not under(resolved, ctx["top"]):
+        shared_artifact = False
+        boundary = ctx["top"]
+        if lexical == resolved and ".." not in path.split(os.sep):
+            try:
+                state_path = os.path.join(script_project_root(),
+                                          ".opencode/skills/runtime-state/scripts/state.py")
+                spec = importlib.util.spec_from_file_location("factory_runtime_state", state_path)
+                state = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(state)
+                primary = str(state.primary_checkout(cwd))
+                parts = os.path.relpath(lexical, primary).split(os.sep)
+                shared_artifact = (len(parts) >= 6 and parts[0] == "artifacts"
+                                   and parts[1] in ("web", "api", "mobile", "factory")
+                                   and parts[2] == "qa"
+                                   and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", parts[3])
+                                   and all(part and not part.startswith(".") for part in parts[4:]))
+                if shared_artifact:
+                    boundary = primary
+            except (OSError, ImportError, AttributeError, ValueError):
+                return DENIED
+        if not shared_artifact and (not ctx["linked"] or not is_linked_worktree(cwd)):
+            return DENIED
+        if not under(lexical, boundary) or not under(resolved, boundary):
             return DENIED
         parent = os.path.dirname(resolved)
         while not os.path.isdir(parent):
             parent = os.path.dirname(parent)
         owner = repo_context(parent)
-        if owner and owner["top"] != ctx["top"]:
+        if shared_artifact and not owner:
+            return DENIED
+        if owner and owner["top"] != boundary:
             return DENIED
     def check(candidate):
         real_path = os.path.realpath(candidate)

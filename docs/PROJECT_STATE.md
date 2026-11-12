@@ -1,5 +1,17 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-151 shared QA artifact guard (2026-11-12)
+
+- Branch `fix/fix-shared-qa-artifact-guard-permissions`, worktree
+  `.opencode/worktrees/fix-shared-qa-artifact-guard-permissions/` holds an unverified narrow
+  primary QA artifact exception and disposable adapter regressions. Native role permissions,
+  shell policy and permanent rules are unchanged.
+- Blocked verification: `node --test .opencode/plugins/factory-guard/guard.test.mjs` exited 1
+  (0/5 passed): `/tmp/opencode` fixture `mkdtemp` returned `EACCES`; the pre-existing generated
+  permission equality assertion failed too. No retry, environment repair or live artifact writes.
+- Next: orchestrator resolves environment access and policy drift, authorizes another check,
+  then performs independent QA/review. Not merge-ready. Earlier sessions below are historical.
+
 ## Current session — BOARD-150 planning CLI database resolution (2026-11-12)
 
 - Branch `fix/fix-planning-cli-database-resolution`, worktree `.opencode/worktrees/fix-planning-cli-database-resolution/`.
