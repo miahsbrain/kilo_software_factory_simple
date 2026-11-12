@@ -1,5 +1,14 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-126 candidate race correction (2026-11-12)
+
+- In the same task worktree, candidate directory lookup is anchored to no-follow descriptors,
+  including marker checks. Replaced symlinks are skipped; failures close descriptors and retain
+  safe 503. Scratch regressions cover the race, existing symlinks and active-WAL board data.
+- Focused run: 3 scan cases passed, active-WAL file-byte assertion failed (exit 1) despite
+  current data read. No WAL implementation change or test weakening. Next: parent decides if
+  transient SQLite shared-memory writes are acceptable; broad suite remains unverified.
+
 ## Current session — BOARD-126 independent read correction (2026-11-12)
 
 - High-severity review finding confirmed: `board.read_table` may initialize registered

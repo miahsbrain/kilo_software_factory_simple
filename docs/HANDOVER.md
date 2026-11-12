@@ -1,5 +1,23 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-126 candidate race correction, 2026-11-12**
+> The existing task worktree now anchors the two-level candidate scan to no-follow directory
+> descriptors. Replacing a listed directory with a symlink cannot redirect `.git` inspection;
+> failed scans close descriptors and return the existing safe 503. The focused check passed
+> three scan cases but failed the active-WAL file-byte assertion after a correct current-data
+> read. No WAL behavior was changed. Next: parent decides whether transient WAL shared-memory
+> writes are acceptable; the previously twice-failed broad board suite remains unverified.
+
+## BOARD-126 candidate scan correction inventory
+
+- `board_serve.py:scan_repo_candidates` (effectful metadata only) opens `/projects` and each
+  child with `O_DIRECTORY|O_NOFOLLOW`, scans opened descriptors and checks `.git` relative to
+  the child descriptor; swapped symlinks are skipped. `finally` closes every opened descriptor.
+- `test_board_serve.py` scratch fixtures exercise a swapped symlink, existing symlinks, safe
+  mid-scan failure and descriptor closure. The active-WAL fixture reads current data but its
+  no-changed-file assertion failed, likely because SQLite's WAL reader updates shared-memory
+  lock metadata; this is a hold, not evidence of a green active-WAL path.
+
 > **Session Notes — BOARD-126 independent board read correction, 2026-11-12**
 > The same `feat/expose-registered-repos-and-safe-candidates` worktree now reads registered
 > independent Git-repo boards from existing SQLite only. A missing database yields a visible

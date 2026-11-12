@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Anchor candidate discovery to no-follow directory handles
+**Type:** Fix
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `board_serve.py`, `test_board_serve.py`, `docs/API_CONTRACTS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** A directory could be replaced with a symlink between listing and path-based marker inspection.
+**Impact:** Directory-descriptor-based scanning skips swapped symlinks and closes descriptors on failure; candidate response remains names-only with safe 503. Added active-WAL read regression. Catalogue: python-pro, secure-code-guardian.
+**Verification:** Focused four-test run exited 1: three scan tests passed, active-WAL file-byte assertion failed after current-data read. WAL semantics need a decision; earlier broad suite remains unverified.
+
 ## [2026-11-12] Prevent HTTP reads from initializing registered boards
 **Type:** Fix
 **Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates

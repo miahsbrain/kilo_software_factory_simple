@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -44,6 +45,23 @@ class BoardRefreshTests(unittest.TestCase):
             "| " + " | ".join(viewer.COLUMNS) + " |\n"
             + "| " + " | ".join(["---"] * len(viewer.COLUMNS)) + " |\n"
             + "| " + " | ".join(cells) + " |\n", encoding="utf-8")
+
+    def independent_project(self):
+        project = self.root / "project"
+        project.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(project)], check=True)
+        self.write_board(self.project, "Independent task")
+        subprocess.run(["git", "-C", str(project), "add", "docs/BOARD.md"], check=True)
+        subprocess.run(["git", "-C", str(project), "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"], check=True)
+        self.worktree.is_git_repo = Mock(side_effect=lambda target: target == str(project))
+        self.initialize()
+        return project
+
+    def independent_status(self, project):
+        result = subprocess.run(["git", "-C", str(project), "status", "--porcelain",
+                                 "--untracked-files=all"], capture_output=True, text=True, check=True)
+        return result.stdout
 
     def initialize(self, *args):
         server = Mock()
@@ -145,34 +163,21 @@ class BoardRefreshTests(unittest.TestCase):
         self.assertNotIn(str(self.root), log.getvalue())
 
     def test_independent_registered_board_get_never_initializes_sqlite(self):
-        project = self.root / "project"
-        project.mkdir()
-        subprocess.run(["git", "init", "-q", "-b", "main", str(project)], check=True)
-        self.write_board(self.project, "Independent task")
-        subprocess.run(["git", "-C", str(project), "add", "docs/BOARD.md"], check=True)
-        subprocess.run(["git", "-C", str(project), "-c", "user.name=Fixture",
-                        "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"], check=True)
-        self.worktree.is_git_repo = Mock(side_effect=lambda target: target == str(project))
-        self.initialize()
+        project = self.independent_project()
         db = Path(self.board.database_path(str(project)))
 
-        def git_status():
-            result = subprocess.run(["git", "-C", str(project), "status", "--porcelain",
-                                     "--untracked-files=all"], capture_output=True, text=True, check=True)
-            return result.stdout
-
         self.assertFalse(db.exists())
-        self.assertEqual(git_status(), "")
+        self.assertEqual(self.independent_status(project), "")
         with patch.object(self.board, "read_table", wraps=self.board.read_table) as read_table:
             entry = self.request("/api/board")["boards"][1]
-            self.assertIn("Board not initialized", self.request("/") )
+            self.assertIn("Board not initialized", self.request("/"))
         self.assertEqual(entry["label"], "project")
         self.assertEqual(entry["rows"], [])
         self.assertEqual(entry["error"], "Board not initialized")
         self.assertEqual(read_table.call_count, 2)
         self.assertTrue(all(call.args[0] == str(self.factory) for call in read_table.call_args_list))
         self.assertEqual(list(db.parent.glob(db.name + "*")), [])
-        self.assertEqual(git_status(), "")
+        self.assertEqual(self.independent_status(project), "")
 
         self.board.initialize_board(str(project))
         before = db.read_bytes()
@@ -182,25 +187,60 @@ class BoardRefreshTests(unittest.TestCase):
         self.assertIsNone(entry["error"])
         self.assertEqual(db.read_bytes(), before)
         self.assertEqual(sorted(path.name for path in db.parent.glob(db.name + "*")), sidecars)
-        self.assertEqual(git_status(), "")
+        self.assertEqual(self.independent_status(project), "")
+
+    def test_active_wal_secondary_board_reads_current_data_without_sidecar_writes(self):
+        project = self.independent_project()
+        self.board.initialize_board(str(project))
+        db = Path(self.board.database_path(str(project)))
+        with contextlib.closing(sqlite3.connect(str(db))) as writer:
+            writer.execute("PRAGMA journal_mode=WAL")
+            writer.execute("UPDATE board SET markdown=?, revision=revision+1 WHERE id=1",
+                           (self.project.read_text().replace("Independent task", "Live WAL task"),))
+            writer.commit()
+            files = [db, db.with_name(db.name + "-wal"), db.with_name(db.name + "-shm")]
+            self.assertTrue(all(path.exists() for path in files))
+            before = {path.name: path.read_bytes() for path in files}
+            status = self.independent_status(project)
+            entry = self.request("/api/board")["boards"][1]
+            self.assertEqual([row["Task"] for row in entry["rows"]], ["Live WAL task"])
+            self.assertIsNone(entry["error"])
+            self.assertEqual({path.name: path.read_bytes() for path in files}, before)
+            self.assertEqual(self.independent_status(project), status)
 
     def test_candidate_mid_scan_failure_and_invalid_registry_are_safe(self):
         self.initialize()
         projects = self.root / "projects"
         (projects / "group").mkdir(parents=True)
         scandir = viewer.os.scandir
+        group_inode = (projects / "group").stat().st_ino
+        open_dir = viewer.os.open
+        close_dir = viewer.os.close
+        opened, closed = [], []
+
+        def record_open(*args, **kwargs):
+            fd = open_dir(*args, **kwargs)
+            opened.append(fd)
+            return fd
+
+        def record_close(fd):
+            closed.append(fd)
+            return close_dir(fd)
 
         def fail_nested(directory):
-            if os.fspath(directory) == str(projects / "group"):
-                raise PermissionError("private path: " + str(directory))
+            if os.fstat(directory).st_ino == group_inode:
+                raise PermissionError("private directory")
             return scandir(directory)
 
         with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
                 patch.object(viewer.os, "scandir", side_effect=fail_nested), \
+                patch.object(viewer.os, "open", side_effect=record_open), \
+                patch.object(viewer.os, "close", side_effect=record_close), \
                 contextlib.redirect_stderr(io.StringIO()) as log:
             code, payload = self.response("/api/repo-candidates")
         self.assertEqual((code, payload), (503, {"error": "Repository candidates unavailable."}))
         self.assertNotIn(str(projects), log.getvalue())
+        self.assertEqual(sorted(opened), sorted(closed))
 
         self.registry.write_text(json.dumps({"control": ".", "invalid": "../outside"}))
         with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
@@ -208,6 +248,40 @@ class BoardRefreshTests(unittest.TestCase):
             code, payload = self.response("/api/repo-candidates")
         self.assertEqual((code, payload), (503, {"error": "Repository candidates unavailable."}))
         self.assertNotIn(str(self.root), log.getvalue())
+
+    def test_candidate_swapped_to_symlink_before_open_stays_outside(self):
+        self.initialize()
+        projects = self.root / "projects"
+        projects.mkdir()
+        swapped = projects / "swapped"
+        swapped.mkdir()
+        outside = self.root / "outside"
+        outside.mkdir()
+        (outside / ".git").mkdir()
+        (outside / "private").mkdir()
+        (outside / "private" / ".git").mkdir()
+        safe = projects / "safe"
+        safe.mkdir()
+        (safe / ".git").mkdir()
+        real_open = viewer.os.open
+        root_inode = projects.stat().st_ino
+        changed = []
+
+        def replace_before_open(path, flags, **kwargs):
+            if (path == "swapped" and "dir_fd" in kwargs
+                    and os.fstat(kwargs["dir_fd"]).st_ino == root_inode and not changed):
+                swapped.rmdir()
+                swapped.symlink_to(outside, target_is_directory=True)
+                changed.append(True)
+            return real_open(path, flags, **kwargs)
+
+        with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
+                patch.object(viewer.os, "open", side_effect=replace_before_open):
+            candidates = self.request("/api/repo-candidates")["candidates"]
+        self.assertTrue(changed)
+        self.assertEqual(candidates, [{"name": "safe", "relative_path": "safe"}])
+        self.assertNotIn("outside", json.dumps(candidates))
+        self.assertNotIn("private", json.dumps(candidates))
 
     def test_project_appears_and_disappears_after_initialization(self):
         self.initialize()

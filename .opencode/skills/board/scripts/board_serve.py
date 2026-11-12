@@ -22,6 +22,7 @@ Standard library only. Python 3.9+. The static CSS is built ahead of time by
 import argparse
 import contextlib
 import datetime
+import errno
 import html
 import importlib.util
 import json
@@ -253,28 +254,39 @@ def select_candidates(paths, registered):
 
 def scan_repo_candidates(projects_root, registered):
     """Inspect only directory entries and .git marker types within a two-level root."""
-    if os.path.islink(projects_root):
-        raise OSError("candidate root unavailable")
     found = []
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 
-    def inspect(directory, depth):
-        with os.scandir(directory) as entries:
+    def inspect(directory_fd, depth, parts):
+        with os.scandir(directory_fd) as entries:
             for entry in entries:
                 if entry.name == ".git" or not entry.is_dir(follow_symlinks=False):
                     continue
-                relative = os.path.relpath(entry.path, projects_root)
-                marker = os.path.join(entry.path, ".git")
                 try:
-                    mode = os.stat(marker, follow_symlinks=False).st_mode
-                except FileNotFoundError:
-                    mode = 0
-                is_repo = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
-                if is_repo:
-                    found.append(relative)
-                if depth == 1 and not is_repo:
-                    inspect(entry.path, 2)
+                    child_fd = os.open(entry.name, directory_flags, dir_fd=directory_fd)
+                except OSError as exc:
+                    if exc.errno in (errno.ELOOP, errno.ENOTDIR, errno.ENOENT):
+                        continue
+                    raise
+                try:
+                    try:
+                        mode = os.stat(".git", dir_fd=child_fd, follow_symlinks=False).st_mode
+                    except FileNotFoundError:
+                        mode = 0
+                    relative = "/".join((*parts, entry.name))
+                    is_repo = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
+                    if is_repo:
+                        found.append(relative)
+                    if depth == 1 and not is_repo:
+                        inspect(child_fd, 2, (*parts, entry.name))
+                finally:
+                    os.close(child_fd)
 
-    inspect(projects_root, 1)
+    root_fd = os.open(projects_root, directory_flags)
+    try:
+        inspect(root_fd, 1, ())
+    finally:
+        os.close(root_fd)
     registered_paths = [os.path.relpath(target, projects_root)
                         for _, target in registered
                         if os.path.commonpath((os.path.abspath(projects_root), os.path.abspath(target)))
