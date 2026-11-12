@@ -461,35 +461,46 @@ def accept_plan_batch(path, items):
         return [{"key": item["key"], "id": item["id"]} for item in accepted]
 
 
+def normalized_plan_rows(connection, view):
+    if view not in ("active", "queue", "history"):
+        raise ValueError("unknown planned-work view %r" % view)
+    require_normalized(connection)
+    order_column = "display_position" if view in ("active", "history") else "queue_position"
+    predicate = {
+        "active": "a.plan_item_id IS NOT NULL",
+        "queue": "p.queue_position IS NOT NULL",
+        "history": "p.terminal_outcome IS NOT NULL",
+    }[view]
+    rows = connection.execute("""SELECT p.id, p.task, p.type, p.priority, p.risk,
+        p.blocked_by, p.repos, p.notes, p.user_story, p.queue_position,
+        p.terminal_outcome, a.status, p.display_position, a.branch_worktree
+        FROM planned_items p LEFT JOIN active_work a ON a.plan_item_id=p.id
+        WHERE %s ORDER BY p.%s""" % (predicate, order_column)).fetchall()
+    items = []
+    for row in rows:
+        criteria = connection.execute("""SELECT position, text, verified, proof
+            FROM acceptance_criteria WHERE plan_item_id=? ORDER BY position""", (row[0],)).fetchall()
+        items.append({
+            "id": row[0], "task": row[1], "type": row[2], "priority": row[3],
+            "risk": row[4], "blocked_by": row[5], "repos": row[6], "notes": row[7],
+            "user_story": row[8], "queue_position": row[9], "terminal_outcome": row[10],
+            "status": row[11] or ("Backlog" if view == "queue" else
+                                  "Merged" if row[10] == "completed" else "Dropped"),
+            "display_position": row[12], "branch_worktree": row[13],
+            "acceptance_criteria": [
+                {"position": criterion[0], "text": criterion[1],
+                 "verified": bool(criterion[2]), "proof": criterion[3]}
+                for criterion in criteria],
+        })
+    return items
+
+
 def plan_rows(path, view):
     if view not in ("queue", "history"):
         raise ValueError("unknown planned-work view %r" % view)
     with connect(path) as connection:
-        require_normalized(connection)
         connection.execute("BEGIN")
-        order_column = "queue_position" if view == "queue" else "display_position"
-        predicate = "queue_position IS NOT NULL" if view == "queue" else "terminal_outcome IS NOT NULL"
-        rows = connection.execute("""SELECT p.id, p.task, p.type, p.priority, p.risk,
-            p.blocked_by, p.repos, p.notes, p.user_story, p.queue_position,
-            p.terminal_outcome, a.status, p.display_position
-            FROM planned_items p LEFT JOIN active_work a ON a.plan_item_id=p.id
-            WHERE %s ORDER BY p.%s""" % (predicate, order_column)).fetchall()
-        items = []
-        for row in rows:
-            criteria = connection.execute("""SELECT position, text, verified, proof
-                FROM acceptance_criteria WHERE plan_item_id=? ORDER BY position""", (row[0],)).fetchall()
-            items.append({
-                "id": row[0], "task": row[1], "type": row[2], "priority": row[3],
-                "risk": row[4], "blocked_by": row[5], "repos": row[6], "notes": row[7],
-                "user_story": row[8], "queue_position": row[9], "terminal_outcome": row[10],
-                "status": row[11] or ("Backlog" if view == "queue" else
-                                      "Merged" if row[10] == "completed" else "Dropped"),
-                "display_position": row[12], "acceptance_criteria": [
-                    {"position": criterion[0], "text": criterion[1],
-                     "verified": bool(criterion[2]), "proof": criterion[3]}
-                    for criterion in criteria],
-            })
-        return items
+        return normalized_plan_rows(connection, view)
 
 
 def transition_plan_item(path, board_id, action):

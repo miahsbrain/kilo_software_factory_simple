@@ -1,14 +1,21 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-146 CLI lifecycle (2026-11-12)
+## Current session — BOARD-146 planned-work HTTP API (2026-11-12)
+
+- Implemented read-only factory `GET /api/planned-work`; `/api/board` adds story and structured
+  criteria to normalized active factory rows. Queue/history ordering, safe 503, HEAD/no-store and
+  unchanged registered-project behavior are documented in `docs/API_CONTRACTS.md`.
+- Focused scratch-repository verification passed: 5 tests in 0.302s via the command in
+  `docs/STACK.md`. No live board or migration was touched; prior lifecycle/full suites were not
+  rerun. Next: independent API review.
+
+## Previous session — BOARD-146 CLI lifecycle (2026-11-12)
 
 - Added atomic plan acceptance, queue/history views, promotion, completion and cancellation. The
   active board remains active-only; worktree finalization updates normalized state transactionally.
-  The approved `/api/planned-work` contract is documented, but HTTP implementation is deferred.
-- No live board or migration was touched. The focused retry documented in `docs/STACK.md` passed:
-  5 tests in 0.382s. Missing Notes are canonical `""` and render as `-` only in Markdown; the empty
-  canonical value survives unrelated compatibility edits. Commit `32597b1` records the correction.
-  Next: independent review, then the separately scoped HTTP chunk.
+- The lifecycle retry documented in `docs/STACK.md` passed 5 tests in 0.382s. Missing Notes are
+  canonical `""` and render as `-` only in Markdown; the empty canonical value survives unrelated
+  compatibility edits. Commit `32597b1` records the correction.
 
 ## Previous session — BOARD-146 rebase alignment (2026-11-12)
 

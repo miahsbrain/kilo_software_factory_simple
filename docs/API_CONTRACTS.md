@@ -28,5 +28,6 @@ edit to `.opencode/repos.json`, not a dashboard API operation.
 The planned-work endpoint is available only for the factory control board. If it cannot read that
 board, it returns `503 {"error":"Planned work unavailable."}` without exposing paths or exception
 details. It does not initialize or mutate SQLite. Project boards and existing worktree/repository
-candidate endpoints are unchanged. This contract is approved for a later HTTP implementation; the
-current BOARD-146 slice adds only CLI lifecycle behavior.
+candidate endpoints are unchanged. The route reads normalized state through a read-only SQLite
+connection. `GET` and `HEAD` share status and headers; `HEAD` has no body. This endpoint is
+implemented in `board_serve.py` for BOARD-146.

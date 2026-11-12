@@ -1,17 +1,10 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-146 CLI lifecycle, 2026-11-12**
-> Added explicitly accepted plan batches with generated IDs, dependency-key resolution and
-> transactional validation; added queue/history/promotion/completion/cancellation commands and
-> active-only traditional board views. Worktree completion now updates normalized rows in its
-> existing transaction; direct completion refuses worktree-bearing and Pending Merge items.
-> Updated the approved `/api/planned-work` contract only; HTTP implementation remains deferred.
-> Lifecycle tests use scratch SQLite. No live board/migration was touched. The focused retry
-> documented in `docs/STACK.md` passed: 5 tests in 0.382s. Missing Notes are canonical `""` and
-> render as `-` only in Markdown; supplied Notes and the empty canonical value survive unrelated
-> compatibility edits. The previous failed run was not repeated beyond this approved retry. The
-> correction is committed as `32597b1`; next is independent review, then the separately scoped HTTP
-> chunk. No live board/migration was touched.
+> **Session Notes — BOARD-146 read-only HTTP API, 2026-11-12**
+> Added `GET /api/planned-work` from normalized queue/history through a read-only SQLite connection;
+> active normalized factory rows in `/api/board` gain story and structured criteria. Registered
+> board behavior is unchanged. Focused scratch-repository verification passed 5 tests in 0.302s;
+> no live board/migration or UI changes. Next: independent API review.
 
 > **Session Notes — BOARD-146 normalized storage and rebase, 2026-11-12**
 > BOARD-146 adds normalized planned items, criteria, active work, and terminal history with an
@@ -736,11 +729,14 @@ Chunk 1 reuses these existing boundaries:
 | `validate_plan_batch(items, existing_ids)` | `.opencode/skills/board/scripts/board.py:315` | Validates a full accepted JSON batch, resolves temporary dependencies and allocates consecutive IDs without I/O or input mutation. | pure |
 | `accept_plan_batch(path, items)` / `transition_plan_item(path, board_id, action)` | `.opencode/skills/board/scripts/board.py:432`, `:490` | Atomically inserts ordered canonical items/criteria or changes queue/active/terminal references; refuses before normalized migration. | effectful (SQLite) |
 | `plan_rows(path, view)` / `format_plan_items(items, view)` | `.opencode/skills/board/scripts/board.py:459`, `:525` | Reads queue/history ordered by queue or stable display position; formats the CLI view. | effectful read / pure format |
+| `normalized_plan_rows(connection, view)` | `.opencode/skills/board/scripts/board.py:464` | Reads canonical active, queue or history items and ordered criteria using the caller's connection; shared by CLI and the read-only API. | effectful read (SQLite connection passed explicitly) |
 | `write_connection_snapshot(connection, markdown, revision, allow_completion=False)` | `.opencode/skills/board/scripts/board.py:418` | Keeps normalized state and the compatibility Markdown snapshot aligned in the caller's transaction. | effectful (SQLite) |
 | `clear_row_worktree(...)` | `.opencode/skills/git-worktree/scripts/worktree.py:1412` | Clears a worktree cell through the board adapter; successful human finalization records completed history in the existing transaction. | effectful (Git, SQLite) |
 | `state.py` | `.opencode/skills/runtime-state/scripts/state.py` | Resolves the primary checkout from Git's absolute common-dir path; `migrate` dry-runs or copies and verifies legacy runtime files without deleting sources. | effectful (Git, filesystem) |
 | `board_serve.py` | `.opencode/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
-| `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:124`, `:1704` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. Existing parser and pure renderer stay shared. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
+| `readonly_board_connection(board, root)` / `read_control_rows(...)` | `.opencode/skills/board/scripts/board_serve.py:167`, `:212` | Opens an existing board using the safe read-only SQLite policy. Normalized factory rows use active-only projection and canonical story/criteria; request handling never initializes or migrates. | effectful (filesystem, SQLite read) |
+| `planned_item_payload(item, view)` | `.opencode/skills/board/scripts/board_serve.py:256` | Maps canonical queue/history rows to current board field names and adds queue position or terminal outcome. | pure |
+| `discover_boards()` / `build_payloads()` | `.opencode/skills/board/scripts/board_serve.py:142`, `:1753` | Discovery checks filesystem paths, including ignored `project/docs/BOARD.md`; payload callbacks rediscover on every HTML/board-JSON request unless explicit paths were supplied. `/api/planned-work` is factory-control-only and reads queue/history through the read-only boundary. Default refresh: 60 seconds; CLI override and manual controls retained. | effectful (filesystem, git, clock); HTML rendering is pure |
 | `worktree_state()` | `.opencode/skills/board/scripts/board_serve.py:171` | Reloads the existing registry and enumerates control/project via `load_repos`, `resolve_repo`, `is_git_repo`, `list_worktrees`, `default_base` and `git_out`. Omits absent/uninitialized projects. Each entry adds `repo` and `base`; existing array and fields stay intact. Main detection and counts use only that repository. Invalid maps flow through existing payload exception handling. | effectful (filesystem, Git); entry construction is deterministic from results |
 | `wb_scope_default()` / `wb_scope_tabs()` / `wb_scope_content()` | `.opencode/skills/board/scripts/board_serve.py:1449`, `:1456`, `:1470` | Pure reusable selection fallback, tablist and scoped content presenters; map harness to control worktrees and reuse existing counts/panels/lanes/cards/rail. Gallery only; asset authored, browser review pending. | pure |
 | `gallery_scope_fixtures()` / `build_gallery_html()` | `.opencode/skills/board/scripts/board_serve.py:1494`, `:1519` | Pure labelled fixtures and gallery composition; identical BOARD-001 IDs are separated by board keys. No live data or second task store. | pure |
@@ -784,9 +780,10 @@ capped at 10 rounds. Full rules in `AGENTS.md` §B4.
 ## 7. Public interfaces
 
 The local dashboard exposes read-only HTTP on loopback port 15180: `GET /api/board`,
-`GET /api/worktrees` and `GET /api/repo-candidates`. `GET /api/planned-work` is an approved
-contract only; its HTTP implementation is deferred. It has no session view, dispatch or write
-endpoint. The board CLI includes the `plan` lifecycle commands. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
+`GET /api/worktrees`, `GET /api/repo-candidates` and factory-only `GET /api/planned-work`. Planned
+work reads queue/history through a read-only SQLite connection; `HEAD` returns matching status and
+headers without a body. The dashboard has no session view, dispatch or write endpoint. The board
+CLI includes the `plan` lifecycle commands. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
 `verify`, `cleanup`) and `env.py` (`sync`, `status`, `clean`). `discard` takes `--apply`, `--force`
 and `--yes`: `--force` alone prints the destruction plan, and `--force --yes` acts after writing a
 recovery copy under `<primary-checkout>/.factory-state/cleanup-wt/<repo-id>/`. `handoff --board <ID>` prints review
@@ -839,6 +836,13 @@ interaction or timer evidence. BOARD-119 reuses actual registry, Git parsing and
 mocked Git results; covers changed registry paths, same-name branches across repositories,
 per-repo main/base/counts/dirty state, missing/uninitialized project, SHA/count fallback, additive
 endpoint keys and existing malformed/invalid registry handling. No live Git calls.
+
+`python3 .opencode/skills/board/scripts/test_board_serve.py PlannedWorkApiTests` uses scratch Git
+repositories and SQLite only. It verifies queue/history order and active exclusion; legacy NULL
+stories, Notes and criterion proofs; normalized active `/api/board` fields; unchanged registered
+project row shape; sanitized unavailable/unmigrated/fixture/project-root 503 responses; GET/HEAD
+status, headers and body behavior; and unchanged DB/WAL and tracked files. It passed 5 tests in
+0.302s.
 
 ## 11. Known issues and risks
 

@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Add read-only planned-work API
+**Type:** Feature
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/board_serve.py`, `.opencode/skills/board/scripts/test_board_serve.py`, `docs/API_CONTRACTS.md`, `docs/STACK.md`, `docs/ARCHITECTURE.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Serve canonical queue/history and structured active criteria through safe read-only SQLite access.
+**Impact:** Focused command `python3 .opencode/skills/board/scripts/test_board_serve.py PlannedWorkApiTests` passed 5 tests in 0.302s. No live board/migration or dependency changes.
+
 ## [2026-11-12] Record BOARD-146 lifecycle fix handoff
 **Type:** Docs
 **Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board

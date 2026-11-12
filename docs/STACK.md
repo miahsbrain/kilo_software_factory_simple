@@ -92,6 +92,9 @@ python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.p
 # BOARD-146 planned-work lifecycle regressions (scratch SQLite databases only)
 python3 .opencode/skills/board/scripts/test_board_normalized.py PlannedLifecycleTests
 
+# BOARD-146 read-only planned-work HTTP API regressions (scratch repositories only)
+python3 .opencode/skills/board/scripts/test_board_serve.py PlannedWorkApiTests
+
 # Create the worktree for a board row
 python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-00X
 

@@ -915,5 +915,277 @@ class GalleryTests(unittest.TestCase):
         self.assertIn(':root[data-theme="light"]', css)
 
 
+class PlannedWorkApiTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="planned-work-api-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.factory = self.root / "docs" / "BOARD.md"
+        self.project = self.root / "project"
+        self.registry = self.root / ".opencode" / "repos.json"
+        self.registry.parent.mkdir()
+        self.registry.write_text(json.dumps({"control": "."}), encoding="utf-8")
+        self.factory.parent.mkdir()
+        self.factory.write_text(self.legacy_markdown(), encoding="utf-8")
+        (self.root / ".gitignore").write_text("/.factory-state/\n/project/\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q", "-b", "main", str(self.root)], check=True)
+        subprocess.run(["git", "-C", str(self.root), "add", ".gitignore",
+                        ".opencode/repos.json", "docs/BOARD.md"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
+                       check=True)
+        self.board = viewer.load_module(
+            "planned_work_board_fixture", Path(__file__).with_name("board.py"))
+        self.db = self.root / ".factory-state" / "factory-board.sqlite3"
+        original_database_path = self.board.database_path
+        self.board.database_path = lambda root: (
+            str(self.db) if os.path.realpath(root) == os.path.realpath(self.root)
+            else original_database_path(root))
+        self.worktree = viewer.load_module(
+            "planned_work_helpers_fixture", Path(__file__).parents[2] / "git-worktree/scripts/worktree.py")
+        self.worktree.list_worktrees = Mock(return_value=[])
+        self.worktree.is_git_repo = Mock(return_value=False)
+        previous_state = viewer.Handler.state
+        self.addCleanup(setattr, viewer.Handler, "state", previous_state)
+
+    @staticmethod
+    def legacy_markdown():
+        rows = [
+            ["BOARD-001", "Legacy active", "Feature", "Ready", "P2", "🟢 low",
+             "- None.", "control", "-", "- [x] Imported criterion; Proof: imported evidence"],
+            ["BOARD-002", "Legacy completed", "Fix", "Merged", "P3", "🟡 medium",
+             "- None.", "control", "-", "Legacy completed note"],
+        ]
+        header = "| " + " | ".join(viewer.COLUMNS) + " |\n"
+        separator = "| " + " | ".join(["---"] * len(viewer.COLUMNS)) + " |\n"
+        return header + separator + "".join(
+            "| " + " | ".join(cells) + " |\n" for cells in rows)
+
+    def setup_normalized(self):
+        self.board.initialize_board(str(self.root))
+        self.board.migrate_normalized(str(self.db), apply=True)
+        drafts = []
+        for key, task in (("queue-a", "Queue A"), ("queue-b", "Queue B"),
+                          ("active", "Promoted active"), ("complete", "Completed history"),
+                          ("cancel", "Cancelled history")):
+            dependencies = ["queue-a"] if key == "queue-b" else []
+            drafts.append({
+                "key": key,
+                "task": task,
+                "type": "Feature",
+                "priority": "P2",
+                "risk": "🟢 low — fixture",
+                "user_story": "As a fixture user, I can inspect " + task.lower() + ".",
+                "acceptance_criteria": [task + " criterion one", task + " criterion two"],
+                "blocked_by": dependencies,
+                "repos": ["control"],
+                "notes": task + " notes",
+            })
+        accepted = self.board.accept_plan_batch(str(self.db), drafts)
+        ids = {entry["key"]: entry["id"] for entry in accepted}
+        self.board.transition_plan_item(str(self.db), ids["active"], "promote")
+        self.board.transition_plan_item(str(self.db), ids["complete"], "promote")
+        self.board.transition_plan_item(str(self.db), ids["complete"], "complete")
+        self.board.transition_plan_item(str(self.db), ids["cancel"], "cancel")
+        self.ids = ids
+        return ids
+
+    def initialize(self, *args):
+        server = Mock()
+        with patch.object(viewer, "load_helpers", return_value=(self.board, self.worktree)), \
+                patch.object(viewer, "repo_root", return_value=str(self.root)), \
+                patch.object(self.board, "initialize_board", return_value=str(self.factory)), \
+                patch.object(viewer, "ThreadingHTTPServer", return_value=server), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(viewer.main(list(args)), 0)
+        server.serve_forever.assert_called_once_with()
+        server.server_close.assert_called_once_with()
+
+    def response(self, path):
+        response = Mock()
+        handler = SimpleNamespace(
+            path=path, state=viewer.Handler.state,
+            send_json=lambda code, payload: response(code, json.dumps(payload)),
+            send_bytes=lambda code, body, content_type: response(code, body.decode("utf-8")))
+        viewer.Handler.do_GET(handler)
+        code, body = response.call_args.args
+        return code, json.loads(body)
+
+    def capture_request(self, path, method):
+        class Capture:
+            def __init__(capture_self):
+                capture_self.path = path
+                capture_self.command = method
+                capture_self.state = viewer.Handler.state
+                capture_self.headers = {}
+                capture_self.body = io.BytesIO()
+                capture_self.code = None
+                capture_self.wfile = capture_self.body
+
+            def send_response(capture_self, code):
+                capture_self.code = code
+
+            def send_header(capture_self, key, value):
+                capture_self.headers[key] = value
+
+            def end_headers(capture_self):
+                pass
+
+            def send_json(capture_self, code, payload):
+                return viewer.Handler.send_json(capture_self, code, payload)
+
+            def send_bytes(capture_self, code, body, content_type):
+                return viewer.Handler.send_bytes(capture_self, code, body, content_type)
+
+            def do_GET(capture_self):
+                return viewer.Handler.do_GET(capture_self)
+
+        handler = Capture()
+        if method == "HEAD":
+            viewer.Handler.do_HEAD(handler)
+        else:
+            viewer.Handler.do_GET(handler)
+        return handler
+
+    def test_planned_work_and_active_board_read_only_contract(self):
+        ids = self.setup_normalized()
+        self.initialize()
+        writer = sqlite3.connect(str(self.db), isolation_level=None)
+        self.addCleanup(writer.close)
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("BEGIN IMMEDIATE")
+        writer.execute("UPDATE board SET revision=revision+1 WHERE id=1")
+        writer.commit()
+        wal = Path(str(self.db) + "-wal")
+        shm = Path(str(self.db) + "-shm")
+        self.assertTrue(wal.exists() and shm.exists())
+        database_before = self.db.read_bytes()
+        wal_before = wal.read_bytes()
+        sidecars_before = sorted(path.name for path in self.db.parent.glob(self.db.name + "*"))
+        tracked_before = {path: path.read_bytes() for path in
+                          (self.root / ".gitignore", self.registry, self.factory)}
+        status_before = subprocess.run(
+            ["git", "-C", str(self.root), "status", "--porcelain", "--untracked-files=all"],
+            capture_output=True, text=True, check=True).stdout
+
+        with patch.object(self.board, "connect", side_effect=AssertionError("write-capable board connect")), \
+                patch.object(self.board, "initialize_board",
+                             side_effect=AssertionError("HTTP initialized board")):
+            code, planned = self.response("/api/planned-work")
+            self.assertEqual(code, 200)
+            code, board = self.response("/api/board")
+            self.assertEqual(code, 200)
+
+        self.assertEqual([item["ID"] for item in planned["queue"]],
+                         [ids["queue-a"], ids["queue-b"]])
+        self.assertEqual([item["queue_position"] for item in planned["queue"]], [0, 1])
+        self.assertEqual(planned["queue"][1]["Blocked by"], ids["queue-a"])
+        self.assertEqual([item["ID"] for item in planned["history"]],
+                         ["BOARD-002", ids["complete"], ids["cancel"]])
+        self.assertEqual([item["terminal_outcome"] for item in planned["history"]],
+                         ["completed", "completed", "cancelled"])
+        all_planned_ids = {item["ID"] for item in planned["queue"] + planned["history"]}
+        self.assertNotIn(ids["active"], all_planned_ids)
+        self.assertEqual(planned["history"][0]["user_story"], None)
+        self.assertEqual(planned["history"][0]["Notes"], "Legacy completed note")
+        self.assertEqual(planned["queue"][0]["user_story"],
+                         "As a fixture user, I can inspect queue a.")
+        self.assertEqual(planned["queue"][0]["acceptance_criteria"][0], {
+            "position": 0, "text": "Queue A criterion one", "verified": False, "proof": None})
+        active = board["boards"][0]["rows"]
+        self.assertEqual({row["ID"] for row in active}, {"BOARD-001", ids["active"]})
+        self.assertEqual(set(active[0]), set(viewer.COLUMNS) | {
+            "Notes raw", "user_story", "acceptance_criteria"})
+        legacy = next(row for row in active if row["ID"] == "BOARD-001")
+        self.assertIsNone(legacy["user_story"])
+        self.assertEqual(legacy["Notes raw"],
+                         "- [x] Imported criterion; Proof: imported evidence")
+        self.assertEqual(legacy["acceptance_criteria"][0]["proof"], "imported evidence")
+        self.assertIn("generated_at", planned)
+        self.assertEqual(self.db.read_bytes(), database_before)
+        self.assertEqual(wal.read_bytes(), wal_before)
+        self.assertEqual(sorted(path.name for path in self.db.parent.glob(self.db.name + "*")),
+                         sidecars_before)
+        self.assertEqual({path: path.read_bytes() for path in tracked_before}, tracked_before)
+        status_after = subprocess.run(
+            ["git", "-C", str(self.root), "status", "--porcelain", "--untracked-files=all"],
+            capture_output=True, text=True, check=True).stdout
+        self.assertEqual(status_after, status_before)
+
+        get = self.capture_request("/api/planned-work", "GET")
+        head = self.capture_request("/api/planned-work", "HEAD")
+        self.assertEqual(head.code, get.code)
+        self.assertEqual(head.headers, get.headers)
+        self.assertEqual(head.headers["Cache-Control"], "no-store")
+        self.assertEqual(head.headers["Content-Length"], str(len(get.body.getvalue())))
+        self.assertEqual(head.body.getvalue(), b"")
+
+    def test_unavailable_or_unmigrated_factory_returns_sanitized_503(self):
+        self.initialize()
+        missing_db = self.db
+        with contextlib.redirect_stderr(io.StringIO()) as log:
+            code, payload = self.response("/api/planned-work")
+        self.assertEqual((code, payload), (503, {"error": "Planned work unavailable."}))
+        self.assertNotIn(str(self.root), log.getvalue())
+        self.assertFalse(missing_db.exists())
+        get = self.capture_request("/api/planned-work", "GET")
+        head = self.capture_request("/api/planned-work", "HEAD")
+        self.assertEqual(head.code, get.code)
+        self.assertEqual(head.headers, get.headers)
+        self.assertEqual(head.headers["Cache-Control"], "no-store")
+        self.assertEqual(head.body.getvalue(), b"")
+
+        self.board.initialize_board(str(self.root))
+        db = self.db
+        before = db.read_bytes()
+        sidecars = sorted(path.name for path in db.parent.glob(db.name + "*"))
+        with patch.object(self.board, "connect", side_effect=AssertionError("HTTP migrated board")), \
+                patch.object(self.board, "initialize_board",
+                             side_effect=AssertionError("HTTP initialized board")):
+            code, payload = self.response("/api/planned-work")
+        self.assertEqual((code, payload), (503, {"error": "Planned work unavailable."}))
+        self.assertEqual(db.read_bytes(), before)
+        self.assertEqual(sorted(path.name for path in db.parent.glob(db.name + "*")), sidecars)
+
+    def test_planned_work_is_unavailable_for_explicit_markdown_fixture(self):
+        self.initialize("--file", str(self.factory))
+        code, payload = self.response("/api/planned-work")
+        self.assertEqual((code, payload), (503, {"error": "Planned work unavailable."}))
+
+    def test_planned_work_is_unavailable_for_project_control_root(self):
+        (self.root / "DOMAIN.md").write_text("Project fixture", encoding="utf-8")
+        self.initialize()
+        code, payload = self.response("/api/planned-work")
+        self.assertEqual((code, payload), (503, {"error": "Planned work unavailable."}))
+
+    def test_registered_project_rows_keep_existing_shape(self):
+        self.setup_normalized()
+        self.project.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(self.project)], check=True)
+        project_board = self.project / "docs" / "BOARD.md"
+        project_board.parent.mkdir()
+        project_board.write_text(self.legacy_markdown().replace("Legacy active", "Registered task"),
+                                 encoding="utf-8")
+        (self.project / ".gitignore").write_text("/.factory-state/\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.project), "add", ".gitignore", "docs/BOARD.md"],
+                       check=True)
+        subprocess.run(["git", "-C", str(self.project), "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
+                       check=True)
+        self.registry.write_text(json.dumps({"control": ".", "project": "project"}),
+                                 encoding="utf-8")
+        self.worktree.is_git_repo = Mock(side_effect=lambda root: root == str(self.project))
+        self.board.initialize_board(str(self.project))
+        self.initialize()
+        boards = self.response("/api/board")[1]["boards"]
+        registered = boards[1]["rows"][0]
+        self.assertEqual(registered["Task"], "Registered task")
+        self.assertEqual(set(registered), set(viewer.COLUMNS) | {"Notes raw"})
+        code, payload = self.response("/api/planned-work")
+        self.assertEqual(code, 200)
+        self.assertEqual([item["ID"] for item in payload["queue"]],
+                         ["BOARD-003", "BOARD-004"])
+
+
 if __name__ == "__main__":
     unittest.main()
