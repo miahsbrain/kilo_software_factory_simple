@@ -659,8 +659,9 @@ class BoardBootstrapTests(unittest.TestCase):
     def test_legacy_runtime_state_blocks_board_bootstrap_before_empty_database(self):
         main = self.root / "main"
         self.repository(main)
-        legacy_export = main / ".git/factory-board-export.md"
-        legacy_export.write_text("old board export", encoding="utf-8")
+        legacy_database = main / ".git/factory-board.sqlite3"
+        with sqlite3.connect(legacy_database) as connection:
+            connection.execute("CREATE TABLE legacy_state (value TEXT)")
         script = str(Path(__file__).with_name("board.py").resolve())
         result = subprocess.run([sys.executable, script, "show"], cwd=main,
                                 capture_output=True, text=True)
@@ -668,6 +669,30 @@ class BoardBootstrapTests(unittest.TestCase):
         self.assertIn("run .opencode/skills/runtime-state/scripts/state.py migrate first",
                       result.stderr)
         self.assertFalse((main / ".factory-state").exists())
+
+    def test_unverified_target_database_does_not_bypass_board_command_guard(self):
+        main = self.root / "main"
+        self.repository(main)
+        with sqlite3.connect(main / ".git/factory-board.sqlite3") as connection:
+            connection.execute("CREATE TABLE legacy_state (value TEXT)")
+        target = main / ".factory-state/factory-board.sqlite3"
+        target.parent.mkdir()
+        target.write_bytes(b"unverified target")
+        script = str(Path(__file__).with_name("board.py").resolve())
+        result = subprocess.run([sys.executable, script, "show"], cwd=main,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, self.board.REFUSED)
+        self.assertIn("complete verified destination", result.stderr)
+        self.assertEqual(target.read_bytes(), b"unverified target")
+
+    def test_clean_clone_board_command_initializes_normally(self):
+        main = self.root / "fresh"
+        self.repository(main)
+        script = str(Path(__file__).with_name("board.py").resolve())
+        result = subprocess.run([sys.executable, script, "show"], cwd=main,
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((main / ".factory-state/factory-board.sqlite3").is_file())
 
     def test_import_once_preserves_source_bytes_and_main_status(self):
         main = self.root / "main"

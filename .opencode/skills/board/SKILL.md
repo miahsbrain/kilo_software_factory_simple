@@ -12,9 +12,10 @@ not a live board. `board.py export` generates Markdown in `.factory-state/` on r
 
 First use imports an existing local main-checkout legacy board once and keeps its original bytes
 as a SQLite snapshot. If legacy runtime data remains in Git metadata while the new database is
-absent, normal board commands fail closed; run the explicit runtime-state migration first. A fresh
-clone with no legacy runtime state starts empty. Never import a historical Git-tracked board into
-a fresh clone. Back up SQLite consistently or export before moving clones.
+absent, normal board commands fail closed unless the atomic migration-completion manifest confirms
+the complete snapshot was installed and its expected items remain; run the explicit runtime-state
+migration first. A fresh clone with no legacy runtime state starts empty. Never import a historical
+Git-tracked board into a fresh clone. Back up SQLite consistently or export before moving clones.
 Viewer requests stay read-only and never initialize another registered project's board.
 
 - **Worktree branches never edit the board.** A builder reports its lane status; the orchestrator

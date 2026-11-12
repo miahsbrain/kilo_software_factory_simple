@@ -1,11 +1,11 @@
 # HANDOVER — software factory
 
 > **Session Notes — BOARD-148 runtime state tooling in progress, 2026-11-12**
-> Shared resolver and explicit dry-run/apply migration tooling are being corrected in
-> `.opencode/worktrees/move-clone-local-state-out-of-git-metadata`. Production state was not read,
-> copied, or migrated; no live board update was made. Tests were not run by the builder; the
-> architect will run the documented focused suite after review. Do not run handoff before the new
-> state store is bootstrapped.
+> Corrected `database_path()` now gates default board readers and writers on the atomic migration
+> manifest; regression coverage was added for incomplete destinations and clean-clone startup.
+> Production state was not read, copied, or migrated; no live board update was made. Tests were not
+> run by the builder; the architect will run the documented focused suite after review. Do not run
+> handoff before the new state store is bootstrapped.
 
 > **Session Notes — BOARD-126 ready for human inspection, 2026-11-12**
 > Registered repositories appear in the read-only feeds. `/api/repo-candidates` lists
@@ -171,7 +171,9 @@
   to install it. The migration reads the SQLite source through a read-only connection and backs
   it up consistently, including WAL data,
   verifies integrity, and atomically installs a complete snapshot without deleting its source.
-  Any partial or non-identical existing destination is refused. `board.py export` writes the
+  The snapshot includes `.migration-complete.json`, which normal board/review/recovery writers
+  validate while legacy files remain. Any partial or non-identical existing destination is refused.
+  `board.py export` writes the
   current Markdown snapshot under `.factory-state/`; Git does not synchronize live rows or reports.
 - `board.py:cmd_pre_merge_check` (effectful filesystem/SQLite), `write_export` (effectful atomic
   bytes/text snapshot) preserve the import and byte backup; `worktree.py:cmd_handoff` (effectful)

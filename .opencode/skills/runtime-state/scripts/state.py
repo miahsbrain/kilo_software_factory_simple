@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Resolve and explicitly migrate clone-local factory runtime state."""
 import argparse
+import hashlib
+import json
 import os
+import re
 import shutil
 import sqlite3
 import stat
@@ -12,6 +15,8 @@ from pathlib import Path
 
 STATE_DIR = ".factory-state"
 BOARD_DATABASE = "factory-board.sqlite3"
+COMPLETION_MARKER = ".migration-complete.json"
+COMPLETION_FORMAT = "factory-runtime-state-v1"
 BOARD_FILES = ("factory-board-export.md", "factory-board-legacy-backup.md")
 SIDECARS = tuple(BOARD_DATABASE + suffix for suffix in ("-wal", "-shm", "-journal"))
 
@@ -127,7 +132,7 @@ def _backup_database(source, destination):
 
 
 def _copy_tree(source, destination):
-    shutil.copytree(source, destination, symlinks=False)
+    shutil.copytree(source, destination, symlinks=True)
     _regular_or_directory(destination)
 
 
@@ -149,6 +154,114 @@ def _build_snapshot(entries, payload):
     for _, relative, kind in entries:
         if kind == "sqlite":
             _verify_database(os.path.join(payload, relative))
+    _write_completion_marker(payload, entries)
+
+
+def _snapshot_manifest(root):
+    manifest = []
+    for current, directories, files in os.walk(root):
+        directories.sort()
+        files.sort()
+        for name in directories + files:
+            path = os.path.join(current, name)
+            relative = os.path.relpath(path, root)
+            info = os.lstat(path)
+            if stat.S_ISDIR(info.st_mode):
+                item = {"path": relative, "kind": "directory"}
+            elif stat.S_ISREG(info.st_mode):
+                digest = hashlib.sha256()
+                with open(path, "rb") as stream:
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                item = {"path": relative, "kind": "file", "sha256": digest.hexdigest()}
+            else:
+                raise OSError("refusing non-regular staged state: %s" % path)
+            manifest.append(item)
+    return manifest
+
+
+def _write_completion_marker(payload, entries):
+    manifest = _snapshot_manifest(payload)
+    encoded_manifest = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    value = {
+        "format": COMPLETION_FORMAT,
+        "snapshot_sha256": hashlib.sha256(encoded_manifest).hexdigest(),
+        "database": any(relative == BOARD_DATABASE and kind == "sqlite"
+                        for _, relative, kind in entries),
+        "entries": manifest,
+    }
+    marker = os.path.join(payload, COMPLETION_MARKER)
+    with open(marker, "x", encoding="utf-8") as stream:
+        json.dump(value, stream, sort_keys=True, separators=(",", ":"))
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def _read_completion_marker(root):
+    marker = os.path.join(root, COMPLETION_MARKER)
+    try:
+        if os.path.islink(marker) or not stat.S_ISREG(os.lstat(marker).st_mode):
+            return None
+        with open(marker, encoding="utf-8") as stream:
+            value = json.load(stream)
+    except (OSError, ValueError):
+        return None
+    if (not isinstance(value, dict) or value.get("format") != COMPLETION_FORMAT
+            or not isinstance(value.get("database"), bool)
+            or not isinstance(value.get("snapshot_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", value["snapshot_sha256"])
+            or not isinstance(value.get("entries"), list)):
+        return None
+    encoded_manifest = json.dumps(value["entries"], sort_keys=True,
+                                  separators=(",", ":")).encode("utf-8")
+    if hashlib.sha256(encoded_manifest).hexdigest() != value["snapshot_sha256"]:
+        return None
+    seen = set()
+    for item in value["entries"]:
+        if not isinstance(item, dict):
+            return None
+        relative = item.get("path")
+        kind = item.get("kind")
+        if (not isinstance(relative, str) or not relative or os.path.isabs(relative)
+                or os.path.normpath(relative) != relative
+                or ".." in relative.split(os.sep) or relative in seen
+                or not isinstance(kind, str) or kind not in {"file", "directory"}):
+            return None
+        if (kind == "file" and (not isinstance(item.get("sha256"), str)
+                                 or not re.fullmatch(r"[0-9a-f]{64}", item["sha256"]))):
+            return None
+        seen.add(relative)
+        path = os.path.join(root, relative)
+        if os.path.islink(path):
+            return None
+        try:
+            info = os.lstat(path)
+        except OSError:
+            return None
+        if ((kind == "file" and not stat.S_ISREG(info.st_mode))
+                or (kind == "directory" and not stat.S_ISDIR(info.st_mode))):
+            return None
+    database_entry = next((item for item in value["entries"]
+                           if item.get("path") == BOARD_DATABASE), None)
+    if value["database"] != (database_entry is not None and database_entry.get("kind") == "file"):
+        return None
+    return value
+
+
+def _source_snapshot_paths(entries):
+    paths = set()
+    for source, relative, kind in entries:
+        if kind != "tree":
+            paths.add(relative)
+            continue
+        for current, directories, files in os.walk(source):
+            base = os.path.relpath(current, source)
+            mapped = relative if base == "." else os.path.join(relative, base)
+            paths.add(mapped)
+            for name in directories + files:
+                paths.add(os.path.join(mapped, name))
+    return paths
 
 
 def _identical(left, right):
@@ -183,12 +296,25 @@ def _common_dir(root):
 def ensure_runtime_ready(cwd):
     root = primary_checkout(cwd)
     common = _common_dir(root)
-    destination = os.path.join(state_root(cwd), BOARD_DATABASE)
+    state_directory = state_root(cwd)
+    if os.path.lexists(state_directory) and os.path.islink(state_directory):
+        raise OSError("refusing symbolic link for runtime state directory: %s" % state_directory)
+    destination = os.path.join(state_directory, BOARD_DATABASE)
     if os.path.lexists(destination) and os.path.islink(destination):
         raise OSError("refusing symbolic link for runtime database: %s" % destination)
-    if migration_entries(common) and not os.path.isfile(destination):
-        raise OSError("legacy runtime state exists without its migrated board database; "
-                      "run .opencode/skills/runtime-state/scripts/state.py migrate first")
+    entries = migration_entries(common)
+    if entries:
+        marker = _read_completion_marker(state_directory)
+        marker_paths = ({item["path"] for item in marker["entries"]}
+                        if marker is not None else set())
+        expected_paths = _source_snapshot_paths(entries)
+        has_database = any(relative == BOARD_DATABASE and kind == "sqlite"
+                           for _, relative, kind in entries)
+        if (marker is None or not expected_paths.issubset(marker_paths)
+                or marker["database"] != has_database
+                or (has_database and not os.path.isfile(destination))):
+            raise OSError("legacy runtime state exists without a complete verified destination; "
+                          "run .opencode/skills/runtime-state/scripts/state.py migrate first")
 
 
 def migrate(cwd, apply=False):

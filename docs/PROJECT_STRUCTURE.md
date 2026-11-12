@@ -48,6 +48,7 @@ and is never tracked here (ADR-053).
     │       ├── CHANGELOG.md          # product-facing changelog (user-approved only)
     │       └── docs/                 # blank governance set: BOARD, HANDOVER, STACK, …
     ├── .factory-state/               # clone-local runtime state, shared by worktrees
+    │   ├── .migration-complete.json  # atomic-snapshot completion manifest
     │   ├── factory-board.sqlite3     # live board database and export snapshots
     │   ├── reviews/                  # QA/UI reports and bounded ledger
     │   └── cleanup-wt/<repo-id>/     # recovery journals and backups

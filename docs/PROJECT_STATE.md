@@ -7,6 +7,8 @@
   copied, initialized, or migrated. No board row was edited from this task worktree.
 - Builder tests were not run under the architect's verification restriction. Next: architect
   reviews and runs the documented focused suite, then performs the explicitly approved migration.
+  The migration-completion manifest is installed atomically and gates default writers while
+  legacy Git-metadata state remains.
 
 ## Current session — BOARD-131 factory backlog plan reviewed (2026-11-12)
 

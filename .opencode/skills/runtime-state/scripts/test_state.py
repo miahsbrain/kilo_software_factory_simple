@@ -71,6 +71,26 @@ class RuntimeStateTests(unittest.TestCase):
             state.ensure_runtime_ready(self.root)
         self.assertFalse(os.path.exists(self.destination))
 
+    def test_unverified_target_database_does_not_prove_migration_complete(self):
+        self.write(self.common, "factory-board-export.md", b"old export")
+        target = os.path.join(self.destination, state.BOARD_DATABASE)
+        os.makedirs(self.destination)
+        with sqlite3.connect(target) as connection:
+            connection.execute("CREATE TABLE board (id INTEGER PRIMARY KEY)")
+        with open(target, "rb") as stream:
+            before = stream.read()
+        with self.assertRaisesRegex(OSError, "complete verified destination"):
+            state.ensure_runtime_ready(self.root)
+        with open(target, "rb") as stream:
+            self.assertEqual(stream.read(), before)
+
+    def test_readiness_rejects_missing_item_from_completed_snapshot(self):
+        self.write(self.common, "reviews/BOARD-1-qa.md", b"report")
+        state.migrate(self.root, apply=True)
+        os.unlink(os.path.join(self.destination, "reviews", "BOARD-1-qa.md"))
+        with self.assertRaisesRegex(OSError, "complete verified destination"):
+            state.ensure_runtime_ready(self.root)
+
     def test_migration_snapshots_uncheckpointed_wal_without_changing_source(self):
         database, connection = self.wal_database()
         self.write(self.common, "factory-board-export.md", b"board export")
@@ -89,6 +109,9 @@ class RuntimeStateTests(unittest.TestCase):
         with sqlite3.connect(destination_db) as migrated:
             self.assertEqual(migrated.execute("SELECT value FROM entries").fetchone()[0],
                              "committed only to WAL")
+        state.ensure_runtime_ready(self.root)
+        self.assertTrue(os.path.isfile(os.path.join(self.destination,
+                                                    state.COMPLETION_MARKER)))
         self.assertTrue(os.path.isfile(os.path.join(
             self.destination, "cleanup-wt", "control", "finalize-BOARD-1-control.json")))
         connection.close()
