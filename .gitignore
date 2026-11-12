@@ -5,6 +5,8 @@
 # The legacy board remains tracked as the first-import source; clone-local runtime state is not.
 /docs/BOARD.md
 .factory-state/
+# Private runtime-state staging is removed after migration, but ignored if interrupted.
+/.factory-state-migration-*/
 
 # Agent worktrees: one per board row, created by .opencode/skills/git-worktree/scripts/worktree.py
 .opencode/worktrees/

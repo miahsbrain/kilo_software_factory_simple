@@ -39,7 +39,8 @@ class RuntimeStateTests(unittest.TestCase):
                 if not os.path.isdir(path):
                     with open(path, "rb") as stream:
                         content = stream.read()
-                snapshot[relative] = (info.st_mode, content)
+                snapshot[relative] = (info.st_mode, info.st_ino, info.st_size,
+                                      info.st_mtime_ns, info.st_ctime_ns, content)
         return snapshot
 
     def wal_database(self):

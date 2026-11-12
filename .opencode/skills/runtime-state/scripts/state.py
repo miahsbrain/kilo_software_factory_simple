@@ -112,7 +112,97 @@ def _verify_database(path):
         raise OSError("SQLite integrity check failed: %s" % (result,))
 
 
-def _backup_database(source, destination):
+def _file_metadata(info):
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
+            info.st_atime_ns, info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _readonly_snapshot_flags():
+    return (os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NOATIME", 0))
+
+
+def _source_file_snapshot(path):
+    descriptor = os.open(path, _readonly_snapshot_flags())
+    with os.fdopen(descriptor, "rb") as stream:
+        before = os.fstat(stream.fileno())
+        path_before = os.lstat(path)
+        if (not stat.S_ISREG(before.st_mode) or os.path.islink(path)
+                or _file_metadata(before) != _file_metadata(path_before)):
+            raise OSError("SQLite source changed while opening snapshot file: %s" % path)
+        digest = hashlib.sha256()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+        after = os.fstat(stream.fileno())
+        path_after = os.lstat(path)
+    if (_file_metadata(before) != _file_metadata(after)
+            or _file_metadata(after) != _file_metadata(path_after)):
+        raise OSError("SQLite source changed while reading snapshot file: %s" % path)
+    return _file_metadata(after), digest.hexdigest()
+
+
+def _copy_snapshot_file(source, destination):
+    source_descriptor = os.open(source, _readonly_snapshot_flags())
+    destination_descriptor = None
+    try:
+        source_file = os.fdopen(source_descriptor, "rb")
+        source_descriptor = None
+        with source_file:
+            before = os.fstat(source_file.fileno())
+            path_before = os.lstat(source)
+            if (not stat.S_ISREG(before.st_mode) or os.path.islink(source)
+                    or _file_metadata(before) != _file_metadata(path_before)):
+                raise OSError("SQLite source changed while copying snapshot file: %s" % source)
+            destination_descriptor = os.open(
+                destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            digest = hashlib.sha256()
+            with os.fdopen(destination_descriptor, "wb") as output:
+                destination_descriptor = None
+                for chunk in iter(lambda: source_file.read(1024 * 1024), b""):
+                    output.write(chunk)
+                    digest.update(chunk)
+                output.flush()
+                os.fsync(output.fileno())
+            after = os.fstat(source_file.fileno())
+            path_after = os.lstat(source)
+        if (_file_metadata(before) != _file_metadata(after)
+                or _file_metadata(after) != _file_metadata(path_after)):
+            raise OSError("SQLite source changed while copying snapshot file: %s" % source)
+        return _file_metadata(after), digest.hexdigest()
+    except BaseException:
+        if destination_descriptor is not None:
+            os.close(destination_descriptor)
+        if os.path.lexists(destination):
+            os.unlink(destination)
+        raise
+    finally:
+        if source_descriptor is not None:
+            os.close(source_descriptor)
+
+
+def _snapshot_sqlite_database(source, private_directory):
+    """Copy SQLite files read-only; all source writers must be stopped first."""
+    os.mkdir(private_directory)
+    sources = [source]
+    sources.extend(source + suffix for suffix in ("-wal", "-shm")
+                   if os.path.lexists(source + suffix))
+    before = {path: _source_file_snapshot(path) for path in sources}
+    copied = {}
+    for path in sources:
+        target = os.path.join(private_directory, os.path.basename(path))
+        copied[path] = _copy_snapshot_file(path, target)
+    current_sources = [source]
+    current_sources.extend(source + suffix for suffix in ("-wal", "-shm")
+                           if os.path.lexists(source + suffix))
+    after = {path: _source_file_snapshot(path) for path in current_sources}
+    if (sources != current_sources or before != after
+            or any(before[path] != copied[path] for path in sources)):
+        raise OSError("SQLite source changed during snapshot; stop all writers and retry")
+    source_mode = stat.S_IMODE(before[source][0][2])
+    return os.path.join(private_directory, os.path.basename(source)), source_mode
+
+
+def _backup_database(source, destination, source_mode):
     source_uri = Path(source).resolve().as_uri() + "?mode=ro"
     source_connection = sqlite3.connect(source_uri, uri=True, timeout=10)
     destination_connection = sqlite3.connect(destination, timeout=10)
@@ -125,7 +215,7 @@ def _backup_database(source, destination):
     finally:
         destination_connection.close()
         source_connection.close()
-    os.chmod(destination, stat.S_IMODE(os.stat(source).st_mode))
+    os.chmod(destination, source_mode)
     _verify_database(destination)
     if os.path.lexists(destination + "-wal") or os.path.lexists(destination + "-shm"):
         raise OSError("SQLite snapshot unexpectedly retained destination sidecars")
@@ -136,13 +226,15 @@ def _copy_tree(source, destination):
     _regular_or_directory(destination)
 
 
-def _build_snapshot(entries, payload):
+def _build_snapshot(entries, payload, staging):
     os.mkdir(payload)
     for source, relative, kind in entries:
         destination = os.path.join(payload, relative)
         os.makedirs(os.path.dirname(destination), exist_ok=True)
         if kind == "sqlite":
-            _backup_database(source, destination)
+            sqlite_source, source_mode = _snapshot_sqlite_database(
+                source, os.path.join(staging, "sqlite-source"))
+            _backup_database(sqlite_source, destination, source_mode)
         elif kind == "tree":
             _copy_tree(source, destination)
             if not _identical(source, destination):
@@ -326,10 +418,13 @@ def migrate(cwd, apply=False):
         return
 
     destination = os.path.join(root, STATE_DIR)
+    if os.path.lexists(destination) and os.path.islink(destination):
+        raise OSError("refusing symbolic link for runtime state destination: %s" % destination)
     with tempfile.TemporaryDirectory(prefix=".factory-state-migration-", dir=root) as staging:
         payload = os.path.join(staging, "payload")
-        _build_snapshot(entries, payload)
+        _build_snapshot(entries, payload, staging)
         if os.path.lexists(destination):
+            _regular_or_directory(destination)
             if not os.path.isdir(destination) or not _identical(payload, destination):
                 raise OSError("refusing partial, extra, or non-identical existing state: %s" % destination)
             print("verified identical complete state: %s" % destination)
@@ -347,8 +442,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Resolve or explicitly migrate factory runtime state")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("path", help="print the clone-local state directory")
-    migration = sub.add_parser("migrate", help="dry-run migration from Git metadata")
-    migration.add_argument("--apply", action="store_true", help="install verified snapshot; never delete source")
+    migration = sub.add_parser(
+        "migrate", help="migrate Git-metadata state after stopping all legacy DB writers")
+    migration.add_argument("--apply", action="store_true",
+                           help="install verified snapshot; never delete source")
     args = parser.parse_args(argv)
     try:
         if args.command == "path":

@@ -97,6 +97,15 @@ def git_out(cwd, *args):
     return out if code == 0 else None
 
 
+def common_dir(cwd):
+    """Return Git's absolute common directory, or None when it cannot be resolved."""
+    common = git_out(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if not common or not os.path.isabs(common):
+        return None
+    common = os.path.realpath(common)
+    return common if os.path.isdir(common) else None
+
+
 def git_raw(cwd, *args, timeout=60):
     """(code, stdout, stderr) with the output untouched, for content that must stay exact."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}

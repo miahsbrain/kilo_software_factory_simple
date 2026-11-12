@@ -166,11 +166,12 @@
   records live under `<primary-checkout>/.factory-state/`, shared across linked worktrees. Board
   initialization refuses to create an empty database while legacy Git-metadata state remains;
   a fresh clone with no legacy runtime state initializes normally.
-- Migrate existing local state explicitly with `python3 .opencode/skills/runtime-state/scripts/state.py migrate`
-  to review the plan, then `python3 .opencode/skills/runtime-state/scripts/state.py migrate --apply`
-  to install it. The migration reads the SQLite source through a read-only connection and backs
-  it up consistently, including WAL data,
-  verifies integrity, and atomically installs a complete snapshot without deleting its source.
+- Stop every writer to the legacy SQLite database before migration. The migration copies the
+  database and any WAL/SHM files read-only into private staging, checks source metadata/content
+  stability, then runs SQLite backup and integrity verification against the staged copy only.
+  Migrate explicitly with `python3 .opencode/skills/runtime-state/scripts/state.py migrate` to
+  review the plan, then `python3 .opencode/skills/runtime-state/scripts/state.py migrate --apply`
+  to install a complete snapshot atomically without deleting the source.
   The snapshot includes `.migration-complete.json`, which normal board/review/recovery writers
   validate while legacy files remain. Any partial or non-identical existing destination is refused.
   `board.py export` writes the

@@ -6,9 +6,9 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 ## [2026-11-12] Move runtime state outside Git metadata
 **Type:** Feature
 **Board:** BOARD-148 | **Branch:** chore/move-clone-local-state-out-of-git-metadata
-**Changed:** runtime-state resolver/migration CLI, board/worktree/QA state consumers, tests, rules, and factory docs.
+**Changed:** runtime-state resolver/migration CLI, board/worktree/QA state consumers, regression fixtures, rules, and factory docs.
 **Why:** Keep clone-local mutable state outside `.git` while sharing it across linked worktrees.
-**Impact:** Runtime paths move to `<primary-checkout>/.factory-state/`; migration is explicit, uses a read-only SQLite backup, stages and atomically installs a complete snapshot with a completion manifest, and never deletes source. Default board writers refuse unverified destinations. Production migration not run.
+**Impact:** Runtime paths move to `<primary-checkout>/.factory-state/`; migration requires all legacy DB writers stopped, snapshots DB/WAL/SHM read-only into private staging, verifies source stability, then backs up and validates only the staged DB. A completion manifest is installed atomically; default writers refuse unverified destinations. Interrupted staging is ignored. Production migration not run.
 **Verification:** `git diff --check` passed before the corrective edits. No post-correction command or behavior tests were run; the architect will run the documented focused suite.
 
 ## [2026-11-12] Plan factory implementation backlog

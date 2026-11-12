@@ -36,7 +36,8 @@ class BoardRefreshTests(unittest.TestCase):
         previous_state = viewer.Handler.state
         self.addCleanup(setattr, viewer.Handler, "state", previous_state)
         self.write_board(self.factory, "Factory task")
-        (self.root / ".gitignore").write_text("/project/\n", encoding="utf-8")
+        (self.root / ".gitignore").write_text(
+            "/project/\n/.factory-state/\n", encoding="utf-8")
 
     def write_board(self, path, task):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -50,8 +51,9 @@ class BoardRefreshTests(unittest.TestCase):
         project = self.root / "project"
         project.mkdir()
         subprocess.run(["git", "init", "-q", "-b", "main", str(project)], check=True)
+        (project / ".gitignore").write_text("/.factory-state/\n", encoding="utf-8")
         self.write_board(self.project, "Independent task")
-        subprocess.run(["git", "-C", str(project), "add", "docs/BOARD.md"], check=True)
+        subprocess.run(["git", "-C", str(project), "add", ".gitignore", "docs/BOARD.md"], check=True)
         subprocess.run(["git", "-C", str(project), "-c", "user.name=Fixture",
                         "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"], check=True)
         self.worktree.is_git_repo = Mock(side_effect=lambda target: target == str(project))
@@ -610,7 +612,7 @@ class BoardBootstrapTests(unittest.TestCase):
         marker = root / ".opencode/repos.json"
         marker.parent.mkdir(exist_ok=True)
         marker.write_text('{"control":"."}\n')
-        (root / ".gitignore").write_text("/.opencode/worktrees/\n")
+        (root / ".gitignore").write_text("/.opencode/worktrees/\n/.factory-state/\n")
         self.git(root, "add", ".opencode/repos.json", ".gitignore")
         self.git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
                  "commit", "-m", "fixture")

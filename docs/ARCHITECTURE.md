@@ -30,11 +30,13 @@ needs. Every work surface must be registered before the factory reads its conten
   Git's absolute common-dir path and fail closed when it cannot be verified.
 - Review reports and ledgers live in `.factory-state/reviews/`; cleanup recovery journals and
   backups live in `.factory-state/cleanup-wt/<repo-id>/` to keep repository identities separate.
-- The explicit runtime-state migration command supports dry-run and `--apply`; it snapshots SQLite
-  through a read-only backup, verifies integrity, stages the complete state tree, and installs it
-  atomically without deleting Git-metadata sources. Existing destinations must match the complete
-  snapshot exactly; partial, extra, or differing state is refused. A completion manifest is
-  installed in the same atomic snapshot and gates normal writers while legacy state remains.
+- The explicit runtime-state migration command supports dry-run and `--apply`; all legacy database
+  writers must be stopped first. It copies the database and WAL/SHM files read-only into private
+  staging, checks source metadata and content before and after the copy, then backs up and verifies
+  only the staged SQLite copy. It installs the complete state tree atomically without deleting
+  Git-metadata sources. Existing destinations must match the complete snapshot exactly; partial,
+  extra, or differing state is refused. A completion manifest gates normal writers while legacy
+  state remains.
 - Git is the source of branch and worktree state. The board's `Branch/Worktree` cell links a task
   to its isolated worktree.
 - The dashboard is read-only. It shows board state, branches and worktrees. It does not expose

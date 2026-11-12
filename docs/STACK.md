@@ -44,7 +44,7 @@ python3 .opencode/skills/board/scripts/board.py show
 python3 .opencode/skills/board/scripts/board.py export
 
 # Resolve the clone-local runtime-state path, or explicitly migrate old Git-metadata state.
-# Migration defaults to dry-run; --apply copies/verifies and never removes the source.
+# Stop all legacy database writers first; migration snapshots DB/WAL/SHM read-only and never removes source.
 python3 .opencode/skills/runtime-state/scripts/state.py path
 python3 .opencode/skills/runtime-state/scripts/state.py migrate
 python3 .opencode/skills/runtime-state/scripts/state.py migrate --apply
