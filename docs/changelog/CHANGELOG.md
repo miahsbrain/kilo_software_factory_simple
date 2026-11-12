@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Correct bootstrap finalize instructions
+**Type:** Docs
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `.opencode/skills/git-worktree/SKILL.md`, `docs/HANDOVER.md` and this log.
+**Why:** The ready handoff prints an absolute bootstrap-script finalize command; older instructions incorrectly required manual merge and cleanup.
+**Impact:** Preserve pre-merge import and byte-exact backup, then direct the human to review and run the printed command from the clean base checkout in a real TTY. No runtime change.
+**Verification:** File review and `git diff --check` only. Catalogue: code-documenter.
+
 ## [2026-11-12] Clarify app work-surface finalize path
 **Type:** Docs
 **Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap

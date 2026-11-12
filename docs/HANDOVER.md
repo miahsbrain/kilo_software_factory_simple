@@ -22,16 +22,19 @@
   SQLite `source_bytes` snapshot without changing the Markdown. `board.py export` writes the
   current readable snapshot under Git common dir. Use a consistent SQLite backup (or export)
   when transferring a clone; Git does not synchronize live rows or reviewer reports.
-- On merge of this branch, tracked `docs/BOARD.md` is deleted from the integration checkout;
+- On integration of this branch, tracked `docs/BOARD.md` is deleted from the integration checkout;
   a previously initialized SQLite database retains the live rows. **Before the one-time human
-  merge**, stop board writers and run from this bootstrap worktree:
+  integration**, stop board writers and run from this bootstrap worktree:
   `python3 .opencode/skills/board/scripts/board.py pre-merge-check`, then
   `python3 .opencode/skills/board/scripts/board.py export`. The check imports a missing database
   from the main-checkout source, verifies its `source_bytes` match, refuses a missing/changed
   source, and writes/prints the SQLite, byte-exact legacy backup and current Markdown export
-  paths in Git common dir. The second command refreshes the export. Do not merge if either fails; after merge,
-  a new clone with no local board initializes
-  empty. The still-tracked blank project template is not historical state.
+  paths in Git common dir. The second command refreshes the export. Do not proceed if either
+  fails. Review the handoff, then run the absolute `finalize` command printed by
+  `worktree.py handoff --board BOARD-124` from the clean `opencode` base checkout in a real TTY;
+  it uses this bootstrap worktree's script, not the base's old relative script. After integration,
+  a new clone with no local board initializes empty. The still-tracked blank project template is
+  not historical state.
 - `board.py:cmd_pre_merge_check` (effectful filesystem/SQLite), `write_export` (effectful atomic
   bytes/text snapshot) preserve the import and byte backup; `worktree.py:cmd_handoff` (effectful)
   prints the absolute shell-quoted control script and target main checkout for app/control repos.

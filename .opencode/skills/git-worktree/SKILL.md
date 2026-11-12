@@ -483,9 +483,9 @@ The configured base is `opencode` for factory tasks; project repositories use th
 configured base. A separately approved feature branch may be the target for a larger feature.
 
 **One-time bootstrap handoff:** before this branch is integrated, the main checkout still has
-the old `worktree.py` and cannot run its `finalize` command. After review and human approval,
-the human must run the following **in this bootstrap worktree, before the merge**, while the
-main checkout still has its legacy `docs/BOARD.md` (stop board writers first):
+the old `worktree.py`; do not use its relative script path for `finalize`. After review and
+human approval, stop board writers and run the following **in this bootstrap worktree, before
+integration**, while the main checkout still has its legacy `docs/BOARD.md`:
 
 ```bash
 python3 .opencode/skills/board/scripts/board.py pre-merge-check
@@ -495,11 +495,12 @@ python3 .opencode/skills/board/scripts/board.py export
 The first command initializes a missing local SQLite database from the main checkout's legacy
 board and checks the imported bytes against the source. It refuses missing/malformed or changed
 source, and prints the database, byte-exact backup and current readable export paths under the Git
-common directory. The second command refreshes and prints that export path. Confirm both succeed before
-the human manually merges `feat/sqlite-board-bootstrap` into `opencode`, then handle its
-worktree cleanup and local board transition. Do not run the old main-checkout script as if it
-were the new finalize gate; do not restore rows from Git history in a fresh clone. This bootstrap
-exception does not apply to later tasks.
+common directory. The second command refreshes and prints that export path. Confirm both succeed,
+then review the handoff and run the **absolute `finalize` command printed by**
+`worktree.py handoff --board BOARD-124` from the clean `opencode` base checkout in a real TTY.
+The printed command uses this bootstrap worktree's script, not the base checkout's old relative
+script. Do not restore rows from Git history in a fresh clone. This bootstrap exception does not
+apply to later tasks.
 
 ---
 
