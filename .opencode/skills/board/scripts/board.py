@@ -1435,6 +1435,10 @@ def main(argv):
             return REFUSED
     try:
         path = args.file if args.file else initialize_board(control_root(os.getcwd()))
+        if args.command == "plan":
+            path = live_database(path)
+            if not path:
+                raise ValueError("planned work requires the live SQLite board")
     except (OSError, UnicodeError, ValueError, sqlite3.Error) as exc:
         print("cannot initialize board: %s" % exc, file=sys.stderr)
         return REFUSED

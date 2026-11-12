@@ -4,6 +4,8 @@ import importlib.util
 import io
 import json
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -257,7 +259,9 @@ class PlannedLifecycleTests(unittest.TestCase):
 
     def run_cli(self, args, stdin=""):
         output = io.StringIO()
-        with patch.object(board, "initialize_board", return_value=self.path), \
+        with patch.object(board, "initialize_board",
+                          return_value=str(Path(self.temp.name) / board.BOARD_PATH)), \
+                patch.object(board, "live_database", return_value=self.path), \
                 patch("sys.stdin", io.StringIO(stdin)), redirect_stdout(output), \
                 redirect_stderr(io.StringIO()):
             return board.main(args), output.getvalue()
@@ -431,6 +435,113 @@ class PlannedLifecycleTests(unittest.TestCase):
             self.assertEqual(connection.execute(
                 "SELECT COUNT(*) FROM acceptance_criteria WHERE plan_item_id='BOARD-146'").fetchone(),
                 (2,))
+
+
+class PlannedCliDatabaseTests(unittest.TestCase):
+    def make_repo(self, legacy=False):
+        temporary = tempfile.TemporaryDirectory(prefix="board-plan-cli-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
+        (root / ".opencode").mkdir()
+        (root / ".opencode" / "repos.json").write_text(json.dumps({"control": "."}))
+        (root / "docs").mkdir()
+        source = NormalizedBoardMigrationTests.make_markdown().encode() if legacy else None
+        if source is not None:
+            (root / board.BOARD_PATH).write_bytes(source)
+        board.initialize_board(str(root))
+        database = board.database_path(str(root))
+        board.migrate_normalized(database, apply=True)
+        return root, database, source
+
+    def run_cli(self, root, arguments, stdin="", expected=board.OK):
+        result = subprocess.run([sys.executable, str(Path(board.__file__).resolve()), *arguments],
+                                cwd=root, input=stdin, text=True, capture_output=True, timeout=20)
+        self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+        return result
+
+    def database_snapshot(self, database):
+        with sqlite3.connect(database) as connection:
+            return tuple(connection.iterdump())
+
+    def assert_legacy_untouched(self, root, database, source):
+        legacy = root / board.BOARD_PATH
+        if source is None:
+            self.assertFalse(legacy.exists())
+        else:
+            self.assertEqual(legacy.read_bytes(), source)
+        for suffix in ("-wal", "-shm", "-journal"):
+            self.assertFalse(Path(str(legacy) + suffix).exists())
+        with sqlite3.connect(database) as connection:
+            self.assertEqual(connection.execute(
+                "SELECT source_bytes FROM board WHERE id=1").fetchone(), (source,))
+
+    def test_all_plan_commands_use_canonical_database_with_or_without_legacy_source(self):
+        for legacy in (False, True):
+            with self.subTest(legacy=legacy):
+                root, database, source = self.make_repo(legacy)
+                before = self.database_snapshot(database)
+                queue = board.plan_rows(database, "queue")
+                history = board.plan_rows(database, "history")
+                self.run_cli(root, ["plan", "queue"])
+                self.run_cli(root, ["plan", "history"])
+                self.assertEqual(self.database_snapshot(database), before)
+                self.assert_legacy_untouched(root, database, source)
+
+                drafts = [PlannedLifecycleTests.draft("finish", "Finish CLI work"),
+                          PlannedLifecycleTests.draft("cancel", "Cancel CLI work")]
+                result = self.run_cli(root, ["plan", "accept"], json.dumps(drafts))
+                ids = [line.split()[-1] for line in result.stdout.splitlines()]
+                self.assertEqual(len(ids), 2)
+                self.assertEqual([item["id"] for item in board.plan_rows(database, "queue")],
+                                 [item["id"] for item in queue] + ids)
+                self.assert_legacy_untouched(root, database, source)
+                self.run_cli(root, ["plan", "promote", ids[0]])
+                with sqlite3.connect(database) as connection:
+                    self.assertEqual(connection.execute(
+                        "SELECT status FROM active_work WHERE plan_item_id=?", (ids[0],))
+                        .fetchone(), ("Ready",))
+                    self.assertEqual(connection.execute(
+                        "SELECT COUNT(*) FROM acceptance_criteria WHERE plan_item_id IN (?, ?)", ids)
+                        .fetchone(), (4,))
+                self.assert_legacy_untouched(root, database, source)
+                self.run_cli(root, ["plan", "complete", ids[0]])
+                self.assert_legacy_untouched(root, database, source)
+                self.run_cli(root, ["plan", "cancel", ids[1]])
+                self.assert_legacy_untouched(root, database, source)
+                self.assertEqual(board.plan_rows(database, "queue"), queue)
+                terminal = board.plan_rows(database, "history")
+                self.assertEqual(len(terminal), len(history) + 2)
+                self.assertEqual({item["id"]: item["terminal_outcome"] for item in terminal
+                                  if item["id"] in ids},
+                                 {ids[0]: "completed", ids[1]: "cancelled"})
+                before = self.database_snapshot(database)
+                displayed = self.run_cli(root, ["plan", "history"]).stdout
+                for item_id in ids:
+                    self.assertIn(item_id, displayed)
+                self.run_cli(root, ["plan", "queue"])
+                self.assertEqual(self.database_snapshot(database), before)
+                self.assert_legacy_untouched(root, database, source)
+
+    def test_file_plan_commands_are_refused_without_mutating_fixture_or_database(self):
+        root, database, source = self.make_repo()
+        fixture = root / "fixture.md"
+        fixture_bytes = NormalizedBoardMigrationTests.make_markdown().encode()
+        fixture.write_bytes(fixture_bytes)
+        before = self.database_snapshot(database)
+        for arguments in (["queue"], ["history"], ["accept"], ["promote", "BOARD-001"],
+                          ["complete", "BOARD-001"], ["cancel", "BOARD-001"]):
+            with self.subTest(command=arguments[0]):
+                result = self.run_cli(root, ["--file", str(fixture), "plan", *arguments],
+                                      json.dumps([PlannedLifecycleTests.draft("new", "New work")]),
+                                      expected=board.REFUSED)
+                self.assertIn("--file is read-only", result.stderr)
+                self.assertEqual(fixture.read_bytes(), fixture_bytes)
+                self.assertEqual(self.database_snapshot(database), before)
+                self.assert_legacy_untouched(root, database, source)
+        self.run_cli(root, ["--file", str(fixture), "show"])
+        self.assertEqual(fixture.read_bytes(), fixture_bytes)
+        self.assertEqual(self.database_snapshot(database), before)
 
 
 class PlannedProjectionValidationTests(unittest.TestCase):
