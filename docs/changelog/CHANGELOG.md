@@ -30,6 +30,12 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Changed:** QA/UI instructions, native edit/write/patch role permissions, project templates and scopes, UI-UX guidance, handover, project state and decisions; copied BOARD-146 QA report to its approved artifact path.
 **Why:** Keep reports/evidence with task artifacts while reserving `.factory-state/reviews/` for bounded-loop ledgers.
 **Impact:** New report paths and role-specific file-tool permissions; shell remains trusted-agent authority. Ledger location, 10-round cap and stop conditions remain unchanged. Historical reports remain untouched.
+## [2026-11-12] Preserve checklist details and cancelled history
+**Type:** Fix
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, `.opencode/skills/board/scripts/test_board_normalized.py`, board architecture/decision/business-logic/handover/stack/project-state docs.
+**Why:** Extract multiple semicolon-separated Notes checkboxes independently and retain normalized items when removed through the compatibility CLI.
+**Impact:** Each criterion keeps its own verification/proof; remove records cancellation without deleting canonical history. Verification was not run because the approved suite attempts are exhausted.
 
 ## [2026-11-12] Correct normalized migration fixture count
 **Type:** Fix

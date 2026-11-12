@@ -39,6 +39,10 @@ needs. Every work surface must be registered before the factory reads its conten
   Existing board CLI and worktree callers retain their Markdown-table interface as a compatibility
   projection. The explicit `migrate-normalized` command previews by default and requires `--apply`
   to back up and transactionally migrate the imported snapshot; it never runs at startup.
+   Legacy Notes may contain multiple checklist criteria separated by `; - [ ]`; each checkbox,
+  verification state and explicit proof is stored separately without rewriting Notes. Removing a
+  normalized row through the compatibility CLI cancels it: active/queue references are cleared,
+  while the canonical item and its history are retained.
 - The explicit runtime-state migration command supports dry-run and `--apply`; all legacy database
   writers must be stopped first. It copies the database and WAL/SHM files read-only into private
   staging, checks source metadata and content before and after the copy, then backs up and verifies

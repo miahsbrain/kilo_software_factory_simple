@@ -306,7 +306,9 @@ def sync_normalized(connection, markdown):
             connection.execute("INSERT INTO acceptance_criteria VALUES (?, ?, ?, ?, ?)",
                                (board_id, position, text, int(verified), proof))
     for board_id in existing.keys() - seen:
-        connection.execute("DELETE FROM planned_items WHERE id=?", (board_id,))
+        connection.execute("DELETE FROM active_work WHERE plan_item_id=?", (board_id,))
+        connection.execute("UPDATE planned_items SET queue_position=NULL, terminal_outcome='cancelled' "
+                           "WHERE id=?", (board_id,))
 
 
 def criteria_from_notes(notes):
@@ -314,20 +316,22 @@ def criteria_from_notes(notes):
     items = []
     lines = (notes or "").splitlines()
     for index, line in enumerate(lines):
-        match = re.match(r"^\s*[-*]\s+\[([ xX])\]\s+(.+?)\s*$", line)
-        if not match:
-            continue
-        proof = None
-        text = match.group(2)
-        inline_proof = re.match(r"^(.*?)\s*;\s*Proof:\s*(.+?)\s*$", text, re.IGNORECASE)
-        if inline_proof:
-            text, proof = inline_proof.groups()
-        if index + 1 < len(lines):
-            proof_match = re.match(r"^\s{2,}(?:[-*]\s+)?Proof:\s*(.+?)\s*$",
-                                   lines[index + 1], re.IGNORECASE)
-            if proof_match and proof is None:
-                proof = proof_match.group(1)
-        items.append((text, match.group(1).strip().lower() == "x", proof))
+        checkboxes = list(re.finditer(
+            r"(?:^\s*|;\s+)([-*]\s+\[([ xX])\]\s+.*?)(?=;\s+[-*]\s+\[[ xX]\]\s+|$)",
+            line))
+        for checkbox_index, checkbox in enumerate(checkboxes):
+            match = re.match(r"[-*]\s+\[([ xX])\]\s+(.+?)\s*$", checkbox.group(1))
+            proof = None
+            text = match.group(2)
+            inline_proof = re.match(r"^(.*?)\s*;\s*Proof:\s*(.+?)\s*$", text, re.IGNORECASE)
+            if inline_proof:
+                text, proof = inline_proof.groups()
+            if checkbox_index == len(checkboxes) - 1 and index + 1 < len(lines):
+                proof_match = re.match(r"^\s{2,}(?:[-*]\s+)?Proof:\s*(.+?)\s*$",
+                                       lines[index + 1], re.IGNORECASE)
+                if proof_match and proof is None:
+                    proof = proof_match.group(1)
+            items.append((text, match.group(1).strip().lower() == "x", proof))
     return items
 
 

@@ -283,12 +283,15 @@
   per-item criterion positions are unique; SQLite foreign keys and transactions protect writes.
   Migration is never automatic: dry-run is read-only; `--apply` makes a consistent backup first,
   then applies transactional DDL and data conversion. Existing Notes stay verbatim; explicit
-  checklist entries/proofs are copied to criteria rows.
+  checklist entries/proofs are copied to criteria rows, including separate same-line entries
+  delimited by `; - [ ]`. A following proof line applies to the final checklist on that line.
 - Before normalized migration, the existing Markdown snapshot remains the CLI source. After
   migration, `read_table` renders a compatibility projection from normalized rows and
   `write_atomic` updates normalized state in the same SQLite transaction. Historical status
   mapping: Backlog→queue; Ready/In Progress/In Review/Pending Merge/Blocked→active work;
   Merged→completed; Dropped→cancelled. `display_position` preserves current table order.
+  `board.py remove <ID>` cancels normalized items rather than deleting them: active/queue references
+  are removed, terminal outcome becomes cancelled, and the item, criteria and Notes remain.
 - CLI `show`/`lanes` read current SQLite state; `add`, `note`, `set-status`, `set-field`,
   `add-column`, `remove` update SQLite; `export` writes a readable Markdown snapshot in the
   common Git directory. The viewer discovers per-clone control/project databases and reads

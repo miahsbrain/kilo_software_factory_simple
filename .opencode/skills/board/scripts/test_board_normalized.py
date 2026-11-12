@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import board
@@ -36,7 +37,8 @@ class NormalizedBoardMigrationTests(unittest.TestCase):
             rows.append(("BOARD-%03d" % number, "Backlog", dependencies[number],
                          "queue note %d" % number))
         rows.extend([("BOARD-145", "Merged", "None.", "completed note"),
-                     ("BOARD-146", "In Progress", "BOARD-145", "- [ ] Active criterion; Proof: explicit"),
+                      ("BOARD-146", "In Progress", "BOARD-145",
+                       "- [x] Active criterion; Proof: explicit; - [ ] Secondary criterion; Proof: second"),
                      ("BOARD-147", "Ready", "BOARD-146", "ready note"),
                      ("BOARD-148", "Merged", "None.", "later completed"),
                      ("BOARD-149", "In Review", "None.", "reviewing"),
@@ -96,9 +98,10 @@ class NormalizedBoardMigrationTests(unittest.TestCase):
             self.assertEqual(connection.execute(
                 "SELECT position, text, verified, proof FROM acceptance_criteria "
                 "WHERE plan_item_id='BOARD-146'").fetchall(),
-                [(0, "Active criterion", 0, "explicit")])
+                [(0, "Active criterion", 1, "explicit"),
+                 (1, "Secondary criterion", 0, "second")])
             self.assertEqual(connection.execute(
-                "SELECT COUNT(*) FROM acceptance_criteria").fetchone(), (2,))
+                "SELECT COUNT(*) FROM acceptance_criteria").fetchone(), (3,))
             rendered, error = board.parse_table(board.normalized_markdown(
                 connection, self.markdown))
             self.assertIsNone(error)
@@ -122,7 +125,7 @@ class NormalizedBoardMigrationTests(unittest.TestCase):
                               for number in expected_dependencies},
                              {"BOARD-%03d" % number: dependency
                               for number, dependency in expected_dependencies.items()})
-            self.assertEqual(rendered_rows[-3][8], "branch/path")
+            self.assertEqual(rendered_by_id["BOARD-146"][8], "branch/path")
             self.assertEqual(connection.execute(
                 "SELECT notes FROM planned_items WHERE id='BOARD-130'").fetchone()[0],
                 "- [x] Keep blocker; Proof: captured")
@@ -154,6 +157,34 @@ class NormalizedBoardMigrationTests(unittest.TestCase):
                 "SELECT text, verified, proof FROM acceptance_criteria "
                 "WHERE plan_item_id='BOARD-146'").fetchall(),
                 [("Changed criterion", 1, "revised")])
+
+    def test_remove_cancels_normalized_rows_and_retains_history(self):
+        board.migrate_normalized(self.path, apply=True)
+        with patch.object(board, "live_database", return_value=self.path), \
+                patch.object(board, "database_path", return_value=self.path), \
+                patch.object(board, "note_uncommitted"):
+            self.assertEqual(board.cmd_remove(SimpleNamespace(id="BOARD-146"), "fixture.md"), board.OK)
+            self.assertEqual(board.cmd_remove(SimpleNamespace(id="BOARD-143"), "fixture.md"), board.OK)
+        with board.connect(self.path) as connection:
+            for board_id in ("BOARD-146", "BOARD-143"):
+                self.assertEqual(connection.execute(
+                    "SELECT terminal_outcome, queue_position FROM planned_items WHERE id=?",
+                    (board_id,)).fetchone(), ("cancelled", None))
+                self.assertIsNone(connection.execute(
+                    "SELECT 1 FROM active_work WHERE plan_item_id=?", (board_id,)).fetchone())
+            self.assertEqual(connection.execute(
+                "SELECT notes FROM planned_items WHERE id='BOARD-146'").fetchone()[0],
+                "- [x] Active criterion; Proof: explicit; - [ ] Secondary criterion; Proof: second")
+            self.assertEqual(connection.execute(
+                "SELECT text, verified, proof FROM acceptance_criteria "
+                "WHERE plan_item_id='BOARD-146' ORDER BY position").fetchall(),
+                [("Active criterion", 1, "explicit"), ("Secondary criterion", 0, "second")])
+
+    def test_same_line_checklists_extract_individual_state_and_proofs(self):
+        notes = "- [x] First criterion; Proof: first proof; - [ ] Second criterion; Proof: second proof"
+        self.assertEqual(board.criteria_from_notes(notes),
+                         [("First criterion", True, "first proof"),
+                          ("Second criterion", False, "second proof")])
 
     def test_duplicate_ids_fail_transaction_and_leave_source_rows_unchanged(self):
         duplicate = self.markdown + "\n" + self.markdown.splitlines()[2]

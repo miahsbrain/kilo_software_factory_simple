@@ -49,6 +49,9 @@ python3 .opencode/skills/board/scripts/board.py migrate-normalized
 # Apply only after reviewing the preview; creates a consistent .pre-normalized.bak backup
 python3 .opencode/skills/board/scripts/board.py migrate-normalized --apply
 
+# On normalized state remove cancels while retaining history, criteria and Notes.
+# Migration stores each semicolon-separated checkbox and explicit proof separately.
+
 # Resolve the clone-local runtime-state path, or explicitly migrate old Git-metadata state.
 # Stop all legacy database writers first; migration snapshots DB/WAL/SHM read-only and never removes source.
 python3 .opencode/skills/runtime-state/scripts/state.py path
