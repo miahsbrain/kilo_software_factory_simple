@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ledger.py — the bounded QA/fix ledger for one board row.
 
-One short file per row in the control repository's Git common directory carries
+One short file per row in the primary checkout's `.factory-state/reviews/` carries
 the round number, findings, corrections in the same worktree and stop reason.
 
 A row may go through at most 3 rounds. `next-round` refuses to open round 4;
@@ -19,9 +19,9 @@ Usage:
 Exit codes: 0 ok, 1 refused, 2 usage error.
 """
 import argparse
+import importlib.util
 import os
 import re
-import subprocess
 import sys
 
 MAX_ROUNDS = 3
@@ -229,12 +229,16 @@ def main(argv):
         print("invalid --task-id: expected BOARD-[0-9]+", file=sys.stderr)
         return USAGE
     if args.ledger_dir is None:
-        result = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-                                capture_output=True, text=True)
-        if result.returncode:
-            print("refused: cannot locate Git common directory for review ledger", file=sys.stderr)
+        state_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                                  "../../runtime-state/scripts/state.py"))
+        spec = importlib.util.spec_from_file_location("factory_runtime_state", state_file)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        try:
+            args.ledger_dir = os.path.join(module.state_root(os.getcwd()), "reviews")
+        except OSError as exc:
+            print("refused: cannot resolve local review ledger: %s" % exc, file=sys.stderr)
             return REFUSED
-        args.ledger_dir = os.path.join(result.stdout.strip(), "reviews")
     handler = {
         "status": cmd_status,
         "next-round": cmd_next_round,

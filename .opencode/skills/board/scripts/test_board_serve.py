@@ -697,7 +697,7 @@ class BoardBootstrapTests(unittest.TestCase):
         output = subprocess.run([sys.executable, script, "export"], cwd=linked, capture_output=True)
         self.assertEqual(output.returncode, 0, output.stderr)
         export = Path(output.stdout.decode().strip())
-        self.assertEqual(export.parent, main / ".git")
+        self.assertEqual(export.parent, main / ".factory-state")
         self.assertIn("BOARD-001", export.read_text())
         self.assertEqual(self.git(main, "status", "--porcelain"), "")
 

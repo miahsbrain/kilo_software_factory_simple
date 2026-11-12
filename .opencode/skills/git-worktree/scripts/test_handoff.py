@@ -225,7 +225,7 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(self.board_cells()[8], "-")
 
     def test_invalid_recovery_record_refuses_before_cleanup(self):
-        journal = Path(self.repo, ".git/cleanup-wt/finalize-BOARD-904-control.json")
+        journal = Path(self.repo, ".factory-state/cleanup-wt/control/finalize-BOARD-904.json")
         journal.parent.mkdir(parents=True, exist_ok=True)
         journal.write_text('{"path":"wrong"}')
         code, out, err = self.finalize_confirmed()
@@ -235,7 +235,7 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(self.board_cells()[3], "Pending Merge")
 
     def test_incomplete_journal_never_publishes_or_merges_and_retry_works(self):
-        journal = Path(self.repo, ".git/cleanup-wt/finalize-BOARD-904-control.json")
+        journal = Path(self.repo, ".factory-state/cleanup-wt/control/finalize-BOARD-904.json")
         for operation in ("fsync", "link"):
             with self.subTest(operation=operation):
                 with patch.object(worktree.os, operation, side_effect=OSError("injected failure")):

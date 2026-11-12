@@ -19,7 +19,7 @@ Repos | Branch/Worktree | Notes. `Repos` holds the repo ids from
 column into an existing table without a hand edit; it is the only way the table
 changes shape.
 
-The SQLite database lives in Git's common directory, shared across worktrees.
+The SQLite database lives in the primary checkout's `.factory-state`, shared across worktrees.
 On first initialization it imports the main checkout's legacy Markdown once.
 The existing table parser and cell API remain available for lifecycle callers.
 Writes merge disjoint cell edits under a SQLite transaction and refuse conflicts.
@@ -149,15 +149,17 @@ def cmd_pre_merge_check(root):
 
 
 def database_path(root):
-    result = subprocess.run(["git", "-C", root, "rev-parse", "--git-common-dir"],
-                            capture_output=True, text=True, timeout=10)
-    if result.returncode:
-        raise OSError("cannot locate Git common directory for %s: %s" % (root, result.stderr.strip()))
-    return os.path.join(os.path.abspath(os.path.join(root, result.stdout.strip())), DATABASE_NAME)
+    state_file = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                              "../../runtime-state/scripts/state.py"))
+    spec = importlib.util.spec_from_file_location("factory_runtime_state", state_file)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return os.path.join(module.state_root(root), DATABASE_NAME)
 
 
 @contextlib.contextmanager
 def connect(path):
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     connection = sqlite3.connect(path, timeout=10, isolation_level=None)
     try:
         connection.execute("PRAGMA busy_timeout=10000")
@@ -763,7 +765,7 @@ def main(argv):
     p.add_argument("id")
 
     sub.add_parser("lanes", help="count rows per status lane")
-    sub.add_parser("export", help="write a Markdown snapshot to the Git common directory")
+    sub.add_parser("export", help="write a Markdown snapshot to .factory-state")
     sub.add_parser("pre-merge-check", help="verify and back up the legacy board before its one-time merge")
 
     args = parser.parse_args(argv)

@@ -10,7 +10,7 @@ Every change in this factory happens in an isolated git worktree. The worktree c
 
 This is **CLI only**: plain `git`, no extension, no `gh`, no browser, no pull requests.
 
-The live board is local SQLite under the Git common directory, shared by all worktrees. Only the
+The live board is local SQLite under `<primary-checkout>/.factory-state/`, shared by all worktrees. Only the
 orchestrator updates rows through `board.py`; `docs/BOARD.md` is a legacy import source and
 Markdown exports are generated snapshots. The human-only finalize command owns merge cleanup.
 
@@ -150,7 +150,7 @@ many commits the base does not have, how many files are dirty, and exactly what 
 It then refuses with the command that acts. No file is written and nothing is deleted.
 
 **Step two — `--force --yes`** acts: it removes the worktree and deletes the branch. Before it
-destroys anything it writes a recovery copy under `<git-common-dir>/cleanup-wt/`:
+destroys anything it writes a recovery copy under `.factory-state/cleanup-wt/<repo-id>/`:
 
 | File | What it holds |
 |---|---|
@@ -160,7 +160,7 @@ destroys anything it writes a recovery copy under `<git-common-dir>/cleanup-wt/`
 Both paths are printed. To restore:
 
 ```bash
-git apply <git-common-dir>/cleanup-wt/<timestamp>.patch     # the uncommitted changes
+git apply <primary-checkout>/.factory-state/cleanup-wt/<repo-id>/<timestamp>.patch     # the uncommitted changes
 git branch <branch> <sha>                                    # the commits, from the TSV
 ```
 
@@ -462,7 +462,7 @@ it is not an OS security boundary. Conflicts are reported per path and resolved 
 worktree before re-review; an initiated merge is aborted on failure when safe.
 After confirmation it holds the SQLite writer lock across row validation, merge, teardown
 and the final board update. Other board writers may wait or time out during integration.
-Before merge/teardown it publishes a complete synced recovery record in the Git common directory
+Before merge/teardown it publishes a complete synced recovery record in `.factory-state/cleanup-wt/<repo-id>/`
 without replacing an existing record; an interrupted temp write cannot poison the final path.
 If cleanup stops after removing the worktree or branch, rerun the same human-only command
 from the base checkout: the record proves the integrated tip and the board row is completed
@@ -491,25 +491,20 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD
 The configured base is `opencode` for factory tasks; project repositories use their own
 configured base. A separately approved feature branch may be the target for a larger feature.
 
-**One-time bootstrap handoff:** before this branch is integrated, the main checkout still has
-the old `worktree.py`; do not use its relative script path for `finalize`. After review and
-human approval, stop board writers and run the following **in this bootstrap worktree, before
-integration**, while the main checkout still has its legacy `docs/BOARD.md`:
+**Runtime-state migration:** after reviewing the migration implementation, stop board writers and
+run these commands from the primary control checkout. Dry-run first; apply copies and verifies
+state without deleting the original Git-metadata sources. Do not run handoff until the state store
+is bootstrapped:
 
 ```bash
-python3 .opencode/skills/board/scripts/board.py pre-merge-check
-python3 .opencode/skills/board/scripts/board.py export
+python3 .opencode/skills/runtime-state/scripts/state.py migrate
+python3 .opencode/skills/runtime-state/scripts/state.py migrate --apply
 ```
 
-The first command initializes a missing local SQLite database from the main checkout's legacy
-board and checks the imported bytes against the source. It refuses missing/malformed or changed
-source, and prints the database, byte-exact backup and current readable export paths under the Git
-common directory. The second command refreshes and prints that export path. Confirm both succeed,
-then review the handoff and run the **absolute `finalize` command printed by**
-`worktree.py handoff --board BOARD-124` from the clean `opencode` base checkout in a real TTY.
-The printed command uses this bootstrap worktree's script, not the base checkout's old relative
-script. Do not restore rows from Git history in a fresh clone. This bootstrap exception does not
-apply to later tasks.
+The migration refuses non-identical destinations, verifies exact existing destinations
+idempotently, and leaves every source untouched. Do not restore rows from Git history in a fresh
+clone. A new clone without legacy local state starts with no runtime board; the board's normal
+initialization rules govern it.
 
 ---
 
@@ -534,7 +529,7 @@ row, so it touches nothing on the board. A refused cleanup changes nothing on th
 lane stays as it was and the cell keeps pointing at the live worktree.
 
 The script refuses when the branch has commits not reachable from the base, or when the worktree
-is dirty. It writes a recovery record to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before
+is dirty. It writes a recovery record to `<primary-checkout>/.factory-state/cleanup-wt/<repo-id>/<timestamp>.tsv` before
 acting. It removes the env copies from the worktree first. **Never delete a worktree holding
 unmerged work.**
 

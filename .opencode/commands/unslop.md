@@ -37,7 +37,7 @@ cannot leave `In Review` until the audit is recorded (`AGENTS.md` §B4.2).
    times.
 6. **Check.** Run the checklist at the end of the skill file, render again, and compare against
    the audit list. Anything still on the list gets fixed.
- 7. **Record the audit** in `<git-common-dir>/reviews/<task-id>-unslop.md`: the direction, the sign-group
+ 7. **Record the audit** in `<primary-checkout>/.factory-state/reviews/<task-id>-unslop.md`: the direction, the sign-group
    audit, a line per pass, the checklist result, and a PASS/FAIL verdict. A row with no recorded
    audit stays `In Review`.
 8. **File the findings.** Write each finding as expected-vs-actual with the screenshot or

@@ -28,7 +28,7 @@ and follow §B4.2 and `.opencode/skills/qa-review/SKILL.md` for built-in-browser
 
 A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
 
-The state of each round lives in `<git-common-dir>/reviews/<task-id>-ledger.md` —
+The state of each round lives in `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` —
 the round number, findings, corrections in the same worktree and stop reason.
 
 The ledger is the **only** thing carried between rounds. If this is not your first round on the
@@ -142,7 +142,7 @@ to a different tool unless the user says so. A missing browser, package, or syst
 
 ## Submit your review
 
-Write it to `<git-common-dir>/reviews/<task-id>-ui.md` outside the task worktree:
+Write it to `<primary-checkout>/.factory-state/reviews/<task-id>-ui.md` outside the task worktree:
 
     # UI/UX review — <task-id> <task name>
     **Reviewed commit:** <sha>   **Verdict:** PASS | FAIL

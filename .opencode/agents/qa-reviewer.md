@@ -29,7 +29,7 @@ assigned test-tool work, not UI verification/review. Repository rules and approv
 
 A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
 
-The state of each round lives in `<git-common-dir>/reviews/<task-id>-ledger.md` —
+The state of each round lives in `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` —
 the round number, findings, corrections in the existing worktree and stop reason.
 
 The ledger is the **only** thing carried between rounds. If this is not your first round on the
@@ -142,7 +142,7 @@ fake a review.
 
 ## Submit your review
 
-Write the review to `<git-common-dir>/reviews/<task-id>-qa.md` outside the task worktree:
+Write the review to `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md` outside the task worktree:
 
     # QA review — <task-id> <task name>
     **Reviewed commit:** <sha>   **Verdict:** PASS | FAIL

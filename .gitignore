@@ -2,8 +2,9 @@
 # The factory never tracks it. See AGENTS.md §"The factory and the project".
 /project/
 
-# Legacy board is retained for first import; SQLite and its export live in Git's common directory.
+# The legacy board remains tracked as the first-import source; clone-local runtime state is not.
 /docs/BOARD.md
+.factory-state/
 
 # Agent worktrees: one per board row, created by .opencode/skills/git-worktree/scripts/worktree.py
 .opencode/worktrees/

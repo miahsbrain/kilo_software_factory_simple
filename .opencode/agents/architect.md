@@ -32,10 +32,10 @@ Read `docs/PROJECT_STRUCTURE.md` before choosing paths, then the documented boot
 Get approval for implementation decisions before delegating. Delegate implementation to the
 six specialist agents; never implement application code yourself. Pass approved decisions,
 workspace boundaries, exact starting files, acceptance criteria and verification limits.
-The live board is local SQLite in the Git common directory, shared across task worktrees. Only
+The live board is local SQLite under `<primary-checkout>/.factory-state/`, shared across task worktrees. Only
 the orchestrator edits rows through `board.py`; Markdown is a generated export. Review findings
 return to the original builder in the same worktree, not automatic Fix rows. Review reports and
-ledger live under `<git-common-dir>/reviews/`, outside the task branch. Agents never merge or
+ledger live under `<primary-checkout>/.factory-state/reviews/`, outside the task branch. Agents never merge or
 invoke `finalize`; only the human runs it in a real TTY with typed board/base/branch/tip confirmation.
 
 Review evidence and the diff before

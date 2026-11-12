@@ -1,5 +1,13 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-148 clone-local state migration tooling (2026-11-12)
+
+- Runtime state resolution, migration CLI, and consumer-path updates are in progress in
+  `.opencode/worktrees/move-clone-local-state-out-of-git-metadata`. No live state was read,
+  copied, initialized, or migrated. No board row was edited from this task worktree.
+- Next: finish focused verification and review, commit locally, then architect reviews and runs
+  the explicitly approved migration dry-run/apply from the primary checkout.
+
 ## Current session — BOARD-131 factory backlog plan reviewed (2026-11-12)
 
 - The approved factory scope is a read-only board/worktree/branch dashboard, SQLite as the task
