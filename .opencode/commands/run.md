@@ -31,10 +31,12 @@ references under `AGENTS.md` §A7, and report skills used or that none matched.
    - UI artifacts land in the one canonical folder at the repository root:
      `artifacts/<scope>/qa/<date>/<task-id>/`. Record route, viewport, theme, steps, expected and
      observed results; transfer browser captures using server-local paths, not desktop paths.
-       Review reports and ledger stay under `<primary-checkout>/.factory-state/reviews/`, outside task worktrees.
-   - A row goes through at most **3** QA↔fix rounds. Round 3 is the last. Each round's review is
-       done by a fresh reviewer that reads `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and current
-     screenshots, not the previous reviewer's reasoning. The ledger script opens and closes rounds:
+    Review reports and ledger stay under `<primary-checkout>/.factory-state/reviews/`, outside task worktrees.
+    - A row may go through at most 10 QA↔fix rounds. Round 10 is the last. If it still fails, move
+      the row to `Blocked` with what was tried and the question for the human; do not open an
+      eleventh round. Each round's review is done by a fresh reviewer that reads
+      `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and current screenshots, not
+      the previous reviewer's reasoning. The ledger script opens and closes rounds:
      `python3 .opencode/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005`.
     - Findings are deduplicated by fingerprint (`kind|category|route|subject`). Record them in
       the ledger and original row notes. Reuse the same builder and worktree; never open an

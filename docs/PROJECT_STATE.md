@@ -1,15 +1,24 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-148 clone-local state migration tooling (2026-11-12)
+## Current session — BOARD-145 QA↔fix cap update (2026-11-12)
 
-- BOARD-148 is in `.opencode/worktrees/move-clone-local-state-out-of-git-metadata` on
-  `chore/move-clone-local-state-out-of-git-metadata`. The verified snapshot is installed at
-  `.factory-state/`; the original `.git/` state remains untouched, and cleanup was not approved
-  or performed. `state.py path` and `board.py show` resolve to the new state.
-- Verification: runtime-state suite passed 13 tests; board suite passed 35; handoff suite passed
-  34 (run by the user after the final fixture correction). Independent QA returned PASS, and all
-  four acceptance proofs are recorded on BOARD-148. Next: the human inspects and finalizes the
-  branch after the guarded handoff.
+- Approved policy and ledger cap is 10 rounds. Round 10 is last; a still-failing row moves to
+  `Blocked` with what was tried and the question for the human. Critical-path failures, repeated
+  fingerprints, and human stop remain immediate block conditions.
+- The ledger boundary tests and policy/docs updates are in
+  `.opencode/worktrees/raise-qa-review-loop-limit-to-ten` on
+  `chore/raise-qa-review-loop-limit-to-ten`. BOARD-130 remains historically Blocked at three
+  rounds and was not reopened or edited. The specified ledger test passed (4 tests). Next: commit
+  and return the handoff for human review. BOARD-148 remains integrated: runtime state is in
+  `.factory-state/`, with the original `.git/` state untouched and cleanup not approved or performed.
+
+## Previous session — BOARD-148 clone-local state migration (2026-11-12)
+
+- The verified snapshot is installed at `.factory-state/`; `state.py path` and `board.py show`
+  resolve to it. The original `.git/` state remains untouched; cleanup was not approved or performed.
+- Runtime-state tests passed 13, board tests 35, and the user-run handoff suite passed 34 after
+  the final fixture correction. Independent QA returned PASS; all four acceptance proofs are on
+  BOARD-148. The human owns the guarded handoff and any cleanup decision.
 
 ## Current session — BOARD-131 factory backlog plan reviewed (2026-11-12)
 

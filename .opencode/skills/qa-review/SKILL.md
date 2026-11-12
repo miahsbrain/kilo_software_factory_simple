@@ -229,7 +229,8 @@ defect may be scoped as a separate task.
 
 ## 6a. The bounded loop: rounds and the ledger
 
-A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
+A row may go through at most 10 QA↔fix rounds. Round 10 is the last. If it still fails, move the
+row to `Blocked` with what was tried and the question for the human; do not open an eleventh round.
 
 Each round's state lives in `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`. It holds the round
 number, findings, same-worktree corrections and stop reason.
@@ -247,13 +248,13 @@ python3 .opencode/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-00
 python3 .opencode/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
 ```
 
-`next-round` refuses to open round 4.
+`next-round` refuses to open round 11.
 
 **Stop conditions** — the loop stops at whichever comes first:
 
 | Stop condition | What happens |
 |---|---|
-| Round cap reached (3 rounds, row still failing) | Row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round. |
+| Round cap reached (10 rounds, row still failing) | Row moves to `Blocked` with what was tried and the question for the human. No eleventh round. |
 | A critical path is red (money, data loss, auth, security) | Row is `Blocked` immediately. Never retried silently. |
 | The same fingerprint is filed twice | The original row is escalated to `Blocked`; no new row opens. |
 | The human says stop | Row is `Blocked` with the reason recorded in the ledger's stop reason. |

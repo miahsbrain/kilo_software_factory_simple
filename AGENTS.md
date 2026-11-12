@@ -494,7 +494,7 @@ Three rules. They apply to the architect and to every builder.
    Changing the thing you are measuring invalidates the measurement and sends you back to the
    start.
 
-The same three rules govern the **QA↔fix loop** for a row: the loop is capped at 3 rounds, a
+The same three rules govern the **QA↔fix loop** for a row: the loop is capped at 10 rounds, a
 repeat finding blocks the original row instead of opening another, and the ledger under
 `<primary-checkout>/.factory-state/reviews/` is the only state carried between rounds.
 
@@ -1096,9 +1096,9 @@ met**, proven by evidence. The lanes repeat until then.
    behavior must pass on the same branch before `Pending Merge`.
 3. **Separate approved defects are separate tasks.** Only a genuinely independent defect with
    its own decision and acceptance criteria gets a new Fix row and worktree.
-4. **The loop is bounded at 3 rounds.** A row gets at most three QA↔fix rounds. When the third
-   round still fails, the row moves to `Blocked` with what was tried and the question the human
-   needs to answer. There is no fourth round.
+4. **The loop is bounded at 10 rounds.** A row may go through at most 10 QA↔fix rounds. Round 10
+   is the last. If it still fails, move the row to `Blocked` with what was tried and the question
+   for the human; do not open an eleventh round.
 5. **A repeat finding is not a new task.** A repeated fingerprint blocks the original row;
    do not create another row for the same complaint.
 6. **A red critical path is an immediate `Blocked` row.** Money, data loss, auth, and security
@@ -1129,9 +1129,9 @@ python3 .opencode/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 A QA finding can come back, get fixed, and come back again. The loop is bounded by a **round cap**
 and a **ledger**, and duplicate findings are recognised by a **fingerprint**.
 
-**The round cap.** A row may go through **at most 3** QA↔fix rounds. Round 3 is the last. When the
-cap is reached and the row still fails, the row moves to `Blocked` with a summary of what was
-tried and the question the human needs to answer. A fourth round is never opened.
+**The round cap.** A row may go through at most 10 QA↔fix rounds. Round 10 is the last. If it
+still fails, move the row to `Blocked` with what was tried and the question for the human; do not
+open an eleventh round.
 
 **The ledger.** Each round's state lives in one short file per row:
 `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`. It holds the round number, findings,
@@ -1151,7 +1151,7 @@ python3 .opencode/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-00
 python3 .opencode/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
 ```
 
-`next-round` refuses to open round 4. That refusal is the cap.
+`next-round` refuses to open round 11. That refusal is the cap.
 
 **The fingerprint.** A finding gets a deterministic fingerprint derived from what it is about —
 `kind|category|route|subject` — so the same complaint about the same thing produces the same
@@ -1172,7 +1172,7 @@ remains for independently approved defects, not in-task review corrections.
 
 | Stop condition | What happens |
 |---|---|
-| **The round cap is reached** (3 rounds done, row still failing) | The row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round is opened. |
+| **The round cap is reached** (10 rounds done, row still failing) | The row moves to `Blocked` with what was tried and the question for the human. No eleventh round is opened. |
 | **A critical path is red** (money, data loss, auth, security) | The row is `Blocked` immediately. It is never retried silently. |
 | **The same fingerprint is filed twice** | The original task is escalated to `Blocked` rather than a new one opening. |
 | **The human says stop** | The row is `Blocked` with the human's reason recorded in the ledger's stop reason. |

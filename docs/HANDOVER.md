@@ -1,13 +1,32 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-148 runtime state migration applied, 2026-11-12**
+> **Session Notes — BOARD-145 QA↔fix round cap, 2026-11-12**
+> Raised the new QA↔fix loop cap to 10. The ledger opens round 10 and refuses round 11;
+> focused boundary tests use a temporary ledger directory. Critical-path, repeated-fingerprint,
+> and human-stop conditions still block immediately. BOARD-130 remains Blocked at its historical
+> three-round cap; no historical review records changed. Work is in `.opencode/worktrees/raise-qa-review-loop-limit-to-ten`
+> on `chore/raise-qa-review-loop-limit-to-ten`. The specified ledger test passed (4 tests).
+> The approved 10-round cap is retained after rebase; BOARD-148's `.factory-state/` runtime state
+> and migration remain unchanged. Next: human review of the rebased commit.
+
+> **Earlier session — BOARD-148 runtime state migration applied, 2026-11-12**
 > The verified snapshot is installed at `.factory-state/`; the original `.git/` state remains
 > untouched and cleanup was not approved or performed. `state.py path` resolves to the new store,
 > and `board.py show` reads the migrated board. Runtime-state tests passed 13/13, board tests 35/35,
 > and the user-run handoff suite passed 34/34 after the final fixture correction. Independent QA
-> returned PASS, and all four acceptance proofs are recorded on BOARD-148. Next: the human inspects
-> and finalizes the branch after the guarded handoff. No cleanup of the original `.git/` state was
-> approved or performed.
+> returned PASS, and all four acceptance proofs are recorded on BOARD-148. No cleanup of the
+> original `.git/` state was approved or performed.
+
+> **Session Notes — BOARD-131 plan reviewed, 2026-11-12**
+> `docs/FACTORY_ROADMAP.md` now records the approved scope and 13 granular SQLite backlog rows.
+> The live board is clone-local SQLite; the dashboard is read-only and shows lanes, branches and
+> worktrees. BOARD-130 remains Blocked after its three-round cap; its task-local artifact change is
+> not integrated. The docs-only review found no blocking issue; the handover conflict markers are
+> tracked as BOARD-144, blocked by BOARD-130. Plan commit `3d0cecc` is on the task branch.
+> `git diff --check` passed. Next: confirm a clean handoff state, then request human inspection.
+> The factory-dev role was approved in principle; exact rules and permission entry remain pending
+> A9 approval. `docs/HANDOVER.md` still has conflict markers in its Testing section; BOARD-144 is
+> blocked by BOARD-130 until artifact guidance can be reconciled.
 
 > **Session Notes — BOARD-126 ready for human inspection, 2026-11-12**
 > Registered repositories appear in the read-only feeds. `/api/repo-candidates` lists
@@ -734,16 +753,13 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 
 ## 10. Testing
 
-<<<<<<< HEAD
-Verification uses focused script tests. The verification of a change is the smallest relevant script run, recorded with
-=======
 UI verification/review uses only OpenCode's built-in browser (§B4.2, QA skill). Browser evidence
 stays under `artifacts/<scope>/qa/<date>/<task-id>/` with route, viewport, theme, steps, expected
 and observed results. Screenshot/`files.get` paths are server-local; desktop file IDs require
 transfer. Unavailable browser access or measurements hold criteria, with no fallback or pass claim.
 
-No test suite. The verification of a change is the smallest relevant script run, recorded with
->>>>>>> docs/require-catalog-skills-and-browser-ui-reviews
+Focused script tests are the available verification; there is no general test suite. Each change
+uses the smallest relevant script run, recorded with
 its result and a `file:line` proof (AGENTS.md §B4 "Verification cost rule"). The dev container
 ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup file.
 

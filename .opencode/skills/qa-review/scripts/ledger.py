@@ -4,7 +4,7 @@
 One short file per row in the primary checkout's `.factory-state/reviews/` carries
 the round number, findings, corrections in the same worktree and stop reason.
 
-A row may go through at most 3 rounds. `next-round` refuses to open round 4;
+A row may go through at most 10 rounds. `next-round` refuses to open round 11;
 the row moves to Blocked instead.
 
 Usage:
@@ -24,7 +24,7 @@ import os
 import re
 import sys
 
-MAX_ROUNDS = 3
+MAX_ROUNDS = 10
 FIELDS = ("Findings", "Corrections", "Stop reason")
 LEGACY_FIELDS = ("Fix rows", "Fix rows merged")
 ROUND_RE = re.compile(r"^## Round (\d+)\s*$")
@@ -125,8 +125,8 @@ def cmd_next_round(args):
     if len(rounds) >= MAX_ROUNDS:
         print("refused: the round cap of %d is reached for %s" % (MAX_ROUNDS, args.task_id),
               file=sys.stderr)
-        print("move the row to Blocked with a summary of what was tried and the question "
-              "the human has to answer", file=sys.stderr)
+        print("move the row to Blocked with what was tried and the question for the human; "
+              "do not open an eleventh round", file=sys.stderr)
         return REFUSED
     number = len(rounds) + 1
     rounds.append({"number": number, "fields": {field: "-" for field in FIELDS}})
