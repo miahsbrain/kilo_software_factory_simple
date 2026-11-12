@@ -31,6 +31,13 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Why:** Keep reports/evidence with task artifacts while reserving `.factory-state/reviews/` for bounded-loop ledgers.
 **Impact:** New report paths and role-specific file-tool permissions; shell remains trusted-agent authority. Ledger location, 10-round cap and stop conditions remain unchanged. Historical reports remain untouched.
 
+## [2026-11-12] Normalize planned and active board storage
+**Type:** Feature
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board.py`, normalized migration tests, board architecture/decision/stack/handover/business-logic/project-state documentation.
+**Why:** Separate planned queue, active work, criteria and terminal history while retaining existing board CLI behavior.
+**Impact:** Explicit `migrate-normalized` dry-run and `--apply` migration added. Applying creates a consistent backup through a separate read-only connection while holding the writer lock, verifies snapshot content/revision, then migrates transactionally. No live database was migrated; no planning lifecycle commands or endpoint added.
+
 ## [2026-11-12] Correct ledger invalid-ID test mock
 **Type:** Fix
 **Board:** BOARD-145 | **Branch:** chore/raise-qa-review-loop-limit-to-ten

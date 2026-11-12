@@ -35,6 +35,7 @@ Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 import argparse
 import contextlib
 import importlib.util
+import json
 import os
 import re
 import sqlite3
@@ -60,6 +61,7 @@ COLUMN_FOR_FIELD = {"risk": "Risk", "priority": "Priority", "blocked-by": "Block
                     "repos": "Repos", "branch-worktree": "Branch/Worktree", "notes": "Notes"}
 OPEN_STATUSES = ("Backlog", "Ready", "In Progress", "In Review", "Pending Merge", "Blocked")
 FINGERPRINT_PREFIX = "fp="
+NORMALIZED_TABLES = ("planned_items", "acceptance_criteria", "active_work")
 
 OK = 0
 REFUSED = 1
@@ -169,6 +171,7 @@ def connect(path):
     connection = sqlite3.connect(path, timeout=10, isolation_level=None)
     try:
         connection.execute("PRAGMA busy_timeout=10000")
+        connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA journal_mode=WAL")
         yield connection
         if connection.in_transaction:
@@ -179,6 +182,247 @@ def connect(path):
         raise
     finally:
         connection.close()
+
+
+def normalized_schema(connection):
+    statements = ("""CREATE TABLE IF NOT EXISTS planned_items (
+            id TEXT PRIMARY KEY,
+            task TEXT NOT NULL,
+            type TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            risk TEXT NOT NULL,
+            blocked_by TEXT NOT NULL,
+            repos TEXT NOT NULL,
+            notes TEXT NOT NULL,
+            user_story TEXT,
+            queue_position INTEGER UNIQUE,
+            terminal_outcome TEXT CHECK (terminal_outcome IN ('completed', 'cancelled')),
+            display_position INTEGER NOT NULL UNIQUE
+        )""", """CREATE TABLE IF NOT EXISTS acceptance_criteria (
+            plan_item_id TEXT NOT NULL REFERENCES planned_items(id) ON DELETE CASCADE,
+            position INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            verified INTEGER NOT NULL DEFAULT 0 CHECK (verified IN (0, 1)),
+            proof TEXT,
+            PRIMARY KEY (plan_item_id, position)
+        )""", """CREATE TABLE IF NOT EXISTS active_work (
+            plan_item_id TEXT PRIMARY KEY REFERENCES planned_items(id) ON DELETE CASCADE,
+            status TEXT NOT NULL CHECK (status IN ('Ready', 'In Progress', 'In Review', 'Pending Merge', 'Blocked')),
+            branch_worktree TEXT
+        )""")
+    for statement in statements:
+        connection.execute(statement)
+
+
+def normalized_enabled(connection):
+    tables = {row[0] for row in connection.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+    return all(name in tables for name in NORMALIZED_TABLES)
+
+
+def normalized_markdown(connection, markdown):
+    parsed, error = parse_table(markdown)
+    if parsed is None:
+        raise ValueError(error)
+    headers = [cell.strip() for cell in header_cells(parsed)]
+    rows = connection.execute("""SELECT p.id, p.task, p.type, p.priority, p.risk,
+        p.blocked_by, p.repos, p.notes, p.display_position, p.queue_position,
+        p.terminal_outcome, a.status, a.branch_worktree
+        FROM planned_items p LEFT JOIN active_work a ON a.plan_item_id=p.id
+        ORDER BY p.display_position""").fetchall()
+    table_rows = []
+    for row in rows:
+        (board_id, task, item_type, priority, risk, blocked_by, repos, notes, _display,
+         queue_position, terminal, active_status, branch) = row
+        status = active_status or ("Backlog" if queue_position is not None else
+                                   "Merged" if terminal == "completed" else
+                                   "Dropped" if terminal == "cancelled" else None)
+        if status is None:
+            raise ValueError("planned item %s has no lifecycle reference" % board_id)
+        fields = {"ID": board_id, "Task": task, "Type": item_type, "Status": status,
+                  "Priority": priority, "Risk": risk, "Blocked by": blocked_by,
+                  "Repos": repos, "Branch/Worktree": branch or "-", "Notes": notes}
+        table_rows.append("| " + " | ".join(fields.get(header, "-").replace("|", "\\|")
+                                             for header in headers) + " |")
+    lines = list(parsed["lines"][:parsed["header"] + 2])
+    lines.extend(table_rows)
+    lines.extend(parsed["lines"][parsed["rows"][-1] + 1:] if parsed["rows"] else
+                 parsed["lines"][parsed["header"] + 2:])
+    return "\n".join(lines)
+
+
+def sync_normalized(connection, markdown):
+    parsed, error = parse_table(markdown)
+    if parsed is None:
+        raise ValueError(error)
+    headers = [cell.strip() for cell in header_cells(parsed)]
+    existing = {row[0]: row[0] for row in connection.execute("SELECT id FROM planned_items")}
+    queue_position = connection.execute(
+        "SELECT COALESCE(MAX(queue_position), -1)+1 FROM planned_items").fetchone()[0]
+    display_position = connection.execute(
+        "SELECT COALESCE(MAX(display_position), -1)+1 FROM planned_items").fetchone()[0]
+    seen = set()
+    for source_position, line_index in enumerate(parsed["rows"]):
+        values = dict(zip(headers, cell_texts(parsed["lines"], line_index)))
+        board_id = values.get("ID", "")
+        seen.add(board_id)
+        status = values.get("Status", "")
+        previous = connection.execute("SELECT display_position, queue_position FROM planned_items WHERE id=?",
+                                      (board_id,)).fetchone()
+        item_display = previous[0] if previous else display_position + source_position
+        if not previous:
+            display_position += 1
+        queue = previous[1] if previous else None
+        terminal = None
+        if status == "Backlog":
+            queue = queue if queue is not None else queue_position
+            if previous is None or previous[1] is None:
+                queue_position += 1
+        elif status == "Merged":
+            queue, terminal = None, "completed"
+        elif status == "Dropped":
+            queue, terminal = None, "cancelled"
+        else:
+            queue = None
+        connection.execute("""INSERT INTO planned_items
+            (id, task, type, priority, risk, blocked_by, repos, notes, display_position,
+             queue_position, terminal_outcome)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET task=excluded.task, type=excluded.type,
+            priority=excluded.priority, risk=excluded.risk, blocked_by=excluded.blocked_by,
+            repos=excluded.repos, notes=excluded.notes, queue_position=excluded.queue_position,
+            terminal_outcome=excluded.terminal_outcome""",
+                           (board_id, values.get("Task", ""), values.get("Type", ""),
+                            values.get("Priority", ""), values.get("Risk", ""),
+                            values.get("Blocked by", ""), values.get("Repos", ""),
+                            values.get("Notes", ""), item_display, queue, terminal))
+        connection.execute("DELETE FROM active_work WHERE plan_item_id=?", (board_id,))
+        if status in OPEN_STATUSES[1:]:
+            branch = values.get("Branch/Worktree", "-")
+            connection.execute("INSERT INTO active_work VALUES (?, ?, ?)",
+                               (board_id, status, None if branch == "-" else branch))
+        connection.execute("DELETE FROM acceptance_criteria WHERE plan_item_id=?", (board_id,))
+        for position, (text, verified, proof) in enumerate(criteria_from_notes(values.get("Notes", ""))):
+            connection.execute("INSERT INTO acceptance_criteria VALUES (?, ?, ?, ?, ?)",
+                               (board_id, position, text, int(verified), proof))
+    for board_id in existing.keys() - seen:
+        connection.execute("DELETE FROM planned_items WHERE id=?", (board_id,))
+
+
+def criteria_from_notes(notes):
+    """Extract explicit Markdown checklist entries and their immediately-following proof lines."""
+    items = []
+    lines = (notes or "").splitlines()
+    for index, line in enumerate(lines):
+        match = re.match(r"^\s*[-*]\s+\[([ xX])\]\s+(.+?)\s*$", line)
+        if not match:
+            continue
+        proof = None
+        text = match.group(2)
+        inline_proof = re.match(r"^(.*?)\s*;\s*Proof:\s*(.+?)\s*$", text, re.IGNORECASE)
+        if inline_proof:
+            text, proof = inline_proof.groups()
+        if index + 1 < len(lines):
+            proof_match = re.match(r"^\s{2,}(?:[-*]\s+)?Proof:\s*(.+?)\s*$",
+                                   lines[index + 1], re.IGNORECASE)
+            if proof_match and proof is None:
+                proof = proof_match.group(1)
+        items.append((text, match.group(1).strip().lower() == "x", proof))
+    return items
+
+
+def migrate_normalized(path, apply=False):
+    """Explicitly normalize the imported Markdown snapshot; dry-run does not write."""
+    if apply:
+        connection_context = connect(path)
+    else:
+        connection_context = contextlib.closing(sqlite3.connect(
+            "file:" + os.path.abspath(path) + "?mode=ro", uri=True))
+    with connection_context as connection:
+        if apply:
+            connection.execute("BEGIN IMMEDIATE")
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='board'").fetchone() is None:
+            raise ValueError("legacy board snapshot is missing")
+        if normalized_enabled(connection):
+            raise ValueError("normalized board schema already exists; refusing repeat migration")
+        row = connection.execute("SELECT markdown, revision FROM board WHERE id=1").fetchone()
+        if row is None:
+            raise ValueError("legacy board snapshot is missing")
+        parsed, error = parse_table(row[0], path)
+        if parsed is None:
+            raise ValueError(error)
+        records = []
+        headers = [cell.strip() for cell in header_cells(parsed)]
+        for position, line_index in enumerate(parsed["rows"]):
+            cells = cell_texts(parsed["lines"], line_index)
+            values = dict(zip(headers, cells))
+            status = values.get("Status", "")
+            if status not in STATUSES:
+                raise ValueError("unsupported legacy status %r for %s" % (status, values.get("ID")))
+            records.append((values, status, position))
+        if not apply:
+            return {"items": len(records), "queued": sum(s == "Backlog" for _, s, _ in records),
+                    "active": sum(s in OPEN_STATUSES[1:] for _, s, _ in records),
+                    "completed": sum(s == "Merged" for _, s, _ in records),
+                    "cancelled": sum(s == "Dropped" for _, s, _ in records)}
+
+        backup_path = path + ".pre-normalized.bak"
+        if os.path.exists(backup_path):
+            raise ValueError("migration backup already exists; refusing to overwrite it")
+        backup = sqlite3.connect(backup_path)
+        try:
+            source = sqlite3.connect(
+                "file:" + os.path.abspath(path) + "?mode=ro", uri=True)
+            try:
+                source.backup(backup)
+            finally:
+                source.close()
+            result = backup.execute("PRAGMA integrity_check").fetchone()[0]
+            if result != "ok":
+                raise sqlite3.DatabaseError("backup integrity check failed: %s" % result)
+            if backup.execute("SELECT markdown, revision FROM board WHERE id=1").fetchone() != row:
+                raise sqlite3.DatabaseError("backup does not match locked legacy snapshot")
+        except BaseException:
+            backup.close()
+            if os.path.exists(backup_path):
+                os.unlink(backup_path)
+            raise
+        else:
+            backup.close()
+
+        normalized_schema(connection)
+        queue_position = 0
+        for values, status, source_position in records:
+            board_id = values.get("ID", "")
+            branch = values.get("Branch/Worktree", "-")
+            item_values = (board_id, values.get("Task", ""), values.get("Type", ""),
+                           values.get("Priority", ""), values.get("Risk", ""),
+                           values.get("Blocked by", ""), values.get("Repos", ""),
+                           values.get("Notes", ""), source_position)
+            queued_at = queue_position if status == "Backlog" else None
+            if queued_at is not None:
+                queue_position += 1
+            terminal = "completed" if status == "Merged" else "cancelled" if status == "Dropped" else None
+            connection.execute("""INSERT INTO planned_items
+                (id, task, type, priority, risk, blocked_by, repos, notes, display_position,
+                 user_story, queue_position, terminal_outcome)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)""",
+                               item_values[:8] + (item_values[8], queued_at, terminal))
+            if status in OPEN_STATUSES[1:]:
+                connection.execute("INSERT INTO active_work VALUES (?, ?, ?)",
+                                   (board_id, status, None if branch == "-" else branch))
+            for criterion_position, (text, verified, proof) in enumerate(
+                    criteria_from_notes(values.get("Notes", ""))):
+                connection.execute("""INSERT INTO acceptance_criteria
+                    (plan_item_id, position, text, verified, proof) VALUES (?, ?, ?, ?, ?)""",
+                                   (board_id, criterion_position, text, int(verified), proof))
+        connection.execute("UPDATE board SET revision=revision+1 WHERE id=1")
+        connection.commit()
+        return {"items": len(records), "queued": sum(s == "Backlog" for _, s, _ in records),
+                "active": sum(s in OPEN_STATUSES[1:] for _, s, _ in records),
+                "completed": sum(s == "Merged" for _, s, _ in records),
+                "cancelled": sum(s == "Dropped" for _, s, _ in records),
+                "backup": backup_path}
 
 
 def live_database(path):
@@ -204,6 +448,8 @@ def read_table(path):
             with connect(db) as connection:
                 content, revision = connection.execute(
                     "SELECT markdown, revision FROM board WHERE id = 1").fetchone()
+                if normalized_enabled(connection):
+                    content = normalized_markdown(connection, content)
             if not hasattr(_snapshots, "values"):
                 _snapshots.values = {}
             _snapshots.values[db] = (content, revision)
@@ -334,7 +580,11 @@ def write_atomic(path, lines):
             connection.execute("BEGIN IMMEDIATE")
             latest, revision = connection.execute(
                 "SELECT markdown, revision FROM board WHERE id = 1").fetchone()
+            if normalized_enabled(connection):
+                latest = normalized_markdown(connection, latest)
             merged = merge_board_changes(baseline, proposed, latest)
+            if normalized_enabled(connection):
+                sync_normalized(connection, merged)
             connection.execute("UPDATE board SET markdown = ?, revision = ? WHERE id = 1",
                                (merged, revision + 1))
         return
@@ -770,6 +1020,9 @@ def main(argv):
     p = sub.add_parser("remove", help="remove a row")
     p.add_argument("id")
 
+    p = sub.add_parser("migrate-normalized", help="preview or apply the normalized-board migration")
+    p.add_argument("--apply", action="store_true", help="create a consistent backup and migrate")
+
     sub.add_parser("lanes", help="count rows per status lane")
     sub.add_parser("export", help="write a Markdown snapshot to .factory-state")
     sub.add_parser("pre-merge-check", help="verify and back up the legacy board before its one-time merge")
@@ -783,6 +1036,15 @@ def main(argv):
         return REFUSED
     if args.command == "pre-merge-check":
         return cmd_pre_merge_check(control_root(os.getcwd()))
+    if args.command == "migrate-normalized":
+        try:
+            path = database_path(control_root(os.getcwd()))
+            result = migrate_normalized(path, args.apply)
+            print(json.dumps(result, sort_keys=True))
+            return OK
+        except (OSError, ValueError, sqlite3.Error) as exc:
+            print("normalized migration refused: %s" % exc, file=sys.stderr)
+            return REFUSED
     try:
         path = args.file if args.file else initialize_board(control_root(os.getcwd()))
     except (OSError, UnicodeError, ValueError, sqlite3.Error) as exc:

@@ -1,6 +1,13 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-149 QA report artifacts (2026-11-12)
+## Current session — BOARD-146 rebase alignment (2026-11-12)
+
+- BOARD-146 normalized storage, compatibility CLI, explicit migration, checklist parsing and
+  cancellation history are retained. The user reports the board suite passed 42 tests in 3.139s;
+  it was not rerun for this alignment. Rebase onto current `opencode` is in progress. Do not run a
+  live migration or modify the live board.
+
+## Previous session — BOARD-149 QA report artifacts (2026-11-12)
 
 - New QA/UI reports and evidence use `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA owns
   `qa.md` and QA evidence, UI critique owns `ui.md`, and builders own `builder/`. The bounded-loop
@@ -10,7 +17,7 @@
   The docs-only follow-up passed architect review. Next: the user inspects the worktree and runs
   the human-only finalize command.
 
-## Previous session — BOARD-145 QA↔fix cap update (2026-11-12)
+## Earlier session — BOARD-145 QA↔fix cap update (2026-11-12)
 
 - Approved policy and ledger cap is 10 rounds. Round 10 is last; a still-failing row moves to
   `Blocked` with what was tried and the question for the human. Critical-path failures, repeated

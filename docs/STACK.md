@@ -43,6 +43,12 @@ python3 .opencode/skills/board/scripts/board.py show
 # Generate a readable Markdown snapshot in `.factory-state` (prints its path)
 python3 .opencode/skills/board/scripts/board.py export
 
+# Preview normalized board migration (read-only; default)
+python3 .opencode/skills/board/scripts/board.py migrate-normalized
+
+# Apply only after reviewing the preview; creates a consistent .pre-normalized.bak backup
+python3 .opencode/skills/board/scripts/board.py migrate-normalized --apply
+
 # Resolve the clone-local runtime-state path, or explicitly migrate old Git-metadata state.
 # Stop all legacy database writers first; migration snapshots DB/WAL/SHM read-only and never removes source.
 python3 .opencode/skills/runtime-state/scripts/state.py path
@@ -60,7 +66,7 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD
 # Board refresh regressions (temporary fixture trees, no live server)
 python3 .opencode/skills/board/scripts/test_board_serve.py
 
-# Board bootstrap/migration and viewer regressions (temporary repositories only)
+# Board bootstrap, normalized migration and viewer regressions (temporary repositories only)
 python3 -m unittest discover -s .opencode/skills/board/scripts -p 'test_board*.py'
 
 # Create the worktree for a board row

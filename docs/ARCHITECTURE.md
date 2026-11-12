@@ -32,6 +32,13 @@ needs. Every work surface must be registered before the factory reads its conten
   primary checkout. Only bounded-loop ledgers live in `.factory-state/reviews/`; update them through
   `ledger.py`. Cleanup recovery journals and backups live in `.factory-state/cleanup-wt/<repo-id>/`
   to keep repository identities separate.
+- Planned work, acceptance criteria, active work and terminal history are normalized in the same
+  SQLite database. `planned_items` is canonical; `active_work` contains only promoted, nonterminal
+  rows, and `acceptance_criteria` stores ordered checklist items and proof separately. Nullable
+  queue positions order backlog work; terminal outcomes retain completed/cancelled history.
+  Existing board CLI and worktree callers retain their Markdown-table interface as a compatibility
+  projection. The explicit `migrate-normalized` command previews by default and requires `--apply`
+  to back up and transactionally migrate the imported snapshot; it never runs at startup.
 - The explicit runtime-state migration command supports dry-run and `--apply`; all legacy database
   writers must be stopped first. It copies the database and WAL/SHM files read-only into private
   staging, checks source metadata and content before and after the copy, then backs up and verifies

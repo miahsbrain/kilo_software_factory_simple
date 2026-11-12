@@ -1,5 +1,12 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-146 normalized storage and rebase, 2026-11-12**
+> BOARD-146 adds normalized planned items, criteria, active work, and terminal history with an
+> explicit migration and compatibility CLI. Same-line checklists retain separate verification and
+> proof; `remove` cancels while retaining history. The user reports the suite passed 42 tests in
+> 3.139s; it was not rerun for this alignment. The branch is being rebased onto current `opencode`;
+> no live board or migration was run.
+
 > **Session Notes — BOARD-149 QA artifacts, 2026-11-12**
 > New QA/UI reports and evidence live in the shared main-checkout directory
 > `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA writes `qa.md`, UI critique writes `ui.md`,
@@ -263,14 +270,25 @@
 > remains in this branch to avoid removing a possibly newer integration-checkout board on merge.
 > Later slices must reconcile legacy tracking, lifecycle governance and human-only finalization.
 
-## SQLite board core inventory
+## SQLite board inventory
 
 - `board.py:initialize_board`, `database_path`, `connect`, `live_database`, `read_table`,
   `write_atomic`, `write_export` are **effectful**: Git discovery, SQLite read/write or local
   export. `parse_table`, `merge_board_changes`, `cell_texts`, `replace_cell` are **pure**.
-- Schema: one `board` row (`id=1`, Markdown snapshot, original import bytes, revision); no
-  runtime files in the checkout. WAL and busy timeout serialize concurrent writers. First
-  import validates the old table; malformed UTF-8/table fails closed without changing source.
+- Schema: `board` retains the original imported Markdown/source bytes and revision as the
+  compatibility snapshot. The explicit normalized schema adds `planned_items` (Board ID and
+  non-lifecycle fields, optional `user_story`, `queue_position`, terminal outcome and
+  `display_position`), `acceptance_criteria` (ordered text, verification and proof), and
+  `active_work` (approved active status and nullable branch/worktree). Queue positions and
+  per-item criterion positions are unique; SQLite foreign keys and transactions protect writes.
+  Migration is never automatic: dry-run is read-only; `--apply` makes a consistent backup first,
+  then applies transactional DDL and data conversion. Existing Notes stay verbatim; explicit
+  checklist entries/proofs are copied to criteria rows.
+- Before normalized migration, the existing Markdown snapshot remains the CLI source. After
+  migration, `read_table` renders a compatibility projection from normalized rows and
+  `write_atomic` updates normalized state in the same SQLite transaction. Historical status
+  mapping: Backlog→queue; Ready/In Progress/In Review/Pending Merge/Blocked→active work;
+  Merged→completed; Dropped→cancelled. `display_position` preserves current table order.
 - CLI `show`/`lanes` read current SQLite state; `add`, `note`, `set-status`, `set-field`,
   `add-column`, `remove` update SQLite; `export` writes a readable Markdown snapshot in the
   common Git directory. The viewer discovers per-clone control/project databases and reads
