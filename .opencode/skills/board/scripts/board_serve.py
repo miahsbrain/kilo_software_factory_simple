@@ -179,7 +179,11 @@ def readonly_board_connection(board, root):
     # Immutable reads avoid creating WAL sidecars on a fully checkpointed board.
     uri = "file:%s?mode=ro%s" % (quote(db, safe="/"), "" if wal else "&immutable=1")
     with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
-        yield connection
+        connection.execute("BEGIN")
+        try:
+            yield connection
+        finally:
+            connection.rollback()
 
 
 def read_secondary_table(board, path, root):

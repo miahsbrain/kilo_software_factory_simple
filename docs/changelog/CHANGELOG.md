@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Keep planned-work payloads on one snapshot
+**Type:** Fix
+**Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board
+**Changed:** `.opencode/skills/board/scripts/board_serve.py`, `.opencode/skills/board/scripts/test_board_serve.py`, `docs/ARCHITECTURE.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Prevent related normalized reads from combining different committed lifecycle states.
+**Impact:** The read-only adapter now holds an explicit SQLite read transaction. The focused API class passed 7 tests in 0.529s.
+
 ## [2026-11-12] Add read-only planned-work API
 **Type:** Feature
 **Board:** BOARD-146 | **Branch:** feat/separate-planned-work-from-active-board

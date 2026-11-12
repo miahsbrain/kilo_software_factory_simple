@@ -63,7 +63,8 @@ needs. Every work surface must be registered before the factory reads its conten
   OpenCode sessions, dispatch agents, write board rows or maintain a second run-history table.
 - `/api/planned-work` is a read-only factory-control-board endpoint. It reads normalized queue and
   terminal history through the safe read-only SQLite boundary, excluding active items. It shares the
-  canonical normalized row query with the CLI; request handling does not initialize or migrate data.
+  canonical normalized row query with the CLI and holds one explicit read transaction across related
+  selects; request handling does not initialize or migrate data.
 - OpenCode's architect coordinates specialist agents. The approved builder limit is two total and
   one per repository. This policy is not enforced until BOARD-133 is complete.
 - A `factory-dev` specialist is approved for control-repo board/worktree/guard tooling, but its

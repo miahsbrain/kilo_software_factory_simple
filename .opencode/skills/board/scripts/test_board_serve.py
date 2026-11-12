@@ -1047,6 +1047,17 @@ class PlannedWorkApiTests(unittest.TestCase):
             viewer.Handler.do_GET(handler)
         return handler
 
+    def keep_wal_open(self):
+        writer = sqlite3.connect(str(self.db), isolation_level=None)
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("BEGIN IMMEDIATE")
+        writer.execute("UPDATE board SET revision=revision+1 WHERE id=1")
+        writer.commit()
+        self.addCleanup(writer.close)
+        self.assertTrue(Path(str(self.db) + "-wal").exists())
+        self.assertTrue(Path(str(self.db) + "-shm").exists())
+        return writer
+
     def test_planned_work_and_active_board_read_only_contract(self):
         ids = self.setup_normalized()
         self.initialize()
@@ -1157,6 +1168,90 @@ class PlannedWorkApiTests(unittest.TestCase):
         self.initialize()
         code, payload = self.response("/api/planned-work")
         self.assertEqual((code, payload), (503, {"error": "Planned work unavailable."}))
+
+    def test_planned_work_uses_one_snapshot_during_cancellation(self):
+        ids = self.setup_normalized()
+        self.initialize()
+        self.keep_wal_open()
+        original_query = self.board.normalized_plan_rows
+        cancelled = []
+
+        def cancel_after_queue_query(connection, view):
+            rows = original_query(connection, view)
+            if view == "queue" and not cancelled:
+                self.board.transition_plan_item(str(self.db), ids["queue-a"], "cancel")
+                cancelled.append(ids["queue-a"])
+            return rows
+
+        with patch.object(self.board, "normalized_plan_rows", side_effect=cancel_after_queue_query):
+            code, payload = self.response("/api/planned-work")
+
+        self.assertEqual(code, 200)
+        self.assertEqual(cancelled, [ids["queue-a"]])
+        queue_ids = [item["ID"] for item in payload["queue"]]
+        history_ids = [item["ID"] for item in payload["history"]]
+        self.assertIn(ids["queue-a"], queue_ids)
+        self.assertNotIn(ids["queue-a"], history_ids)
+
+        code, current = self.response("/api/planned-work")
+        self.assertEqual(code, 200)
+        self.assertNotIn(ids["queue-a"], [item["ID"] for item in current["queue"]])
+        self.assertIn(ids["queue-a"], [item["ID"] for item in current["history"]])
+
+    def test_active_board_uses_one_snapshot_during_finalization(self):
+        ids = self.setup_normalized()
+        self.initialize()
+        self.keep_wal_open()
+        active_id = ids["active"]
+        worktree_path = str(self.root / ".opencode" / "worktrees" / "fixture")
+        worktree_entry = worktree_path + " · branch feat/fixture"
+        with self.board.connect(str(self.db)) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("UPDATE active_work SET status='In Progress', branch_worktree=? "
+                               "WHERE plan_item_id=?", (worktree_entry, active_id))
+            self.board.persist_normalized_projection(connection)
+
+        original_projection = self.board.normalized_markdown
+        finalized = []
+
+        def finalize_after_active_projection(connection, markdown, active_only=False):
+            projected = original_projection(connection, markdown, active_only=active_only)
+            if active_only and not finalized:
+                finalized.append(active_id)
+                with self.board.connect(str(self.db)) as writer:
+                    writer.execute("BEGIN IMMEDIATE")
+                    snapshot, revision = writer.execute(
+                        "SELECT markdown, revision FROM board WHERE id=1").fetchone()
+                    table, error = self.board.parse_table(snapshot, str(self.factory))
+                    self.assertIsNone(error)
+                    row_index = next(index for index in table["rows"]
+                                     if self.board.cell_texts(table["lines"], index)[0] == active_id)
+                    ok, message = self.worktree.clear_row_worktree(
+                        self.board, str(self.factory), table, row_index, str(self.root),
+                        worktree_path, status="Merged", connection=writer, revision=revision)
+                    self.assertTrue(ok, message)
+                    writer.commit()
+            return projected
+
+        with patch.object(self.board, "normalized_markdown", side_effect=finalize_after_active_projection):
+            code, payload = self.response("/api/board")
+
+        self.assertEqual(code, 200)
+        self.assertEqual(finalized, [active_id])
+        rows = payload["boards"][0]["rows"]
+        active = next(row for row in rows if row["ID"] == active_id)
+        self.assertEqual(active["user_story"], "As a fixture user, I can inspect promoted active.")
+        self.assertEqual(active["acceptance_criteria"], [
+            {"position": 0, "text": "Promoted active criterion one", "verified": False,
+             "proof": None},
+            {"position": 1, "text": "Promoted active criterion two", "verified": False,
+             "proof": None},
+        ])
+
+        code, planned = self.response("/api/planned-work")
+        self.assertEqual(code, 200)
+        self.assertIn(active_id, [item["ID"] for item in planned["history"]])
+        self.assertNotIn(active_id, [item["ID"] for item in planned["queue"]])
 
     def test_registered_project_rows_keep_existing_shape(self):
         self.setup_normalized()

@@ -1,13 +1,13 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-146 planned-work HTTP API (2026-11-12)
+## Current session — BOARD-146 HTTP snapshot consistency (2026-11-12)
 
-- Implemented read-only factory `GET /api/planned-work`; `/api/board` adds story and structured
-  criteria to normalized active factory rows. Queue/history ordering, safe 503, HEAD/no-store and
-  unchanged registered-project behavior are documented in `docs/API_CONTRACTS.md`.
-- Focused scratch-repository verification passed: 5 tests in 0.302s via the command in
-  `docs/STACK.md`. No live board or migration was touched; prior lifecycle/full suites were not
-  rerun. Next: independent API review.
+- Fixed the API consistency finding by holding an explicit read transaction across related SQLite
+  selects. Deterministic scratch WAL interleavings cover cancellation during queue/history and
+  finalization during active projection/details.
+- The focused command in `docs/STACK.md` passed 7 tests in 0.529s. No live board or migration was
+  touched; prior lifecycle/full suites were not rerun. Next: human inspection after independent
+  review of this fix.
 
 ## Previous session — BOARD-146 CLI lifecycle (2026-11-12)
 
