@@ -20,16 +20,21 @@ Standard library only. Python 3.9+. The static CSS is built ahead of time by
 `.opencode/skills/board/ui`; the server only reads it.
 """
 import argparse
+import contextlib
 import datetime
+import errno
 import html
 import importlib.util
 import json
 import os
 import re
+import sqlite3
+import stat
 import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import quote
 
 LANES = ["Backlog", "Ready", "In Progress", "In Review", "Pending Merge",
          "Merged", "Blocked", "Dropped"]
@@ -64,6 +69,7 @@ GIT_TIMEOUT = 5
 DEFAULT_PORT = 15180
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_REFRESH = 60
+PROJECTS_ROOT = "/projects"
 BOARD_READ_HINT = (" Check the SQLite board or the explicit --file fixture.")
 # Inline favicon: the page stays offline and makes no favicon request.
 FAVICON = ("data:image/svg+xml,"
@@ -119,28 +125,32 @@ def board_file(path, root):
     return os.path.join(root, "docs", "BOARD.md")
 
 
-def discover_boards(root):
-    """[(label, path)] for the harness board and the project board, when both exist.
+def registered_repos(worktree, root):
+    """Resolve only entries explicitly listed in the control repository's map."""
+    repos, error = worktree.load_repos(root)
+    if error:
+        raise ValueError(error)
+    resolved = []
+    for repo_id in repos:
+        target, error = worktree.resolve_repo(root, repos, repo_id)
+        if error:
+            raise ValueError(error)
+        resolved.append((repo_id, target))
+    return resolved
 
-    The factory root has no DOMAIN.md; the project root has one. From either root the
-    sibling board is found, so one server shows both boards.
-    """
-    root = os.path.abspath(root)
-    is_project = os.path.exists(os.path.join(root, "DOMAIN.md"))
+
+def discover_boards(root, worktree=None):
+    """Board paths for registered repositories; never initialize a secondary board."""
+    if worktree is None:
+        _, worktree = load_helpers()
+    is_project = os.path.isfile(os.path.join(root, "DOMAIN.md"))
     boards = []
-    if is_project:
-        boards.append(("project", os.path.join(root, "docs", "BOARD.md")))
-        parent = os.path.dirname(root)
-        if (os.path.exists(os.path.join(parent, ".opencode"))
-                and board_available(parent)):
-            boards.append(("harness", os.path.join(parent, "docs", "BOARD.md")))
-    else:
-        boards.append(("harness", os.path.join(root, "docs", "BOARD.md")))
-        child = os.path.join(root, "project")
-        if os.path.isfile(os.path.join(child, "DOMAIN.md")) and board_available(child):
-            boards.append(("project", os.path.join(child, "docs", "BOARD.md")))
-        elif os.path.exists(os.path.join(child, "docs", "BOARD.md")):
-            boards.append(("project", os.path.join(child, "docs", "BOARD.md")))
+    for repo_id, target in registered_repos(worktree, root):
+        label = ("project" if is_project else "harness") if repo_id == "control" else repo_id
+        if (repo_id == "project" and not worktree.is_git_repo(target)
+                and not board_available(target)):
+            continue
+        boards.append((label, os.path.join(target, "docs", "BOARD.md")))
     return boards
 
 
@@ -153,11 +163,38 @@ def board_available(root):
         return False
 
 
-def read_rows(board, path):
+def read_secondary_table(board, path, root):
+    """Read an existing registered SQLite board without invoking board initialization."""
+    try:
+        db = board.database_path(root)
+        try:
+            info = os.lstat(db)
+        except FileNotFoundError:
+            return None, "Board not initialized"
+        if not stat.S_ISREG(info.st_mode):
+            return None, "cannot read the board"
+        wal = os.path.exists(db + "-wal")
+        shm = os.path.exists(db + "-shm")
+        if wal != shm:
+            return None, "cannot read the board"
+        # Immutable reads avoid creating WAL sidecars on a fully checkpointed board.
+        uri = "file:%s?mode=ro%s" % (quote(db, safe="/"), "" if wal else "&immutable=1")
+        with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
+            row = connection.execute("SELECT markdown FROM board WHERE id = 1").fetchone()
+        if row is None:
+            return None, "cannot read the board"
+        return board.parse_table(row[0], path)
+    except (OSError, ValueError, sqlite3.Error):
+        return None, "cannot read the board"
+
+
+def read_rows(board, path, secondary_root=None):
     """(rows, error). The board is read fresh; nothing is cached."""
-    table, err = board.read_table(path)
+    table, err = (read_secondary_table(board, path, secondary_root)
+                  if secondary_root else board.read_table(path))
     if table is None:
-        return [], (err or "cannot read the board") + BOARD_READ_HINT
+        return [], (err or "cannot read the board") + ("" if err == "Board not initialized"
+                                                     else BOARD_READ_HINT)
     rows = []
     for i in table["rows"]:
         cells = board.cell_texts(table["lines"], i)
@@ -178,17 +215,9 @@ def lane_map(rows):
 
 
 def worktree_state(worktree, root):
-    """Fresh worktrees for control and registered project, with stable repo ids."""
-    repos, error = worktree.load_repos(root)
-    if error:
-        raise ValueError(error)
+    """Fresh worktrees for every registered repository, with stable repo ids."""
     entries = []
-    for repo_id in ("control", "project"):
-        if repo_id not in repos:
-            continue
-        target, error = worktree.resolve_repo(root, repos, repo_id)
-        if error:
-            raise ValueError(error)
+    for repo_id, target in registered_repos(worktree, root):
         if repo_id != "control" and not worktree.is_git_repo(target):
             continue
         listed = worktree.list_worktrees(target)
@@ -215,6 +244,54 @@ def worktree_state(worktree, root):
                 "base": base,
             })
     return entries
+
+
+def select_candidates(paths, registered):
+    """Exclude registered paths and preserve distinct relative paths, not basenames."""
+    return [{"name": os.path.basename(path), "relative_path": path}
+            for path in sorted(set(paths) - set(registered))]
+
+
+def scan_repo_candidates(projects_root, registered):
+    """Inspect only directory entries and .git marker types within a two-level root."""
+    found = []
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+    def inspect(directory_fd, depth, parts):
+        with os.scandir(directory_fd) as entries:
+            for entry in entries:
+                if entry.name == ".git" or not entry.is_dir(follow_symlinks=False):
+                    continue
+                try:
+                    child_fd = os.open(entry.name, directory_flags, dir_fd=directory_fd)
+                except OSError as exc:
+                    if exc.errno in (errno.ELOOP, errno.ENOTDIR, errno.ENOENT):
+                        continue
+                    raise
+                try:
+                    try:
+                        mode = os.stat(".git", dir_fd=child_fd, follow_symlinks=False).st_mode
+                    except FileNotFoundError:
+                        mode = 0
+                    relative = "/".join((*parts, entry.name))
+                    is_repo = stat.S_ISDIR(mode) or stat.S_ISREG(mode)
+                    if is_repo:
+                        found.append(relative)
+                    if depth == 1 and not is_repo:
+                        inspect(child_fd, 2, (*parts, entry.name))
+                finally:
+                    os.close(child_fd)
+
+    root_fd = os.open(projects_root, directory_flags)
+    try:
+        inspect(root_fd, 1, ())
+    finally:
+        os.close(root_fd)
+    registered_paths = [os.path.relpath(target, projects_root)
+                        for _, target in registered
+                        if os.path.commonpath((os.path.abspath(projects_root), os.path.abspath(target)))
+                        == os.path.abspath(projects_root)]
+    return select_candidates(found, registered_paths)
 
 
 JS = """
@@ -1552,6 +1629,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/worktrees":
             self.send_json(200, self.state["worktree_payload"]())
             return
+        if path == "/api/repo-candidates":
+            try:
+                self.send_json(200, self.state["candidate_payload"]())
+            except (OSError, ValueError):
+                print("[REPO] Candidate scan failed - directory unavailable", file=sys.stderr)
+                self.send_json(503, {"error": "Repository candidates unavailable."})
+            return
         if path == "/static/board.css":
             self.send_file(STATIC_ROOT / "board.css", "text/css; charset=utf-8")
             return
@@ -1574,10 +1658,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_bytes(404, b"not found\n", "text/plain; charset=utf-8")
 
 
-def board_states(board, paths):
+def board_states(board, paths, secondary_roots=None):
     states = []
     for label, path in paths:
-        rows, error = read_rows(board, path)
+        rows, error = read_rows(board, path, (secondary_roots or {}).get(path))
         lanes = lane_map(rows)
         states.append({
             "label": label,
@@ -1593,9 +1677,13 @@ def board_states(board, paths):
 def build_payloads(board, worktree, paths, root):
     def board_payload():
         current_paths = paths if paths is not None else (
-            discover_boards(root) or [("board", board_file(None, root))])
+            discover_boards(root, worktree) or [("board", board_file(None, root))])
+        secondary_roots = ({os.path.join(target, "docs", "BOARD.md"): target
+                            for repo_id, target in registered_repos(worktree, root)
+                            if repo_id != "control" and worktree.is_git_repo(target)}
+                           if paths is None else {})
         return {
-            "boards": board_states(board, current_paths),
+            "boards": board_states(board, current_paths, secondary_roots),
             "generated_at": now(),
         }
 
@@ -1604,6 +1692,11 @@ def build_payloads(board, worktree, paths, root):
             return worktree_state(worktree, root)
         except Exception:
             return []
+
+    def candidate_payload():
+        registered = registered_repos(worktree, root)
+        candidates = scan_repo_candidates(PROJECTS_ROOT, registered)
+        return {"candidates": candidates, "scanned_at": now()}
 
     def html_page():
         try:
@@ -1615,7 +1708,7 @@ def build_payloads(board, worktree, paths, root):
             error = "could not read the board: %s%s" % (exc, BOARD_READ_HINT)
         return build_html(states, state, now(), error, Handler.state["refresh"], root=root)
 
-    return board_payload, worktree_payload, html_page
+    return board_payload, worktree_payload, candidate_payload, html_page
 
 
 def now():
@@ -1650,10 +1743,12 @@ def main(argv):
             return 1
         paths = None
 
-    board_payload, worktree_payload, html_page = build_payloads(board, worktree, paths, root)
+    board_payload, worktree_payload, candidate_payload, html_page = build_payloads(
+        board, worktree, paths, root)
     Handler.state = {
         "board_payload": board_payload,
         "worktree_payload": worktree_payload,
+        "candidate_payload": candidate_payload,
         "html": html_page,
         "gallery": build_gallery_html,
         "refresh": max(1, args.refresh),
@@ -1665,7 +1760,7 @@ def main(argv):
         print("cannot bind %s:%d (%s)" % (args.host, args.port, exc), file=sys.stderr)
         return 1
     url = "http://%s:%d/" % ("127.0.0.1" if args.host == "0.0.0.0" else args.host, args.port)
-    for label, path in (paths if paths is not None else discover_boards(root)):
+    for label, path in (paths if paths is not None else discover_boards(root, worktree)):
         print("board:   %-8s %s" % (label, path))
     print("serving: %s" % url)
     print("stop with Ctrl-C")

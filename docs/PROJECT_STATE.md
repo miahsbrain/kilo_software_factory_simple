@@ -1,5 +1,50 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-126 registered-repo feed reviewed (2026-11-12)
+
+- Registered-repo APIs and no-follow candidate discovery are committed on
+  `feat/expose-registered-repos-and-safe-candidates`. Read-only secondary SQLite reads
+  report an uninitialized board without creating it. Human-approved active-WAL reads may
+  update transient existing `-shm` metadata.
+- Current-state board suite: `python3 -m unittest discover -s .opencode/skills/board/scripts
+  -p 'test_board*.py'` passed 32 tests; independent review PASS. Next: human inspection
+  and integration before the React gallery slice.
+
+## Earlier BOARD-126 WAL test clarification (2026-11-12)
+
+- Human approved transient `-shm` metadata changes on active-WAL reads, not DB/WAL writes or
+  board/sidecar creation. Scoped test assertion and contract/ADR updated; server unchanged.
+- Focused four-test second attempt exited 0 (4 tests, 0.088s). Next: parent review. Earlier
+  twice-failed broad board suite is unverified.
+
+## Current session — BOARD-126 candidate race correction (2026-11-12)
+
+- In the same task worktree, candidate directory lookup is anchored to no-follow descriptors,
+  including marker checks. Replaced symlinks are skipped; failures close descriptors and retain
+  safe 503. Scratch regressions cover the race, existing symlinks and active-WAL board data.
+- Focused run: 3 scan cases passed, active-WAL file-byte assertion failed (exit 1) despite
+  current data read. No WAL implementation change or test weakening. Next: parent decides if
+  transient SQLite shared-memory writes are acceptable; broad suite remains unverified.
+
+## Current session — BOARD-126 independent read correction (2026-11-12)
+
+- High-severity review finding confirmed: `board.read_table` may initialize registered
+  independent repositories during GET. The same task branch now routes them through read-only
+  SQLite; missing DBs report `Board not initialized` in their board entry.
+- New scratch regressions cover no DB/WAL or Git status changes, existing-board reads, and
+  candidate mid-scan/registry failures. Focused check failed once because read-only SQLite
+  created WAL sidecars, then passed 2/2 after using immutable reads for checkpointed DBs.
+  Next: parent review and full-suite verification; the prior broad suite remains unverified.
+
+## Current session — BOARD-126 registered API slice (2026-11-12)
+
+- `feat/expose-registered-repos-and-safe-candidates` lists all mapped repositories in the
+  existing board/worktree APIs, and names-only unregistered candidates at `/api/repo-candidates`.
+- Candidate discovery is not registration or authorization. No dashboard write API or client/UI
+  changes. Documented regression suite failed twice on old unregistered-project fixture
+  expectations (first: 1 failure; second: 3 failures); final fixture/scanner corrections were
+  not rerun under the two-attempt cap. Next: parent independent verification and API review.
+
 ## Current session — BOARD-125 review correction (2026-11-12)
 
 - Returned to Build on the existing `fix/repair-finalize-after-worktree-removal`

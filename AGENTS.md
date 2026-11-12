@@ -84,6 +84,7 @@ document.
   that holds `AGENTS.md`, `docs/` and the board is the **control repo**; each app repo is a
   **work surface**. `.opencode/repos.json` maps a repo id to its path, and it is the only way into
   another repository. The board, the domain rules and the API contracts stay in the control repo.
+  The dashboard may discover candidate Git repository directory names up to two levels under `/projects`, without following symlinks. Discovery does not authorize reading a candidate’s board, worktrees, source, or configuration. `.opencode/repos.json` remains the only gateway to repository contents and work-surface actions; a human registers candidates explicitly.
 
 - **Existing project:** the actual layout wins. Keep it. Document the discovered structure in
   `docs/PROJECT_STRUCTURE.md` and map actual paths to purposes

@@ -1,5 +1,88 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-126 ready for human inspection, 2026-11-12**
+> Registered repositories appear in the read-only feeds. `/api/repo-candidates` lists
+> unregistered names at two levels under `/projects` through no-follow directory handles.
+> Independent boards are read without initialization; an absent board reports
+> `Board not initialized`. The current-state board suite passed 32 tests, and independent
+> review passed. `feat/expose-registered-repos-and-safe-candidates` awaits human integration;
+> next build slice is the React/Tailwind component gallery, then its approval before screens.
+
+> **Session Notes — BOARD-126 approved WAL read semantics, 2026-11-12**
+> Current-data reads of an active WAL board may change transient metadata in an existing
+> SQLite `-shm` file. The test now preserves the no-new-sidecar, unchanged DB/WAL, unchanged
+> row and clean Git requirements. Focused four-test rerun passed (0.088s); no server source
+> changed. Next: parent review; the earlier twice-failed broad suite remains unverified.
+
+## BOARD-126 WAL verification scope
+
+- `test_board_serve.py:test_active_wal_secondary_board_reads_current_data_without_sidecar_writes`
+  (effectful scratch Git/SQLite fixture) checks latest row, unchanged DB/WAL bytes, the same
+  sidecar filenames and unchanged clean Git status. It intentionally does not compare `-shm`
+  bytes, since SQLite may update transient read-lock metadata there (ADR-089).
+- `test_independent_registered_board_get_never_initializes_sqlite` remains unchanged: GET on a
+  missing secondary board creates no DB or sidecars and leaves tracked/untracked status clean.
+
+> **Session Notes — BOARD-126 candidate race correction, 2026-11-12**
+> The existing task worktree now anchors the two-level candidate scan to no-follow directory
+> descriptors. Replacing a listed directory with a symlink cannot redirect `.git` inspection;
+> failed scans close descriptors and return the existing safe 503. The focused check passed
+> three scan cases but failed the active-WAL file-byte assertion after a correct current-data
+> read. No WAL behavior was changed. Next: parent decides whether transient WAL shared-memory
+> writes are acceptable; the previously twice-failed broad board suite remains unverified.
+
+## BOARD-126 candidate scan correction inventory
+
+- `board_serve.py:scan_repo_candidates` (effectful metadata only) opens `/projects` and each
+  child with `O_DIRECTORY|O_NOFOLLOW`, scans opened descriptors and checks `.git` relative to
+  the child descriptor; swapped symlinks are skipped. `finally` closes every opened descriptor.
+- `test_board_serve.py` scratch fixtures exercise a swapped symlink, existing symlinks, safe
+  mid-scan failure and descriptor closure. The active-WAL fixture reads current data but its
+  no-changed-file assertion failed, likely because SQLite's WAL reader updates shared-memory
+  lock metadata; this is a hold, not evidence of a green active-WAL path.
+
+> **Session Notes — BOARD-126 independent board read correction, 2026-11-12**
+> The same `feat/expose-registered-repos-and-safe-candidates` worktree now reads registered
+> independent Git-repo boards from existing SQLite only. A missing database yields a visible
+> per-repo `Board not initialized` error; HTTP GET never creates it. Two focused scratch
+> regressions passed after a first sidecar-creation failure was corrected. Next: parent review
+> and full-suite verification; the prior broad suite remains unverified.
+
+## BOARD-126 read-only correction inventory
+
+- `board_serve.py:read_secondary_table` (effectful Git path lookup and read-only SQLite) uses
+  the existing `board.database_path` and `parse_table` without calling `initialize_board` or
+  `read_table`; missing DB is an explicit error. Checkpointed databases use an immutable
+  read-only connection to avoid WAL sidecars; existing WAL/SHM pairs use read-only WAL mode.
+  Incomplete pairs return a per-board read error. `read_rows`, `board_states` and
+  `build_payloads` (effectful routing/reads) select this path only for independent registered
+  Git repositories; control and explicit-file reads retain their existing behavior.
+- Scratch independent-Git fixture tests assert no SQLite DB/WAL or Git status changes on GET,
+  existing board content reads, and safe 503 for mid-scan and invalid registry errors. Focused
+  check: first run failed (read-only WAL sidecars); second run 2 tests OK after correction.
+
+> **Session Notes — BOARD-126 server/API slice, 2026-11-12**
+> In `feat/expose-registered-repos-and-safe-candidates`, the dashboard reads board and worktree
+> state for registered IDs only, and exposes metadata-only candidate names via
+> `GET /api/repo-candidates`. Candidate scans are rooted at `/projects` and never authorize
+> repository contents. The test suite failed twice on legacy unregistered-project expectations;
+> final corrections were not rerun. Next: parent independent verification/review, then client work.
+
+## BOARD-126 server inventory
+
+- `board_serve.py:registered_repos` (effectful map read) resolves every ID through the existing
+  worktree helpers. `discover_boards`, `board_available`, `read_rows`, `worktree_state`
+  (effectful filesystem, SQLite or Git) read registered repositories without creating their boards.
+- `board_serve.py:select_candidates` (pure) excludes registered relative paths and sorts distinct
+  candidates. `scan_repo_candidates` (effectful directory metadata) checks only directories and
+  `.git` marker types two levels beneath the injected root, never following symlinks.
+- `Handler.do_GET`, `build_payloads` (effectful HTTP and request-time reads) expose the new
+  read-only endpoint. Candidate errors return 503 with no path/exception; see
+  [API_CONTRACTS.md](API_CONTRACTS.md). No new dependency, persistence or environment variable.
+- Verification: documented temporary-fixture board suite ran twice and failed on legacy
+  unregistered-project expectations (first 1 failure, second 3 failures). Final corrections
+  require parent verification; independent QA/review and client integration remain separate.
+
 > **Session Notes — BOARD-125 independent-review correction, 2026-11-12**
 > The same `fix/repair-finalize-after-worktree-removal` worktree now publishes a
 > verified, fsynced recovery temp file without replacing an existing journal. A

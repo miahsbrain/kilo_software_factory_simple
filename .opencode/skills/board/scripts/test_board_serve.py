@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -45,6 +46,23 @@ class BoardRefreshTests(unittest.TestCase):
             + "| " + " | ".join(["---"] * len(viewer.COLUMNS)) + " |\n"
             + "| " + " | ".join(cells) + " |\n", encoding="utf-8")
 
+    def independent_project(self):
+        project = self.root / "project"
+        project.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(project)], check=True)
+        self.write_board(self.project, "Independent task")
+        subprocess.run(["git", "-C", str(project), "add", "docs/BOARD.md"], check=True)
+        subprocess.run(["git", "-C", str(project), "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"], check=True)
+        self.worktree.is_git_repo = Mock(side_effect=lambda target: target == str(project))
+        self.initialize()
+        return project
+
+    def independent_status(self, project):
+        result = subprocess.run(["git", "-C", str(project), "status", "--porcelain",
+                                 "--untracked-files=all"], capture_output=True, text=True, check=True)
+        return result.stdout
+
     def initialize(self, *args):
         server = Mock()
         with patch.object(viewer, "load_helpers", return_value=(self.board, self.worktree)), \
@@ -57,6 +75,11 @@ class BoardRefreshTests(unittest.TestCase):
         server.server_close.assert_called_once_with()
 
     def request(self, path):
+        code, body = self.response(path)
+        self.assertEqual(code, 200)
+        return body
+
+    def response(self, path):
         response = Mock()
         handler = SimpleNamespace(
             path=path, state=viewer.Handler.state,
@@ -64,8 +87,206 @@ class BoardRefreshTests(unittest.TestCase):
             send_bytes=lambda code, body, content_type: response(code, body.decode("utf-8")))
         viewer.Handler.do_GET(handler)
         code, body = response.call_args.args
-        self.assertEqual(code, 200)
-        return json.loads(body) if path.startswith("/api/") else body
+        return code, json.loads(body) if path.startswith("/api/") else body
+
+    def test_all_registered_boards_and_worktrees_keep_their_ids(self):
+        self.initialize()
+        for name in ("alpha", "beta", "gamma"):
+            target = self.root / name
+            self.write_board(target / "docs/BOARD.md", name + " task")
+            (target / ".git").mkdir()
+        self.registry.write_text(json.dumps({"control": ".", "alpha": "alpha",
+                                             "beta": "beta", "gamma": "gamma"}))
+        self.worktree.is_git_repo = Mock(return_value=True)
+        self.worktree.list_worktrees = Mock(side_effect=lambda target: [
+            {"path": target, "head": "abc1234", "branch": "main"}])
+        self.worktree.default_base = Mock(return_value="main")
+        self.worktree.git = Mock(return_value=(1, "", ""))
+        labels = [entry["label"] for entry in self.request("/api/board")["boards"]]
+        self.assertEqual(labels, ["harness", "alpha", "beta", "gamma"])
+        self.assertEqual([entry["repo"] for entry in self.request("/api/worktrees")],
+                         ["control", "alpha", "beta", "gamma"])
+        page = self.request("/")
+        for label in labels:
+            self.assertIn('data-wb-scope-tab="%s"' % label, page)
+
+    def test_registered_missing_board_reports_existing_read_error_without_creating_one(self):
+        self.initialize()
+        target = self.root / "alpha"
+        target.mkdir()
+        self.registry.write_text(json.dumps({"control": ".", "alpha": "alpha"}))
+        entry = self.request("/api/board")["boards"][1]
+        self.assertEqual(entry["label"], "alpha")
+        self.assertEqual(entry["rows"], [])
+        self.assertIn("cannot read", entry["error"])
+        self.assertFalse((target / "docs/BOARD.md").exists())
+
+    def test_candidate_scan_is_names_only_and_does_not_follow_symlinks(self):
+        self.initialize()
+        projects = self.root / "projects"
+        projects.mkdir()
+        for relative in ("group-one/shared", "group-two/shared", "registered",
+                         "group-three/linked", "plain"):
+            target = projects / relative
+            target.mkdir(parents=True)
+            if relative.endswith("linked"):
+                (target / ".git").write_text("gitdir: /private/elsewhere")
+            else:
+                (target / ".git").mkdir()
+        (projects / "group-one" / "alias").symlink_to(projects / "group-two/shared", target_is_directory=True)
+        (projects / "group-three" / "symlink-marker").mkdir()
+        (projects / "group-three" / "symlink-marker" / ".git").symlink_to(
+            projects / "plain/.git", target_is_directory=True)
+        (projects / "outside").symlink_to(self.root, target_is_directory=True)
+        (projects / "registered" / "private").mkdir()
+        (projects / "registered" / "private" / ".git").mkdir()
+        self.registry.write_text(json.dumps({"control": ".", "registered": str(projects / "registered")}))
+        with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
+                patch.object(self.board, "read_table", wraps=self.board.read_table) as board_read, \
+                patch.object(self.worktree, "git", side_effect=AssertionError("candidate Git access")):
+            payload = self.request("/api/repo-candidates")
+        self.assertEqual(set(payload), {"candidates", "scanned_at"})
+        self.assertEqual(payload["candidates"], [
+            {"name": "shared", "relative_path": "group-one/shared"},
+            {"name": "linked", "relative_path": "group-three/linked"},
+            {"name": "shared", "relative_path": "group-two/shared"},
+            {"name": "plain", "relative_path": "plain"}])
+        board_read.assert_not_called()
+        self.assertNotIn(str(projects), json.dumps(payload["candidates"]))
+
+    def test_inaccessible_candidate_root_returns_safe_503(self):
+        self.initialize()
+        with patch.object(viewer, "PROJECTS_ROOT", str(self.root / "missing")), \
+                contextlib.redirect_stderr(io.StringIO()) as log:
+            code, payload = self.response("/api/repo-candidates")
+        self.assertEqual((code, payload), (503, {"error": "Repository candidates unavailable."}))
+        self.assertNotIn(str(self.root), log.getvalue())
+
+    def test_independent_registered_board_get_never_initializes_sqlite(self):
+        project = self.independent_project()
+        db = Path(self.board.database_path(str(project)))
+
+        self.assertFalse(db.exists())
+        self.assertEqual(self.independent_status(project), "")
+        with patch.object(self.board, "read_table", wraps=self.board.read_table) as read_table:
+            entry = self.request("/api/board")["boards"][1]
+            self.assertIn("Board not initialized", self.request("/"))
+        self.assertEqual(entry["label"], "project")
+        self.assertEqual(entry["rows"], [])
+        self.assertEqual(entry["error"], "Board not initialized")
+        self.assertEqual(read_table.call_count, 2)
+        self.assertTrue(all(call.args[0] == str(self.factory) for call in read_table.call_args_list))
+        self.assertEqual(list(db.parent.glob(db.name + "*")), [])
+        self.assertEqual(self.independent_status(project), "")
+
+        self.board.initialize_board(str(project))
+        before = db.read_bytes()
+        sidecars = sorted(path.name for path in db.parent.glob(db.name + "*"))
+        entry = self.request("/api/board")["boards"][1]
+        self.assertEqual([row["Task"] for row in entry["rows"]], ["Independent task"])
+        self.assertIsNone(entry["error"])
+        self.assertEqual(db.read_bytes(), before)
+        self.assertEqual(sorted(path.name for path in db.parent.glob(db.name + "*")), sidecars)
+        self.assertEqual(self.independent_status(project), "")
+
+    def test_active_wal_secondary_board_reads_current_data_without_sidecar_writes(self):
+        project = self.independent_project()
+        self.board.initialize_board(str(project))
+        db = Path(self.board.database_path(str(project)))
+        with contextlib.closing(sqlite3.connect(str(db))) as writer:
+            writer.execute("PRAGMA journal_mode=WAL")
+            writer.execute("UPDATE board SET markdown=?, revision=revision+1 WHERE id=1",
+                           (self.project.read_text().replace("Independent task", "Live WAL task"),))
+            writer.commit()
+            files = [db, db.with_name(db.name + "-wal"), db.with_name(db.name + "-shm")]
+            self.assertTrue(all(path.exists() for path in files))
+            sidecar_names = {path.name for path in db.parent.glob(db.name + "*")}
+            before = {path.name: path.read_bytes() for path in files[:2]}
+            status = self.independent_status(project)
+            self.assertEqual(status, "")
+            entry = self.request("/api/board")["boards"][1]
+            self.assertEqual([row["Task"] for row in entry["rows"]], ["Live WAL task"])
+            self.assertIsNone(entry["error"])
+            self.assertEqual({path.name: path.read_bytes() for path in files[:2]}, before)
+            self.assertEqual({path.name for path in db.parent.glob(db.name + "*")}, sidecar_names)
+            self.assertIn("Live WAL task", writer.execute(
+                "SELECT markdown FROM board WHERE id = 1").fetchone()[0])
+            self.assertEqual(self.independent_status(project), status)
+
+    def test_candidate_mid_scan_failure_and_invalid_registry_are_safe(self):
+        self.initialize()
+        projects = self.root / "projects"
+        (projects / "group").mkdir(parents=True)
+        scandir = viewer.os.scandir
+        group_inode = (projects / "group").stat().st_ino
+        open_dir = viewer.os.open
+        close_dir = viewer.os.close
+        opened, closed = [], []
+
+        def record_open(*args, **kwargs):
+            fd = open_dir(*args, **kwargs)
+            opened.append(fd)
+            return fd
+
+        def record_close(fd):
+            closed.append(fd)
+            return close_dir(fd)
+
+        def fail_nested(directory):
+            if os.fstat(directory).st_ino == group_inode:
+                raise PermissionError("private directory")
+            return scandir(directory)
+
+        with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
+                patch.object(viewer.os, "scandir", side_effect=fail_nested), \
+                patch.object(viewer.os, "open", side_effect=record_open), \
+                patch.object(viewer.os, "close", side_effect=record_close), \
+                contextlib.redirect_stderr(io.StringIO()) as log:
+            code, payload = self.response("/api/repo-candidates")
+        self.assertEqual((code, payload), (503, {"error": "Repository candidates unavailable."}))
+        self.assertNotIn(str(projects), log.getvalue())
+        self.assertEqual(sorted(opened), sorted(closed))
+
+        self.registry.write_text(json.dumps({"control": ".", "invalid": "../outside"}))
+        with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
+                contextlib.redirect_stderr(io.StringIO()) as log:
+            code, payload = self.response("/api/repo-candidates")
+        self.assertEqual((code, payload), (503, {"error": "Repository candidates unavailable."}))
+        self.assertNotIn(str(self.root), log.getvalue())
+
+    def test_candidate_swapped_to_symlink_before_open_stays_outside(self):
+        self.initialize()
+        projects = self.root / "projects"
+        projects.mkdir()
+        swapped = projects / "swapped"
+        swapped.mkdir()
+        outside = self.root / "outside"
+        outside.mkdir()
+        (outside / ".git").mkdir()
+        (outside / "private").mkdir()
+        (outside / "private" / ".git").mkdir()
+        safe = projects / "safe"
+        safe.mkdir()
+        (safe / ".git").mkdir()
+        real_open = viewer.os.open
+        root_inode = projects.stat().st_ino
+        changed = []
+
+        def replace_before_open(path, flags, **kwargs):
+            if (path == "swapped" and "dir_fd" in kwargs
+                    and os.fstat(kwargs["dir_fd"]).st_ino == root_inode and not changed):
+                swapped.rmdir()
+                swapped.symlink_to(outside, target_is_directory=True)
+                changed.append(True)
+            return real_open(path, flags, **kwargs)
+
+        with patch.object(viewer, "PROJECTS_ROOT", str(projects)), \
+                patch.object(viewer.os, "open", side_effect=replace_before_open):
+            candidates = self.request("/api/repo-candidates")["candidates"]
+        self.assertTrue(changed)
+        self.assertEqual(candidates, [{"name": "safe", "relative_path": "safe"}])
+        self.assertNotIn("outside", json.dumps(candidates))
+        self.assertNotIn("private", json.dumps(candidates))
 
     def test_project_appears_and_disappears_after_initialization(self):
         self.initialize()
@@ -218,7 +439,7 @@ class BoardRefreshTests(unittest.TestCase):
             self.assertEqual(group[1]["branch"], "fix/shared")
             self.assertEqual(group[1]["sha"], "fedcba9")
             self.assertEqual((group[1]["ahead"], group[1]["behind"], group[1]["dirty"]), expected)
-        self.write_board(self.project, "Project task")
+        self.write_board(project / "docs/BOARD.md", "Project task")
         page = self.request("/")
         self.assertEqual(page.count('2 worktrees</span>'), 2)
         self.assertEqual(page.count('class="wb-wt"'), 4)
@@ -244,7 +465,7 @@ class BoardRefreshTests(unittest.TestCase):
                 self.assertEqual(self.request("/api/worktrees"), control)
                 page = self.request("/")
                 self.assertIn('2 worktrees</span>', page)
-                self.assertIn('0 worktrees</span>', page)
+                self.assertNotIn('data-wb-scope-tab="project"', page)
                 self.assertEqual(page.count('class="wb-wt"'), 2)
 
     def test_main_uses_real_scoped_data_and_shared_workbench(self):

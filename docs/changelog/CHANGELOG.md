@@ -3,6 +3,46 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Verify registered-repository read boundary
+**Type:** Docs
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `docs/PROJECT_STATE.md`, `docs/HANDOVER.md`, this log.
+**Why:** Record current-state suite and independent review after the API/security corrections.
+**Impact:** None; no runtime change. The earlier failed attempts remain recorded below.
+**Verification:** Board suite 32 tests OK on `ec15b3d`; independent review PASS.
+
+## [2026-11-12] Clarify active-WAL read verification
+**Type:** Test
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `test_board_serve.py`, `docs/API_CONTRACTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** SQLite may change existing `-shm` metadata on a read-only active-WAL lookup.
+**Impact:** The regression still requires current row, unchanged DB/WAL bytes and sidecar set, and clean Git status; only existing transient `-shm` bytes are exempt. Missing-board no-write assertions remain. No server change. Catalogue: python-pro, secure-code-guardian.
+**Verification:** Focused four-test second attempt exited 0: 4 tests in 0.088s. Earlier broad suite remains unverified; parent review pending.
+
+## [2026-11-12] Anchor candidate discovery to no-follow directory handles
+**Type:** Fix
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `board_serve.py`, `test_board_serve.py`, `docs/API_CONTRACTS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** A directory could be replaced with a symlink between listing and path-based marker inspection.
+**Impact:** Directory-descriptor-based scanning skips swapped symlinks and closes descriptors on failure; candidate response remains names-only with safe 503. Added active-WAL read regression. Catalogue: python-pro, secure-code-guardian.
+**Verification:** Focused four-test run exited 1: three scan tests passed, active-WAL file-byte assertion failed after current-data read. WAL semantics need a decision; earlier broad suite remains unverified.
+
+## [2026-11-12] Prevent HTTP reads from initializing registered boards
+**Type:** Fix
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `board_serve.py`, `test_board_serve.py`, `docs/API_CONTRACTS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** The existing board reader can create SQLite when a registered independent repo lacks its board.
+**Impact:** Read-only secondary SQLite lookup; a missing board remains visible with `Board not initialized`. Only the board CLI can initialize it. No migration or new dependency. Catalogue: python-pro, api-designer, secure-code-guardian.
+**Verification:** Focused scratch check first failed on read-only SQLite WAL sidecars; corrected and second run passed 2 tests in 0.087s. Prior broad suite remains unverified; parent review pending.
+
+## [2026-11-12] Expose registered repositories and safe candidate names
+**Type:** Feature
+**Board:** BOARD-126 | **Branch:** feat/expose-registered-repos-and-safe-candidates
+**Changed:** `board_serve.py`, `test_board_serve.py`, root/template `AGENTS.md`, `docs/API_CONTRACTS.md`, `docs/PROJECT_STRUCTURE.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, this log.
+**Why:** The dashboard previously showed only a control/project pair and could not safely show prospective repo names.
+**Impact:** Registered repos appear in existing read-only APIs; a separate metadata-only candidate API scans `/projects` up to two levels. No registration or candidate content access; no migration or new dependency. Catalogue: python-pro, api-designer, secure-code-guardian.
+**Verification:** Documented suite failed twice on old unregistered-project fixture expectations; corrected without a third run under the two-attempt cap. Parent independent verification/review pending.
+
 ## [2026-11-12] Hold approval lock and publish finalize recovery atomically
 **Type:** Fix
 **Board:** BOARD-125 | **Branch:** fix/repair-finalize-after-worktree-removal
