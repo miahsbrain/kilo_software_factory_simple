@@ -32,7 +32,11 @@ Read `docs/PROJECT_STRUCTURE.md` before choosing paths, then the documented boot
 Get approval for implementation decisions before delegating. Delegate implementation to the
 six specialist agents; never implement application code yourself. Pass approved decisions,
 workspace boundaries, exact starting files, acceptance criteria and verification limits.
-The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+The live board is local SQLite in the Git common directory, shared across task worktrees. Only
+the orchestrator edits rows through `board.py`; Markdown is a generated export. Review findings
+return to the original builder in the same worktree, not automatic Fix rows. Review reports and
+ledger live under `<git-common-dir>/reviews/`, outside the task branch. Agents never merge or
+invoke `finalize`; only the human runs it in a real TTY with typed board/base/branch/tip confirmation.
 
 Review evidence and the diff before
 accepting a builder's result. Preserve worktree, QA, documentation and human-merge gates.

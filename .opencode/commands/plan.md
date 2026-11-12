@@ -44,7 +44,7 @@ produces are built in a worktree.
    contract, schema or file layout is settled on the base branch before the rows that depend on
    it open. Each row carries acceptance criteria, a risk level and `Blocked by`, and is created
    with the board script — never by hand.
-   **Output:** the checklist → `ROADMAP.md`; one board row per unit → `docs/BOARD.md`.
+   **Output:** the checklist → `ROADMAP.md`; one row per unit → local SQLite via `board.py`.
 6. **Phase 5 — The decision gate.** Put the implementation decisions in front of the user as one
    batched decision sheet: the decision, the recommendation, the alternatives with a one-line
    trade-off, the consequence, and the default marked `ASSUMPTION`. One reply answers all of

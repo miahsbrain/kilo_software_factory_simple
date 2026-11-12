@@ -11,9 +11,9 @@ load `browser`, use only OpenCode's built-in browser, and hold unavailable crite
 python3 .opencode/skills/board/scripts/board_serve.py --port 15180
 ```
 
-- It serves `docs/BOARD.md` and the live `git worktree list` state, re-read on every request.
-- Startup creates the current control board only when absent; every request is read-only.
-- The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+- It serves the Git-common-dir SQLite board and live `git worktree list` state, re-read on request.
+- Startup imports an existing local legacy board once or initializes empty; requests are read-only.
+- `docs/BOARD.md` is legacy input, not live state. `board.py export` generates Markdown on demand.
 - `--host 0.0.0.0` binds wider when the port must be reached from outside the container.
 - `--open` opens the URL in the default browser when that is available.
 - `--refresh N` changes the page auto-refresh interval in seconds (default 10).

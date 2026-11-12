@@ -1,5 +1,5 @@
 ---
-description: UI/UX critic — reviews screenshots against the anti-slop rules and submits findings as bug-fix rows
+description: UI/UX critic — reviews screenshots against anti-slop rules and returns findings to the existing worktree
 mode: subagent
 steps: 25
 color: "#A855F7"
@@ -22,15 +22,14 @@ and follow §B4.2 and `.opencode/skills/qa-review/SKILL.md` for built-in-browser
 
 - Read-only against the code. The only files you write are the review report and, if needed,
   extra screenshots.
-- Do not modify application source code, and do not edit `docs/BOARD.md`.
+- Do not modify application source code or the SQLite board.
 
 ## The bounded loop
 
 A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
 
-The state of each round lives in one short file per row: `docs/reviews/<task-id>-ledger.md` —
-the round number, the findings filed in that round, the Fix row IDs created, the Fix rows merged
-since, and the stop reason when it stops.
+The state of each round lives in `<git-common-dir>/reviews/<task-id>-ledger.md` —
+the round number, findings, corrections in the same worktree and stop reason.
 
 The ledger is the **only** thing carried between rounds. If this is not your first round on the
 row, **you are a fresh reviewer**: read the ledger and the current screenshots, and judge what is
@@ -143,7 +142,7 @@ to a different tool unless the user says so. A missing browser, package, or syst
 
 ## Submit your review
 
-Write it to `docs/reviews/<task-id>-ui.md`:
+Write it to `<git-common-dir>/reviews/<task-id>-ui.md` outside the task worktree:
 
     # UI/UX review — <task-id> <task name>
     **Reviewed commit:** <sha>   **Verdict:** PASS | FAIL
@@ -192,8 +191,8 @@ Write it to `docs/reviews/<task-id>-ui.md`:
     ## Overall impression
     <three lines: what works, what does not, the single highest-impact change>
 
-Each finding is a **bug-fix row** for the board: it names the rule broken, what was expected, what
-was actually observed, and the evidence that proves it.
+Each finding returns to the original builder in the existing worktree: name the rule,
+expected vs actual and evidence.
 
 Validate each finding and take its fingerprint:
 
@@ -202,9 +201,8 @@ python3 .opencode/skills/qa-review/scripts/check-finding.py --body-file <finding
     --kind ux --priority medium --category visual --route /path
 ```
 
-Exit 0 prints the fingerprint (`kind|category|route|subject`) on stdout. Pass it to
-`board.py add --fingerprint` so the same complaint about the same thing is recognised the next
-time it is raised.
+Exit 0 prints the fingerprint (`kind|category|route|subject`). Record it in the local ledger;
+a repeat blocks the original row rather than creating another task.
 
 **A screen that passes §2 and fails §3.1 or §3.2 is still a FAIL.** Beautiful and useless is not
 done.
@@ -212,7 +210,7 @@ done.
 ## Report back
 
 The verdict, the findings list with severity, the screenshot paths, and the single highest-impact
-change. Say plainly which findings should become board rows of type `Fix`. Do not edit
-`docs/BOARD.md` — the orchestrator owns the board and creates the rows from your findings.
+change. Say plainly which findings return the original row to `In Progress`. Do not edit the
+SQLite board; only a distinct independently approved defect receives its own task.
 
-Never push. Never merge into `main`. Never create a pull request.
+Never push, merge, invoke `finalize` or create a pull request.

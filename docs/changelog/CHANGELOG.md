@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Complete local-board and human-gate migration
+**Type:** Fix
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `worktree.py`, `test_handoff.py`, `ledger.py`, root/template rules, agent/skill/command guidance, `docs/BOARD.md` index, structure/stack/decisions/handover.
+**Why:** Prevent unattended integration and conflicted main checkout; remove tracked historical board state and automatic Fix-worktree fanout.
+**Impact:** Local SQLite board and reviewer records stay outside Git; Markdown is generated export. Human typed-TTY gate is policy deterrence, not same-identity security. Existing board bytes and import snapshot preserved; fresh clone starts empty. In-task findings reuse the task worktree.
+**Verification:** Lifecycle suite in isolated temporary repositories; independent parent review still required.
+
 ## [2026-11-12] Gate env provisioning and add human-only finalization
 **Type:** Feature
 **Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap

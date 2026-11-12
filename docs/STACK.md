@@ -13,6 +13,7 @@ Tailwind stylesheet, and it produces a committed file — the viewer itself need
 |---|---|---|
 | Python | 3.9+ | every script under `.opencode/skills/*/scripts/` |
 | SQLite | Python `sqlite3` | `<git-common-dir>/factory-board.sqlite3`, one per clone; WAL and 10s busy timeout |
+| Local review records | Markdown | `<git-common-dir>/reviews/`, outside task worktrees |
 | OpenCode | V2 | `opencode.jsonc`, `.opencode/agents/`, `.opencode/commands/`, five discoverable skills |
 | Node.js | 22 | the dev container, the Playwright MCP, the Tailwind build |
 | Playwright | the global install in the dev container | retained historical/test tooling, not UI QA |
@@ -42,6 +43,10 @@ python3 .opencode/skills/board/scripts/board.py show
 # Generate a readable Markdown snapshot in the Git common directory (prints its path)
 python3 .opencode/skills/board/scripts/board.py export
 
+# Human-only integration, from target base checkout on a real terminal
+# Requires typed board ID, base, branch and full tip; agents never invoke it.
+python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
+
 # Board refresh regressions (temporary fixture trees, no live server)
 python3 .opencode/skills/board/scripts/test_board_serve.py
 
@@ -56,6 +61,9 @@ python3 .opencode/skills/git-worktree/scripts/test_env.py
 
 # Focused handoff gates (isolated temporary repositories inside the task worktree)
 python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_handoff.py'
+
+# Lifecycle and TTY/conflict regressions (temporary repositories only)
+python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'
 
 # Security adapter boundary tests (temporary dummy repositories only)
 node --test .opencode/plugins/factory-guard/guard.test.mjs

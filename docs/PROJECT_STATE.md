@@ -1,5 +1,18 @@
 # PROJECT STATE — software factory
 
+## Current session — SQLite migration corrective slice (2026-11-12)
+
+- `feat/sqlite-board-bootstrap` remains in the same worktree. `docs/BOARD.md` is untracked on
+  the task branch only; disk bytes and SQLite import snapshot remain. Root/template rules,
+  specialist agents, scripts and derived commands now route in-task findings back to the same
+  worktree and keep reviewer reports/ledger in Git common-dir `reviews/`.
+- Human-only finalize requires a real TTY and typed board/base/branch/tip. Conflict preflight
+  reports path/cause; a failed merge initiated by the command is aborted when safe. The gate
+  deters unintended invocation but cannot isolate processes sharing one OS identity.
+- Lifecycle test suite: first run 23 tests, two fixture/retry failures; corrected and second run
+  23 tests OK. Later output-only redaction was file-reviewed, not retested under the two-attempt
+  limit. Next: independent parent QA/review; no merge/finalize by agents.
+
 ## Current session — SQLite board core slice (2026-11-12)
 
 - `feat/sqlite-board-bootstrap` in its assigned worktree moves default board reads/mutations

@@ -2,12 +2,12 @@
 description: Show the live board, pick the next task, and move it through the worktree lanes
 ---
 
-You are the **orchestrator**. This command runs in the main checkout and is the only writer of
-`docs/BOARD.md`.
+You are the **orchestrator**. Update the Git-common-dir SQLite board through `board.py` only.
 
-The live `docs/BOARD.md` is local, Git-ignored workspace state. Tooling creates it when absent in the control repo’s main checkout. Never overwrite an existing board or copy it into task worktrees. Only the orchestrator edits its rows through `board.py`.
+`docs/BOARD.md` is a legacy one-time import source, not the live board. Markdown exports are
+generated snapshots; the human-only finalize command owns its integration transition.
 
-Run `python3 .opencode/skills/board/scripts/board.py show` to initialize a missing board, then read it and report:
+Run `python3 .opencode/skills/board/scripts/board.py show` to initialize SQLite, then report:
 
 1. **Snapshot** — every row: ID, task, type, status, risk, worktree, next action.
 2. **Counts per lane** — Backlog, Ready, In Progress, In Review, Pending Merge, Blocked, Merged.
@@ -33,4 +33,6 @@ Then, if asked to start it:
   Only finished, verified, reviewed, committed, clean `Pending Merge` work gets merge guidance.
   Otherwise provide only review/diff and blockers, with no manually added merge or teardown.
   Never merge, push, or open a PR yourself.
-- After the user merges, set `Merged` and clean up the worktree.
+- A review finding returns to the original builder in the same worktree. Do not create an
+  automatic Fix row. The human invokes `worktree.py finalize` with a real terminal and typed
+  board/base/branch/tip; agents never invoke it or independently merge/clean up.

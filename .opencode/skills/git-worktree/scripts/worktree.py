@@ -1129,6 +1129,7 @@ def cmd_finalize(args, cwd):
         print("refused: missing branch and recovery record", file=sys.stderr)
         return REFUSED
     integrated = git(repo, "merge-base", "--is-ancestor", tip, base)[0] == 0
+    base_tip = git_out(repo, "rev-parse", "refs/heads/" + base)
     if not integrated:
         if not os.path.isdir(path) or repo_of_path(path) != os.path.realpath(repo):
             print("refused: recorded worktree missing or in wrong repository", file=sys.stderr)
@@ -1150,15 +1151,28 @@ def cmd_finalize(args, cwd):
                                   "--no-messages", base, branch)
         if code != 0:
             paths = output.splitlines()[1:]
+            _, detail, _ = git(repo, "merge-tree", "--write-tree", base, branch)
+            messages = [(match.group(1), line) for line in detail.splitlines()
+                        if (match := re.match(r"^CONFLICT \(([a-zA-Z /-]+)\):", line))]
             print("refused: merge conflict; retain the task worktree. Resolve there and re-review.",
                   file=sys.stderr)
             for conflict in paths:
-                print("conflict: %s — competing edits on base and task branch" % conflict,
+                cause = next((category for category, line in messages
+                              if line.endswith(" in " + conflict)), "competing edits (type unavailable)")
+                print("conflict: %s — %s" % (conflict, cause),
                       file=sys.stderr)
             if not paths:
-                print("preflight failed: %s" % (error.splitlines() or ["unknown reason"])[-1],
-                      file=sys.stderr)
+                print("preflight failed without path details; inspect Git locally", file=sys.stderr)
             return REFUSED
+    if not confirm_finalize(args.board, base, branch, tip):
+        return REFUSED
+    live_tip = git_out(repo, "rev-parse", "refs/heads/" + branch)
+    if (git_out(repo, "rev-parse", "refs/heads/" + base) != base_tip
+            or (live_tip or (existing["tip"] if integrated and existing else None)) != tip
+            or git_out(repo, "symbolic-ref", "--short", "HEAD") != base
+            or git(repo, "status", "--porcelain", "--untracked-files=all")[0:2] != (0, "")):
+        print("refused: base, branch or main checkout changed during confirmation", file=sys.stderr)
+        return REFUSED
     print("limitation: QA, review, acceptance proofs and verification are certified by the "
           "Pending Merge lane; their evidence is not machine-readable here.")
     if not existing:
@@ -1167,10 +1181,18 @@ def cmd_finalize(args, cwd):
             json.dump({"path": path, "branch": branch, "tip": tip, "base": base,
                        "base_tip": git_out(repo, "rev-parse", base)}, stream)
     if not integrated:
+        before_merge = git_out(repo, "rev-parse", "HEAD")
         code, _, error = git(repo, "merge", "--no-ff", branch,
-                             "-m", "merge: %s" % slug_of(path, repo))
+                              "-m", "merge: %s" % slug_of(path, repo))
         if code != 0:
-            print("merge failed; repository state retained: %s" % (error.splitlines() or ["unknown"])[-1],
+            if (before_merge and git_out(repo, "rev-parse", "HEAD") == before_merge
+                    and git_out(repo, "rev-parse", "-q", "--verify", "MERGE_HEAD")):
+                abort_code, _, _ = git(repo, "merge", "--abort")
+                if abort_code != 0:
+                    print("merge abort failed; main checkout needs human inspection", file=sys.stderr)
+                else:
+                    print("merge initiated here was aborted; task branch and board retained", file=sys.stderr)
+            print("merge failed; task branch and board retained (Git exit %d)" % code,
                   file=sys.stderr)
             return REFUSED
     if git(repo, "merge-base", "--is-ancestor", tip, base)[0] != 0:
@@ -1204,6 +1226,27 @@ def cmd_finalize(args, cwd):
           (base, branch, "Pending Merge (other repos remain)" if remaining else "Merged"))
     print("recovery record: %s" % journal)
     return OK
+
+
+def confirm_finalize(board_id, base, branch, tip):
+    """Require a local terminal and a typed binding to this exact merge target."""
+    expected = "%s %s %s %s" % (board_id, base, branch, tip)
+    try:
+        with open("/dev/tty", "r+", encoding="utf-8") as terminal:
+            if not terminal.isatty():
+                print("refused: finalize requires a real interactive terminal", file=sys.stderr)
+                return False
+            terminal.write("Human-only finalize. This is a local policy gate, not an OS security boundary.\n"
+                           "Type exactly to confirm: %s\n> " % expected)
+            terminal.flush()
+            answer = terminal.readline().rstrip("\r\n")
+    except OSError:
+        print("refused: finalize requires a real interactive terminal", file=sys.stderr)
+        return False
+    if answer != expected:
+        print("refused: confirmation did not match board, base, branch and tip", file=sys.stderr)
+        return False
+    return True
 
 
 def cmd_verify(args, cwd):

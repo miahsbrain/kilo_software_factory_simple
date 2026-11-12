@@ -1,5 +1,34 @@
 # HANDOVER — software factory
 
+> **Session Notes — SQLite migration corrective slice, 2026-11-12**
+> Worktree `feat/sqlite-board-bootstrap` keeps the live board in Git-common-dir SQLite.
+> Factory `docs/BOARD.md` is untracked on this task branch; its on-disk bytes and preexisting
+> SQLite import snapshot remain. A fresh clone after integration starts empty, never from
+> historical tracked rows. Human-only finalize requires a real TTY and typed board ID, base,
+> branch and full tip; merge preflight reports conflict paths/types, and a failed initiated merge
+> is aborted if safe. QA/UI findings now return to the original builder in the same worktree;
+> reviewer reports and ledger belong under `<git-common-dir>/reviews/`. Next: independent parent
+> review and QA; this task is not merge-ready merely because it is committed.
+
+## Transition and recovery
+
+- Existing local board: `board.py show` imports main-checkout legacy bytes once into the local
+  SQLite `source_bytes` snapshot without changing the Markdown. `board.py export` writes the
+  current readable snapshot under Git common dir. Use a consistent SQLite backup (or export)
+  when transferring a clone; Git does not synchronize live rows or reviewer reports.
+- On merge of this branch, tracked `docs/BOARD.md` is deleted from the integration checkout;
+  a previously initialized SQLite database retains the live rows. Before merging, verify a
+  local board import/export or backup. After merge, a new clone with no local board initializes
+  empty. The still-tracked blank project template is not historical state.
+- `worktree.py:cmd_finalize` (effectful Git/SQLite) performs clean preflight, typed terminal
+  confirmation and resumable integration. `confirm_finalize` (effectful `/dev/tty` input) cannot
+  establish identity against a process sharing the same OS user. Failed merge abort is scoped
+  to `MERGE_HEAD` created during this call and unchanged pre-merge HEAD; otherwise inspect
+  manually. `ledger.py:main` (effectful Git discovery) defaults to common-dir local reviews;
+  `parse_ledger`/`render_ledger` (pure) retain historical Fix-row fields for old records.
+- Verification: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_*.py'`;
+  parent independently reviews evidence before marking Pending Merge.
+
 > **Session Notes — BOARD-124 lifecycle slice, 2026-11-12**
 > `feat/sqlite-board-bootstrap` now makes create/resume refuse env errors; failed create records
 > a Blocked partial worktree rather than losing its ownership. Human-only `finalize --board ID`

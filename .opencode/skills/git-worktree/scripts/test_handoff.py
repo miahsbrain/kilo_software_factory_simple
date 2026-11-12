@@ -3,6 +3,7 @@ import contextlib
 import io
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -146,6 +147,18 @@ class HandoffTests(unittest.TestCase):
         self.args.board = "BOARD-999"
         self.assert_withheld("no row with ID")
 
+    def test_review_correction_resumes_same_worktree_without_fix_row(self):
+        before = self.board_cells()
+        self.set_status("In Progress")
+        code, out, err = test_env.run(self.repo, self.script, "resume", "--board", "BOARD-904")
+        self.assertEqual(code, 0, out + err)
+        self.assertIn(self.path, out)
+        code, out, err = test_env.run(self.repo, self.script, "create", "--board", "BOARD-904")
+        self.assertNotEqual(code, 0)
+        self.assertIn("already has a live worktree", err)
+        self.assertEqual(self.board_cells()[8], before[8])
+        self.assertEqual(len(worktree.list_worktrees(self.repo)), 2)
+
     def test_already_merged_pending_row_offers_finalize_but_no_merge(self):
         code, out, err = test_env.git(self.repo, "merge", "--no-ff", "feat/hand-off-a-worktree",
                                      "-m", "scratch merge")
@@ -162,7 +175,7 @@ class HandoffTests(unittest.TestCase):
     def test_human_finalize_integrates_cleans_and_preserves_board_file(self):
         board_file = Path(self.repo, "docs", "BOARD.md")
         before = board_file.read_bytes()
-        code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
+        code, out, err = self.finalize_confirmed()
         self.assertEqual(code, 0, out + err)
         self.assertFalse(os.path.exists(self.path))
         self.assertEqual(test_env.git(self.repo, "branch", "--list", "feat/hand-off-a-worktree")[1], "")
@@ -181,6 +194,70 @@ class HandoffTests(unittest.TestCase):
         self.assertIsNone(error)
         return module.cell_texts(table["lines"], module.row_by_id(table, "BOARD-904"))
 
+    def finalize_confirmed(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch.object(worktree, "script_root", return_value=self.repo), \
+                patch.object(worktree, "confirm_finalize", return_value=True), \
+                contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = worktree.cmd_finalize(SimpleNamespace(board="BOARD-904", repo=None), self.repo)
+        return code, stdout.getvalue(), stderr.getvalue()
+
+    def test_confirmation_refuses_noninteractive_and_wrong_input(self):
+        code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
+        self.assertNotEqual(code, 0)
+        self.assertIn("interactive terminal", err)
+        self.assertTrue(Path(self.path).is_dir())
+        self.assertEqual(self.board_cells()[3], "Pending Merge")
+        tip = self.git("rev-parse", "HEAD")
+
+        class Terminal(io.StringIO):
+            def __init__(self, answer):
+                super().__init__()
+                self.answer = answer
+
+            def isatty(self):
+                return True
+
+            def readline(self):
+                return self.answer
+
+            def close(self):
+                self.prompt = self.getvalue()
+                super().close()
+
+        for answer, accepted in (("no\n", False),
+                                 ("BOARD-904 main feat/hand-off-a-worktree %s\n" % tip, True)):
+            terminal = Terminal(answer)
+            with patch("builtins.open", return_value=terminal):
+                self.assertIs(worktree.confirm_finalize("BOARD-904", "main",
+                    "feat/hand-off-a-worktree", tip), accepted)
+            self.assertIn(tip, terminal.prompt)
+
+    def test_failed_merge_aborts_only_own_merge_and_preserves_task(self):
+        original = worktree.git
+        aborted = []
+
+        def failing_merge(cwd, *args, **kwargs):
+            if cwd == self.repo and args[:2] == ("merge", "--no-ff"):
+                Path(self.repo, ".git/MERGE_HEAD").write_text(self.git("rev-parse", "HEAD") + "\n")
+                return 1, "", "injected merge failure"
+            if cwd == self.repo and args[:2] == ("merge", "--abort"):
+                aborted.append(True)
+                Path(self.repo, ".git/MERGE_HEAD").unlink()
+                return 0, "", ""
+            return original(cwd, *args, **kwargs)
+
+        with patch.object(worktree, "script_root", return_value=self.repo), \
+                patch.object(worktree, "confirm_finalize", return_value=True), \
+                patch.object(worktree, "git", side_effect=failing_merge), \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(worktree.cmd_finalize(SimpleNamespace(board="BOARD-904", repo=None),
+                                                    self.repo), worktree.REFUSED)
+        self.assertEqual(aborted, [True])
+        self.assertTrue(Path(self.path).is_dir())
+        self.assertEqual(self.board_cells()[3], "Pending Merge")
+        self.assertEqual(test_env.git(self.repo, "status", "--porcelain")[1], "")
+
     def test_finalize_refuses_unfinished_and_dirty(self):
         self.set_status("In Review")
         code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
@@ -194,6 +271,10 @@ class HandoffTests(unittest.TestCase):
         self.assertTrue(os.path.isdir(self.path))
 
     def test_conflict_preflight_retains_both_worktrees_and_row(self):
+        self.git("add", "kept.txt")
+        test_env.write(os.path.join(self.path, "kept.txt"), "task side\n")
+        self.git("add", "kept.txt")
+        self.git("commit", "-m", "task edit")
         test_env.write(os.path.join(self.repo, "kept.txt"), "competing base edit\n")
         code, _, err = test_env.git(self.repo, "add", "kept.txt")
         self.assertEqual(code, 0, err)
@@ -202,18 +283,21 @@ class HandoffTests(unittest.TestCase):
         code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
         self.assertNotEqual(code, 0, out + err)
         self.assertIn("kept.txt", err)
+        self.assertIn("add/add", err)
         self.assertTrue(os.path.isdir(self.path))
         self.assertEqual(self.board_cells()[3], "Pending Merge")
+        self.assertEqual(test_env.git(self.repo, "status", "--porcelain")[1], "")
 
     def test_retry_after_interrupted_board_update(self):
         with patch.object(worktree, "script_root", return_value=self.repo):
-            with patch.object(worktree, "clear_row_worktree", return_value=(False, "injected")):
+            with patch.object(worktree, "clear_row_worktree", return_value=(False, "injected")), \
+                    patch.object(worktree, "confirm_finalize", return_value=True):
                 with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(worktree.cmd_finalize(SimpleNamespace(board="BOARD-904", repo=None),
                                                             self.repo), worktree.REFUSED)
         self.assertFalse(os.path.exists(self.path))
         self.assertEqual(self.board_cells()[3], "Pending Merge")
-        code, out, err = test_env.run(self.repo, self.script, "finalize", "--board", "BOARD-904")
+        code, out, err = self.finalize_confirmed()
         self.assertEqual(code, 0, out + err)
         self.assertEqual(self.board_cells()[3], "Merged")
 
@@ -249,6 +333,51 @@ class EnvFailureTests(unittest.TestCase):
         code, out, err = test_env.run(self.repo, self.script, "resume", "--board", "BOARD-904")
         self.assertNotEqual(code, 0)
         self.assertNotIn("is In Progress", out)
+
+
+class BoardMigrationTests(unittest.TestCase):
+    def test_untracked_legacy_board_preserves_sqlite_and_fresh_clone_starts_empty(self):
+        with tempfile.TemporaryDirectory(prefix="migration-test-", dir=Path(__file__).parents[4]) as temp:
+            repo = test_env.make_repo(temp)
+            test_env.write(str(Path(repo, ".gitignore")),
+                           ".opencode/worktrees/\n__pycache__/\ndocs/BOARD.md\n")
+            self.assertEqual(test_env.git(repo, "add", ".gitignore")[0], 0)
+            self.assertEqual(test_env.git(repo, "commit", "-m", "ignore runtime files")[0], 0)
+            board_script = Path(repo, ".opencode/skills/board/scripts/board.py")
+            original = Path(repo, "docs/BOARD.md").read_bytes()
+            code, out, err = test_env.run(repo, str(board_script), "show", "BOARD-904")
+            self.assertEqual(code, 0, out + err)
+            module = worktree.load_board_module(repo)
+            with module.connect(module.database_path(repo)) as connection:
+                saved = connection.execute("SELECT source_bytes FROM board WHERE id = 1").fetchone()[0]
+            self.assertEqual(saved, original)
+
+            task = Path(repo, ".opencode/worktrees/migration")
+            task.parent.mkdir(parents=True, exist_ok=True)
+            code, out, err = test_env.git(repo, "worktree", "add", "-b", "migration", str(task))
+            self.assertEqual(code, 0, err)
+            code, out, err = test_env.git(str(task), "rm", "--cached", "--", "docs/BOARD.md")
+            self.assertEqual(code, 0, err)
+            self.assertEqual((task / "docs/BOARD.md").read_bytes(), original)
+            code, out, err = test_env.git(str(task), "commit", "-m", "untrack legacy board")
+            self.assertEqual(code, 0, err)
+            code, out, err = test_env.git(repo, "merge", "--no-ff", "migration", "-m", "integrate")
+            self.assertEqual(code, 0, err)
+            self.assertEqual(test_env.git(repo, "status", "--porcelain")[1], "")
+            code, out, err = test_env.run(repo, str(board_script), "export")
+            self.assertEqual(code, 0, out + err)
+            self.assertIn("BOARD-904", Path(module.database_path(repo)).with_name(
+                "factory-board-export.md").read_text())
+
+            clone = Path(temp, "fresh-clone")
+            result = subprocess.run(["git", "clone", "--quiet", "--", repo, str(clone)],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((clone / "docs/BOARD.md").exists())
+            code, out, err = test_env.run(str(clone), str(clone / ".opencode/skills/board/scripts/board.py"),
+                                          "show")
+            self.assertEqual(code, 0, out + err)
+            self.assertNotIn("BOARD-904", out)
 
 
 if __name__ == "__main__":

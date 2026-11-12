@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """ledger.py — the bounded QA/fix ledger for one board row.
 
-One short file per row, docs/reviews/<task-id>-ledger.md, carries the state
-between rounds: the round number, the findings filed in that round, the Fix
-row IDs created, the Fix rows merged since, and the stop reason when it stops.
+One short file per row in the control repository's Git common directory carries
+the round number, findings, corrections in the same worktree and stop reason.
 
 A row may go through at most 3 rounds. `next-round` refuses to open round 4;
 the row moves to Blocked instead.
 
 Usage:
-  ledger.py status      --task-id BOARD-005 [--ledger-dir docs/reviews]
+  ledger.py status      --task-id BOARD-005 [--ledger-dir <local-dir>]
   ledger.py next-round  --task-id BOARD-005
   ledger.py finding     --task-id BOARD-005 --fingerprint "kind|category|route|subject"
                          [--evidence <path>] [--fix-row BOARD-010]
@@ -22,10 +21,12 @@ Exit codes: 0 ok, 1 refused, 2 usage error.
 import argparse
 import os
 import re
+import subprocess
 import sys
 
 MAX_ROUNDS = 3
-FIELDS = ("Findings", "Fix rows", "Fix rows merged", "Stop reason")
+FIELDS = ("Findings", "Corrections", "Stop reason")
+LEGACY_FIELDS = ("Fix rows", "Fix rows merged")
 ROUND_RE = re.compile(r"^## Round (\d+)\s*$")
 
 
@@ -48,7 +49,7 @@ def parse_ledger(text):
             header.append(line)
             continue
         item = re.match(r"^- ([A-Za-z ]+): (.*)$", line)
-        if item and item.group(1) in FIELDS:
+        if item and item.group(1) in FIELDS + LEGACY_FIELDS:
             current["fields"][item.group(1)] = item.group(2).strip()
     return header, rounds
 
@@ -58,7 +59,7 @@ def render_ledger(header, rounds):
     for entry in rounds:
         lines.append("")
         lines.append("## Round %d" % entry["number"])
-        for field in FIELDS:
+        for field in FIELDS + tuple(f for f in LEGACY_FIELDS if f in entry["fields"]):
             lines.append("- %s: %s" % (field, entry["fields"].get(field, "-")))
     return "\n".join(lines) + "\n"
 
@@ -145,7 +146,7 @@ def cmd_finding(args):
         item += " — " + args.evidence
     entry["fields"]["Findings"] = append_item(entry["fields"].get("Findings"), item)
     if args.fix_row:
-        entry["fields"]["Fix rows"] = append_item(entry["fields"].get("Fix rows"), args.fix_row)
+        entry["fields"]["Corrections"] = append_item(entry["fields"].get("Corrections"), args.fix_row)
     write_ledger(path, header, rounds)
     print("round %d: finding recorded" % entry["number"])
     return OK
@@ -157,8 +158,8 @@ def cmd_merged(args):
         print("refused: no round is open for %s" % args.task_id, file=sys.stderr)
         return REFUSED
     entry = rounds[-1]
-    entry["fields"]["Fix rows merged"] = append_item(
-        entry["fields"].get("Fix rows merged"), args.fix_row)
+    entry["fields"]["Corrections"] = append_item(
+        entry["fields"].get("Corrections"), args.fix_row)
     write_ledger(path, header, rounds)
     print("round %d: %s marked merged" % (entry["number"], args.fix_row))
     return OK
@@ -195,8 +196,7 @@ def main(argv):
     parser = argparse.ArgumentParser(
         prog="ledger.py",
         description="Track the bounded QA/fix rounds of one board row.")
-    parser.add_argument("--ledger-dir", default="docs/reviews",
-                        help="directory that holds the ledger files (default: docs/reviews)")
+    parser.add_argument("--ledger-dir", help="override local review directory")
     sub = parser.add_subparsers(dest="command")
 
     for name, help_text in (
@@ -224,6 +224,13 @@ def main(argv):
     if not args.command:
         parser.print_help()
         return USAGE
+    if args.ledger_dir is None:
+        result = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                                capture_output=True, text=True)
+        if result.returncode:
+            print("refused: cannot locate Git common directory for review ledger", file=sys.stderr)
+            return REFUSED
+        args.ledger_dir = os.path.join(result.stdout.strip(), "reviews")
     handler = {
         "status": cmd_status,
         "next-round": cmd_next_round,
