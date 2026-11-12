@@ -1,5 +1,28 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-125 finalize teardown repair, 2026-11-12**
+> In `fix/repair-finalize-after-worktree-removal`, the human-only finalize command now
+> displays board, base, branch and full tip before requiring an exact `yes` on TTY stdin.
+> It rechecks Git and the SQLite row after confirmation. The loaded board adapter retains
+> control-repo discovery when the running script is removed with its task worktree. A
+> validated, fsynced Git-common-dir recovery record precedes merge/teardown; retry after
+> removal clears the row without re-merging. Other repos remain Pending Merge.
+> Next: parent independent review; agents do not invoke real finalize or merge.
+
+## BOARD-125 lifecycle inventory
+
+- `worktree.py:load_board_module` (effectful import) binds its existing `control_root`
+  to the loaded board module so the same process can update SQLite after self-removal.
+- `worktree.py:cmd_finalize` (effectful Git, filesystem, SQLite) validates the recorded
+  path/branch/base/tip and commit before replay, persists and syncs the recovery record
+  before integration, and re-reads Pending Merge and worktree ownership after confirmation.
+  `clear_row_worktree` (effectful SQLite through the board adapter) keeps other repo entries.
+- `worktree.py:confirm_finalize` (effectful terminal) shows the target, accepts only
+  `yes` followed by a newline, and refuses non-TTY, EOF, mismatch and stream errors.
+  Confirmation is a local deterrence, not an OS security boundary.
+- Verification: focused scratch-repository handoff tests from `docs/STACK.md`; parent
+  reviews result before changing the board lane.
+
 > **Session Notes — BOARD-124 terminal confirmation correction, 2026-11-12**
 > In `feat/sqlite-board-bootstrap`, `confirm_finalize` uses TTY stdin and stderr rather than
 > opening `/dev/tty`, which raised `io.UnsupportedOperation` on the human's interactive host.

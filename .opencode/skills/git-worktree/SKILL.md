@@ -453,13 +453,17 @@ human-only finalize (run from target base checkout in a real terminal):
   python3 '<absolute-control-script-path>' finalize --board BOARD-00X [--repo <id>]
 ```
 
-Finalize requires interactive stdin and stderr and a typed board ID, base, branch and full tip;
-the challenge is printed to stderr and one line is read from stdin. It does not open `/dev/tty`,
+Finalize shows the board ID, base, branch and full tip on interactive stderr, then requires
+typing exactly `yes` on interactive stdin. It does not open `/dev/tty`,
 which failed even when the invoking shell's stdin was a TTY. It checks clean worktrees and
 preflights conflicts, then coordinates merge, cleanup and board update. Non-interactive use is
 refused with no bypass flag. Same-identity code can bypass this local policy/deterrence gate;
 it is not an OS security boundary. Conflicts are reported per path and resolved in the task
 worktree before re-review; an initiated merge is aborted on failure when safe.
+Before merge/teardown it persists a validated recovery record in the Git common directory.
+If cleanup stops after removing the worktree or branch, rerun the same human-only command
+from the base checkout: the record proves the integrated tip and the board row is completed
+without re-merging. An invalid record or changed row refuses rather than guessing.
 
 When a clean branch is already merged into the base, the block prints a `git show --stat` line
 and offers the same human-only finalize command for resumable cleanup. Dirty or unknown state

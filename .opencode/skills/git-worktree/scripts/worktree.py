@@ -322,6 +322,9 @@ def load_board_module(root):
     spec = importlib.util.spec_from_file_location("board", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    # The invoking script may live in the worktree being removed. Keep board
+    # discovery bound to this process rather than importing that deleted path.
+    module.control_root = control_root
     return module
 
 
@@ -1117,10 +1120,21 @@ def cmd_finalize(args, cwd):
     journal = os.path.join(common, "cleanup-wt", "finalize-%s-%s.json" % (args.board, repo_id))
     existing = None
     if os.path.exists(journal):
-        with open(journal, encoding="utf-8") as stream:
-            existing = json.load(stream)
-        if existing.get("path") != path or existing.get("branch") != branch:
-            print("refused: recovery record does not match row", file=sys.stderr)
+        try:
+            with open(journal, encoding="utf-8") as stream:
+                existing = json.load(stream)
+        except (OSError, ValueError) as exc:
+            print("refused: cannot read recovery record: %s" % exc, file=sys.stderr)
+            return REFUSED
+        if (not isinstance(existing, dict) or existing.get("path") != path
+                or existing.get("branch") != branch or existing.get("base") != base
+                or not isinstance(existing.get("tip"), str)
+                or not re.fullmatch(r"[0-9a-f]{40,64}", existing["tip"])
+                or not isinstance(existing.get("base_tip"), str)
+                or not re.fullmatch(r"[0-9a-f]{40,64}", existing["base_tip"])
+                or git_out(repo, "rev-parse", "--verify", existing["tip"] + "^{commit}")
+                != existing["tip"]):
+            print("refused: recovery record does not match row or repository", file=sys.stderr)
             return REFUSED
     tip = git_out(repo, "rev-parse", "refs/heads/" + branch)
     if existing and tip and tip != existing["tip"]:
@@ -1175,13 +1189,33 @@ def cmd_finalize(args, cwd):
             or git(repo, "status", "--porcelain", "--untracked-files=all")[0:2] != (0, "")):
         print("refused: base, branch or main checkout changed during confirmation", file=sys.stderr)
         return REFUSED
+    current, current_index = board_row(board, board_file, args.board)
+    if current is None:
+        return REFUSED
+    current_cells = board.cell_texts(current["lines"], current_index)
+    if (current_cells[STATUS_INDEX] != "Pending Merge"
+            or current_cells[column] != cells[column]):
+        print("refused: board row changed during confirmation", file=sys.stderr)
+        return REFUSED
+    table, index = current, current_index
     print("limitation: QA, review, acceptance proofs and verification are certified by the "
           "Pending Merge lane; their evidence is not machine-readable here.")
     if not existing:
         os.makedirs(os.path.dirname(journal), exist_ok=True)
-        with open(journal, "x", encoding="utf-8") as stream:
-            json.dump({"path": path, "branch": branch, "tip": tip, "base": base,
-                       "base_tip": git_out(repo, "rev-parse", base)}, stream)
+        try:
+            with open(journal, "x", encoding="utf-8") as stream:
+                json.dump({"path": path, "branch": branch, "tip": tip, "base": base,
+                           "base_tip": base_tip}, stream)
+                stream.flush()
+                os.fsync(stream.fileno())
+            directory = os.open(os.path.dirname(journal), os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+        except OSError as exc:
+            print("refused: recovery record is not durable: %s" % exc, file=sys.stderr)
+            return REFUSED
     if not integrated:
         before_merge = git_out(repo, "rev-parse", "HEAD")
         code, _, error = git(repo, "merge", "--no-ff", branch,
@@ -1231,14 +1265,14 @@ def cmd_finalize(args, cwd):
 
 
 def confirm_finalize(board_id, base, branch, tip):
-    """Require interactive streams and a typed binding to this exact merge target."""
-    expected = "%s %s %s %s" % (board_id, base, branch, tip)
+    """Show the target and require an exact interactive yes from a real terminal."""
     try:
         if not sys.stdin.isatty() or not sys.stderr.isatty():
             print("refused: finalize requires a real interactive terminal", file=sys.stderr)
             return False
         sys.stderr.write("Human-only finalize. This is a local policy gate, not an OS security boundary.\n"
-                         "Type exactly to confirm: %s\n> " % expected)
+                         "Board: %s\nBase: %s\nBranch: %s\nTip: %s\n"
+                         "Type exactly yes to confirm: " % (board_id, base, branch, tip))
         sys.stderr.flush()
         answer = sys.stdin.readline()
     except (OSError, UnicodeError, KeyboardInterrupt):
@@ -1247,8 +1281,8 @@ def confirm_finalize(board_id, base, branch, tip):
         except (OSError, UnicodeError):
             pass
         return False
-    if not answer.endswith("\n") or answer[:-1].removesuffix("\r") != expected:
-        print("refused: confirmation did not match board, base, branch and tip", file=sys.stderr)
+    if not answer.endswith("\n") or answer[:-1].removesuffix("\r") != "yes":
+        print("refused: confirmation must be exactly yes", file=sys.stderr)
         return False
     return True
 

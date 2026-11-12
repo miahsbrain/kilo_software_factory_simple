@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Repair finalize after self-removal
+**Type:** Fix
+**Board:** BOARD-125 | **Branch:** fix/repair-finalize-after-worktree-removal
+**Changed:** `worktree.py`, `test_handoff.py`, git-worktree skill, `docs/STACK.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md`, this log.
+**Why:** SQLite row update imported a script that finalize had just deleted with its worktree.
+**Impact:** Loaded board adapter keeps live control discovery; validated, durable recovery supports replay without re-merging; human prompt shows target and requires exact `yes` on real TTY. No bypass or live integration by agents.
+**Verification:** Focused scratch-repo handoff tests; parent independent review required. Catalogue: python-pro, cli-developer, debugging-wizard, secure-code-guardian.
+
 ## [2026-11-12] Correct interactive finalize confirmation
 **Type:** Fix
 **Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap

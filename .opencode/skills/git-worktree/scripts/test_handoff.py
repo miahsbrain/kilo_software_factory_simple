@@ -201,6 +201,61 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(self.board_cells()[8], "-")
         self.assertIn("recovery record:", out)
 
+    def test_finalize_script_inside_removed_worktree_updates_sqlite(self):
+        script = os.path.join(self.path, ".opencode/skills/git-worktree/scripts/worktree.py")
+        self.assertTrue(os.path.isfile(script))
+        code, out, err = self.finalize_confirmed(script=script)
+        self.assertEqual(code, 0, out + err)
+        self.assertFalse(os.path.exists(script))
+        self.assertEqual(self.board_cells()[3], "Merged")
+        self.assertEqual(self.board_cells()[8], "-")
+
+    def test_replay_after_worktree_and_branch_removed_with_script_in_worktree(self):
+        script = os.path.join(self.path, ".opencode/skills/git-worktree/scripts/worktree.py")
+        with patch.object(worktree, "clear_row_worktree", return_value=(False, "injected")):
+            code, out, err = self.finalize_confirmed(script=script)
+        self.assertEqual(code, worktree.REFUSED, out + err)
+        self.assertFalse(os.path.exists(self.path))
+        self.assertEqual(test_env.git(self.repo, "branch", "--list", "feat/hand-off-a-worktree")[1], "")
+        self.assertEqual(self.board_cells()[3], "Pending Merge")
+        code, out, err = self.finalize_confirmed()
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.board_cells()[3], "Merged")
+        self.assertEqual(self.board_cells()[8], "-")
+
+    def test_invalid_recovery_record_refuses_before_cleanup(self):
+        journal = Path(self.repo, ".git/cleanup-wt/finalize-BOARD-904-control.json")
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        journal.write_text('{"path":"wrong"}')
+        code, out, err = self.finalize_confirmed()
+        self.assertEqual(code, worktree.REFUSED, out + err)
+        self.assertIn("recovery record does not match", err)
+        self.assertTrue(os.path.isdir(self.path))
+        self.assertEqual(self.board_cells()[3], "Pending Merge")
+
+    def test_finalize_preserves_other_repo_worktree_entry(self):
+        other = "apps/api/.opencode/worktrees/api-task · branch feat/api-task"
+        board_script = os.path.join(self.repo, ".opencode/skills/board/scripts/board.py")
+        cell = self.board_cells()[8] + ", " + other
+        code, out, err = test_env.run(self.repo, board_script, "set-field", "BOARD-904",
+                                      "--field", "branch-worktree", "--value", cell)
+        self.assertEqual(code, 0, out + err)
+        code, out, err = self.finalize_confirmed()
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.board_cells()[3], "Pending Merge")
+        self.assertEqual(self.board_cells()[8], other)
+
+    def test_board_change_during_confirmation_refuses(self):
+        def change_board(*args):
+            self.set_status("Blocked")
+            return True
+        with patch.object(worktree, "script_root", return_value=self.repo), \
+                patch.object(worktree, "confirm_finalize", side_effect=change_board), \
+                contextlib.redirect_stderr(io.StringIO()):
+            code = worktree.cmd_finalize(self.args, self.repo)
+        self.assertEqual(code, worktree.REFUSED)
+        self.assertTrue(os.path.isdir(self.path))
+
     def board_cells(self):
         import importlib.util
         path = Path(self.repo, ".opencode/skills/board/scripts/board.py")
@@ -211,10 +266,11 @@ class HandoffTests(unittest.TestCase):
         self.assertIsNone(error)
         return module.cell_texts(table["lines"], module.row_by_id(table, "BOARD-904"))
 
-    def finalize_confirmed(self):
+    def finalize_confirmed(self, script=None):
         stdout, stderr = io.StringIO(), io.StringIO()
-        with patch.object(worktree, "script_root", return_value=self.repo), \
-                patch.object(worktree, "confirm_finalize", return_value=True), \
+        with (patch.object(worktree, "__file__", script) if script else
+              patch.object(worktree, "script_root", return_value=self.repo)), \
+                 patch.object(worktree, "confirm_finalize", return_value=True), \
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             code = worktree.cmd_finalize(SimpleNamespace(board="BOARD-904", repo=None), self.repo)
         return code, stdout.getvalue(), stderr.getvalue()
@@ -242,25 +298,28 @@ class HandoffTests(unittest.TestCase):
                     raise self.failure
                 return super().readline()
 
-        for answer, accepted in (("no\n", False), (expected + "\n", True),
-                                 (expected + "\r\n", True), ("", False),
-                                 (expected, False), (expected + "\n\n", True)):
+        for answer, accepted in (("no\n", False), ("yes\n", True),
+                                 ("yes\r\n", True), ("", False),
+                                 ("YES\n", False), ("yes", False),
+                                 (expected + "\n", False), ("yes\n\n", True)):
             with self.subTest(answer=answer):
                 stdin, stderr = TtyStream(answer), TtyStream()
                 with patch.object(worktree.sys, "stdin", stdin), patch.object(worktree.sys, "stderr", stderr):
                     self.assertIs(worktree.confirm_finalize("BOARD-904", "main",
                         "feat/hand-off-a-worktree", tip), accepted)
-                self.assertIn(expected, stderr.getvalue())
+                for value in ("BOARD-904", "main", "feat/hand-off-a-worktree", tip):
+                    self.assertIn(value, stderr.getvalue())
+                self.assertIn("Type exactly yes", stderr.getvalue())
                 self.assertEqual(stdin.readline(), "\n" if answer.endswith("\n\n") else "")
 
         for stdin_tty, stderr_tty in ((False, True), (True, False)):
             with self.subTest(stdin_tty=stdin_tty, stderr_tty=stderr_tty):
-                stdin, stderr = TtyStream(expected + "\n", tty=stdin_tty), TtyStream(tty=stderr_tty)
+                stdin, stderr = TtyStream("yes\n", tty=stdin_tty), TtyStream(tty=stderr_tty)
                 with patch.object(worktree.sys, "stdin", stdin), patch.object(worktree.sys, "stderr", stderr):
                     self.assertFalse(worktree.confirm_finalize("BOARD-904", "main",
                         "feat/hand-off-a-worktree", tip))
-                self.assertNotIn(expected, stderr.getvalue())
-                self.assertEqual(stdin.readline(), expected + "\n")
+                self.assertNotIn(tip, stderr.getvalue())
+                self.assertEqual(stdin.readline(), "yes\n")
 
         for failure in (OSError("read failed"), UnicodeError("invalid input"), KeyboardInterrupt()):
             with self.subTest(failure=type(failure).__name__):
@@ -270,12 +329,12 @@ class HandoffTests(unittest.TestCase):
                         "feat/hand-off-a-worktree", tip))
                 self.assertIn("confirmation interrupted or unavailable", stderr.getvalue())
 
-        stdin, stderr = TtyStream(expected + "\n"), TtyStream()
+        stdin, stderr = TtyStream("yes\n"), TtyStream()
         with patch.object(worktree.sys, "stdin", stdin), patch.object(worktree.sys, "stderr", stderr), \
                 patch.object(stderr, "flush", side_effect=OSError("write failed")):
             self.assertFalse(worktree.confirm_finalize("BOARD-904", "main",
                 "feat/hand-off-a-worktree", tip))
-        self.assertEqual(stdin.readline(), expected + "\n")
+        self.assertEqual(stdin.readline(), "yes\n")
 
     def test_failed_merge_aborts_only_own_merge_and_preserves_task(self):
         original = worktree.git

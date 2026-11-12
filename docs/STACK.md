@@ -48,7 +48,7 @@ python3 .opencode/skills/board/scripts/board.py export
 python3 .opencode/skills/board/scripts/board.py pre-merge-check
 
 # Human-only integration, from target base checkout on a real terminal
-# Requires typed board ID, base, branch and full tip; agents never invoke it.
+# Shows board/base/branch/tip and requires typing exactly yes; agents never invoke it.
 python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
 
 # Board refresh regressions (temporary fixture trees, no live server)
