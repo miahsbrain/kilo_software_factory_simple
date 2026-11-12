@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-12] Clarify app work-surface finalize path
+**Type:** Docs
+**Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap
+**Changed:** `.opencode/skills/git-worktree/SKILL.md`, `AGENTS.md`, `templates/project/AGENTS.md` and this log.
+**Why:** Relative control-script examples fail when copied into an app work surface without the harness.
+**Impact:** App handoff guidance uses the printed absolute control-script path and `--repo <id>`; relative examples remain valid for the control checkout only. No runtime change.
+**Verification:** File review and `git diff --check` only. Catalogue: code-documenter.
+
 ## [2026-11-12] Guard bootstrap import and local review paths
 **Type:** Fix
 **Board:** BOARD-124 | **Branch:** feat/sqlite-board-bootstrap

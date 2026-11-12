@@ -1602,10 +1602,13 @@ Work lands on a branch. A human reviews it and decides where it goes:
 - The agent finishes the work, commits it on the worktree branch, and sets the board row to
   `Pending Merge`. That state means **waiting for human approval to merge**.
 - The agent reports the worktree path, the branch, the commits, and the diff command.
-- The human reviews, then runs `python3 .opencode/skills/git-worktree/scripts/worktree.py
-  finalize --board BOARD-00X` in the target base checkout on a real terminal. Type the exact
-  displayed board ID, base, branch and full tip. No unattended bypass flag exists. This is a
-  local policy/deterrence gate, not an absolute security boundary against the same OS identity.
+- The human reviews, then runs the `human-only finalize` command printed by `handoff` in the
+  target base checkout on a real terminal. For app work surfaces, copy its absolute control-script
+  path and `--repo <id>`; the app checkout has no relative harness script. For control-repo tasks,
+  `python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X` works
+  from the control base checkout. Type the exact displayed board ID, base, branch and full tip.
+  No unattended bypass flag exists. This is a local policy/deterrence gate, not an absolute
+  security boundary against the same OS identity.
 
 The agent stops at `Pending Merge`. It does not merge, does not push, and does not open a PR.
 
@@ -1617,7 +1620,7 @@ The agent stops at `Pending Merge`. It does not merge, does not push, and does n
 | What changed in mine? | `git -C .opencode/worktrees/<slug> status` and `git -C .opencode/worktrees/<slug> diff <configured-base>` |
 | What is on my branch? | `git -C .opencode/worktrees/<slug> log --oneline <configured-base>..HEAD` |
 | Is it up to date with base? | `git -C .opencode/worktrees/<slug> merge-base --is-ancestor <configured-base> HEAD && echo "base is ancestor"` |
-| Integrate and clean up | Human runs `python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board <ID>` from the target base checkout; legacy `cleanup --board <ID> --apply` is only for already-merged work |
+| Integrate and clean up | Human copies the `handoff` finalize command (absolute control-script path and `--repo <id>` for apps) into the target base checkout; legacy `cleanup --board <ID> --apply` is only for already-merged work |
 | Which row owns it? | The board row's `Branch/Worktree` column |
 
 Worktrees live under `.opencode/worktrees/<feature-slug>/` and are git-ignored. The full procedure is

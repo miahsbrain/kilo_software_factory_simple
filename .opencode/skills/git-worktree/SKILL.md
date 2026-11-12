@@ -463,11 +463,11 @@ When a clean branch is already merged into the base, the block prints a `git sho
 and offers the same human-only finalize command for resumable cleanup. Dirty or unknown state
 still refuses it.
 
-For an app repository, run that absolute control-repo script while your terminal is in the
-app repository's main checkout. `handoff` prints the actual shell-quoted script path and target
-checkout, even when the app repository contains no harness. Do not replace it with a relative
-path inside the app checkout. Only after rechecking the same readiness gates, the human may use
-the same commands by hand:
+For an app repository, copy the entire `human-only finalize` command from `handoff`, including
+the shell-quoted absolute control-script path and `--repo <id>`. Run it from the app repository's
+main checkout in a real terminal. The app work surface has no harness, so a relative script path
+there will not work. Only after rechecking the same readiness gates, the human may use the
+following relative examples **from the control checkout only**:
 
 ```bash
 # review
@@ -475,7 +475,7 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py list
 git -C .opencode/worktrees/<slug> diff <configured-base>
 git -C .opencode/worktrees/<slug> log --oneline <configured-base>..HEAD
 
-# integrate — run only by the human, in the target base checkout with a real terminal
+# integrate a control-repo task — human only, from the control base checkout in a real terminal
 python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
 ```
 
