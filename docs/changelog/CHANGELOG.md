@@ -21,9 +21,10 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 ## [2026-11-12] Raise QA review loop cap to ten
 **Type:** Chore
 **Board:** BOARD-145 | **Branch:** chore/raise-qa-review-loop-limit-to-ten
-**Changed:** QA ledger, boundary tests, loop policy, reviewer instructions, command shortcuts, decisions, handover and project state.
+**Changed:** QA ledger, boundary tests, loop policy, reviewer instructions, command shortcuts, decisions, handover and project state; corrected session status and QA list indentation after rebase.
 **Why:** Apply the approved ten-round future cap while retaining immediate stop conditions.
 **Impact:** New ledgers permit 10 rounds and refuse 11. BOARD-130 historical state and artifacts remain unchanged.
+**Verification:** Ledger suite passed 5 tests before the documentation-only correction; `git diff --check` verifies the documentation diff.
 
 ## [2026-11-12] Plan factory implementation backlog
 **Type:** Docs

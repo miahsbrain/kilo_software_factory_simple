@@ -8,8 +8,9 @@
 - The ledger boundary tests and policy/docs updates are in
   `.opencode/worktrees/raise-qa-review-loop-limit-to-ten` on
   `chore/raise-qa-review-loop-limit-to-ten`. BOARD-130 remains historically Blocked at three
-  rounds and was not reopened or edited. The specified ledger test passed (4 tests). Next: commit
-  and return the handoff for human review. BOARD-148 remains integrated: runtime state is in
+  rounds and was not reopened or edited. The ledger test passed (5 tests). Rebase commit `d4b9b71`
+  and test-mock correction commit `4608662bd0c6a34a56792927678f9e415a57821a` are present. Next:
+  independent QA/review. BOARD-148 remains integrated: runtime state is in
   `.factory-state/`, with the original `.git/` state untouched and cleanup not approved or performed.
 
 ## Previous session — BOARD-148 clone-local state migration (2026-11-12)

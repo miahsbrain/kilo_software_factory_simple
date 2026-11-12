@@ -4,10 +4,12 @@
 > Raised the new QA↔fix loop cap to 10. The ledger opens round 10 and refuses round 11;
 > focused boundary tests use a temporary ledger directory. Critical-path, repeated-fingerprint,
 > and human-stop conditions still block immediately. BOARD-130 remains Blocked at its historical
-> three-round cap; no historical review records changed. Work is in `.opencode/worktrees/raise-qa-review-loop-limit-to-ten`
-> on `chore/raise-qa-review-loop-limit-to-ten`. The specified ledger test passed (4 tests).
-> The approved 10-round cap is retained after rebase; BOARD-148's `.factory-state/` runtime state
-> and migration remain unchanged. Next: human review of the rebased commit.
+> three-round cap; no historical review records changed. Work is in
+> `.opencode/worktrees/raise-qa-review-loop-limit-to-ten` on
+> `chore/raise-qa-review-loop-limit-to-ten`. The ledger test passed (5 tests). Rebase commit
+> `d4b9b71` and test-mock correction commit
+> `4608662bd0c6a34a56792927678f9e415a57821a` are present. BOARD-148's `.factory-state/` runtime
+> state and migration remain unchanged. Next: independent QA/review.
 
 > **Earlier session — BOARD-148 runtime state migration applied, 2026-11-12**
 > The verified snapshot is installed at `.factory-state/`; the original `.git/` state remains
