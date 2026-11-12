@@ -48,7 +48,7 @@ python3 .opencode/skills/board/scripts/board.py export
 python3 .opencode/skills/board/scripts/board.py pre-merge-check
 
 # Human-only integration, from target base checkout on a real terminal
-# Requires typed board ID, base, branch and full tip; agents never invoke it.
+# Shows board/base/branch/tip and requires typing exactly yes; agents never invoke it.
 python3 .opencode/skills/git-worktree/scripts/worktree.py finalize --board BOARD-00X
 
 # Board refresh regressions (temporary fixture trees, no live server)
@@ -64,6 +64,7 @@ python3 .opencode/skills/git-worktree/scripts/worktree.py create --board BOARD-0
 python3 .opencode/skills/git-worktree/scripts/test_env.py
 
 # Focused handoff gates (isolated temporary repositories inside the task worktree)
+# Includes SQLite lock, atomic recovery journal and replay regressions; no live finalize.
 python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_handoff.py'
 
 # Lifecycle and TTY/conflict regressions (temporary repositories only)

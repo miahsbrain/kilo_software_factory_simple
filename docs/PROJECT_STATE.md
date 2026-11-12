@@ -1,5 +1,22 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-125 review correction (2026-11-12)
+
+- Returned to Build on the existing `fix/repair-finalize-after-worktree-removal`
+  branch: recovery publication is atomic/no-overwrite; a SQLite writer lock now
+  spans post-confirmation validation, integration, cleanup and row transition.
+- Other board writers may wait up to the existing 10s busy timeout or fail; on
+  incomplete integration the durable journal supports replay. Next: parent review
+  after focused scratch tests; no agent-run live finalize.
+
+## Current session — BOARD-125 finalize teardown repair (2026-11-12)
+
+- Assigned `fix/repair-finalize-after-worktree-removal` fixes SQLite row update when the
+  invoking script is deleted with its worktree. Durable recovery validation and replay
+  retain branch/base identity; TTY prompt now requires exactly `yes` after target details.
+- Focused scratch-repository suite passed 32 tests; independent review passed. Next: human
+  inspection and finalize from the `opencode` checkout. Agents never run live finalize.
+
 ## Current session — SQLite migration corrective slice (2026-11-12)
 
 - `feat/sqlite-board-bootstrap` remains in the same worktree. `docs/BOARD.md` is untracked on
