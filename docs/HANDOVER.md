@@ -5,8 +5,9 @@
 > untouched and cleanup was not approved or performed. `state.py path` resolves to the new store,
 > and `board.py show` reads the migrated board. Runtime-state tests passed 13/13, board tests 35/35,
 > and the user-run handoff suite passed 34/34 after the final fixture correction. Independent QA
-> returned PASS. Next: record BOARD-148 acceptance proofs and present the verified branch for human
-> integration. No cleanup of the original `.git/` state was approved or performed.
+> returned PASS, and all four acceptance proofs are recorded on BOARD-148. Next: the human inspects
+> and finalizes the branch after the guarded handoff. No cleanup of the original `.git/` state was
+> approved or performed.
 
 > **Session Notes — BOARD-126 ready for human inspection, 2026-11-12**
 > Registered repositories appear in the read-only feeds. `/api/repo-candidates` lists
