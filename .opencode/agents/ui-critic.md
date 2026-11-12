@@ -20,8 +20,8 @@ and follow §B4.2 and `.opencode/skills/qa-review/SKILL.md` for built-in-browser
 
 ## Scope
 
-- Read-only against the code. The only files you write are the review report and, if needed,
-  extra screenshots.
+- Read-only against the code. Write only `ui.md` under the task's shared artifact directory.
+  QA owns `qa.md` and evidence; builders own `builder/`.
 - Do not modify application source code or the SQLite board.
 
 ## The bounded loop
@@ -143,7 +143,8 @@ to a different tool unless the user says so. A missing browser, package, or syst
 
 ## Submit your review
 
-Write it to `<primary-checkout>/.factory-state/reviews/<task-id>-ui.md` outside the task worktree:
+Write it to `<primary-checkout>/artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/ui.md` outside the task
+worktree. Use `ledger.py` for ledger updates, never concurrently; do not edit `qa.md` or `builder/`.
 
     # UI/UX review — <task-id> <task name>
     **Reviewed commit:** <sha>   **Verdict:** PASS | FAIL

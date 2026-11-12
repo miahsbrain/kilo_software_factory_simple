@@ -76,6 +76,9 @@ artifacts/
     qa/
       <YYYY-MM-DD>/
         <task-id>/            # BOARD-005
+          qa.md                    # QA report
+          ui.md                    # independent UI/UX critique
+          builder/                 # builder-owned evidence
           <route-slug>/
             <viewport>/
               <scheme>/        # light | dark
@@ -93,10 +96,11 @@ Keep route/viewport/theme groups separate and name round captures so comparisons
 Retain historical artifacts. Commit `notes.md` and small component shots; keep full-page captures
 out of git. Do not create empty logs or summaries that imply unobserved checks passed.
 
-**Review reports and the ledger live outside task worktrees:**
-`<primary-checkout>/.factory-state/reviews/<task-id>-qa.md`, `-ui.md`, and `-ledger.md`.
-Default ledger writers fail closed while Git-metadata runtime state remains and the new board
-database is absent; run the explicit runtime-state migration before writing reports or ledgers.
+**Reports and evidence live outside task worktrees** in
+`<primary-checkout>/artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA writes `qa.md` and QA
+evidence, the UI critic writes `ui.md`, and builders write only under `builder/`. The round ledger
+remains at `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`; update it only through
+`ledger.py`, never concurrently.
 
 Per route, viewport, and scheme:
 
@@ -159,7 +163,7 @@ expanding one? Name the existing code if it does.
 One file per finding, in the scope you reviewed:
 
 ```
-artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md
+    artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md
 ```
 
 Required sections — the validator enforces this:
@@ -232,8 +236,9 @@ defect may be scoped as a separate task.
 A row may go through at most 10 QA↔fix rounds. Round 10 is the last. If it still fails, move the
 row to `Blocked` with what was tried and the question for the human; do not open an eleventh round.
 
-Each round's state lives in `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`. It holds the round
-number, findings, same-worktree corrections and stop reason.
+Each round's state lives in `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`. It
+holds the round number, findings, same-worktree corrections and stop reason. Use only `ledger.py`
+to update it, and do not update it concurrently.
 
 The ledger is the **only** thing carried between rounds. **Each round's review must be done by a
 fresh reviewer** that reads the ledger and the current screenshots — not the previous reviewer's

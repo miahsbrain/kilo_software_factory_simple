@@ -211,7 +211,9 @@ around with a new tool.
   never assume desktop and server filesystems are shared.
 - **Skills** — before every task, read `.opencode/catalog/README.md`, apply all relevant skills
   and required references, and report skills used or that none matched (§A7). Example lists are not limits.
-- **Review reports and ledgers** are documents, not artifacts: `docs/reviews/<task-id>-{qa,ui,ledger}.md`.
+- **QA/UI reports and evidence** live under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` in the
+  primary checkout (`qa.md`, `ui.md`, and builder evidence under `builder/`). The bounded-loop
+  ledger alone remains under `.factory-state/reviews/` and is updated through `ledger.py`.
 
 ## Status
 

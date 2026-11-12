@@ -1,5 +1,13 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-149 QA artifacts, 2026-11-12**
+> New QA/UI reports and evidence live in the shared main-checkout directory
+> `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA writes `qa.md`, UI critique writes `ui.md`,
+> builders write only under `builder/`. The ledger remains at
+> `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and is updated only through
+> `ledger.py`. BOARD-146's existing QA report was copied byte-for-byte to its task artifact
+> directory; its original remains. Next: human review of BOARD-149's worktree.
+
 > **Session Notes — BOARD-145 QA↔fix round cap, 2026-11-12**
 > Raised the new QA↔fix loop cap to 10. The ledger opens round 10 and refuses round 11;
 > focused boundary tests use a temporary ledger directory. Critical-path, repeated-fingerprint,
@@ -707,7 +715,8 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 | Artefact | Where | What it holds |
 |---|---|---|
 | The board | `<primary-checkout>/.factory-state/factory-board.sqlite3` | Clone-local authoritative task state; one row per unit. `docs/BOARD.md` is a legacy import source only. |
-| Review reports and ledgers | `<primary-checkout>/.factory-state/reviews/` | Clone-local QA/UI reports, unslop audits, and round ledgers. |
+| QA/UI reports and evidence | `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` | Shared main-checkout artifacts: `qa.md`, `ui.md`, QA evidence, and builder-owned evidence under `builder/`. |
+| QA round ledger | `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` | Clone-local bounded-loop state, updated only through `ledger.py`, never concurrently. |
 | Worktree recovery | `<primary-checkout>/.factory-state/cleanup-wt/<repo-id>/` | Recovery TSVs, patches, and finalize journals, separated by repository identity. |
 | The decisions | `docs/DECISIONS.md` | Append-only ADR table, ADR-001 onward. |
 | The changelog | `docs/changelog/CHANGELOG.md` | The engineering log, newest first, one section per change. |
@@ -719,7 +728,7 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 The board's lanes are the state machine of the factory:
 `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged`, plus `Blocked`
 and `Dropped`. In-task QA findings return to the same row and worktree; the review loop is capped
-at three rounds. Full rules in `AGENTS.md` §B4.
+at 10 rounds. Full rules in `AGENTS.md` §B4.
 
 ## 7. Public interfaces
 

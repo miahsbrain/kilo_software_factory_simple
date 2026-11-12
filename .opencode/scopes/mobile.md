@@ -90,11 +90,10 @@ Passing the anti-slop rules is not enough — the result also has to serve the u
 
 ## QA evidence
 
-The QA lane captures evidence through `.opencode/skills/qa-review/scripts/browser-review.mjs`, which
-computes the canonical path itself: `artifacts/mobile/qa/<date>/<task-id>/` in the **main
-checkout**. The task directory holds `notes.md` with what was checked and the expected vs actual
-result. Review reports stay in `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md` and
-`-ui.md` — those are documents, not artifacts.
+The QA lane stores evidence and reports in the **main checkout** at
+`artifacts/mobile/qa/<YYYY-MM-DD>/<task-id>/`: QA writes `qa.md` and evidence, UI critique writes
+`ui.md`, and builders write only under `builder/`. The ledger remains at
+`<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md`.
 
 ## Production expectations
 

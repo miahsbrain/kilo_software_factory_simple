@@ -2,15 +2,24 @@
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "architect",
   "agents": {
+    "frontend-dev": { "permissions": [
+      { "action": "edit", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
+    ] },
+    "backend-dev": { "permissions": [
+      { "action": "edit", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
+    ] },
+    "mobile-dev": { "permissions": [
+      { "action": "edit", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "allow" }
+    ] },
     "qa-reviewer": { "permissions": [
       { "action": "edit", "resource": "*", "effect": "deny" },
-      { "action": "edit", "resource": "docs/reviews/*", "effect": "allow" },
-      { "action": "edit", "resource": "artifacts/*", "effect": "allow" }
+      { "action": "edit", "resource": "**/artifacts/*/qa/*/*/**", "effect": "allow" },
+      { "action": "edit", "resource": "**/artifacts/*/qa/*/*/ui.md", "effect": "deny" },
+      { "action": "edit", "resource": "**/artifacts/*/qa/*/*/builder/**", "effect": "deny" }
     ] },
     "ui-critic": { "permissions": [
       { "action": "edit", "resource": "*", "effect": "deny" },
-      { "action": "edit", "resource": "docs/reviews/*", "effect": "allow" },
-      { "action": "edit", "resource": "artifacts/*", "effect": "allow" }
+      { "action": "edit", "resource": "**/artifacts/*/qa/*/*/ui.md", "effect": "allow" }
     ] }
   },
   "mcp": {
@@ -344,6 +353,9 @@
       "resource": "**/.opencode/worktrees/**",
       "effect": "allow"
     },
+    { "action": "edit", "resource": "artifacts/**", "effect": "deny" },
+    { "action": "edit", "resource": "**/artifacts/**", "effect": "deny" },
+    { "action": "edit", "resource": "**/.factory-state/reviews/*-ledger.md", "effect": "deny" },
     { "action": "edit", "resource": ".opencode/plugins/*", "effect": "ask" },
     { "action": "edit", "resource": ".opencode/skills/git-worktree/scripts/*", "effect": "ask" },
     { "action": "edit", "resource": "opencode.json*", "effect": "ask" },

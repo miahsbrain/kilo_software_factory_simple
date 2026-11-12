@@ -28,8 +28,10 @@ needs. Every work surface must be registered before the factory reads its conten
   metadata. The live board is `.factory-state/factory-board.sqlite3`; Markdown is a one-time
   import or generated export, never the live state. Scripts resolve the primary checkout from
   Git's absolute common-dir path and fail closed when it cannot be verified.
-- Review reports and ledgers live in `.factory-state/reviews/`; cleanup recovery journals and
-  backups live in `.factory-state/cleanup-wt/<repo-id>/` to keep repository identities separate.
+- QA/UI reports and evidence live under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` in the
+  primary checkout. Only bounded-loop ledgers live in `.factory-state/reviews/`; update them through
+  `ledger.py`. Cleanup recovery journals and backups live in `.factory-state/cleanup-wt/<repo-id>/`
+  to keep repository identities separate.
 - The explicit runtime-state migration command supports dry-run and `--apply`; all legacy database
   writers must be stopped first. It copies the database and WAL/SHM files read-only into private
   staging, checks source metadata and content before and after the copy, then backs up and verifies

@@ -143,7 +143,10 @@ fake a review.
 
 ## Submit your review
 
-Write the review to `<primary-checkout>/.factory-state/reviews/<task-id>-qa.md` outside the task worktree:
+Write the review to `<primary-checkout>/artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/qa.md` outside
+the task worktree. Keep screenshots, logs, measurements, and validated finding files in that same
+task artifact directory. Do not edit `ui.md` or `builder/`; update the ledger only through
+`ledger.py`, never concurrently.
 
     # QA review — <task-id> <task name>
     **Reviewed commit:** <sha>   **Verdict:** PASS | FAIL
