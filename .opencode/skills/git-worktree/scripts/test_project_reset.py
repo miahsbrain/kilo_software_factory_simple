@@ -1,0 +1,530 @@
+"""Maintenance tests use independent repositories confined to this task worktree."""
+import contextlib
+import io
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tempfile
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+import project_reset as reset
+import task_purge as purge
+import worktree as wt
+
+
+ROOT = Path(__file__).resolve().parents[4]
+GUARD = Path(__file__).with_name("guard.py")
+
+
+class ProjectResetTests(unittest.TestCase):
+    def setUp(self):
+        scratch = ROOT / ".tmp"
+        scratch.mkdir(exist_ok=True)
+        self.container = Path(tempfile.mkdtemp(prefix="reset-", dir=scratch))
+        self.addCleanup(self.cleanup_fixture)
+        self.repo = self.container / "selected"
+        self.repo.mkdir()
+        result = subprocess.run([sys.executable, str(GUARD), "check-git", "--", "git init"],
+                                cwd=ROOT, capture_output=True, text=True)
+        self.assertIn(result.returncode, (0, 3), result.stderr)
+        self.assertEqual(wt.git(str(self.repo), "init")[0], 0)
+        self.board = wt.load_board_module(str(ROOT))
+        self.state = self.board.runtime_state_module()
+        self.assertEqual(Path(self.state.primary_checkout(str(self.repo))), self.repo)
+        self.database = self.repo / ".factory-state" / self.board.DATABASE_NAME
+        self.assertEqual(Path(self.state.state_root(str(self.repo))) / self.board.DATABASE_NAME,
+                         self.database)
+        self.assertIn(ROOT, self.database.parents)
+        self.write(".opencode/repos.json", json.dumps({"control": "."}))
+        self.write("DOMAIN.md", "project domain")
+        self.write("ROADMAP.md", "project plans")
+        (self.repo / "docs").mkdir()
+        self.database.parent.mkdir()
+        with sqlite3.connect(self.database) as connection:
+            self.board.normalized_schema(connection)
+            connection.execute("CREATE TABLE board (id INTEGER PRIMARY KEY, markdown TEXT, revision INTEGER)")
+            connection.execute("INSERT INTO board VALUES (1, 'fixture projection', 1)")
+            connection.execute("INSERT INTO planned_items VALUES "
+                               "('BOARD-910','Fixture','Feature','P2','low','None.','control','',NULL,0,NULL,0)")
+            connection.execute("INSERT INTO acceptance_criteria VALUES ('BOARD-910',0,'fixture criterion',0,NULL)")
+            connection.execute("CREATE TABLE plan_id_sequence (singleton INTEGER PRIMARY KEY, high_water INTEGER)")
+            connection.execute("INSERT INTO plan_id_sequence VALUES (1, 999)")
+
+    def cleanup_fixture(self):
+        self.assertIn(ROOT, self.container.parents)
+        command = "rm -rf -- " + shlex.quote(str(self.container))
+        result = subprocess.run([sys.executable, str(GUARD), "check-delete", "--", command],
+                                cwd=ROOT, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        shutil.rmtree(self.container)
+
+    def write(self, relative, content):
+        path = self.repo / relative
+        self.assertIn(self.repo, path.parents)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        return path
+
+    def inventory(self):
+        return reset.preview(SimpleNamespace(repo="control", backup=False), str(self.repo), wt)
+
+    def snapshot(self):
+        return {str(path.relative_to(self.repo)): (path.read_bytes(), path.stat().st_mtime_ns)
+                for path in self.repo.rglob("*") if path.is_file() and not path.is_symlink()}
+
+    def test_preview_exact_inventory_and_no_writes(self):
+        evidence = self.write("artifacts/factory/qa/2026-11-13/BOARD-910/qa.md", "fixture evidence")
+        ledger = self.write(".factory-state/reviews/BOARD-910-ledger.md", "fixture ledger")
+        export = self.write(".factory-state/factory-board-export.md", "fixture export")
+        self.write("apps/api/main.py", "source sentinel")
+        self.write("AGENTS.md", "harness sentinel")
+        self.write("docs/custom.md", "custom sentinel")
+        self.write("docs/changelog/CHANGELOG.md", "engineering sentinel")
+        self.write("docs/handover/api.md", "memory sentinel")
+        self.write("README.md", "readme sentinel")
+        before = self.snapshot()
+        inventory = self.inventory()
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(inventory["repository_kind"], "project")
+        self.assertEqual(inventory["high_water_to_preserve"], 999)
+        self.assertEqual({target["template"] for target in inventory["targets"] if "template" in target},
+                         set(reset.DOCUMENTS))
+        paths = {target["path"] for target in inventory["targets"]}
+        self.assertEqual(paths - {str(self.repo / name) for name in reset.DOCUMENTS},
+                         {str(self.database), str(evidence.parent), str(ledger), str(export)})
+        self.assertFalse((self.database.parent / "clean-slates").exists())
+
+    def test_apply_refuses_before_any_state_access(self):
+        with patch.object(reset, "preview", side_effect=AssertionError("must not inspect")), \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(reset.command(SimpleNamespace(apply=True), "unusable", wt), wt.REFUSED)
+
+    def test_cli_dispatch_and_required_repo(self):
+        output = io.StringIO()
+        with patch.object(wt.os, "getcwd", return_value=str(self.repo)), contextlib.redirect_stdout(output):
+            self.assertEqual(wt.main(["clean-slate", "--repo", "control", "--backup"]), wt.OK)
+        self.assertTrue(json.loads(output.getvalue())["backup_requested"])
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+            wt.main(["clean-slate"])
+        self.assertEqual(error.exception.code, 2)
+
+    def test_factory_preserves_all_documents(self):
+        self.write("templates/project/AGENTS.md", "factory identifier")
+        (self.repo / "docs").mkdir(exist_ok=True)
+        self.repo.joinpath("DOMAIN.md").rename(self.repo / "docs/custom-domain.md")
+        self.repo.joinpath("ROADMAP.md").rename(self.repo / "docs/custom-roadmap.md")
+        self.assertFalse(any(target["kind"] == "replace-document" for target in self.inventory()["targets"]))
+
+    def test_missing_state_is_not_created(self):
+        self.database.rename(self.repo / "saved.sqlite3")
+        self.database.parent.rename(self.repo / "saved-state")
+        before = self.snapshot()
+        self.assertIn("runtime state missing; preview never creates it", self.inventory()["blockers"])
+        self.assertEqual(before, self.snapshot())
+
+    def apply(self, backup=False, resume=None, answer=None, cwd=None):
+        terminal = io.StringIO(answer if answer is not None else "control " + str(self.repo) + "\n")
+        terminal.isatty = lambda: True
+        errors, output = io.StringIO(), io.StringIO()
+        errors.isatty = lambda: True
+        with patch.object(reset.sys, "stdin", terminal), patch.object(reset.sys, "stderr", errors), \
+                contextlib.redirect_stdout(output):
+            result = reset.command(SimpleNamespace(repo="control", backup=backup, apply=True, resume=resume),
+                                   str(cwd or self.repo), wt)
+        return result, errors.getvalue()
+
+    def manifest(self):
+        paths = list((self.database.parent / "clean-slates").glob("*/manifest.json"))
+        self.assertEqual(len(paths), 1)
+        return paths[0], json.loads(paths[0].read_text())
+
+    def assert_empty(self):
+        with sqlite3.connect(self.database) as connection:
+            for table in ("planned_items", "acceptance_criteria", "active_work"):
+                self.assertEqual(connection.execute("SELECT count(*) FROM " + table).fetchone()[0], 0)
+            self.assertEqual(connection.execute("SELECT high_water FROM plan_id_sequence").fetchone()[0], 999)
+            self.assertEqual(connection.execute("SELECT markdown FROM board").fetchone()[0], self.board.empty_board())
+        for relative in reset.DOCUMENTS:
+            self.assertEqual((self.repo / relative).read_bytes(), (reset.BUNDLE / relative).read_bytes())
+
+    def test_apply_exact_effects_and_preserved_boundaries(self):
+        artifact = self.write("artifacts/factory/qa/2026-11-13/BOARD-910/nested/qa.md", "evidence")
+        ledger = self.write(".factory-state/reviews/BOARD-910-ledger.md", "ledger")
+        export = self.write(".factory-state/factory-board-export.md", "export")
+        preserved = [self.write(name, "preserve " + name) for name in (
+            "apps/api/main.py", "AGENTS.md", "README.md", "CHANGELOG.md", "docs/custom.md",
+            "docs/changelog/CHANGELOG.md", "docs/handover/api.md",
+            ".factory-state/purges/BOARD-910/manifest.json", ".factory-state/factory-board-legacy-backup.md",
+            ".git/factory-board-export.md")]
+        preserved.append(self.repo / ".git/HEAD")
+        before = {path: (path.read_bytes(), path.stat().st_ino) for path in preserved}
+        secret = self.repo / ".env"
+        secret.touch()
+        secret_inode = secret.stat().st_ino
+        self.assertEqual(self.apply()[0], wt.OK)
+        self.assert_empty()
+        self.assertFalse(artifact.parents[1].exists())
+        self.assertFalse(ledger.exists())
+        self.assertFalse(export.exists())
+        self.assertEqual(before, {path: (path.read_bytes(), path.stat().st_ino) for path in preserved})
+        self.assertEqual(secret_inode, secret.stat().st_ino)
+        path, record = self.manifest()
+        self.assertTrue(record["complete"])
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
+
+    def test_wrong_confirmation_is_side_effect_free(self):
+        before = self.snapshot()
+        result, error = self.apply(answer="control\n")
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("confirmation did not match", error)
+        self.assertEqual(before, self.snapshot())
+
+    def test_late_drift_refuses_before_metadata_or_effects(self):
+        original = reset.confirm
+        def drift(repo, root):
+            original(repo, root)
+            self.write("DOMAIN.md", "changed during prompt")
+        with patch.object(reset, "confirm", side_effect=drift):
+            result, error = self.apply()
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("changed after confirmation", error)
+        self.assertFalse((self.database.parent / "clean-slates").exists())
+        self.assertEqual((self.repo / "ROADMAP.md").read_text(), "project plans")
+
+    def test_apply_refuses_nonprimary_cwd(self):
+        nested = self.repo / "docs"
+        self.assertIn("independent primary checkout", self.apply(cwd=nested)[1])
+        self.assertFalse((self.database.parent / "clean-slates").exists())
+
+    def test_backup_interruption_retains_metadata_and_retries_same_manifest(self):
+        self.write(".factory-state/factory-board-export.md", "export")
+        with patch.object(purge, "copy_backup", side_effect=OSError("injected backup interruption")):
+            result, error = self.apply(backup=True)
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("injected backup interruption", error)
+        manifest, record = self.manifest()
+        self.assertFalse(record["complete"])
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+        self.assertTrue((manifest.parent / record["backup_attempts"][0]).exists())
+        self.assertEqual(self.apply(backup=True, resume=manifest.parent.name)[0], wt.OK)
+        _, record = self.manifest()
+        self.assertEqual(len(record["backup_attempts"]), 2)
+        self.assertTrue(record["backup_complete"])
+        self.assert_empty()
+
+    def interrupt_manifest(self, predicate):
+        original = purge.save_manifest
+        fired = []
+        def interrupt(wt_module, path, record):
+            if not fired and predicate(record):
+                fired.append(True)
+                raise OSError("injected durable-boundary interruption")
+            return original(wt_module, path, record)
+        return patch.object(purge, "save_manifest", side_effect=interrupt)
+
+    def test_replacement_interruption_resumes_from_published_new_inode(self):
+        with self.interrupt_manifest(lambda record: any(step["phase"] == "done" for step in record["steps"])):
+            result, error = self.apply()
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("injected durable-boundary interruption", error)
+        manifest, record = self.manifest()
+        self.assertEqual(record["steps"][0]["phase"], "running")
+        self.assertEqual(self.apply(resume=manifest.parent.name)[0], wt.OK)
+        self.assert_empty()
+
+    def test_unpublished_staging_creation_and_partial_write_resume_with_fresh_attempts(self):
+        original = reset.os.fdopen
+        operation_id = None
+        retained = []
+        for partial in (b"", b"interrupted replacement"):
+            @contextlib.contextmanager
+            def interrupted(descriptor, mode, **kwargs):
+                with original(descriptor, mode, **kwargs) as stream:
+                    if mode == "wb":
+                        stream.write(partial)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                        raise OSError("injected staging-write interruption")
+                    yield stream
+            with patch.object(reset.os, "fdopen", side_effect=interrupted):
+                result, error = self.apply(resume=operation_id)
+            self.assertEqual(result, wt.REFUSED)
+            self.assertIn("injected staging-write interruption", error)
+            manifest, record = self.manifest()
+            operation_id = manifest.parent.name
+            step = record["steps"][0]
+            self.assertEqual(step["phase"], "pending")
+            self.assertNotIn("post", step)
+            staged = manifest.parent / step["replacement_attempts"][-1]
+            self.assertEqual(staged.read_bytes(), partial)
+            retained.append((staged, staged.stat().st_ino, partial))
+            self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+            self.assertEqual((self.repo / "ROADMAP.md").read_text(), "project plans")
+            with sqlite3.connect(self.database) as connection:
+                self.assertEqual(connection.execute("SELECT count(*) FROM planned_items").fetchone()[0], 1)
+        self.assertIn("confirmation did not match", self.apply(resume=operation_id, answer="yes\n")[1])
+        self.assertEqual(self.apply(resume=operation_id)[0], wt.OK)
+        self.assert_empty()
+        self.assertEqual(len(self.manifest()[1]["steps"][0]["replacement_attempts"]), 3)
+        for staged, identity, partial in retained:
+            self.assertEqual((staged.stat().st_ino, staged.read_bytes()), (identity, partial))
+
+    def test_saved_staging_postimage_change_is_not_overwritten(self):
+        original = reset.os.replace
+        def interrupt(source, target):
+            if Path(source).name.startswith("replacement-"):
+                raise OSError("injected pre-publication interruption")
+            return original(source, target)
+        with patch.object(reset.os, "replace", side_effect=interrupt):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, record = self.manifest()
+        step = record["steps"][0]
+        self.assertEqual(step["phase"], "running")
+        staged = manifest.parent / step["replacement_attempts"][-1]
+        staged.write_text("externally changed preparation")
+        result, error = self.apply(resume=manifest.parent.name)
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("staged replacement changed", error)
+        self.assertEqual(staged.read_text(), "externally changed preparation")
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+        self.assertEqual(len(self.manifest()[1]["steps"][0]["replacement_attempts"]), 1)
+
+    def test_unpublished_staging_retry_refuses_changed_target(self):
+        with self.interrupt_manifest(lambda record: bool(record["steps"][0].get("replacement_attempts"))):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, _ = self.manifest()
+        self.write("DOMAIN.md", "changed target")
+        result, error = self.apply(resume=manifest.parent.name)
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("document pre/postimage changed", error)
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "changed target")
+
+    @contextlib.contextmanager
+    def competing_database_writer(self, commit_change=False):
+        original = self.board.connect
+        @contextlib.contextmanager
+        def connect(path):
+            self.assertEqual(Path(path), self.database)
+            self.assertEqual(Path(self.state.primary_checkout(str(self.repo))), self.repo)
+            with original(path) as connection:
+                writer = sqlite3.connect(path, isolation_level=None, timeout=0)
+                try:
+                    writer.execute("BEGIN IMMEDIATE")
+                    if commit_change:
+                        writer.execute("UPDATE planned_items SET task='concurrent change' WHERE id='BOARD-910'")
+                        writer.execute("COMMIT")
+                    else:
+                        connection.execute("PRAGMA busy_timeout=1")
+                    yield connection
+                finally:
+                    if writer.in_transaction:
+                        writer.execute("ROLLBACK")
+                    writer.close()
+        with patch.object(wt, "load_board_module", return_value=self.board), \
+                patch.object(self.board, "connect", side_effect=connect):
+            yield
+
+    def test_sqlite_writer_contention_refuses_before_effects_then_resumes(self):
+        with self.competing_database_writer(), patch.object(reset, "apply_locked", wraps=reset.apply_locked) as apply_locked:
+            result, error = self.apply()
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("database is locked", error)
+        apply_locked.assert_not_called()
+        manifest, record = self.manifest()
+        self.assertTrue(all(step["phase"] == "pending" for step in record["steps"]))
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+        self.assertEqual(self.apply(resume=manifest.parent.name)[0], wt.OK)
+        self.assert_empty()
+
+    def test_stale_concurrent_reset_revalidates_under_writer_lock(self):
+        original = reset.apply_locked
+        def locked(*args):
+            self.assertTrue(args[-1].in_transaction)
+            return original(*args)
+        with self.competing_database_writer(commit_change=True), patch.object(reset, "apply_locked", side_effect=locked) as check:
+            result, error = self.apply()
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("database pre/postimage changed", error)
+        check.assert_called_once()
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute("SELECT task FROM planned_items").fetchone()[0], "concurrent change")
+        self.assertTrue(all(step["phase"] == "pending" for step in self.manifest()[1]["steps"]))
+
+    def test_stale_concurrent_resume_revalidates_under_writer_lock(self):
+        with self.interrupt_manifest(lambda record: bool(record.get("database_post"))):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, record = self.manifest()
+        original = reset.apply_locked
+        def locked(*args):
+            self.assertTrue(args[-1].in_transaction)
+            return original(*args)
+        with self.competing_database_writer(commit_change=True), patch.object(reset, "apply_locked", side_effect=locked) as check:
+            result, error = self.apply(resume=manifest.parent.name)
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("database pre/postimage changed", error)
+        check.assert_called_once()
+        self.assertEqual(self.manifest()[1], record)
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute("SELECT task FROM planned_items").fetchone()[0], "concurrent change")
+
+    def test_database_commit_interruption_recovers_without_rediscovery(self):
+        with self.interrupt_manifest(lambda record: record["complete"]):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, record = self.manifest()
+        self.assertEqual(record["database_phase"], "committing")
+        self.assertFalse(record["complete"])
+        self.assert_empty()
+        with patch.object(reset, "preview", side_effect=AssertionError("must use saved ownership")):
+            self.assertEqual(self.apply(resume=manifest.parent.name)[0], wt.OK)
+        self.assertTrue(self.manifest()[1]["complete"])
+
+    def test_resume_refuses_recreated_or_changed_completed_target(self):
+        export = self.write(".factory-state/factory-board-export.md", "original export")
+        with self.interrupt_manifest(lambda record: any(step["phase"] == "done" for step in record["steps"])):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, _ = self.manifest()
+        export.write_text("recreated export")
+        result, error = self.apply(resume=manifest.parent.name)
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("changed", error)
+        self.assertEqual(export.read_text(), "recreated export")
+
+    def test_resume_is_explicit_and_freshly_confirmed(self):
+        with self.interrupt_manifest(lambda record: bool(record.get("database_post"))):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, _ = self.manifest()
+        self.assertIn("explicit --resume", self.apply()[1])
+        self.assertIn("confirmation did not match", self.apply(resume=manifest.parent.name, answer="yes\n")[1])
+        self.assertIn("original --backup", self.apply(backup=True, resume=manifest.parent.name)[1])
+        self.assertEqual(self.apply(resume=manifest.parent.name)[0], wt.OK)
+
+    def test_resume_refuses_symlink_hardlink_or_nested_repository(self):
+        artifact = self.write("artifacts/factory/qa/2026-11-13/BOARD-910/qa.md", "evidence")
+        with self.interrupt_manifest(lambda record: bool(record.get("database_post"))):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, _ = self.manifest()
+        self.write("artifacts/factory/qa/2026-11-13/BOARD-910/.git", "nested repository marker")
+        self.assertIn("foreign repository boundary", self.apply(resume=manifest.parent.name)[1])
+        self.repo.joinpath("artifacts/factory/qa/2026-11-13/BOARD-910/.git").rename(self.repo / "nested-marker")
+        artifact.rename(self.repo / "saved-evidence")
+        artifact.symlink_to(self.repo / "saved-evidence")
+        self.assertIn("symbolic link", self.apply(resume=manifest.parent.name)[1])
+
+    def test_unknown_manifest_delete_authority_refused(self):
+        with self.interrupt_manifest(lambda record: bool(record.get("database_post"))):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, record = self.manifest()
+        source = self.write("apps/api/main.py", "preserved source")
+        record["plan"]["targets"].append(reset.file_target(source, self.repo))
+        record["plan_digest"] = purge.digest(record["plan"])
+        manifest.write_text(json.dumps(record))
+        self.assertIn("delete authority refused", self.apply(resume=manifest.parent.name)[1])
+        self.assertEqual(source.read_text(), "preserved source")
+
+    def test_sidecars_block_without_sqlite_open(self):
+        self.write(".factory-state/factory-board.sqlite3-wal", "fixture sidecar")
+        before = self.snapshot()
+        with patch.object(self.board, "readonly_connection", side_effect=AssertionError("must not open")):
+            with patch.object(wt, "load_board_module", return_value=self.board):
+                self.assertIn("stop SQLite writers and resolve sidecars before inventory", self.inventory()["blockers"])
+        self.assertEqual(before, self.snapshot())
+
+    def test_unknown_evidence_blocks_and_is_not_selected(self):
+        unknown = self.write("artifacts/factory/qa/2026-11-13/BOARD-911/qa.md", "unowned evidence")
+        inventory = self.inventory()
+        self.assertTrue(any("unknown artifact ownership" in reason for reason in inventory["blockers"]))
+        self.assertNotIn(str(unknown.parent), {target["path"] for target in inventory["targets"]})
+
+    def test_retained_recovery_copies_disclosed(self):
+        backup = self.write(".factory-state/purges/BOARD-910/manifest.json", "historic recovery")
+        legacy = self.write(".factory-state/factory-board-legacy-backup.md", "historic board")
+        old = self.write(".git/factory-board-export.md", "retained migration source")
+        inventory = self.inventory()
+        self.assertTrue({str(backup.parents[1]), str(legacy), str(old)}.issubset(set(inventory["retained_paths"])))
+        self.assertNotIn(str(legacy), {target["path"] for target in inventory["targets"]})
+
+    def test_active_worktree_blocks_without_inspecting_path(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("INSERT INTO active_work VALUES ('BOARD-910','In Progress','unavailable-worktree')")
+        with patch.object(wt, "list_worktrees", return_value=[{"path": str(self.repo)}, {"path": "unavailable"}]):
+            reasons = self.inventory()["blockers"]
+        self.assertIn("linked or unresolved worktrees must be resolved separately", reasons)
+        self.assertIn("active worktree references must be resolved separately", reasons)
+
+    def test_document_symlink_refused(self):
+        (self.repo / "docs").mkdir(exist_ok=True)
+        (self.repo / "docs/STACK.md").symlink_to(self.repo / "DOMAIN.md")
+        with self.assertRaisesRegex(ValueError, "symbolic link refused"):
+            self.inventory()
+
+    def test_hard_link_refused(self):
+        (self.repo / "docs").mkdir(exist_ok=True)
+        os.link(self.repo / "DOMAIN.md", self.repo / "docs/STACK.md")
+        with self.assertRaisesRegex(ValueError, "hard-linked target refused"):
+            self.inventory()
+
+    def test_nested_git_marker_refused(self):
+        self.write("artifacts/factory/qa/2026-11-13/BOARD-910/.git", "nested marker")
+        with self.assertRaisesRegex(ValueError, "nested repository refused"):
+            self.inventory()
+
+    def test_secret_name_refused_without_content_read(self):
+        path = self.repo / "artifacts/factory/qa/2026-11-13/BOARD-910/.env"
+        path.parent.mkdir(parents=True)
+        path.touch()
+        with patch.object(purge, "tree_stamp", side_effect=AssertionError("must not hash evidence")):
+            with self.assertRaisesRegex(ValueError, "secret-like target refused"):
+                reset.evidence_inventory(self.repo, {"BOARD-910"})
+
+    def test_app_shared_scope_refused(self):
+        self.write(".opencode/repos.json", json.dumps({"control": ".."}))
+        with self.assertRaisesRegex(ValueError, "traversal mapping"):
+            self.inventory()
+
+    def test_foreign_absolute_root_refused(self):
+        self.write(".opencode/repos.json", json.dumps({"control": str(self.container)}))
+        with self.assertRaisesRegex(ValueError, "outside selected boundary"):
+            self.inventory()
+
+    def test_ambiguous_project_kind_refused(self):
+        self.write("templates/project/AGENTS.md", "conflicting marker")
+        with self.assertRaisesRegex(ValueError, "ambiguous factory/project"):
+            self.inventory()
+
+    def test_template_manifest_drift_refused(self):
+        bundle = self.container / "bundle"
+        shutil.copytree(reset.BUNDLE, bundle)
+        (bundle / "DOMAIN.md").write_text("changed fixture template")
+        with patch.object(reset, "BUNDLE", bundle), self.assertRaisesRegex(ValueError, "template hash mismatch"):
+            self.inventory()
+
+    def test_unknown_template_version_refused(self):
+        bundle = self.container / "bundle"
+        shutil.copytree(reset.BUNDLE, bundle)
+        (bundle / "manifest.json").write_text('{"format":"unknown","files":{}}')
+        with patch.object(reset, "BUNDLE", bundle), self.assertRaisesRegex(ValueError, "unrecognized portable template"):
+            self.inventory()
+
+    def test_unknown_database_tables_refused(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("CREATE TABLE application_data (value TEXT)")
+        with self.assertRaisesRegex(ValueError, "unrecognized database tables"):
+            self.inventory()
+
+    def test_unknown_dependency_and_repository_block(self):
+        reasons = reset.validate_rows([("BOARD-910", "foreign", "BOARD-911")], [], {"control"})
+        self.assertEqual(len(reasons), 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

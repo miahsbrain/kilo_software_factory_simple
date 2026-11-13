@@ -1,5 +1,65 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-153 independent QA and source review complete, 2026-11-13**
+> Completed implementation on `feat/add-human-confirmed-project-clean-slate`,
+> `.opencode/worktrees/add-human-confirmed-project-clean-slate/`.
+> Fresh independent round-2 QA passed 37 tests in 10.658s at `4e1219b`.
+> Architect reviewed the recovery implementation and correction diff with no blocking finding.
+> Evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-153/qa.md:2-5`.
+> No live board/reset, backup or runtime migration performed. No other-session worktrees inspected.
+> Next action: human inspection and integration. No merge, push or live reset performed.
+> Verification limited to file review because this was a low-risk visual/static change.
+
+### BOARD-153 clean-slate inventory
+
+- Pure `repository_kind` at `.opencode/skills/git-worktree/scripts/project_reset.py:26` and
+  `validate_rows` at `.opencode/skills/git-worktree/scripts/project_reset.py:34` classify governance/ownership.
+  Effectful readers `checked_content`, `file_target`, `inode`, `database_image`, `template_inventory`,
+  `evidence_inventory`, `selection`, `preview` occupy `.opencode/skills/git-worktree/scripts/project_reset.py:52-279`.
+  They bind the primary root, map, templates, exact target stamps and logical database image.
+- Effectful terminal boundaries `require_terminal`, `confirm` are at
+  `.opencode/skills/git-worktree/scripts/project_reset.py:282-294`; read/validation boundaries
+  `replacement_image`, `expand_steps`, `validate_record`, `validate_files` are at
+  `.opencode/skills/git-worktree/scripts/project_reset.py:305-417`.
+- Effectful `sync_directory`, `empty_database`, `backup_record`, `execute_step`, `apply_locked`,
+  `command` are at `.opencode/skills/git-worktree/scripts/project_reset.py:297`,
+  `.opencode/skills/git-worktree/scripts/project_reset.py:420-642`. They publish private durable metadata,
+  verify optional backups, advance exact filesystem steps, and transactionally empty canonical state.
+- `worktree.py clean-slate --repo <id> [--backup]` remains side-effect-free preview. Human-only
+  `--apply` requires the selected primary checkout and exact repository ID plus canonical path on a TTY.
+  Missing state is never initialized. Initial preview refuses SQLite sidecars, active worktrees,
+  unknown ownership and unsafe paths. Project replacements use the 14 bundled templates;
+  factory docs, source, harness, secrets, Git history, custom docs, logs and memory maps remain.
+- `.factory-state/clean-slates/<operation-id>/manifest.json` records root/map/template identities,
+  filesystem pre/postimages, canonical database pre/postimages and the preserved ID high-water.
+  Filesystem phases are `pending → running → done`; database phases are
+  `pending → committing → committed`. Documents use staged atomic new-inode replacement;
+  evidence is removed file-by-file, then only inventoried empty directories are removed.
+  The canonical SQLite `BEGIN IMMEDIATE` writer lock covers reset execution; commit is last.
+- `validate_record` checks operation-owned `replacement-<step-index>-<uuid>` attempt names at
+  `.opencode/skills/git-worktree/scripts/project_reset.py:330-383`. Effectful `execute_step` at
+  `.opencode/skills/git-worktree/scripts/project_reset.py:479-527` durably records an attempt before
+  exclusive creation. Pending retries retain incomplete preparations and create fresh files; a saved
+  running postimage must still match exactly, and changed targets/stages are never overwritten.
+- Optional backups use verified private `content-<uuid>` attempts and a consistent SQLite snapshot.
+  Failed attempts and historical recovery/migration sources remain. `--resume <operation-id>` requires
+  fresh exact confirmation and the original backup choice, uses saved ownership even after DB commit,
+  and refuses changed/recreated targets. No implicit operation selection or automatic rollback.
+- Verification: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'`
+  passed 37 tests in 10.408s on the correction's first attempt. New staging tests at
+  `.opencode/skills/git-worktree/scripts/test_project_reset.py:243-308` interrupt actual exclusive-file
+  preparation with empty/partial bytes, require fresh confirmation, retain previous attempts and
+  reject saved-stage/target changes. Effectful fixture adapter `competing_database_writer` at
+  `.opencode/skills/git-worktree/scripts/test_project_reset.py:311-333` opens a second real SQLite
+  connection only in the asserted independent fixture. Tests at
+  `.opencode/skills/git-worktree/scripts/test_project_reset.py:335-379` prove writer contention refuses
+  before effects and stale reset/resume images refuse inside the acquired writer transaction while
+  preserving the competing commit. No live maintenance/build or thread writing live state.
+  Fresh independent round-2 QA then passed the same 37 tests in 10.658s at `4e1219b`;
+  evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-153/qa.md:2-26`.
+  Architect source review of recovery and correction is complete with no blocking finding.
+  Prior verification history stays in the engineering log. Human inspection/integration is next.
+
 > **Session Notes — BOARD-152 structure map and QA round 2, 2026-11-13**
 > In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.
 > QA round 2 passed 47 isolated viewer/purge tests and 39 adjacent lifecycle/handoff tests,

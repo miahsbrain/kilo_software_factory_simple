@@ -3,6 +3,38 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Record clean-slate independent QA and source review
+**Type:** Docs
+**Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`.
+**Why:** Fresh independent round-2 QA passed 37 tests in 10.658s at `4e1219b`; architect reviewed the recovery implementation and correction diff with no blocking finding. Evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-153/qa.md:2-26`.
+**Impact:** Current notes now identify human inspection/integration as the next action. Historical entries preserved; no source, rules, shortcuts, board, ledger or live-state changes; no merge/push/reset.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. No test rerun.
+
+## [2026-11-13] Recover interrupted clean-slate replacement preparation
+**Type:** Fix
+**Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate
+**Changed:** `project_reset.py`, `test_project_reset.py`, handover/state/stack/structure/architecture docs.
+**Why:** Round-1 finding `bug|functional|/clean-slate|an-interrupted-replacement-staging-write-leaves-clean-slate`: deterministic preparation could strand same-manifest resume before a saved postimage. Extend existing `execute_step` and `validate_record`; reuse the durable unique-attempt pattern in `backup_record`, without changing purge or reset authority. No new application functions, files, tools or dependencies.
+**Impact:** Persist unique replacement attempt names before exclusive creation; retain interrupted attempts and use fresh staging only while pending. Saved running stages and changed targets retain strict refusal. Source/harness/secrets/history/non-reset boundaries unchanged. Correct stale structure comments that still described preview-only behavior. Independent re-QA/review pending; no live reset/board/ledger/other-worktree operations.
+**Verification:** `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'` passed 37 tests in 10.408s on correction attempt 1. Added actual empty/partial staging-write interruption, fresh named resume, retained attempts, changed-stage/target refusal; real second-connection SQLite writer contention plus stale reset/resume checks inside the writer transaction preserve the competing commit. Fixtures are independent repositories confined to the task worktree; no live writer, production build or alternate verification command.
+
+## [2026-11-13] Add human-only clean-slate execution and recovery
+**Type:** Feature
+**Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate
+**Changed:** `project_reset.py`, `test_project_reset.py`, `worktree.py` parser/help, stack/architecture/decision/session docs.
+**Why:** Execute the approved closed inventory without widening purge authority. Reuse durable metadata, private copies, SQLite snapshot and writer-lock primitives; no dependencies, rule/shortcut edits or changes to purge behavior.
+**Impact:** Exact named TTY confirmation, durable pre/postimages, optional verified backups, per-node deletes, atomic document replacements, commit-last canonical emptying and explicit confirmed resume. Preserve source/harness/secrets/history, historical copies and ID high-water. No live reset or board edits; independent QA/review pending.
+**Verification:** `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'` passed 31 tests in 7.873s on attempt 2. Attempt 1 exited 1: two `FileExistsError: [Errno 17] File exists` fixture errors; `unsupported operand type(s) for +: 'PosixPath' and 'str'` at backup reader; expected `nested repository` versus actual `foreign repository boundary` refusal. Architect approved fixture `exist_ok=True`, string path conversion and matching the correct refusal. Tests cover confirmation, drift, preservation, backup/replacement/DB-commit interruption and saved-manifest recovery in independent task-local fixtures. No live maintenance, production build or other-worktree read.
+
+## [2026-11-13] Add preview-only repository clean-slate inventory
+**Type:** Feature
+**Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate
+**Changed:** `project_reset.py`, `test_project_reset.py`, minimal `worktree.py` parser/dispatch, portable `git-worktree/templates/project-v1/` bundle, architecture/decision/structure/stack/session docs.
+**Why:** Establish an exact fail-closed reset inventory before implementing any destructive effects. The new module keeps reset authority separate from task purge; the portable bundle removes dependence on an external factory checkout. Fixtures live beside the domain they test.
+**Impact:** New explicit-repository read-only preview; apply immediately refuses. No live board/reset, state migration, backup, source or harness deletion. Preserve historical recovery copies and monotonic ID high-water. No new dependencies or permanent-rule/shortcut edits. Whole BOARD-153 remains unfinished.
+**Verification:** `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'` passed all 20 tests in 3.364s on attempt 2. Attempt 1 exited 1: `AttributeError: 'NoneType' object has no attribute 'REFUSED'` in the apply-refusal fixture. Architect approved passing the real `wt` module; the assertion preventing preview access remains. Fixture-only `git init` was explicitly approved; cleanup was guarded and confined to the task worktree. No live maintenance or board operation.
+
 ## [2026-11-13] Map task purge layout and record QA round 2
 **Type:** Docs
 **Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge

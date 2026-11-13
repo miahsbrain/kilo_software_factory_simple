@@ -23,6 +23,25 @@ Tailwind stylesheet, and it produces a committed file — the viewer itself need
 
 ## Commands
 
+BOARD-153 clean-slate preview and isolated verification:
+
+```bash
+python3 .opencode/skills/git-worktree/scripts/worktree.py clean-slate --repo control
+python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'
+```
+
+`--repo` is mandatory. `--backup` requests a verified private content backup before reset effects.
+Human-only `--apply` must run from the selected independent primary checkout; a TTY must type the
+exact repository ID, one space and canonical checkout path. Active/linked worktrees block execution.
+`--resume <operation-id>` requires `--apply`, fresh exact confirmation and the original `--backup`
+choice. Use the explicit ID from `.factory-state/clean-slates/<operation-id>/manifest.json`;
+no unattended bypass, automatic rollback or implicit operation selection exists.
+Tests initialize disposable independent repositories inside this task worktree, with explicit
+human approval for fixture-only `git init`; no live clean-slate or board operations are verification.
+Latest round-1 correction result: 37 tests passed in 10.408s on attempt 1. Independent re-QA/review
+remain pending. The suite uses two real SQLite connections only in asserted task-local fixtures
+to prove contention and stale reset/resume revalidation; no live database or background writer.
+
 BOARD-152 verification (standard-library Python, repository-local disposable fixtures only):
 
 ```bash

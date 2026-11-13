@@ -1,5 +1,24 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-153 independent QA and source review complete (2026-11-13)
+
+- Branch `feat/add-human-confirmed-project-clean-slate`, worktree
+  `.opencode/worktrees/add-human-confirmed-project-clean-slate/`.
+- Added human-only named TTY apply, mandatory durable metadata, optional verified private backup,
+  atomic document replacements and explicit same-manifest recovery. Source/harness/secrets/history,
+  historical copies and monotonic ID high-water remain protected by the closed inventory.
+- Fixed pending replacement preparation with durable unique attempt tracking and fresh exclusive
+  staging on resume. Retain interrupted files; refuse changed saved stages or published targets.
+- Targeted verification passed 37 tests in 10.408s on the first correction attempt, including real
+  isolated SQLite contention and stale reset/resume revalidation under the writer lock.
+  No live-state operations, board/ledger edits, production builds or other-worktree inspection.
+- Fresh independent round-2 QA passed 37 tests in 10.658s at `4e1219b`:
+  `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-153/qa.md:2-26`.
+  Architect reviewed the recovery implementation and correction diff with no blocking finding.
+- Docs-only closeout; no tests rerun. Verification limited to file review because this was a
+  low-risk visual/static change. Next action: human inspection and integration; no merge/push/reset.
+- BOARD-152 notes below are historical, not a claim about this task's current merge readiness.
+
 ## Current session — BOARD-152 structure map and QA round 2 (2026-11-13)
 
 - QA round 2 passed 47 isolated viewer/purge tests and 39 adjacent lifecycle/handoff tests,

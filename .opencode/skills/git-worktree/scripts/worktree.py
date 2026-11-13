@@ -1624,6 +1624,12 @@ def main(argv):
     p.add_argument("--orphan", nargs=3, action="append", default=[],
                    metavar=("REPO", "PATH", "BRANCH"), help="explicit cancelled-task ownership evidence")
 
+    p = sub.add_parser("clean-slate", help="preview repository reset; human-only confirmed apply")
+    p.add_argument("--repo", required=True, help="explicit registered standalone control repository ID")
+    p.add_argument("--backup", action="store_true", help="verify a private backup before reset effects")
+    p.add_argument("--apply", action="store_true", help="human-only: requires exact repository and canonical path on a TTY")
+    p.add_argument("--resume", metavar="OPERATION_ID", help="resume this manifest only; requires --apply and fresh confirmation")
+
     p = sub.add_parser("handoff", help="print the hand-off block for a board row")
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
     p.add_argument("--repo", help="repo id from .opencode/repos.json (default: control)")
@@ -1648,6 +1654,9 @@ def main(argv):
         parser.print_help()
         return USAGE
     cwd = os.getcwd()
+    if args.command == "clean-slate":
+        import project_reset
+        return project_reset.command(args, cwd, sys.modules[__name__])
     if args.command == "purge":
         import task_purge
         return task_purge.command(args, cwd, sys.modules[__name__])
