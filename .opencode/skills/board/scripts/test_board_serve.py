@@ -20,7 +20,7 @@ import board_serve as viewer
 
 class BoardRefreshTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="board-refresh-")
+        self.temp = tempfile.TemporaryDirectory(prefix="board-refresh-", dir=Path(__file__).parents[4])
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.factory = self.root / "docs" / "BOARD.md"
@@ -594,7 +594,7 @@ class BoardRefreshTests(unittest.TestCase):
 
 class BoardBootstrapTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="board-bootstrap-")
+        self.temp = tempfile.TemporaryDirectory(prefix="board-bootstrap-", dir=Path(__file__).parents[4])
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.board = viewer.load_module("bootstrap_board", Path(__file__).with_name("board.py"))
@@ -917,7 +917,7 @@ class GalleryTests(unittest.TestCase):
 
 class PlannedWorkApiTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="planned-work-api-")
+        self.temp = tempfile.TemporaryDirectory(prefix="planned-work-api-", dir=Path(__file__).parents[4])
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.factory = self.root / "docs" / "BOARD.md"

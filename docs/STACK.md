@@ -29,6 +29,13 @@ BOARD-152 verification (standard-library Python, repository-local disposable fix
 python3 .opencode/skills/git-worktree/scripts/test_task_purge.py
 ```
 
+BOARD-152 approved correction and adjacent allocator/lifecycle/viewer/finalizer verification
+(one command; all selected suite fixtures are repository-local):
+
+```bash
+PYTHONPATH=.opencode/skills/git-worktree/scripts:.opencode/skills/board/scripts python3 -m unittest test_task_purge test_board_normalized.PlannedLifecycleTests test_board_serve.BoardRefreshTests test_handoff
+```
+
 Task purge preview: `python3 .opencode/skills/git-worktree/scripts/worktree.py purge --board BOARD-NNN`.
 Human-only apply adds `--apply`, optionally `--backup`; run from the primary control checkout and
 type the exact task ID at the terminal prompt. Cancelled orphan evidence is repeated

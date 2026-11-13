@@ -38,7 +38,11 @@ SQLite immediate transaction. Filesystem/Git steps precede canonical deletion; f
 the task and durable metadata for inspected retry. A crash after SQLite commit is recognized on
 retry. Changed or partially removed trees refuse rather than delete content whose identity can
 no longer be proven. Optional private content backups are separate from mandatory operational
-metadata. Historical/shared backups, legacy copies and exports are retained and disclosed.
+metadata. Backup preparation records `copying` before copying into a fresh private UUID directory;
+only fsynced, content-verified copies transition to `complete`. Retry preserves abandoned attempts,
+verifies the completed copy against stored content digests, and never silently disables backup.
+Nested `.git` markers of any type refuse; only the expected verified root worktree file is allowed.
+Historical/shared backups, legacy copies and exports are retained and disclosed.
 Git objects/history are not rewritten or erased; deleting the selected branch can remove its
 reflog, and purge does not guarantee permanent retention of unreachable objects.
 `plan_id_sequence` retains a monotonic allocation high-water

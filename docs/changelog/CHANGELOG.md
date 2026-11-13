@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Checkpoint BOARD-152 safety corrections with verification hold
+**Type:** Fix
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** `task_purge.py`, `test_task_purge.py`, repository-local temporary fixtures in `test_board_normalized.py`, `test_board_serve.py`, `test_handoff.py`; `docs/STACK.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/ARCHITECTURE.md`, engineering log.
+**Why:** Human approved both round-1 fixes and adjacent tests. Extend existing `tree_stamp`/`revalidate_target` to reject every nested Git marker except the verified root worktree file. Extend existing manifest/copy boundaries with durable backup attempts before copying, content verification and refusal to change requested backup policy. New `content_identity` is pure copy-comparison policy; `backup_stamp`/`prepare_backup` isolate backup identity and preparation effects rather than duplicating teardown orchestration.
+**Impact:** Fresh retry directories retain incomplete backups and never authorize unbacked deletion. Seven added cases cover nested linked/ordinary repositories, fake markers, partial/corrupt backups, changed sources, primary source/harness/secret sentinels, and ordinary discard retention. No clean-slate or shortcut implementation.
+**Verification:** Single combined command documented in `docs/STACK.md` ran 86 tests in 43.453s, exit 1: 9 failures, 1 error. Viewer tests resolved live BOARD-147/BOARD-152 instead of fixture rows. Output also printed `BOARD-153 risk set`, `BOARD-146 status set to Blocked`, `BOARD-146 notes set`, `BOARD-143 notes set`, `BOARD-131 risk set`; possible live-state isolation failure requires architect/human inspection. No rerun, live-state restoration or further source fix attempted. Corrections remain unverified; no merge readiness. Round-1 reports/ledger preserved.
+
 ## [2026-11-12] Record BOARD-152 blocked independent QA
 **Type:** Docs
 **Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge

@@ -1,25 +1,22 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-152 task purge (2026-11-12)
+## Current session — BOARD-152 corrective checkpoint (2026-11-13)
 
 - Worktree `.opencode/worktrees/add-human-confirmed-task-purge/`, branch
-  `feat/add-human-confirmed-task-purge`. Implementation checkpoint `7e30045` is **Blocked**:
-  independent QA round 1 FAIL. Builder check passed 20 tests in 5.876 seconds; QA's documented
-  `test_task_purge.py` run passed 20 in 5.744 seconds but does not prove destructive isolation.
-- Source findings: `.opencode/skills/git-worktree/scripts/task_purge.py:62-78` accepts nested linked
-  repositories with `.git` files, then recursive deletion at
-  `.opencode/skills/git-worktree/scripts/task_purge.py:359-360` can remove them. Backup preparation
-  at `.opencode/skills/git-worktree/scripts/task_purge.py:457-471` precedes the durable manifest;
-  a partial `content/` directory can prevent retry.
+  `feat/add-human-confirmed-task-purge`. Both round-1 corrections were human-approved and implemented:
+  nested Git-marker rejection and durable, verified backup preparation with fresh retry attempts.
+  Added seven fault/isolation/sentinel/discard tests; localized temporary-directory fixtures.
+- Builder hold: the single documented combined command ran 86 tests in 43.453s, exit 1,
+  9 failures and 1 error. Viewer fixtures exposed live BOARD-147/BOARD-152 rows; output printed
+  updates to BOARD-153 risk, BOARD-146 status/notes, BOARD-143 notes and BOARD-131 risk.
+  Possible live-state effects require architect inspection. No test rerun or restoration attempted.
 - Validated evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-152/`
   (`qa.md`, `finding-1.md`, `finding-2.md`). Architect owns round-1 ledger/fingerprint records.
 - Four follow-up policies approved: independent high-water IDs, explicit cancelled-orphan evidence,
   durable resumable manifest with task deletion last, historical/shared backup retention.
-- No live purge, cleanup, integration or remote operation. BOARD-153 clean-slate and BOARD-154
-  shortcuts remain queued. Next: human decision before the original builder corrects this worktree.
-  Recommend nested Git-marker rejection with only the expected root marker allowed, durable/resumable
-  backup preparation and isolation/crash/sentinel tests plus adjacent allocator/viewer/lifecycle checks.
-  Current checkpoint is docs-only; file review only, no source changes or tests.
+- No deliberate live purge/cleanup, integration or remote operation. BOARD-153 clean-slate and
+  BOARD-154 shortcuts remain queued. Next: human/architect decision on possible live-state
+  recovery and isolated fixture correction before any further check. Not merge-ready.
 
 ## Current session — BOARD-151 shared QA artifact guard (2026-11-12)
 

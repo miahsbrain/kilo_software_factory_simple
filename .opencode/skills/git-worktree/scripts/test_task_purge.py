@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[4]
 
 class TaskPurgeTests(unittest.TestCase):
     def setUp(self):
+        (ROOT / ".tmp").mkdir(exist_ok=True)
         self.temp = tempfile.TemporaryDirectory(prefix="purge-", dir=ROOT / ".tmp")
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(test_env.make_repo(self.temp.name))
@@ -115,7 +116,7 @@ class TaskPurgeTests(unittest.TestCase):
         old = recovery / "historical.tsv"
         old.write_text("shared historical backup")
         self.assertEqual(self.call(apply=True, backup=True)[0], wt.OK, self.last_error)
-        backup = self.manifest.parent / "content"
+        backup = self.manifest.parent / json.loads(self.manifest.read_text())["backup"]["directory"]
         self.assertEqual((backup / "0/draft.txt").read_text(), "recoverable content")
         self.assertEqual((backup.stat().st_mode & 0o777), 0o700)
         self.assertEqual(((backup / "0/draft.txt").stat().st_mode & 0o777), 0o600)
@@ -261,6 +262,117 @@ class TaskPurgeTests(unittest.TestCase):
             self.assertEqual(self.call(apply=True, confirm=False)[0], wt.REFUSED)
         self.assertIn("registration changed", self.last_error)
         self.assertTrue(self.exists())
+
+    def test_nested_linked_repository_is_preserved(self):
+        selected, _, _ = self.reports()
+        nested = selected / "unrelated-linked-repository"
+        self.assertEqual(test_env.git(str(self.repo), "worktree", "add", "-b", "feat/unrelated", str(nested))[0], 0)
+        sentinel = nested / "source-sentinel.txt"
+        sentinel.write_text("unrelated source")
+        registration = test_env.git(str(self.repo), "worktree", "list", "--porcelain")[1]
+        self.assertEqual(self.call(apply=True)[0], wt.REFUSED)
+        self.assertIn("nested repository", self.last_error)
+        self.assertEqual(sentinel.read_text(), "unrelated source")
+        self.assertTrue((nested / ".git").is_file())
+        self.assertEqual(test_env.git(str(self.repo), "worktree", "list", "--porcelain")[1], registration)
+        self.assertTrue(self.exists())
+        self.assertFalse(self.manifest.exists())
+
+    def test_nested_ordinary_repository_and_fake_marker_are_preserved(self):
+        selected, _, _ = self.reports()
+        nested = selected / "ordinary-repo"
+        nested.mkdir()
+        self.assertEqual(test_env.git(str(nested), "init", "-q")[0], 0)
+        sentinel = nested / "source.txt"
+        sentinel.write_text("unrelated source")
+        self.assertEqual(self.call(apply=True)[0], wt.REFUSED)
+        self.assertTrue((nested / ".git").is_dir())
+        self.assertEqual(sentinel.read_text(), "unrelated source")
+        with self.assertRaisesRegex(ValueError, "nested repository"):
+            purge.tree_stamp(selected)
+        fake = self.repo / "ordinary-file-marker"
+        fake.mkdir()
+        (fake / ".git").write_text("not a repository")
+        with self.assertRaisesRegex(ValueError, "nested repository"):
+            purge.tree_stamp(fake)
+
+    def test_partial_backup_is_durable_and_retry_uses_verified_fresh_copy(self):
+        path, _ = self.worktree()
+        (path / "draft.txt").write_text("recover me")
+        self.reports()
+        real = purge.copy_backup
+        def interrupted(source, target, state):
+            self.assertTrue(self.manifest.exists())
+            self.assertEqual(json.loads(self.manifest.read_text())["backup"]["phase"], "copying")
+            real(source, target, state)
+            raise OSError("injected backup interruption")
+        with patch.object(purge, "copy_backup", side_effect=interrupted):
+            self.assertEqual(self.call(apply=True, backup=True)[0], wt.REFUSED)
+        manifest = json.loads(self.manifest.read_text())
+        abandoned = self.manifest.parent / manifest["backup"]["directory"]
+        self.assertTrue(abandoned.exists())
+        self.assertTrue(path.exists())
+        self.assertTrue(self.exists())
+        self.assertEqual(self.call(apply=True, backup=False)[0], wt.REFUSED)
+        self.assertTrue(path.exists())
+        self.assertEqual(self.call(apply=True, backup=True)[0], wt.OK, self.last_error)
+        completed = json.loads(self.manifest.read_text())["backup"]
+        self.assertEqual(len(completed["attempts"]), 2)
+        self.assertEqual(completed["phase"], "complete")
+        self.assertTrue(abandoned.exists())
+        self.assertEqual((self.manifest.parent / completed["directory"] / "0/draft.txt").read_text(), "recover me")
+
+    def test_source_change_during_backup_refuses_with_originals_intact(self):
+        selected, ledger, _ = self.reports()
+        real = purge.copy_backup
+        def changed(source, target, state):
+            real(source, target, state)
+            if source == selected:
+                (selected / "qa.md").write_text("changed during backup")
+        with patch.object(purge, "copy_backup", side_effect=changed):
+            self.assertEqual(self.call(apply=True, backup=True)[0], wt.REFUSED)
+        self.assertTrue(self.exists())
+        self.assertTrue(ledger.exists())
+        self.assertEqual((selected / "qa.md").read_text(), "changed during backup")
+        self.assertEqual(self.call(apply=True, backup=True)[0], wt.REFUSED)
+
+    def test_corrupt_backup_cannot_authorize_deletion_on_retry(self):
+        path, _ = self.worktree()
+        (path / "draft.txt").write_text("original draft")
+        with patch.object(purge, "execute_locked", side_effect=OSError("injected before deletion")):
+            self.assertEqual(self.call(apply=True, backup=True)[0], wt.REFUSED)
+        backup = json.loads(self.manifest.read_text())["backup"]
+        (self.manifest.parent / backup["directory"] / "0/draft.txt").write_text("corrupted")
+        self.assertEqual(self.call(apply=True, backup=True)[0], wt.REFUSED)
+        self.assertIn("backup content changed", self.last_error)
+        self.assertEqual((path / "draft.txt").read_text(), "original draft")
+        self.assertTrue(self.exists())
+
+    def test_primary_source_harness_and_secret_sentinels_survive(self):
+        self.reports()
+        sentinels = {self.repo / "apps/web/src/source.txt": b"application source sentinel",
+                     self.repo / ".opencode/harness-sentinel.txt": b"harness sentinel",
+                     self.repo / ".env": b"fixture secret sentinel, not a credential"}
+        for path, data in sentinels.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        self.assertEqual(self.call(apply=True, backup=True)[0], wt.OK, self.last_error)
+        for path, data in sentinels.items():
+            self.assertEqual(path.read_bytes(), data)
+
+    def test_ordinary_discard_retains_canonical_task(self):
+        path, _ = self.worktree()
+        args = SimpleNamespace(board=self.task, repo=None, base="main", force=False, yes=False, apply=True)
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            code = wt.cmd_discard(args, str(self.repo))
+        self.assertEqual(code, wt.OK)
+        self.assertFalse(path.exists())
+        self.assertTrue(self.exists())
+        with self.board.readonly_connection(self.database) as connection:
+            row = connection.execute("SELECT status, branch_worktree FROM active_work WHERE plan_item_id=?",
+                                     (self.task,)).fetchone()
+            self.assertEqual(row[0], "Ready")
+            self.assertIn(row[1], (None, "-", ""))
 
     def test_cli_preview_and_no_unattended_flag(self):
         script = ROOT / ".opencode/skills/git-worktree/scripts/worktree.py"

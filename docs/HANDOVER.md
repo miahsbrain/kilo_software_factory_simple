@@ -1,21 +1,21 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-152 task purge, 2026-11-12**
+> **Session Notes — BOARD-152 corrective checkpoint, 2026-11-13**
 > In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.
-> Implementation checkpoint `7e30045` is **Blocked** after independent QA round 1 FAIL.
-> Builder check passed 20 tests in 5.876 seconds; QA reran the documented
-> `python3 .opencode/skills/git-worktree/scripts/test_task_purge.py`: 20 passed in 5.744 seconds.
-> Passing tests do not clear two source-traced findings: nested linked-repository `.git` files
-> escape the directory-only rejection at `.opencode/skills/git-worktree/scripts/task_purge.py:62-78`
-> and can be recursively removed at `.opencode/skills/git-worktree/scripts/task_purge.py:359-360`;
-> backup preparation at `.opencode/skills/git-worktree/scripts/task_purge.py:457-471` precedes
-> durable manifest publication, so interruption can leave `content/` blocking retry.
+> Human approved correcting both round-1 findings. Source now rejects nested `.git` markers of
+> every type and permits only the verified root linked-worktree file. Backup preparation records
+> copying attempts durably before copying, uses fresh private directories on retry, verifies content
+> and source stability, and refuses to drop the requested backup policy. Added seven regression cases.
+> The one approved combined command in `docs/STACK.md` failed: 86 tests in 43.453s,
+> exit 1, 9 failures and 1 error. Viewer fixtures resolved live BOARD-147/BOARD-152 rows instead
+> of their own data; output also printed `BOARD-153 risk set`, `BOARD-146 status set to Blocked`,
+> `BOARD-146 notes set`, `BOARD-143 notes set`, and `BOARD-131 risk set`. Live-state isolation
+> may have failed. Do not rerun or restore live state without human/architect approval.
 > Validated findings and QA report: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-152/`
 > (`qa.md`, `finding-1.md`, `finding-2.md`); architect recorded fingerprints and round-1 ledger.
-> Next: human decision before any source correction in this same worktree. Recommendation:
-> reject every nested Git marker except the expected root linked-worktree marker, make backup
-> preparation durable/resumable, add isolation/crash/sentinel tests and adjacent allocator/viewer/lifecycle checks.
-> This checkpoint changes documentation only. No live maintenance, source correction or test rerun.
+> Next: architect investigates the possible live-state effects and obtains approval for fixture
+> isolation fixes and another check. No live purge/cleanup was requested or deliberately executed;
+> no board restoration, integration, push or merge performed. This checkpoint is not merge-ready.
 
 ### BOARD-152 module inventory
 
@@ -24,20 +24,26 @@
   Identity/inventory read effects: `task_snapshot`, `safe_path`, `tree_stamp`, `targets_for_task`,
   `report_targets` and `read_inventory` at
   `.opencode/skills/git-worktree/scripts/task_purge.py:20-214`; `validate_manifest` and
-  `revalidate_target` at `.opencode/skills/git-worktree/scripts/task_purge.py:239-318`.
+  `revalidate_target` at `.opencode/skills/git-worktree/scripts/task_purge.py:370`.
   Explicit write/terminal effects: `confirm`, `save_manifest` at
   `.opencode/skills/git-worktree/scripts/task_purge.py:217-236`; `copy_backup` at
   `.opencode/skills/git-worktree/scripts/task_purge.py:285-295`; `execute_locked` and `command`
-  at `.opencode/skills/git-worktree/scripts/task_purge.py:321-477`.
+  at `.opencode/skills/git-worktree/scripts/task_purge.py:397` and
+  `.opencode/skills/git-worktree/scripts/task_purge.py:449`. Pure `content_identity` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:298` strips filesystem identity for copy
+  comparison; effectful `backup_stamp` and `prepare_backup` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:304-367` verify durable backup attempts.
 - `.opencode/skills/board/scripts/board.py:189`: `readonly_connection` is the shared read-only boundary
   used by the viewer and purge; `reserve_plan_ids` persists allocation state under the caller's
   transaction at `.opencode/skills/board/scripts/board.py:463`; pure `validate_plan_batch`
   at `.opencode/skills/board/scripts/board.py:344` accepts its high-water input explicitly.
 - CLI: `worktree.py purge --board <ID> [--apply] [--backup] [--orphan REPO PATH BRANCH ...]`.
-  Preview is agent-permitted; apply is human-only and blocked by the QA findings above. Mandatory metadata remains under
-  `.factory-state/purges/<ID>/`; optional backups under its `content/`, private permissions.
+  Preview is agent-permitted; apply is human-only and held pending passing verification/review.
+  Mandatory metadata remains under `.factory-state/purges/<ID>/`; optional backups use private
+  `content-<uuid>/` attempts. Incomplete attempts are retained, never reused for deletion authority.
   A partial tree removal whose identity cannot be re-proven needs human inspection, not blind retry.
-- Verification: `python3 .opencode/skills/git-worktree/scripts/test_task_purge.py` passed 20 tests.
+- Historical verification: the initial `test_task_purge.py` passed 20 tests before correction.
+  The current combined command failed as recorded above; do not infer a current pass.
   Evidence: read-only preview at `.opencode/skills/git-worktree/scripts/test_task_purge.py:67`,
   cancelled-orphan handling at `.opencode/skills/git-worktree/scripts/test_task_purge.py:124`,
   partial-failure retry at `.opencode/skills/git-worktree/scripts/test_task_purge.py:189`,

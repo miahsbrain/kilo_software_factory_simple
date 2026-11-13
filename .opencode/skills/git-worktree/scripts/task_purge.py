@@ -54,7 +54,7 @@ def safe_path(path, root, allow_root=False):
     return path
 
 
-def tree_stamp(path):
+def tree_stamp(path, root_marker=None):
     path = Path(path)
     info = path.lstat()
     metadata = [info.st_dev, info.st_ino, info.st_mode, info.st_size,
@@ -73,9 +73,9 @@ def tree_stamp(path):
         raise ValueError("non-regular target refused: %s" % path)
     children = []
     for child in sorted(path.iterdir()):
-        if child.name == ".git" and child.is_dir():
+        if child.name == ".git" and (child != root_marker or not child.is_file()):
             raise ValueError("nested repository refused: %s" % child)
-        children.append([child.name, tree_stamp(child)])
+        children.append([child.name, tree_stamp(child, root_marker)])
     after = path.lstat()
     if metadata != [after.st_dev, after.st_ino, after.st_mode, after.st_size,
                     after.st_mtime_ns, after.st_ctime_ns]:
@@ -180,7 +180,7 @@ def targets_for_task(wt, control, rows, snapshot, orphan, repos):
         if checked_git(wt, path, "symbolic-ref", "--short", "HEAD") != branch:
             raise ValueError("worktree branch changed")
         targets.extend([{"kind": "worktree", "path": str(path), "repo": str(repo),
-                         "branch": branch, "tip": tip, "stamp": digest(tree_stamp(path))},
+                         "branch": branch, "tip": tip, "stamp": digest(tree_stamp(path, path / ".git"))},
                         {"kind": "branch", "repo": str(repo), "branch": branch, "tip": tip}])
     return targets
 
@@ -295,6 +295,78 @@ def copy_backup(source, target, state):
         raise ValueError("backup refused non-regular content")
 
 
+def content_identity(stamp):
+    if stat.S_ISREG(stamp[0][2]):
+        return ["file", stamp[1]]
+    return ["directory", [[name, content_identity(child)] for name, child in stamp[1]]]
+
+
+def backup_stamp(target, path=None):
+    path = Path(path or target["path"])
+    return tree_stamp(path, path / ".git" if target["kind"] == "worktree" else None)
+
+
+def prepare_backup(wt, state, manifest_path, manifest, snapshot):
+    backup = manifest["backup"]
+    if not backup["enabled"]:
+        return
+    if backup["phase"] != "complete":
+        attempt = "content-" + uuid.uuid4().hex
+        backup["attempts"].append(attempt)
+        backup.update(phase="copying", directory=attempt)
+        save_manifest(wt, manifest_path, manifest)
+        directory = manifest_path.parent / attempt
+        directory.mkdir(mode=0o700)
+        task_file = directory / "task.json"
+        descriptor = os.open(task_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w") as stream:
+            json.dump(snapshot, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        content_digests = {}
+        for index, target in enumerate(manifest["targets"]):
+            if "path" not in target:
+                continue
+            revalidate_target(wt, target)
+            copy_backup(Path(target["path"]), directory / str(index), state)
+            revalidate_target(wt, target)
+            if content_identity(backup_stamp(target, directory / str(index))) != content_identity(backup_stamp(target)):
+                raise ValueError("backup content verification failed")
+            content_digests[str(index)] = digest(content_identity(backup_stamp(target, directory / str(index))))
+            for folder, _, files in os.walk(directory / str(index)):
+                for name in files:
+                    with open(Path(folder) / name, "rb") as stream:
+                        os.fsync(stream.fileno())
+                descriptor = os.open(folder, os.O_RDONLY)
+                try:
+                    os.fsync(descriptor)
+                finally:
+                    os.close(descriptor)
+            if (directory / str(index)).is_file():
+                with open(directory / str(index), "rb") as stream:
+                    os.fsync(stream.fileno())
+        descriptor = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        backup["phase"] = "complete"
+        backup["digests"] = content_digests
+        save_manifest(wt, manifest_path, manifest)
+    directory = safe_path(manifest_path.parent / backup["directory"], manifest_path.parent)
+    if json.loads(safe_path(directory / "task.json", directory).read_text()) != snapshot:
+        raise ValueError("backup task content changed")
+    for index, target in enumerate(manifest["targets"]):
+        if "path" in target:
+            copied = content_identity(backup_stamp(target, directory / str(index)))
+            if digest(copied) != backup["digests"].get(str(index)):
+                raise ValueError("backup content changed")
+            if Path(target["path"]).exists():
+                revalidate_target(wt, target)
+                if copied != content_identity(backup_stamp(target)):
+                    raise ValueError("backup no longer matches source")
+
+
 def revalidate_target(wt, target):
     if target["kind"] == "branch":
         tip = wt.git_out(target["repo"], "rev-parse", "--verify", "refs/heads/" + target["branch"])
@@ -308,13 +380,17 @@ def revalidate_target(wt, target):
     path = Path(target["path"])
     if not path.exists() and not path.is_symlink() and target["phase"] in ("running", "done"):
         return False
-    if target["phase"] == "done" or digest(tree_stamp(path)) != target["stamp"]:
-        raise ValueError("filesystem target changed")
     if target["kind"] == "worktree":
+        if wt.repo_of_path(str(path)) != target["repo"] or not any(
+                entry["path"] == str(path) and entry.get("branch") == target["branch"]
+                for entry in wt.list_worktrees(target["repo"])):
+            raise ValueError("worktree registration changed")
         if checked_git(wt, path, "symbolic-ref", "--short", "HEAD") != target["branch"]:
             raise ValueError("worktree branch changed")
         if checked_git(wt, target["repo"], "rev-parse", "refs/heads/" + target["branch"]) != target["tip"]:
             raise ValueError("worktree tip changed")
+    if target["phase"] == "done" or digest(backup_stamp(target)) != target["stamp"]:
+        raise ValueError("filesystem target changed")
     return True
 
 
@@ -403,7 +479,8 @@ def command(args, cwd, wt):
                 targets += report_targets(control, args.board)
                 manifest = {"format": 1, "board": args.board, "control": str(control),
                             "task_digest": digest(snapshot), "orphan": args.orphan,
-                            "repos_digest": digest(repos), "complete": False,
+                             "repos_digest": digest(repos), "complete": False,
+                            "backup": {"enabled": args.backup, "phase": "pending", "attempts": []},
                             "targets": [dict(target, phase="pending") for target in targets]}
             else:
                 snapshot = None
@@ -414,6 +491,15 @@ def command(args, cwd, wt):
               "legacy copies. Cancelled orphan ownership is supplied by the human, not inferred.")
         print("Optional --backup retains private content in the purge recovery directory.")
         validate_manifest(wt, manifest, control, repos)
+        backup = manifest.get("backup")
+        if (not isinstance(backup, dict) or backup.get("enabled") != args.backup
+                or backup.get("phase") not in ("pending", "copying", "complete")
+                or not isinstance(backup.get("attempts"), list)
+                or any(not re.fullmatch(r"content-[0-9a-f]{32}", name) for name in backup["attempts"])
+                or (backup.get("phase") == "complete" and (
+                    backup.get("directory") not in backup["attempts"]
+                    or not isinstance(backup.get("digests"), dict)))):
+            raise ValueError("backup policy or recovery metadata changed")
         if not args.apply:
             return wt.OK
         if Path(cwd) != control:
@@ -460,15 +546,8 @@ def command(args, cwd, wt):
                     if fresh != [{k: v for k, v in target.items() if k != "phase"}
                                  for target in manifest["targets"]]:
                         raise ValueError("targets changed during confirmation")
-                    if args.backup:
-                        backup = directory / "content"
-                        backup.mkdir(mode=0o700)
-                        (backup / "task.json").write_text(json.dumps(current))
-                        os.chmod(backup / "task.json", 0o600)
-                        for index, target in enumerate(manifest["targets"]):
-                            if "path" in target:
-                                copy_backup(Path(target["path"]), backup / str(index), state)
                     save_manifest(wt, manifest_path, manifest)
+                prepare_backup(wt, state, manifest_path, manifest, current)
                 execute_locked(wt, board, connection, control, manifest_path, manifest)
         print("Purged %s; durable operational metadata retained at %s" % (args.board, manifest_path))
         return wt.OK

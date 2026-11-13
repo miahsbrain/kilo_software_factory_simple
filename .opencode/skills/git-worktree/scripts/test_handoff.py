@@ -33,7 +33,7 @@ class HandoffTests(unittest.TestCase):
         self.args = SimpleNamespace(board="BOARD-904", repo=None, base="main")
 
     def test_recovery_path_refuses_legacy_state_before_creating_state_directory(self):
-        with tempfile.TemporaryDirectory() as folder:
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parents[4]) as folder:
             subprocess.run(["git", "-C", folder, "init"], check=True,
                            capture_output=True, text=True)
             old_recovery = Path(folder, ".git/cleanup-wt/recovery.patch")
