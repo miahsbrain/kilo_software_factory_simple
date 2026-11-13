@@ -24,6 +24,16 @@ needs. Every work surface must be registered before the factory reads its conten
 
 ## State and boundaries
 
+`worktree.py clean-slate --repo <id>` delegates a read-only, closed inventory to
+`project_reset.py`. It requires a local standalone control map and verified primary checkout;
+shared-board app scopes are refused. It reads normalized SQLite through the existing immutable
+reader only when there are no sidecars, never initializing or migrating state. Linked worktrees,
+active references and unknown evidence ownership block execution. Runtime recovery/migration
+copies remain disclosed and retained. The project-only document allowlist and portable
+`git-worktree/templates/project-v1/manifest.json` define replacement hashes. Factory documents
+are preserved. `--apply` currently refuses before any state access; durable reset execution and
+backup/resume remain later BOARD-153 chunks. No new dependency or purge authority is introduced.
+
 Task purge is a narrow human-only exception to cancellation retention. `worktree.py purge`
 delegates inventory and recovery to `task_purge.py`, sharing board projections, the primary
 checkout resolver, repository mapping, protected-branch policy and durable journal publication.

@@ -1,5 +1,37 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-153 chunk 1, 2026-11-13**
+> In flight on `feat/add-human-confirmed-project-clean-slate`,
+> `.opencode/worktrees/add-human-confirmed-project-clean-slate/`.
+> Added read-only clean-slate inventory, portable templates and isolated preview tests.
+> `--apply` refuses before state access. No live board/reset, backup or runtime migration performed.
+> Next action: architect review of chunk 1 before authorizing execution/recovery implementation.
+
+### BOARD-153 preview inventory
+
+- Pure `repository_kind` at `.opencode/skills/git-worktree/scripts/project_reset.py:24` and
+  `validate_rows` at `.opencode/skills/git-worktree/scripts/project_reset.py:32` classify governance
+  and ownership. Effectful read boundaries `checked_content`, `file_target`, `template_inventory`,
+  `evidence_inventory`, `preview` at `.opencode/skills/git-worktree/scripts/project_reset.py:50-252`
+  reject unsafe targets and produce exact paths/stamps; effectful `command` at
+  `.opencode/skills/git-worktree/scripts/project_reset.py:255` prints preview or refusal.
+  No write/reset entrypoint exists.
+- `worktree.py clean-slate --repo <id> [--backup]` previews only; `--apply` refuses immediately.
+  Missing runtime state is not initialized; SQLite sidecars block logical inventory.
+  The database target retains the monotonic ID high-water while identifying canonical tables and
+  the board projection for later emptying. Project document replacements use 14 bundled templates;
+  factory documents, source, harness, secrets, Git history, custom docs, logs and memory maps stay.
+- Future operational metadata belongs under `.factory-state/clean-slates/<operation-id>/`.
+  This chunk creates none. Historical recovery and migration-source paths are disclosed, not read
+  recursively or cleared. Active worktrees/references and unowned evidence block execution.
+- Focused verification is documented in `docs/STACK.md`; fixtures assert independent primary root
+  and SQLite destination before database writes. BOARD-153 as a whole remains unfinished.
+- Verification: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'`
+  passed 20 tests in 3.364s on attempt 2. Attempt 1 had 19 passes and one fixture error:
+  `AttributeError: 'NoneType' object has no attribute 'REFUSED'`. Architect approved passing the
+  real `wt` module in `.opencode/skills/git-worktree/scripts/test_project_reset.py:106`; the mocked
+  preview assertion remains. No live reset, live board or other-session worktree inspection.
+
 > **Session Notes — BOARD-152 structure map and QA round 2, 2026-11-13**
 > In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.
 > QA round 2 passed 47 isolated viewer/purge tests and 39 adjacent lifecycle/handoff tests,

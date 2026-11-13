@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Add preview-only repository clean-slate inventory
+**Type:** Feature
+**Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate
+**Changed:** `project_reset.py`, `test_project_reset.py`, minimal `worktree.py` parser/dispatch, portable `git-worktree/templates/project-v1/` bundle, architecture/decision/structure/stack/session docs.
+**Why:** Establish an exact fail-closed reset inventory before implementing any destructive effects. The new module keeps reset authority separate from task purge; the portable bundle removes dependence on an external factory checkout. Fixtures live beside the domain they test.
+**Impact:** New explicit-repository read-only preview; apply immediately refuses. No live board/reset, state migration, backup, source or harness deletion. Preserve historical recovery copies and monotonic ID high-water. No new dependencies or permanent-rule/shortcut edits. Whole BOARD-153 remains unfinished.
+**Verification:** `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'` passed all 20 tests in 3.364s on attempt 2. Attempt 1 exited 1: `AttributeError: 'NoneType' object has no attribute 'REFUSED'` in the apply-refusal fixture. Architect approved passing the real `wt` module; the assertion preventing preview access remains. Fixture-only `git init` was explicitly approved; cleanup was guarded and confined to the task worktree. No live maintenance or board operation.
+
 ## [2026-11-13] Map task purge layout and record QA round 2
 **Type:** Docs
 **Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge

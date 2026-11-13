@@ -27,7 +27,10 @@ and is never tracked here (ADR-053).
     │   ├── skills/                   # board, git-worktree, qa-review, runtime-state, unslop, plan
     │   │   └── git-worktree/scripts/
     │   │       ├── task_purge.py      # task inventory, human confirmation, resumable purge
-    │   │       └── test_task_purge.py # repository-local purge safety/fault regressions
+    │   │       ├── test_task_purge.py # repository-local purge safety/fault regressions
+    │   │       ├── project_reset.py   # closed read-only clean-slate inventory; apply unavailable
+    │   │       └── test_project_reset.py # independent repository preview fixtures
+    │   │   └── git-worktree/templates/project-v1/ # 14 portable document templates + hash manifest
     │   └── worktrees/                # one worktree per board row (git-ignored)
     ├── docs/
     │   ├── README.md                 # index of the factory documentation set
