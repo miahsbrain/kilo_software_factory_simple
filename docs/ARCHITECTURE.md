@@ -31,8 +31,22 @@ reader only when there are no sidecars, never initializing or migrating state. L
 active references and unknown evidence ownership block execution. Runtime recovery/migration
 copies remain disclosed and retained. The project-only document allowlist and portable
 `git-worktree/templates/project-v1/manifest.json` define replacement hashes. Factory documents
-are preserved. `--apply` currently refuses before any state access; durable reset execution and
-backup/resume remain later BOARD-153 chunks. No new dependency or purge authority is introduced.
+are preserved. Human-only `--apply` requires the selected primary checkout and exact repository ID
+plus canonical path on stdin/stderr TTYs. This is the same local deterrence boundary as purge,
+not an OS security boundary against code with the same identity.
+
+Reset authority stays in `project_reset.py`, separate from purge's target vocabulary. It reuses
+purge's safe paths, stamps, private copy and durable publication, the runtime resolver/snapshot
+adapter, and the canonical SQLite writer transaction (`BEGIN IMMEDIATE`). Mandatory
+`.factory-state/clean-slates/<operation-id>/manifest.json` records exact filesystem and logical DB
+pre/postimages before reset effects. Optional private backup attempts finish and verify first.
+Per-node deletion avoids ambiguous partially deleted trees; replacements publish staged new inodes.
+Canonical emptying commits last, preserving schemas and ID high-water while replacing stale
+projection prose with the canonical empty view. Crash recovery requires explicit
+`--resume <operation-id>` plus fresh named confirmation, verifies saved ownership/pre/postimages
+even when the board is empty, and refuses drift/recreated targets. Historical copies and incomplete
+backup attempts remain; there is no automatic rollback. No dependency, new lock framework, guard
+bypass or change to purge behavior is introduced. Independent destructive-flow QA is still pending.
 
 Task purge is a narrow human-only exception to cancellation retention. `worktree.py purge`
 delegates inventory and recovery to `task_purge.py`, sharing board projections, the primary

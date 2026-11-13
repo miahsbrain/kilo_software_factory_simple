@@ -1,36 +1,47 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-153 chunk 1, 2026-11-13**
+> **Session Notes — BOARD-153 chunk 2, 2026-11-13**
 > In flight on `feat/add-human-confirmed-project-clean-slate`,
 > `.opencode/worktrees/add-human-confirmed-project-clean-slate/`.
-> Added read-only clean-slate inventory, portable templates and isolated preview tests.
-> `--apply` refuses before state access. No live board/reset, backup or runtime migration performed.
-> Next action: architect review of chunk 1 before authorizing execution/recovery implementation.
+> Added human-only execution, durable recovery and isolated interruption tests over the closed preview.
+> No live board/reset, backup or runtime migration performed. No other-session worktrees inspected.
+> Next action: architect diff review and fresh independent destructive-flow QA before any merge claim.
 
-### BOARD-153 preview inventory
+### BOARD-153 clean-slate inventory
 
-- Pure `repository_kind` at `.opencode/skills/git-worktree/scripts/project_reset.py:24` and
-  `validate_rows` at `.opencode/skills/git-worktree/scripts/project_reset.py:32` classify governance
-  and ownership. Effectful read boundaries `checked_content`, `file_target`, `template_inventory`,
-  `evidence_inventory`, `preview` at `.opencode/skills/git-worktree/scripts/project_reset.py:50-252`
-  reject unsafe targets and produce exact paths/stamps; effectful `command` at
-  `.opencode/skills/git-worktree/scripts/project_reset.py:255` prints preview or refusal.
-  No write/reset entrypoint exists.
-- `worktree.py clean-slate --repo <id> [--backup]` previews only; `--apply` refuses immediately.
-  Missing runtime state is not initialized; SQLite sidecars block logical inventory.
-  The database target retains the monotonic ID high-water while identifying canonical tables and
-  the board projection for later emptying. Project document replacements use 14 bundled templates;
-  factory documents, source, harness, secrets, Git history, custom docs, logs and memory maps stay.
-- Future operational metadata belongs under `.factory-state/clean-slates/<operation-id>/`.
-  This chunk creates none. Historical recovery and migration-source paths are disclosed, not read
-  recursively or cleared. Active worktrees/references and unowned evidence block execution.
-- Focused verification is documented in `docs/STACK.md`; fixtures assert independent primary root
-  and SQLite destination before database writes. BOARD-153 as a whole remains unfinished.
+- Pure `repository_kind` at `.opencode/skills/git-worktree/scripts/project_reset.py:26` and
+  `validate_rows` at `.opencode/skills/git-worktree/scripts/project_reset.py:34` classify governance/ownership.
+  Effectful readers `checked_content`, `file_target`, `inode`, `database_image`, `template_inventory`,
+  `evidence_inventory`, `selection`, `preview` occupy `.opencode/skills/git-worktree/scripts/project_reset.py:52-279`.
+  They bind the primary root, map, templates, exact target stamps and logical database image.
+- Effectful terminal boundaries `require_terminal`, `confirm` are at
+  `.opencode/skills/git-worktree/scripts/project_reset.py:282-294`; read/validation boundaries
+  `replacement_image`, `expand_steps`, `validate_record`, `validate_files` are at
+  `.opencode/skills/git-worktree/scripts/project_reset.py:305-412`.
+- Effectful `sync_directory`, `empty_database`, `backup_record`, `execute_step`, `apply_locked`,
+  `command` are at `.opencode/skills/git-worktree/scripts/project_reset.py:297`,
+  `.opencode/skills/git-worktree/scripts/project_reset.py:415-631`. They publish private durable metadata,
+  verify optional backups, advance exact filesystem steps, and transactionally empty canonical state.
+- `worktree.py clean-slate --repo <id> [--backup]` remains side-effect-free preview. Human-only
+  `--apply` requires the selected primary checkout and exact repository ID plus canonical path on a TTY.
+  Missing state is never initialized. Initial preview refuses SQLite sidecars, active worktrees,
+  unknown ownership and unsafe paths. Project replacements use the 14 bundled templates;
+  factory docs, source, harness, secrets, Git history, custom docs, logs and memory maps remain.
+- `.factory-state/clean-slates/<operation-id>/manifest.json` records root/map/template identities,
+  filesystem pre/postimages, canonical database pre/postimages and the preserved ID high-water.
+  Filesystem phases are `pending → running → done`; database phases are
+  `pending → committing → committed`. Documents use staged atomic new-inode replacement;
+  evidence is removed file-by-file, then only inventoried empty directories are removed.
+  The canonical SQLite `BEGIN IMMEDIATE` writer lock covers reset execution; commit is last.
+- Optional backups use verified private `content-<uuid>` attempts and a consistent SQLite snapshot.
+  Failed attempts and historical recovery/migration sources remain. `--resume <operation-id>` requires
+  fresh exact confirmation and the original backup choice, uses saved ownership even after DB commit,
+  and refuses changed/recreated targets. No implicit operation selection or automatic rollback.
 - Verification: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'`
-  passed 20 tests in 3.364s on attempt 2. Attempt 1 had 19 passes and one fixture error:
-  `AttributeError: 'NoneType' object has no attribute 'REFUSED'`. Architect approved passing the
-  real `wt` module in `.opencode/skills/git-worktree/scripts/test_project_reset.py:106`; the mocked
-  preview assertion remains. No live reset, live board or other-session worktree inspection.
+  passed 31 tests in 7.873s on attempt 2. Attempt 1 exited 1 with two existing-directory fixture errors,
+  a Path/string backup-reader mismatch and an expected refusal wording mismatch. Architect approved
+  those narrow corrections. Fixtures assert independent primary/database identity before writes;
+  no production build or live maintenance ran. Independent QA/review remain outstanding.
 
 > **Session Notes — BOARD-152 structure map and QA round 2, 2026-11-13**
 > In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.

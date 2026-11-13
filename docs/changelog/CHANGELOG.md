@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Add human-only clean-slate execution and recovery
+**Type:** Feature
+**Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate
+**Changed:** `project_reset.py`, `test_project_reset.py`, `worktree.py` parser/help, stack/architecture/decision/session docs.
+**Why:** Execute the approved closed inventory without widening purge authority. Reuse durable metadata, private copies, SQLite snapshot and writer-lock primitives; no dependencies, rule/shortcut edits or changes to purge behavior.
+**Impact:** Exact named TTY confirmation, durable pre/postimages, optional verified backups, per-node deletes, atomic document replacements, commit-last canonical emptying and explicit confirmed resume. Preserve source/harness/secrets/history, historical copies and ID high-water. No live reset or board edits; independent QA/review pending.
+**Verification:** `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'` passed 31 tests in 7.873s on attempt 2. Attempt 1 exited 1: two `FileExistsError: [Errno 17] File exists` fixture errors; `unsupported operand type(s) for +: 'PosixPath' and 'str'` at backup reader; expected `nested repository` versus actual `foreign repository boundary` refusal. Architect approved fixture `exist_ok=True`, string path conversion and matching the correct refusal. Tests cover confirmation, drift, preservation, backup/replacement/DB-commit interruption and saved-manifest recovery in independent task-local fixtures. No live maintenance, production build or other-worktree read.
+
 ## [2026-11-13] Add preview-only repository clean-slate inventory
 **Type:** Feature
 **Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate

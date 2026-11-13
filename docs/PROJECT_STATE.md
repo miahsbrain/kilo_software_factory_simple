@@ -1,14 +1,15 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-153 preview-only chunk 1 (2026-11-13)
+## Current session — BOARD-153 execution/recovery chunk 2 (2026-11-13)
 
 - Branch `feat/add-human-confirmed-project-clean-slate`, worktree
   `.opencode/worktrees/add-human-confirmed-project-clean-slate/`.
-- Added closed read-only inventory and portable template bundle. `--apply` refuses before state
-  access. No live-state operations or board edits; no execution/backup/resume implementation.
-- Targeted preview verification passed 20 tests on attempt 2 after the architect-approved fixture
-  correction. Chunk 1 is ready for architect review, not whole-task merge approval.
-- Next action: review chunk 1, then authorize the next bounded implementation chunk.
+- Added human-only named TTY apply, mandatory durable metadata, optional verified private backup,
+  atomic document replacements and explicit same-manifest recovery. Source/harness/secrets/history,
+  historical copies and monotonic ID high-water remain protected by the closed inventory.
+- Targeted verification passed 31 tests in 7.873s on attempt 2 after three architect-approved
+  corrections. No live-state operations, board edits, production builds or other-worktree inspection.
+- Next action: architect diff review, then fresh independent destructive-flow QA. Not merge-ready.
 - BOARD-152 notes below are historical, not a claim about this task's current merge readiness.
 
 ## Current session — BOARD-152 structure map and QA round 2 (2026-11-13)
