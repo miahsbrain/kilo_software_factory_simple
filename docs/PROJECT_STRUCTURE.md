@@ -25,6 +25,9 @@ and is never tracked here (ADR-053).
     │   ├── repos.json                # repo map: control '.', project 'project'
     │   ├── scopes/<id>.md            # canonical scope rules, one per scope
     │   ├── skills/                   # board, git-worktree, qa-review, runtime-state, unslop, plan
+    │   │   └── git-worktree/scripts/
+    │   │       ├── task_purge.py      # task inventory, human confirmation, resumable purge
+    │   │       └── test_task_purge.py # repository-local purge safety/fault regressions
     │   └── worktrees/                # one worktree per board row (git-ignored)
     ├── docs/
     │   ├── README.md                 # index of the factory documentation set
@@ -51,7 +54,8 @@ and is never tracked here (ADR-053).
     │   ├── .migration-complete.json  # atomic-snapshot completion manifest
     │   ├── factory-board.sqlite3     # live board database and export snapshots
     │   ├── reviews/                  # QA bounded-loop ledgers only
-    │   └── cleanup-wt/<repo-id>/     # recovery journals and backups
+    │   ├── cleanup-wt/<repo-id>/     # recovery journals and backups
+    │   └── purges/<ID>/              # purge manifest, lock and optional content backup attempts
     ├── artifacts/                    # shared task reports and evidence, outside worktrees
     └── project/                      # a project repository lives here in the workspace.
                                       # It is its own git repository and the factory never
@@ -65,6 +69,8 @@ and is never tracked here (ADR-053).
 | `.opencode/agents/` | `architect` primary plus six specialist subagents: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. All inherit session model selection. |
 | `.opencode/commands/` | Ten slash commands that package the workflow. Derived from `AGENTS.md`, never a source of rules. |
 | `.opencode/skills/` | Skills and enforcement scripts: `board`, `git-worktree`, `qa-review`, `runtime-state`, `unslop`, `plan`. |
+| `.opencode/skills/git-worktree/scripts/task_purge.py` | Human-only task purge domain, invoked by `worktree.py purge`: read-only inventory, ownership/path policy, exact confirmation, durable recovery phases and optional verified backups. |
+| `.opencode/skills/git-worktree/scripts/test_task_purge.py` | Disposable repository-local tests for purge ownership, isolation, failures, recovery, backup verification and retained unrelated content. |
 | `.opencode/skills/unslop/` | The unslop skill (CC BY 4.0, Damir Sokolovsky) with its references, its snapshot script and its examples. Its signs list is the extended checklist of the QA lane. |
 | `.opencode/skills/plan/` | The merged plan skill (MIT, © 2025 Jeffallan — upstream `feature-forge` and `architecture-designer`). `SKILL.md` and `references/`: the interview bank, the specification template, EARS syntax, acceptance criteria, pre-discovery subagents, system design, architecture patterns, database selection, ADR template, NFR checklist, and two superpowers research documents (MIT, © Jesse Vincent). |
 | `.opencode/catalog/` | 67 upstream skills (MIT, © 2025 Jeffallan — https://github.com/Jeffallan/claude-skills), each a `SKILL.md` plus `references/`. Outside native `.opencode/skills/` discovery and not registered as an extra skill source; read on demand. `guard.py sync` carries them into a project. |
@@ -81,6 +87,7 @@ and is never tracked here (ADR-053).
 | `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` | Shared QA/UI reports and evidence outside task worktrees: `qa.md`, `ui.md`, and `builder/`. |
 | `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` | Local QA bounded-loop ledger, updated only through `ledger.py`. |
 | `<primary-checkout>/.factory-state/cleanup-wt/<repo-id>/` | Worktree recovery TSVs, patches and finalize journals, separated by repository identity. |
+| `<primary-checkout>/.factory-state/purges/<ID>/` | Task-purge `manifest.json`, exclusive lock and optional private `content-<uuid>/` backup attempts; mandatory operational metadata and incomplete attempts remain for inspected recovery. |
 | `templates/project/docs/BOARD.md` | Tracked blank starter; the copied template ignores its own runtime board. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
 | `opencode.jsonc` | OpenCode V2 settings: default architect, Playwright MCP and generated permissions. |

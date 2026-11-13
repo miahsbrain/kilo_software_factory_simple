@@ -24,6 +24,30 @@ needs. Every work surface must be registered before the factory reads its conten
 
 ## State and boundaries
 
+Task purge is a narrow human-only exception to cancellation retention. `worktree.py purge`
+delegates inventory and recovery to `task_purge.py`, sharing board projections, the primary
+checkout resolver, repository mapping, protected-branch policy and durable journal publication.
+Preview uses the same read-only SQLite boundary as the viewer, never initializes/migrates state,
+and lists exact resources. Apply requires the primary control checkout, a terminal and an exact
+task-ID confirmation. Dependent tasks, foreign repositories, symlinks and changed targets refuse.
+Existing cancelled tasks need explicit orphan ownership evidence; unclaimed worktrees refuse
+rather than infer ownership from names. Ordinary cancellation/discard/finalization are unchanged.
+
+`.factory-state/purges/<ID>/manifest.json` records phases under an exclusive POSIX lock and a
+SQLite immediate transaction. Filesystem/Git steps precede canonical deletion; failures retain
+the task and durable metadata for inspected retry. A crash after SQLite commit is recognized on
+retry. Changed or partially removed trees refuse rather than delete content whose identity can
+no longer be proven. Optional private content backups are separate from mandatory operational
+metadata. Backup preparation records `copying` before copying into a fresh private UUID directory;
+only fsynced, content-verified copies transition to `complete`. Retry preserves abandoned attempts,
+verifies the completed copy against stored content digests, and never silently disables backup.
+Nested `.git` markers of any type refuse; only the expected verified root worktree file is allowed.
+Historical/shared backups, legacy copies and exports are retained and disclosed.
+Git objects/history are not rewritten or erased; deleting the selected branch can remove its
+reflog, and purge does not guarantee permanent retention of unreachable objects.
+`plan_id_sequence` retains a monotonic allocation high-water
+mark independently of task rows. No new dependency, clean-slate or slash shortcut is included.
+
 - Clone-local factory runtime state lives at `<primary-checkout>/.factory-state/`, outside Git
   metadata. The live board is `.factory-state/factory-board.sqlite3`; Markdown is a one-time
   import or generated export, never the live state. Scripts resolve the primary checkout from

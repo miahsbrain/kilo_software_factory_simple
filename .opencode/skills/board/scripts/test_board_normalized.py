@@ -18,7 +18,7 @@ import board
 
 class NormalizedBoardMigrationTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="board-normalized-")
+        self.temp = tempfile.TemporaryDirectory(prefix="board-normalized-", dir=Path(__file__).parents[4])
         self.addCleanup(self.temp.cleanup)
         self.path = str(Path(self.temp.name) / "factory-board.sqlite3")
         self.markdown = self.make_markdown()
@@ -230,7 +230,7 @@ class NormalizedBoardMigrationTests(unittest.TestCase):
 
 class PlannedLifecycleTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="board-plan-lifecycle-")
+        self.temp = tempfile.TemporaryDirectory(prefix="board-plan-lifecycle-", dir=Path(__file__).parents[4])
         self.addCleanup(self.temp.cleanup)
         self.path = str(Path(self.temp.name) / "factory-board.sqlite3")
         markdown = NormalizedBoardMigrationTests.make_markdown()
@@ -439,7 +439,7 @@ class PlannedLifecycleTests(unittest.TestCase):
 
 class PlannedCliDatabaseTests(unittest.TestCase):
     def make_repo(self, legacy=False):
-        temporary = tempfile.TemporaryDirectory(prefix="board-plan-cli-")
+        temporary = tempfile.TemporaryDirectory(prefix="board-plan-cli-", dir=Path(__file__).parents[4])
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
         subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
@@ -546,7 +546,7 @@ class PlannedCliDatabaseTests(unittest.TestCase):
 
 class PlannedProjectionValidationTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="board-plan-validation-")
+        self.temp = tempfile.TemporaryDirectory(prefix="board-plan-validation-", dir=Path(__file__).parents[4])
         self.addCleanup(self.temp.cleanup)
         self.path = str(Path(self.temp.name) / "factory-board.sqlite3")
         markdown = NormalizedBoardMigrationTests.make_markdown()

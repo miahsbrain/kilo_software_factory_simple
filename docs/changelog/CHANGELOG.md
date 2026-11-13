@@ -3,6 +3,38 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Map task purge layout and record QA round 2
+**Type:** Docs
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** `docs/PROJECT_STRUCTURE.md`, session notes in `docs/HANDOVER.md` and `docs/PROJECT_STATE.md`, engineering log.
+**Why:** Architect review found the purge module, focused test file and runtime purge directory missing from the authoritative structure map. Record the user's explicit approval of the exact existing `### Task purge` addition to `.opencode/skills/git-worktree/SKILL.md`, retained unchanged.
+**Impact:** Documentation only. Orchestrator reported QA round-2 PASS: 47 isolated viewer/purge tests and 39 adjacent lifecycle/handoff tests. Evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-152/qa.md` and `.tmp/board152-adjacent-qa.log`. Earlier failures remain historical; live writes were not proven. Architect review passed against `6f72e0b`: no blocking finding after structure-map, safety-path and QA-evidence review; architect reported clean `git diff --check opencode` and worktree. Row awaits Pending Merge handoff and human finalize; no live purge. No code/permanent-rule changes, board/report/ledger edits, merge or push.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. No tests or builds rerun.
+
+## [2026-11-13] Isolate BOARD-152 viewer regression fixtures
+**Type:** Fix
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** `.opencode/skills/board/scripts/test_board_serve.py`, `docs/STACK.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, engineering log.
+**Why:** Non-Git disposable roots inside a linked worktree inherited the real primary checkout during viewer read-only lookups. User approved `git init` only for disposable repositories inside this assigned worktree after guard exit 3. Extend existing BoardRefreshTests setup/write helpers with independent Git identity assertions before board access and isolated SQLite state; adapt missing/malformed fixture cases to the actual read boundary. Runtime resolvers are untouched; no new tool, dependency or product behavior.
+**Impact:** Prevent fixture board reads from escaping to the enclosing live checkout. Prior output proved live reads, not live writes; fixture lifecycle tests can emit field-update messages. No live-state inspection/restoration or purge performed.
+**Verification:** One narrowed command in `docs/STACK.md` passed 47 tests in 12.477s, exit 0 (20 BoardRefreshTests, 27 TaskPurgeTests). Local log `.tmp/board152-isolated-check.log`. Includes previously failing viewer assertions, nested Git-marker preservation, interrupted/corrupt backup handling and source/harness/secret sentinels. Adjacent suites omitted; independent QA/review remain pending. No merge/push.
+
+## [2026-11-13] Checkpoint BOARD-152 safety corrections with verification hold
+**Type:** Fix
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** `task_purge.py`, `test_task_purge.py`, repository-local temporary fixtures in `test_board_normalized.py`, `test_board_serve.py`, `test_handoff.py`; `docs/STACK.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/ARCHITECTURE.md`, engineering log.
+**Why:** Human approved both round-1 fixes and adjacent tests. Extend existing `tree_stamp`/`revalidate_target` to reject every nested Git marker except the verified root worktree file. Extend existing manifest/copy boundaries with durable backup attempts before copying, content verification and refusal to change requested backup policy. New `content_identity` is pure copy-comparison policy; `backup_stamp`/`prepare_backup` isolate backup identity and preparation effects rather than duplicating teardown orchestration.
+**Impact:** Fresh retry directories retain incomplete backups and never authorize unbacked deletion. Seven added cases cover nested linked/ordinary repositories, fake markers, partial/corrupt backups, changed sources, primary source/harness/secret sentinels, and ordinary discard retention. No clean-slate or shortcut implementation.
+**Verification:** Single combined command documented in `docs/STACK.md` ran 86 tests in 43.453s, exit 1: 9 failures, 1 error. Viewer tests resolved live BOARD-147/BOARD-152 instead of fixture rows. Output also printed `BOARD-153 risk set`, `BOARD-146 status set to Blocked`, `BOARD-146 notes set`, `BOARD-143 notes set`, `BOARD-131 risk set`; possible live-state isolation failure requires architect/human inspection. No rerun, live-state restoration or further source fix attempted. Corrections remain unverified; no merge readiness. Round-1 reports/ledger preserved.
+
+## [2026-11-12] Record BOARD-152 blocked independent QA
+**Type:** Docs
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`
+**Why:** Record round-1 FAIL against implementation checkpoint `7e30045`; passing targeted tests do not establish destructive isolation.
+**Impact:** BOARD-152 is Blocked pending human decision. Builder's documented check passed 20 tests in 5.876s; QA rerun passed 20 in 5.744s. Source-traced findings: `.opencode/skills/git-worktree/scripts/task_purge.py:62-78` rejects only `.git` directories, allowing nested linked repositories with `.git` files into recursive deletion at `.opencode/skills/git-worktree/scripts/task_purge.py:359-360`; optional backup preparation at `.opencode/skills/git-worktree/scripts/task_purge.py:457-471` precedes durable manifest publication, so an interrupted partial `content/` directory prevents retry. Validated reports: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-152/{qa.md,finding-1.md,finding-2.md}`; architect recorded fingerprints/round-1 ledger. Recommend nested marker rejection except the expected root worktree marker, durable resumable backup preparation, isolation/crash/sentinel tests and adjacent allocator/viewer/lifecycle verification. No correction before human decision; no source changes or live deletion.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. No tests rerun for this documentation checkpoint.
+
 ## [2026-11-12] Record BOARD-151 independent QA and current handover
 **Type:** Docs
 **Board:** BOARD-151 | **Branch:** fix/fix-shared-qa-artifact-guard-permissions
@@ -721,3 +753,10 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Changed:** `.opencode/plugins/factory-guard/`, canonical policy, guard file/search checks, config sync, STACK and session state
 **Why:** Native search permissions do not enforce target paths; copied control repos need the complete runtime configuration
 **Impact:** Incomplete security migration. Node tests exited 1 on temporary fixture directory EACCES; no workaround attempted. Container and native runtime verification remain pending.
+## [2026-11-12] Add human-confirmed task purge
+**Type:** Feature
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** worktree CLI, focused task-purge module/tests, board allocator/read-only connection, viewer connection reuse, approved root/template maintenance paragraph and scope docs
+**Why:** erase explicitly selected task resources without weakening ordinary retention or isolation
+**Impact:** preview by default; human-only apply with durable recovery and optional private content backup; task IDs remain reserved after purge. Historical/shared copies remain; Git history is not rewritten. The single documented check passed 20 tests in 5.876 seconds; no live deletion.
+**Reuse:** extracted the viewer's read-only connection into board.py, reused existing primary resolver, repo mapping, branch policy and journal publication. New task_purge.py isolates purge inventory/recovery from the general lifecycle orchestrator; test_task_purge.py adds focused disposable-repository safety coverage.

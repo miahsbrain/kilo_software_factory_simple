@@ -44,6 +44,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+from urllib.parse import quote
 
 BOARD_PATH = os.path.join("docs", "BOARD.md")
 DATABASE_NAME = "factory-board.sqlite3"
@@ -182,6 +183,22 @@ def connect(path):
         raise
     finally:
         connection.close()
+
+
+@contextlib.contextmanager
+def readonly_connection(path):
+    if not stat.S_ISREG(os.lstat(path).st_mode):
+        raise ValueError("cannot read the board")
+    wal = os.path.exists(path + "-wal")
+    if wal != os.path.exists(path + "-shm"):
+        raise ValueError("cannot read the board")
+    uri = "file:%s?mode=ro%s" % (quote(path, safe="/"), "" if wal else "&immutable=1")
+    with contextlib.closing(sqlite3.connect(uri, uri=True)) as connection:
+        connection.execute("BEGIN")
+        try:
+            yield connection
+        finally:
+            connection.rollback()
 
 
 def normalized_schema(connection):
@@ -324,7 +341,7 @@ class PlanValidationError(ValueError):
     pass
 
 
-def validate_plan_batch(items, existing_ids):
+def validate_plan_batch(items, existing_ids, high_water=0):
     """Validate and assign IDs to an accepted JSON batch without performing I/O."""
     if not isinstance(items, list) or not items:
         raise PlanValidationError("accepted batch must be a non-empty JSON array")
@@ -383,8 +400,8 @@ def validate_plan_batch(items, existing_ids):
             raise PlanValidationError("item %d notes must be a single-line value without pipes" %
                                       (index + 1))
 
-    next_number = max((int(match.group(1)) for value in existing_ids
-                       for match in [re.fullmatch(r"BOARD-(\d+)", value)] if match), default=0) + 1
+    next_number = max(high_water, max((int(match.group(1)) for value in existing_ids
+                       for match in [re.fullmatch(r"BOARD-(\d+)", value)] if match), default=0)) + 1
     assigned = {key: "BOARD-%03d" % (next_number + index) for index, key in enumerate(keys)}
     result = []
     known_ids = set(existing_ids)
@@ -443,12 +460,23 @@ def write_connection_snapshot(connection, markdown, revision, allow_completion=F
                        (markdown, revision + 1))
 
 
+def reserve_plan_ids(connection):
+    connection.execute("CREATE TABLE IF NOT EXISTS plan_id_sequence "
+                       "(singleton INTEGER PRIMARY KEY CHECK(singleton=1), high_water INTEGER NOT NULL)")
+    highest = max((int(match.group(1)) for (value,) in connection.execute("SELECT id FROM planned_items")
+                   for match in [re.fullmatch(r"BOARD-(\d+)", value)] if match), default=0)
+    connection.execute("INSERT OR IGNORE INTO plan_id_sequence VALUES (1, ?)", (highest,))
+    connection.execute("UPDATE plan_id_sequence SET high_water=MAX(high_water, ?) WHERE singleton=1",
+                       (highest,))
+    return connection.execute("SELECT high_water FROM plan_id_sequence WHERE singleton=1").fetchone()[0]
+
+
 def accept_plan_batch(path, items):
     with connect(path) as connection:
         require_normalized(connection)
         connection.execute("BEGIN IMMEDIATE")
         existing_ids = {row[0] for row in connection.execute("SELECT id FROM planned_items")}
-        accepted = validate_plan_batch(items, existing_ids)
+        accepted = validate_plan_batch(items, existing_ids, reserve_plan_ids(connection))
         queue_position = connection.execute(
             "SELECT COALESCE(MAX(queue_position), -1)+1 FROM planned_items").fetchone()[0]
         display_position = connection.execute(
@@ -466,6 +494,8 @@ def accept_plan_batch(path, items):
                 (plan_item_id, position, text, verified, proof) VALUES (?, ?, ?, 0, NULL)""",
                                   ((item["id"], position, text)
                                    for position, text in enumerate(item["acceptance_criteria"])))
+        connection.execute("UPDATE plan_id_sequence SET high_water=? WHERE singleton=1",
+                           (int(accepted[-1]["id"].split("-")[1]),))
         persist_normalized_projection(connection)
         return [{"key": item["key"], "id": item["id"]} for item in accepted]
 

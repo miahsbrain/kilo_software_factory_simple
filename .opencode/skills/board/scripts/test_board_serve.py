@@ -20,12 +20,20 @@ import board_serve as viewer
 
 class BoardRefreshTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="board-refresh-")
+        self.temp = tempfile.TemporaryDirectory(prefix="board-refresh-", dir=Path(__file__).parents[4])
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        subprocess.run(["git", "init", "-q", "-b", "main", str(self.root)], check=True)
         self.factory = self.root / "docs" / "BOARD.md"
         self.project = self.root / "project" / "docs" / "BOARD.md"
         self.board = viewer.load_module("board_fixture_parser", Path(__file__).with_name("board.py"))
+        state = self.board.runtime_state_module()
+        self.assertEqual(Path(state.primary_checkout(str(self.root))), self.root)
+        self.database = self.root / ".factory-state" / self.board.DATABASE_NAME
+        self.assertEqual(Path(self.board.database_path(str(self.root))), self.database)
+        self.project.parent.parent.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(self.project.parent.parent)], check=True)
+        self.assertEqual(Path(state.primary_checkout(str(self.project.parent.parent))), self.project.parent.parent)
         self.worktree = viewer.load_module(
             "worktree_fixture_helpers", Path(__file__).parents[2] / "git-worktree/scripts/worktree.py")
         self.worktree.list_worktrees = Mock(return_value=[])
@@ -36,6 +44,7 @@ class BoardRefreshTests(unittest.TestCase):
         previous_state = viewer.Handler.state
         self.addCleanup(setattr, viewer.Handler, "state", previous_state)
         self.write_board(self.factory, "Factory task")
+        self.board.initialize_board(str(self.root))
         (self.root / ".gitignore").write_text(
             "/project/\n/.factory-state/\n", encoding="utf-8")
 
@@ -46,10 +55,14 @@ class BoardRefreshTests(unittest.TestCase):
             "| " + " | ".join(viewer.COLUMNS) + " |\n"
             + "| " + " | ".join(["---"] * len(viewer.COLUMNS)) + " |\n"
             + "| " + " | ".join(cells) + " |\n", encoding="utf-8")
+        if path == self.factory and self.database.exists():
+            with self.board.connect(str(self.database)) as connection:
+                connection.execute("UPDATE board SET markdown=?, revision=revision+1 WHERE id=1",
+                                   (path.read_text(),))
 
     def independent_project(self):
         project = self.root / "project"
-        project.mkdir()
+        project.mkdir(exist_ok=True)
         subprocess.run(["git", "init", "-q", "-b", "main", str(project)], check=True)
         (project / ".gitignore").write_text("/.factory-state/\n", encoding="utf-8")
         self.write_board(self.project, "Independent task")
@@ -176,8 +189,7 @@ class BoardRefreshTests(unittest.TestCase):
         self.assertEqual(entry["label"], "project")
         self.assertEqual(entry["rows"], [])
         self.assertEqual(entry["error"], "Board not initialized")
-        self.assertEqual(read_table.call_count, 2)
-        self.assertTrue(all(call.args[0] == str(self.factory) for call in read_table.call_args_list))
+        read_table.assert_not_called()
         self.assertEqual(list(db.parent.glob(db.name + "*")), [])
         self.assertEqual(self.independent_status(project), "")
 
@@ -354,6 +366,7 @@ class BoardRefreshTests(unittest.TestCase):
     def test_requests_never_recreate_missing_fixture(self):
         self.initialize()
         self.factory.unlink()
+        self.database.unlink()
         entries = self.request("/api/board")["boards"]
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["path"], str(self.factory))
@@ -365,6 +378,8 @@ class BoardRefreshTests(unittest.TestCase):
 
     def test_startup_preserves_malformed_and_explicit_missing_board(self):
         self.factory.write_bytes(b"malformed\r\nunchanged")
+        with self.board.connect(str(self.database)) as connection:
+            connection.execute("UPDATE board SET markdown=? WHERE id=1", (self.factory.read_text(),))
         self.initialize()
         entry = self.request("/api/board")["boards"][0]
         self.assertIn("no board table", entry["error"])
@@ -461,6 +476,9 @@ class BoardRefreshTests(unittest.TestCase):
             with self.subTest(registry=registry):
                 uninitialized = self.root / "uninitialized"
                 uninitialized.mkdir(exist_ok=True)
+                subprocess.run(["git", "init", "-q", "-b", "main", str(uninitialized)], check=True)
+                self.assertEqual(Path(self.board.runtime_state_module().primary_checkout(str(uninitialized))),
+                                 uninitialized)
                 # Git in an uninitialized child can report the enclosing control repo.
                 results[(str(uninitialized), "rev-parse", "--show-toplevel")] = str(self.root)
                 self.registry.write_text(json.dumps(registry), encoding="utf-8")
@@ -594,7 +612,7 @@ class BoardRefreshTests(unittest.TestCase):
 
 class BoardBootstrapTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="board-bootstrap-")
+        self.temp = tempfile.TemporaryDirectory(prefix="board-bootstrap-", dir=Path(__file__).parents[4])
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.board = viewer.load_module("bootstrap_board", Path(__file__).with_name("board.py"))
@@ -917,7 +935,7 @@ class GalleryTests(unittest.TestCase):
 
 class PlannedWorkApiTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="planned-work-api-")
+        self.temp = tempfile.TemporaryDirectory(prefix="planned-work-api-", dir=Path(__file__).parents[4])
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.factory = self.root / "docs" / "BOARD.md"

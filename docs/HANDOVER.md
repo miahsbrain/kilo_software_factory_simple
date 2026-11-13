@@ -1,5 +1,57 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-152 structure map and QA round 2, 2026-11-13**
+> In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.
+> QA round 2 passed 47 isolated viewer/purge tests and 39 adjacent lifecycle/handoff tests,
+> as reported by the orchestrator. Evidence:
+> `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-152/qa.md`
+> and `.tmp/board152-adjacent-qa.log`. Both round-1 findings remain preserved in the earlier report.
+> Updated `docs/PROJECT_STRUCTURE.md` with the purge module, test file and runtime recovery directory.
+> User explicitly approved the exact existing `### Task purge` addition in
+> `.opencode/skills/git-worktree/SKILL.md`; it is retained unchanged.
+> Earlier failed verification and fixture read leakage remain documented in the engineering log;
+> live writes were not proven. No live-state restoration or destructive maintenance performed.
+> Verification limited to file review because this was a low-risk visual/static change.
+> Architect review passed against `6f72e0b`: structure map, safety paths and QA round-2 evidence
+> had no blocking finding; architect reported clean `git diff --check opencode` and worktree.
+> Row awaits Pending Merge handoff and human finalize; no live purge. No tests/builds rerun or
+> board/reports/ledger touched for this docs-only closeout.
+
+### BOARD-152 module inventory
+
+- `.opencode/skills/git-worktree/scripts/task_purge.py:16` (`digest`) and
+  `.opencode/skills/git-worktree/scripts/task_purge.py:31` (`validate_dependencies`) are pure.
+  Identity/inventory read effects: `task_snapshot`, `safe_path`, `tree_stamp`, `targets_for_task`,
+  `report_targets` and `read_inventory` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:20-214`; `validate_manifest` and
+  `revalidate_target` at `.opencode/skills/git-worktree/scripts/task_purge.py:370`.
+  Explicit write/terminal effects: `confirm`, `save_manifest` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:217-236`; `copy_backup` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:285-295`; `execute_locked` and `command`
+  at `.opencode/skills/git-worktree/scripts/task_purge.py:397` and
+  `.opencode/skills/git-worktree/scripts/task_purge.py:449`. Pure `content_identity` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:298` strips filesystem identity for copy
+  comparison; effectful `backup_stamp` and `prepare_backup` at
+  `.opencode/skills/git-worktree/scripts/task_purge.py:304-367` verify durable backup attempts.
+- `.opencode/skills/board/scripts/board.py:189`: `readonly_connection` is the shared read-only boundary
+  used by the viewer and purge; `reserve_plan_ids` persists allocation state under the caller's
+  transaction at `.opencode/skills/board/scripts/board.py:463`; pure `validate_plan_batch`
+  at `.opencode/skills/board/scripts/board.py:344` accepts its high-water input explicitly.
+- CLI: `worktree.py purge --board <ID> [--apply] [--backup] [--orphan REPO PATH BRANCH ...]`.
+  Preview is agent-permitted; apply is human-only and held pending passing verification/review.
+  Mandatory metadata remains under `.factory-state/purges/<ID>/`; optional backups use private
+  `content-<uuid>/` attempts. Incomplete attempts are retained, never reused for deletion authority.
+  A partial tree removal whose identity cannot be re-proven needs human inspection, not blind retry.
+- Historical verification: the initial `test_task_purge.py` passed 20 tests before correction.
+  The broad combined command failed as recorded above. Current narrowed check: 47 passed,
+  including 20 viewer and 27 purge tests; this does not establish adjacent-suite green status.
+  Evidence: read-only preview at `.opencode/skills/git-worktree/scripts/test_task_purge.py:67`,
+  cancelled-orphan handling at `.opencode/skills/git-worktree/scripts/test_task_purge.py:124`,
+  partial-failure retry at `.opencode/skills/git-worktree/scripts/test_task_purge.py:189`,
+  high-water allocation at `.opencode/skills/git-worktree/scripts/test_task_purge.py:205`,
+  commit/ack crash recovery at `.opencode/skills/git-worktree/scripts/test_task_purge.py:213`,
+  no unattended CLI bypass at `.opencode/skills/git-worktree/scripts/test_task_purge.py:265`.
+
 > **Session Notes — BOARD-151 shared QA artifact guard, 2026-11-12**
 > Source candidate `af1701dd14fd82c9256534c649f57de2011ee175` passed independent round-1 QA
 > and security/code review; architect review found no blocking source issue. Reviewer command

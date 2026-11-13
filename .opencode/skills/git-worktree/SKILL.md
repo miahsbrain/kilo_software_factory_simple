@@ -27,11 +27,23 @@ the script can do it — the script is where the naming rules and the refusals l
 
 | Script | Does |
 |---|---|
-| `.opencode/skills/git-worktree/scripts/worktree.py` | create · resume · discard · handoff · list · verify · finalize (human only) · legacy cleanup |
+| `.opencode/skills/git-worktree/scripts/worktree.py` | create · resume · discard · handoff · list · verify · finalize (human only) · purge (human-only apply) · legacy cleanup |
 | `.opencode/skills/git-worktree/scripts/env.py` | sync · status · clean — the env files of a worktree |
 | `.opencode/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · install-hooks · policy |
 
 Python 3.9+, standard library only.
+
+### Task purge
+
+`worktree.py purge --board <ID>` previews exact task-owned targets without initializing state.
+Agents may preview, never apply. Human-only `--apply` requires the primary control checkout,
+a real terminal and the exact task ID; no unattended bypass exists. Optional `--backup` retains
+private content separately from mandatory `.factory-state/purges/<ID>/manifest.json` metadata.
+Cancelled orphan evidence is explicit `--orphan REPO PATH BRANCH` (repeat per worktree).
+Retry uses the same task/evidence and durable phases; changed targets refuse. Historical/shared
+backups and legacy copies remain disclosed. Ordinary cancel/discard/finalize semantics remain.
+This implements the approved destructive-maintenance exception in `AGENTS.md`, not a general
+deletion permission. Clean-slate is not implemented here.
 
 ---
 
