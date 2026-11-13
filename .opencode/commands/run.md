@@ -24,13 +24,13 @@ references under `AGENTS.md` §A7, and report skills used or that none matched.
      approval waits for the user.
 3. **QA** — produce evidence, not assertion. One observable check per acceptance criterion,
    with the command and result and `file:line`. For UI work, capture screenshots.
-   - Load `browser` first and use only OpenCode's built-in browser for UI verification/review
-     (§B4.2, QA skill). Use interactions, screenshots, DOM measurements, console and network
-     observations. No Playwright, browser MCP alternatives or `browser-review.mjs`. Hold an
-     unavailable browser/measurement criterion and report the limitation without fallback.
+    - Use the existing Playwright `browser-review.mjs` for canonical UI capture and the configured
+      Playwright MCP for interactions and measurements (§B4.2, QA skill). Inspect screenshots,
+      console and network observations; capture exit 0 is not a verdict. Hold an unavailable
+      tool/measurement criterion and report the failure without substitution.
    - UI artifacts land in the one canonical folder at the repository root:
      `artifacts/<scope>/qa/<date>/<task-id>/`. Record route, viewport, theme, steps, expected and
-     observed results; transfer browser captures using server-local paths, not desktop paths.
+      observed results; the script writes server-local evidence into the canonical path.
    - Shared reports/evidence stay outside task worktrees under
      `<primary-checkout>/artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`: QA writes `qa.md` and
      evidence, UI critique writes `ui.md`, and builders write only under `builder/`. The ledger

@@ -14,13 +14,12 @@ are the contract.
 cannot leave `In Review` until the audit is recorded (`AGENTS.md` §B4.2).
 
 1. **Look at the screen.** Apply the catalogue selection/reporting rule in `AGENTS.md` §A7.
-   Load `browser` first and use only OpenCode's built-in browser for UI verification/review
-   under §B4.2 and the QA skill, including live URLs. Use interactions, screenshots, DOM
-   measurements, console and network observations; no Playwright, browser MCP alternatives,
-   `browser-review.mjs` or snapshot-script fallback.
+    Use the existing Playwright `browser-review.mjs` for canonical UI evidence under §B4.2
+    and the QA skill, including live URLs. Use the configured Playwright MCP for interactions
+    and DOM measurements; inspect screenshots, console and network observations.
    Store evidence under `artifacts/<scope>/qa/<date>/<task-id>/` with route, viewport, theme,
-   steps, expected and observed results. Use returned server-local screenshot/`files.get` paths,
-   not assumed shared desktop paths. Hold unavailable access/measurements and report the limit.
+    steps, expected and observed results. The script writes server-local capture files.
+    Hold unavailable tool access or measurements; do not substitute or install without approval.
    Gallery approval, independent review, accessibility and unslop gates remain mandatory.
 2. **Audit.** Go through `.opencode/skills/unslop/references/signs.md` group by group and list every sign found, one
    line each, with where it lives. The list is long; work through it in groups rather than
@@ -47,8 +46,9 @@ cannot leave `In Review` until the audit is recorded (`AGENTS.md` §B4.2).
        python3 .opencode/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
            --kind ux --priority medium --category visual --route /path
 
-   The orchestrator creates one `Fix` row per finding with the script, with the fingerprint, so a
-   repeat finding escalates the existing row instead of opening a second one.
+    The orchestrator records each in-task finding on the original row and ledger, and returns it
+    to the same builder/worktree; a repeat fingerprint blocks the original row. Only a separately
+    approved independent defect receives a new Fix row.
 9. **Verdict.** A UI row leaves `In Review` only when the QA lane is green, the UI/UX critique
    is green, and this audit is recorded.
 

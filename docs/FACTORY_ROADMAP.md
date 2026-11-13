@@ -11,7 +11,7 @@ Build a reliable local OpenCode factory that can run a small number of independe
 - SQLite board rows and Git worktree metadata remain the only task/run state. Do not add a separate run-history table.
 - Run at most two builders at once and no more than one builder per repository.
 - Projects live in sibling repositories under `/projects/<project-id>`. A project is a monorepo by default; split an app into its own repository only for independent ownership or release. Register every repository explicitly.
-- Keep the existing Python-standard-library dashboard, SQLite board, worktree scripts, reviewer agents, built-in browser QA and unslop gates. Do not add a framework or dependency without a new decision.
+- Keep the existing Python-standard-library dashboard, SQLite board, worktree scripts, reviewer agents, Playwright QA and unslop gates. Do not add a framework or dependency without a new decision.
 - Defer the code-graph engine until the core workflow is working. Do not add graph-engine tasks to this delivery.
 
 ## What already exists

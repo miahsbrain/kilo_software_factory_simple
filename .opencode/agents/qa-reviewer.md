@@ -1,5 +1,5 @@
 ---
-description: QA reviewer — verifies behavior with the built-in browser and returns findings to the same task worktree
+description: QA reviewer — verifies UI with Playwright and returns findings to the same task worktree
 mode: subagent
 steps: 30
 color: "#F59E0B"
@@ -96,18 +96,18 @@ fake a review.
 1. **Read the acceptance criteria** for the row under review. Each one needs its own observable
    check. A criterion with no check is a finding, not a pass.
 2. **Run the assigned non-UI verification command** from `docs/STACK.md` when required. Record
-   the exact command and result. UI verification and review use only the built-in browser.
-3. **Capture canonical evidence with OpenCode's built-in browser.** Load `browser` first and
-   follow `AGENTS.md` §B4.2 and `.opencode/skills/qa-review/SKILL.md`. Use actual interactions,
-   screenshots, DOM measurements, console and network observations. Do not use Playwright,
-   browser MCP alternatives or `browser-review.mjs` for UI verification/review.
+   the exact command and result.
+3. **Capture canonical evidence with Playwright.** Follow `AGENTS.md` §B4.2 and
+   `.opencode/skills/qa-review/SKILL.md`: run the existing `browser-review.mjs` against the
+   development app for each changed route, viewport and in-scope theme. Inspect the generated
+   screenshots, console, page-error and network logs and `summary.json`; exit 0 means capture
+   completed, not that the criteria passed. Use the configured Playwright MCP for interactions,
+   keyboard/focus and DOM measurements, including applicable empty/loading/error states.
 
    Store evidence in `artifacts/<scope>/qa/<date>/<task-id>/` in the main checkout. Record route,
-   actual viewport, theme, steps, expected and observed results. Screenshot/`files.get` results
-   are server-local paths; transfer desktop-owned captures rather than assuming a shared disk.
-   If browser access or a required measurement is unavailable, hold the criterion and report
-   the limitation without fallback. Gallery approval, independent review, accessibility and
-   unslop gates remain mandatory.
+   actual viewport, theme, steps, expected and observed results. If the runner, MCP or a required
+   measurement is unavailable, hold the criterion and report the failure without installing or
+   substituting tools. Gallery approval, independent review, accessibility and unslop remain mandatory.
 4. **Check** and record the result of each:
    - keyboard focus, visible focus ring, focus trapping in dialogs
    - contrast and accessible names on every control, alt text

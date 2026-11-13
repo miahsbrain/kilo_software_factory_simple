@@ -126,7 +126,8 @@ mark independently of task rows. No new dependency, clean-slate or slash shortcu
   one per repository. This policy is not enforced until BOARD-133 is complete.
 - A `factory-dev` specialist is approved for control-repo board/worktree/guard tooling, but its
   exact agent rule and permission entry still need A9 approval (BOARD-143).
-- QA and review use specialist agents; UI evidence uses OpenCode's built-in browser and the
+- QA and review use specialist agents; UI evidence uses the existing Playwright capture script
+  and configured MCP for interaction, alongside the
   approved gallery/anti-slop checks. BOARD-130 remains Blocked, so the approved task-local evidence
   path is not yet integrated into the base branch.
 - A task becomes Pending Merge only after acceptance evidence, verification, independent review,

@@ -38,20 +38,19 @@ Before the task, read `.opencode/catalog/README.md`, apply all relevant skills a
 references, and report skills used or that none matched (`AGENTS.md` §A7). Repository rules and
 approved decisions take precedence.
 
-1. **Look at the screen.** Find the assigned files that render it. Load `browser` first and use
-   only OpenCode's built-in browser for UI verification/review under `AGENTS.md` §B4.2 and the QA
-   skill. Use actual interactions, screenshots, DOM measurements, console and network observations.
+1. **Look at the screen.** Find the assigned files that render it. Follow `AGENTS.md` §B4.2 and
+   the QA skill: use the existing Playwright capture script for canonical screenshots and logs,
+   and configured Playwright MCP for interactions and DOM measurements.
    - Store browser evidence under `artifacts/<scope>/qa/<date>/<task-id>/`; record route, viewport,
-     theme, steps, expected and observed results. Transfer desktop-owned files with the browser;
-     screenshot/`files.get` results are server-local paths, not a shared desktop filesystem.
-   - A live URL uses the same built-in browser workflow, not an alternate capture driver. The
-     retained `snapshot.mjs` is historical/not UI QA; do not use it, Playwright, browser MCP
-     alternatives or `browser-review.mjs` for UI verification/review.
+      theme, steps, expected and observed results. The script writes server-local files into the
+      primary checkout's canonical artifacts path.
+    - A live URL uses the same Playwright workflow. The retained `snapshot.mjs` is not canonical
+      UI QA capture and does not replace `browser-review.mjs`.
    - Only a screenshot? Audit the supplied reference, but hold interaction and measurement
-     criteria until the running UI is available in the built-in browser. Do not reconstruct a
+      criteria until the running UI is available through Playwright. Do not reconstruct a
      page and present it as verified original behavior. Any reconstruction needs an approved scope.
-   - If browser access or a required measurement is unavailable, report the limitation and hold
-     the affected criterion without fallback. Gallery approval, independent review, accessibility
+    - If either tool or a required measurement is unavailable, report the failure and hold
+      the affected criterion without installation or substitution. Gallery approval, independent review, accessibility
      and unslop gates remain mandatory. Reviewers report; only assigned builders change UI code.
 2. **Audit.** Go through [references/signs.md](references/signs.md) and list every sign you find, one line each with where it lives.
 3. **Decide how much to change.** Read the audit honestly before planning anything.
