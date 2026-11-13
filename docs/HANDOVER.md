@@ -5,10 +5,12 @@
 > the read-only preview can serialize its existing plan. Added a BLOB regression asserting the
 > JSON plan and destructive targets match exactly without changing fixture state. Updated the
 > shared file inventory guard to ignore atime-only changes while retaining stable metadata and
-> content checks. Tests cover all three cases. No live preview retry or reset was performed.
-> The single authorized suite attempt failed in the content-mutation fixture before exercising
-> that guard branch; the fixture is corrected but remains unverified. No further test or preview
-> attempt was made. Next action: human review of the WIP checkpoint.
+> content checks. `python3 .opencode/skills/git-worktree/scripts/test_project_reset.py` passed
+> 41 tests. The single authorized read-only preview emitted parseable factory output but reported
+> blockers: the active BOARD-157 worktree and unknown ownership for BOARD-127 artifacts/ledger
+> plus BOARD-145, BOARD-146 and BOARD-148 ledgers. The preview retains factory docs, templates,
+> and historical recovery data. No reset was applied. Next action: resolve the preview blockers,
+> then hand off the reviewed fix for human integration.
 
 > **Session Notes — BOARD-156 Playwright QA policy, 2026-11-13**
 > Branch `docs/use-playwright-for-qa-and-ui-critique`, worktree
@@ -82,9 +84,10 @@
   and refuse device, inode, mode, size, mtime, or ctime changes. Access-time-only changes no
   longer cause a false inventory refusal. Regression cases in
   `.opencode/skills/git-worktree/scripts/test_project_reset.py` cover atime-only, stable metadata,
-  content mutation, and BLOB serialization. The one authorized test run failed because the
-  content-mutation reader fixture lacked `fileno()`; it was corrected without a second run.
-  The earlier preview refusal did not report a path, so no specific target is attributed.
+  content mutation, and BLOB serialization. The test command passed 41 tests. The one subsequent
+  read-only preview emitted parseable factory output but listed the active BOARD-157 worktree and
+  unknown artifact/ledger ownership as blockers. The earlier atime refusal did not report a path,
+  so no specific target is attributed.
 
 - `.opencode/skills/git-worktree/scripts/project_reset.py:85-100` hashes the canonical SQLite
   schema and rows through `database_image`; SQLite BLOB bytes are represented as a tagged hex
