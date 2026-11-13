@@ -57,8 +57,7 @@ def safe_path(path, root, allow_root=False):
 def tree_stamp(path, root_marker=None):
     path = Path(path)
     info = path.lstat()
-    metadata = [info.st_dev, info.st_ino, info.st_mode, info.st_size,
-                info.st_mtime_ns, info.st_ctime_ns]
+    metadata = stable_metadata(info)
     if stat.S_ISREG(info.st_mode):
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NOATIME", 0)
         with os.fdopen(os.open(path, flags), "rb") as stream:
@@ -66,7 +65,8 @@ def tree_stamp(path, root_marker=None):
             content = hashlib.sha256()
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 content.update(chunk)
-            if before != os.fstat(stream.fileno()) or path.lstat() != before:
+            if (stable_metadata(before) != stable_metadata(os.fstat(stream.fileno()))
+                    or stable_metadata(path.lstat()) != stable_metadata(before)):
                 raise ValueError("target changed during inventory")
         return [metadata, content.hexdigest()]
     if not stat.S_ISDIR(info.st_mode):
@@ -77,10 +77,14 @@ def tree_stamp(path, root_marker=None):
             raise ValueError("nested repository refused: %s" % child)
         children.append([child.name, tree_stamp(child, root_marker)])
     after = path.lstat()
-    if metadata != [after.st_dev, after.st_ino, after.st_mode, after.st_size,
-                    after.st_mtime_ns, after.st_ctime_ns]:
+    if metadata != stable_metadata(after):
         raise ValueError("target changed during inventory")
     return [metadata, children]
+
+
+def stable_metadata(info):
+    return [info.st_dev, info.st_ino, info.st_mode, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns]
 
 
 def load_guard():

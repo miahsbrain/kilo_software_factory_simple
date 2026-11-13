@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Preserve BLOB identity in clean-slate preview
+**Type:** Fix
+**Board:** BOARD-157 | **Branch:** fix/fix-factory-clean-slate-preview-json
+**Changed:** `.opencode/skills/git-worktree/scripts/project_reset.py`, `task_purge.py`, `test_project_reset.py`, `docs/HANDOVER.md`, engineering log.
+**Why:** `database_image` passed SQLite BLOB bytes to the shared JSON digest, so the read-only preview failed with `Object of type bytes is not JSON serializable`. Encode only BLOB values as tagged hexadecimal data before hashing, preserving their exact bytes without changing reset targets or digest semantics for other values.
+**Impact:** Clean-slate preview can serialize boards containing BLOB values. Shared file inventory ignores atime-only changes but still refuses content or stable-metadata changes. Target representation, factory-only boundary, and read-only behavior remain unchanged; no reset was applied. The initial `target changed during inventory` refusal did not identify a path, so no specific target is attributed.
+**Verification:** `python3 .opencode/skills/git-worktree/scripts/test_project_reset.py` passed 41 tests. The single authorized read-only `python3 .opencode/skills/git-worktree/scripts/worktree.py clean-slate --repo control` attempt emitted parseable `project-reset-preview-v1` output with `repository_kind: factory`. It listed the active BOARD-157 worktree/active-work reference and unknown ownership for `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-127`, `.factory-state/reviews/BOARD-127-ledger.md`, and the BOARD-145, BOARD-146 and BOARD-148 QA ledgers as blockers. No reset was applied.
+
 ## [2026-11-13] Use Playwright for QA and visual critique
 **Type:** Docs
 **Board:** BOARD-156 | **Branch:** docs/use-playwright-for-qa-and-ui-critique

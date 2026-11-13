@@ -1,5 +1,17 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-157 clean-slate preview JSON repair, 2026-11-13**
+> Reused `database_image` with a lossless tagged-hex representation for SQLite BLOB bytes so
+> the read-only preview can serialize its existing plan. Added a BLOB regression asserting the
+> JSON plan and destructive targets match exactly without changing fixture state. Updated the
+> shared file inventory guard to ignore atime-only changes while retaining stable metadata and
+> content checks. `python3 .opencode/skills/git-worktree/scripts/test_project_reset.py` passed
+> 41 tests. The single authorized read-only preview emitted parseable factory output but reported
+> blockers: the active BOARD-157 worktree and unknown ownership for BOARD-127 artifacts/ledger
+> plus BOARD-145, BOARD-146 and BOARD-148 ledgers. The preview retains factory docs, templates,
+> and historical recovery data. No reset was applied. Next action: resolve the preview blockers,
+> then hand off the reviewed fix for human integration.
+
 > **Session Notes — BOARD-156 Playwright QA policy, 2026-11-13**
 > Branch `docs/use-playwright-for-qa-and-ui-critique`, worktree
 > `.opencode/worktrees/use-playwright-for-qa-and-ui-critique/`.
@@ -66,6 +78,24 @@
   evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-153/qa.md:2-26`.
   Architect source review of recovery and correction is complete with no blocking finding.
   Prior verification history stays in the engineering log. Human inspection/integration is next.
+
+- `.opencode/skills/git-worktree/scripts/task_purge.py:57-91` uses the same stable metadata
+  signature for file reads and directory scans; regular-file reads still verify SHA-256 content
+  and refuse device, inode, mode, size, mtime, or ctime changes. Access-time-only changes no
+  longer cause a false inventory refusal. Regression cases in
+  `.opencode/skills/git-worktree/scripts/test_project_reset.py` cover atime-only, stable metadata,
+  content mutation, and BLOB serialization. The test command passed 41 tests. The one subsequent
+  read-only preview emitted parseable factory output but listed the active BOARD-157 worktree and
+  unknown artifact/ledger ownership as blockers. The earlier atime refusal did not report a path,
+  so no specific target is attributed.
+
+- `.opencode/skills/git-worktree/scripts/project_reset.py:85-100` hashes the canonical SQLite
+  schema and rows through `database_image`; SQLite BLOB bytes are represented as a tagged hex
+  value before the existing deterministic JSON digest. The preview target fields and apply
+  authority are unchanged. Regression at
+  `.opencode/skills/git-worktree/scripts/test_project_reset.py:104-118` adds a BLOB to the
+  isolated board fixture and proves the emitted JSON plan and target list match the inventory
+  exactly while file contents and timestamps remain unchanged.
 
 > **Session Notes — BOARD-152 structure map and QA round 2, 2026-11-13**
 > In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.
