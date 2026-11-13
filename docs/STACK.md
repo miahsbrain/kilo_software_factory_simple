@@ -30,10 +30,19 @@ python3 .opencode/skills/git-worktree/scripts/test_task_purge.py
 ```
 
 BOARD-152 approved correction and adjacent allocator/lifecycle/viewer/finalizer verification
-(one command; all selected suite fixtures are repository-local):
+(historical failed command; do not rerun without fixture-isolation review):
 
 ```bash
 PYTHONPATH=.opencode/skills/git-worktree/scripts:.opencode/skills/board/scripts python3 -m unittest test_task_purge test_board_normalized.PlannedLifecycleTests test_board_serve.BoardRefreshTests test_handoff
+```
+
+BOARD-152 approved isolated viewer/purge check (one run). Disposable viewer roots have independent
+Git metadata and assert primary-checkout/database identity before board access. The user explicitly
+approved `git init` only for disposable repositories inside the assigned BOARD-152 worktree.
+Adjacent suites are omitted from this narrow rerun.
+
+```bash
+PYTHONPATH=.opencode/skills/git-worktree/scripts:.opencode/skills/board/scripts python3 -m unittest -v test_board_serve.BoardRefreshTests test_task_purge > .tmp/board152-isolated-check.log 2>&1
 ```
 
 Task purge preview: `python3 .opencode/skills/git-worktree/scripts/worktree.py purge --board BOARD-NNN`.

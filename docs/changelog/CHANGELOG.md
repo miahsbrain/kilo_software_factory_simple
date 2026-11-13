@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Isolate BOARD-152 viewer regression fixtures
+**Type:** Fix
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** `.opencode/skills/board/scripts/test_board_serve.py`, `docs/STACK.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, engineering log.
+**Why:** Non-Git disposable roots inside a linked worktree inherited the real primary checkout during viewer read-only lookups. User approved `git init` only for disposable repositories inside this assigned worktree after guard exit 3. Extend existing BoardRefreshTests setup/write helpers with independent Git identity assertions before board access and isolated SQLite state; adapt missing/malformed fixture cases to the actual read boundary. Runtime resolvers are untouched; no new tool, dependency or product behavior.
+**Impact:** Prevent fixture board reads from escaping to the enclosing live checkout. Prior output proved live reads, not live writes; fixture lifecycle tests can emit field-update messages. No live-state inspection/restoration or purge performed.
+**Verification:** One narrowed command in `docs/STACK.md` passed 47 tests in 12.477s, exit 0 (20 BoardRefreshTests, 27 TaskPurgeTests). Local log `.tmp/board152-isolated-check.log`. Includes previously failing viewer assertions, nested Git-marker preservation, interrupted/corrupt backup handling and source/harness/secret sentinels. Adjacent suites omitted; independent QA/review remain pending. No merge/push.
+
 ## [2026-11-13] Checkpoint BOARD-152 safety corrections with verification hold
 **Type:** Fix
 **Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge

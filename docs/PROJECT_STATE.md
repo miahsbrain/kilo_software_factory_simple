@@ -2,6 +2,13 @@
 
 ## Current session — BOARD-152 corrective checkpoint (2026-11-13)
 
+- Current candidate: fixture-only correction approved after guard exit 3 for disposable-repository
+  `git init`. Viewer fixtures assert their independent primary-checkout and SQLite paths before
+  reads. Runtime resolver and application behavior are unchanged.
+- Narrowed documented command passed 47 tests in 12.477s, exit 0: BoardRefreshTests plus
+  TaskPurgeTests. Local output `.tmp/board152-isolated-check.log`; no second run. Adjacent suites
+  are not certified by this check. Independent QA/review are next; not merge-ready.
+
 - Worktree `.opencode/worktrees/add-human-confirmed-task-purge/`, branch
   `feat/add-human-confirmed-task-purge`. Both round-1 corrections were human-approved and implemented:
   nested Git-marker rejection and durable, verified backup preparation with fresh retry attempts.
@@ -9,14 +16,16 @@
 - Builder hold: the single documented combined command ran 86 tests in 43.453s, exit 1,
   9 failures and 1 error. Viewer fixtures exposed live BOARD-147/BOARD-152 rows; output printed
   updates to BOARD-153 risk, BOARD-146 status/notes, BOARD-143 notes and BOARD-131 risk.
-  Possible live-state effects require architect inspection. No test rerun or restoration attempted.
+  Fixture read leakage is explained by non-Git directories inheriting their enclosing repository.
+  Source trace does not prove live writes; fixture lifecycle tests also emit mutation messages.
+  No restoration or live-state inspection attempted by this builder.
 - Validated evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-152/`
   (`qa.md`, `finding-1.md`, `finding-2.md`). Architect owns round-1 ledger/fingerprint records.
 - Four follow-up policies approved: independent high-water IDs, explicit cancelled-orphan evidence,
   durable resumable manifest with task deletion last, historical/shared backup retention.
 - No deliberate live purge/cleanup, integration or remote operation. BOARD-153 clean-slate and
-  BOARD-154 shortcuts remain queued. Next: human/architect decision on possible live-state
-  recovery and isolated fixture correction before any further check. Not merge-ready.
+  BOARD-154 shortcuts remain queued. Next: independent QA/review of both round-1 corrections and
+  isolated test evidence. The failed broad check is retained as historical evidence.
 
 ## Current session — BOARD-151 shared QA artifact guard (2026-11-12)
 

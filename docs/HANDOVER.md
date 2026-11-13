@@ -2,6 +2,13 @@
 
 > **Session Notes — BOARD-152 corrective checkpoint, 2026-11-13**
 > In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.
+> Fixture-isolation correction: BoardRefreshTests now initializes independent disposable Git roots,
+> asserts their primary-checkout/database identities before board reads, and uses fixture SQLite.
+> Runtime resolvers are unchanged. User approved fixture-only `git init` after guard exit 3.
+> The narrowed command documented in `docs/STACK.md` passed **47 tests in 12.477s**, exit 0.
+> Retained local output: `.tmp/board152-isolated-check.log`. Covers all BoardRefreshTests and
+> TaskPurgeTests, including round-1 fault/isolation regressions. Adjacent suites were omitted
+> from this narrowed rerun. Independent QA/review remain pending; no merge readiness claimed.
 > Human approved correcting both round-1 findings. Source now rejects nested `.git` markers of
 > every type and permits only the verified root linked-worktree file. Backup preparation records
 > copying attempts durably before copying, uses fresh private directories on retry, verifies content
@@ -10,12 +17,13 @@
 > exit 1, 9 failures and 1 error. Viewer fixtures resolved live BOARD-147/BOARD-152 rows instead
 > of their own data; output also printed `BOARD-153 risk set`, `BOARD-146 status set to Blocked`,
 > `BOARD-146 notes set`, `BOARD-143 notes set`, and `BOARD-131 risk set`. Live-state isolation
-> may have failed. Do not rerun or restore live state without human/architect approval.
+> failed for reads: the non-Git fixture inherited its enclosing checkout. Source trace does not
+> prove live writes; lifecycle fixture tests can also emit those update messages. No live-state
+> restoration was attempted. The previous failed check remains historical evidence, not a pass.
 > Validated findings and QA report: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-152/`
 > (`qa.md`, `finding-1.md`, `finding-2.md`); architect recorded fingerprints and round-1 ledger.
-> Next: architect investigates the possible live-state effects and obtains approval for fixture
-> isolation fixes and another check. No live purge/cleanup was requested or deliberately executed;
-> no board restoration, integration, push or merge performed. This checkpoint is not merge-ready.
+> Next: independent QA/review of the corrected worktree against both preserved round-1 findings.
+> No live purge/cleanup, board restoration, integration, push or merge performed.
 
 ### BOARD-152 module inventory
 
@@ -43,7 +51,8 @@
   `content-<uuid>/` attempts. Incomplete attempts are retained, never reused for deletion authority.
   A partial tree removal whose identity cannot be re-proven needs human inspection, not blind retry.
 - Historical verification: the initial `test_task_purge.py` passed 20 tests before correction.
-  The current combined command failed as recorded above; do not infer a current pass.
+  The broad combined command failed as recorded above. Current narrowed check: 47 passed,
+  including 20 viewer and 27 purge tests; this does not establish adjacent-suite green status.
   Evidence: read-only preview at `.opencode/skills/git-worktree/scripts/test_task_purge.py:67`,
   cancelled-orphan handling at `.opencode/skills/git-worktree/scripts/test_task_purge.py:124`,
   partial-failure retry at `.opencode/skills/git-worktree/scripts/test_task_purge.py:189`,
