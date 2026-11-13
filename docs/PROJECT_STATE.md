@@ -1,19 +1,29 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-152 corrective checkpoint (2026-11-13)
+## Current session — BOARD-152 structure map and QA round 2 (2026-11-13)
+
+- QA round 2 passed 47 isolated viewer/purge tests and 39 adjacent lifecycle/handoff tests,
+  per orchestrator report. Evidence:
+  `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-152/qa.md`
+  and `.tmp/board152-adjacent-qa.log`. Architect final review remains pending.
+- Structure map now names the purge module, focused test file and `.factory-state/purges/<ID>/`.
+  User explicitly approved the exact existing `### Task purge` addition to
+  `.opencode/skills/git-worktree/SKILL.md`; retained unchanged. This correction is docs-only.
+  Verification limited to file review because this was a low-risk visual/static change.
 
 - Current candidate: fixture-only correction approved after guard exit 3 for disposable-repository
   `git init`. Viewer fixtures assert their independent primary-checkout and SQLite paths before
   reads. Runtime resolver and application behavior are unchanged.
 - Narrowed documented command passed 47 tests in 12.477s, exit 0: BoardRefreshTests plus
   TaskPurgeTests. Local output `.tmp/board152-isolated-check.log`; no second run. Adjacent suites
-  are not certified by this check. Independent QA/review are next; not merge-ready.
+  were not certified by that builder check; subsequent independent QA covered 39 adjacent tests.
+  Architect final review is next; not merge-ready.
 
 - Worktree `.opencode/worktrees/add-human-confirmed-task-purge/`, branch
   `feat/add-human-confirmed-task-purge`. Both round-1 corrections were human-approved and implemented:
   nested Git-marker rejection and durable, verified backup preparation with fresh retry attempts.
   Added seven fault/isolation/sentinel/discard tests; localized temporary-directory fixtures.
-- Builder hold: the single documented combined command ran 86 tests in 43.453s, exit 1,
+- Historical builder hold: the single documented combined command ran 86 tests in 43.453s, exit 1,
   9 failures and 1 error. Viewer fixtures exposed live BOARD-147/BOARD-152 rows; output printed
   updates to BOARD-153 risk, BOARD-146 status/notes, BOARD-143 notes and BOARD-131 risk.
   Fixture read leakage is explained by non-Git directories inheriting their enclosing repository.
@@ -24,8 +34,8 @@
 - Four follow-up policies approved: independent high-water IDs, explicit cancelled-orphan evidence,
   durable resumable manifest with task deletion last, historical/shared backup retention.
 - No deliberate live purge/cleanup, integration or remote operation. BOARD-153 clean-slate and
-  BOARD-154 shortcuts remain queued. Next: independent QA/review of both round-1 corrections and
-  isolated test evidence. The failed broad check is retained as historical evidence.
+  BOARD-154 shortcuts remain queued. Next: architect final review of the corrected worktree and
+  QA round-2 evidence. The failed broad check is retained as historical evidence.
 
 ## Current session — BOARD-151 shared QA artifact guard (2026-11-12)
 

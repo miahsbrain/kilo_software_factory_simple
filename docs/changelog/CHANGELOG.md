@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Map task purge layout and record QA round 2
+**Type:** Docs
+**Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge
+**Changed:** `docs/PROJECT_STRUCTURE.md`, session notes in `docs/HANDOVER.md` and `docs/PROJECT_STATE.md`, engineering log.
+**Why:** Architect review found the purge module, focused test file and runtime purge directory missing from the authoritative structure map. Record the user's explicit approval of the exact existing `### Task purge` addition to `.opencode/skills/git-worktree/SKILL.md`, retained unchanged.
+**Impact:** Documentation only. Orchestrator reported QA round-2 PASS: 47 isolated viewer/purge tests and 39 adjacent lifecycle/handoff tests. Evidence: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-152/qa.md` and `.tmp/board152-adjacent-qa.log`. Earlier failures remain historical; live writes were not proven. Architect final review remains pending. No code/permanent-rule changes, live-state operations, report/ledger edits, merge or push.
+**Verification:** Verification limited to file review because this was a low-risk visual/static change. No tests or builds rerun.
+
 ## [2026-11-13] Isolate BOARD-152 viewer regression fixtures
 **Type:** Fix
 **Board:** BOARD-152 | **Branch:** feat/add-human-confirmed-task-purge

@@ -1,29 +1,18 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-152 corrective checkpoint, 2026-11-13**
+> **Session Notes — BOARD-152 structure map and QA round 2, 2026-11-13**
 > In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.
-> Fixture-isolation correction: BoardRefreshTests now initializes independent disposable Git roots,
-> asserts their primary-checkout/database identities before board reads, and uses fixture SQLite.
-> Runtime resolvers are unchanged. User approved fixture-only `git init` after guard exit 3.
-> The narrowed command documented in `docs/STACK.md` passed **47 tests in 12.477s**, exit 0.
-> Retained local output: `.tmp/board152-isolated-check.log`. Covers all BoardRefreshTests and
-> TaskPurgeTests, including round-1 fault/isolation regressions. Adjacent suites were omitted
-> from this narrowed rerun. Independent QA/review remain pending; no merge readiness claimed.
-> Human approved correcting both round-1 findings. Source now rejects nested `.git` markers of
-> every type and permits only the verified root linked-worktree file. Backup preparation records
-> copying attempts durably before copying, uses fresh private directories on retry, verifies content
-> and source stability, and refuses to drop the requested backup policy. Added seven regression cases.
-> The one approved combined command in `docs/STACK.md` failed: 86 tests in 43.453s,
-> exit 1, 9 failures and 1 error. Viewer fixtures resolved live BOARD-147/BOARD-152 rows instead
-> of their own data; output also printed `BOARD-153 risk set`, `BOARD-146 status set to Blocked`,
-> `BOARD-146 notes set`, `BOARD-143 notes set`, and `BOARD-131 risk set`. Live-state isolation
-> failed for reads: the non-Git fixture inherited its enclosing checkout. Source trace does not
-> prove live writes; lifecycle fixture tests can also emit those update messages. No live-state
-> restoration was attempted. The previous failed check remains historical evidence, not a pass.
-> Validated findings and QA report: `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-12/BOARD-152/`
-> (`qa.md`, `finding-1.md`, `finding-2.md`); architect recorded fingerprints and round-1 ledger.
-> Next: independent QA/review of the corrected worktree against both preserved round-1 findings.
-> No live purge/cleanup, board restoration, integration, push or merge performed.
+> QA round 2 passed 47 isolated viewer/purge tests and 39 adjacent lifecycle/handoff tests,
+> as reported by the orchestrator. Evidence:
+> `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-152/qa.md`
+> and `.tmp/board152-adjacent-qa.log`. Both round-1 findings remain preserved in the earlier report.
+> Updated `docs/PROJECT_STRUCTURE.md` with the purge module, test file and runtime recovery directory.
+> User explicitly approved the exact existing `### Task purge` addition in
+> `.opencode/skills/git-worktree/SKILL.md`; it is retained unchanged.
+> Earlier failed verification and fixture read leakage remain documented in the engineering log;
+> live writes were not proven. No live-state restoration or destructive maintenance performed.
+> Verification limited to file review because this was a low-risk visual/static change.
+> No tests/builds rerun or board/reports/ledger touched. Next: architect final review; not merge-ready.
 
 ### BOARD-152 module inventory
 
