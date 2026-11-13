@@ -5,7 +5,8 @@
 - QA round 2 passed 47 isolated viewer/purge tests and 39 adjacent lifecycle/handoff tests,
   per orchestrator report. Evidence:
   `/projects/miahsbrain/opencode_sf/artifacts/factory/qa/2026-11-13/BOARD-152/qa.md`
-  and `.tmp/board152-adjacent-qa.log`. Architect final review remains pending.
+  and `.tmp/board152-adjacent-qa.log`. Architect review passed against `6f72e0b` with no blocking
+  finding; architect reported clean `git diff --check opencode` and worktree.
 - Structure map now names the purge module, focused test file and `.factory-state/purges/<ID>/`.
   User explicitly approved the exact existing `### Task purge` addition to
   `.opencode/skills/git-worktree/SKILL.md`; retained unchanged. This correction is docs-only.
@@ -17,7 +18,7 @@
 - Narrowed documented command passed 47 tests in 12.477s, exit 0: BoardRefreshTests plus
   TaskPurgeTests. Local output `.tmp/board152-isolated-check.log`; no second run. Adjacent suites
   were not certified by that builder check; subsequent independent QA covered 39 adjacent tests.
-  Architect final review is next; not merge-ready.
+  Row awaits Pending Merge handoff and human finalize; no live purge.
 
 - Worktree `.opencode/worktrees/add-human-confirmed-task-purge/`, branch
   `feat/add-human-confirmed-task-purge`. Both round-1 corrections were human-approved and implemented:
@@ -34,8 +35,8 @@
 - Four follow-up policies approved: independent high-water IDs, explicit cancelled-orphan evidence,
   durable resumable manifest with task deletion last, historical/shared backup retention.
 - No deliberate live purge/cleanup, integration or remote operation. BOARD-153 clean-slate and
-  BOARD-154 shortcuts remain queued. Next: architect final review of the corrected worktree and
-  QA round-2 evidence. The failed broad check is retained as historical evidence.
+  BOARD-154 shortcuts remain queued. Next: orchestrator Pending Merge handoff, then human finalize.
+  The failed broad check is retained as historical evidence; this builder has not set the board lane.
 
 ## Current session — BOARD-151 shared QA artifact guard (2026-11-12)
 

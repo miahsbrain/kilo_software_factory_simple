@@ -12,7 +12,10 @@
 > Earlier failed verification and fixture read leakage remain documented in the engineering log;
 > live writes were not proven. No live-state restoration or destructive maintenance performed.
 > Verification limited to file review because this was a low-risk visual/static change.
-> No tests/builds rerun or board/reports/ledger touched. Next: architect final review; not merge-ready.
+> Architect review passed against `6f72e0b`: structure map, safety paths and QA round-2 evidence
+> had no blocking finding; architect reported clean `git diff --check opencode` and worktree.
+> Row awaits Pending Merge handoff and human finalize; no live purge. No tests/builds rerun or
+> board/reports/ledger touched for this docs-only closeout.
 
 ### BOARD-152 module inventory
 
