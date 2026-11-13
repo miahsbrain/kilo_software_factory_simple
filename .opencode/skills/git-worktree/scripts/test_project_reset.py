@@ -101,6 +101,62 @@ class ProjectResetTests(unittest.TestCase):
                          {str(self.database), str(evidence.parent), str(ledger), str(export)})
         self.assertFalse((self.database.parent / "clean-slates").exists())
 
+    def test_preview_serializes_blob_digest_without_changing_targets_or_state(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("ALTER TABLE planned_items ADD COLUMN fixture_blob BLOB")
+            connection.execute("UPDATE planned_items SET fixture_blob=? WHERE id='BOARD-910'", (b"\x00\xff",))
+        before = self.snapshot()
+        expected = self.inventory()
+        output = io.StringIO()
+        with patch.object(wt.os, "getcwd", return_value=str(self.repo)), contextlib.redirect_stdout(output):
+            self.assertEqual(wt.main(["clean-slate", "--repo", "control"]), wt.OK)
+        serialized = json.loads(output.getvalue())
+        self.assertEqual(serialized["targets"], expected["targets"])
+        self.assertEqual(serialized, expected)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_tree_stamp_ignores_atime_only_during_read(self):
+        path = self.write("inventory-target", "stable content")
+        before = path.stat()
+        after = SimpleNamespace(**{name: getattr(before, name) for name in (
+            "st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")},
+            st_atime_ns=before.st_atime_ns + 1)
+        expected = purge.tree_stamp(path)
+        with patch.object(purge.os, "fstat", side_effect=[before, after]):
+            self.assertEqual(purge.tree_stamp(path), expected)
+
+    def test_tree_stamp_refuses_stable_metadata_change_during_read(self):
+        path = self.write("inventory-target", "stable content")
+        before = path.stat()
+        changed = SimpleNamespace(**{name: getattr(before, name) for name in (
+            "st_dev", "st_ino", "st_mode", "st_size", "st_atime_ns", "st_ctime_ns")},
+            st_mtime_ns=before.st_mtime_ns + 1)
+        with patch.object(purge.os, "fstat", side_effect=[before, changed]):
+            with self.assertRaisesRegex(ValueError, "target changed during inventory"):
+                purge.tree_stamp(path)
+
+    def test_tree_stamp_refuses_content_change_during_read(self):
+        path = self.write("inventory-target", "original")
+        original_fdopen = purge.os.fdopen
+
+        @contextlib.contextmanager
+        def mutate_after_read(descriptor, mode):
+            with original_fdopen(descriptor, mode) as stream:
+                class MutatingReader:
+                    def fileno(self):
+                        return stream.fileno()
+
+                    def read(self, size):
+                        content = stream.read(size)
+                        if content:
+                            path.write_bytes(b"modified")
+                        return content
+                yield MutatingReader()
+
+        with patch.object(purge.os, "fdopen", side_effect=mutate_after_read):
+            with self.assertRaisesRegex(ValueError, "target changed during inventory"):
+                purge.tree_stamp(path)
+
     def test_apply_refuses_before_any_state_access(self):
         with patch.object(reset, "preview", side_effect=AssertionError("must not inspect")), \
                 contextlib.redirect_stderr(io.StringIO()):

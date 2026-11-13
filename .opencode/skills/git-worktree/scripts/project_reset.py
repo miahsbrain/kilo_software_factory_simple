@@ -82,14 +82,22 @@ def inode(path):
     return [value.st_dev, value.st_ino, value.st_mode]
 
 
+def database_value(value):
+    if isinstance(value, bytes):
+        return {"sqlite_blob_hex": value.hex()}
+    if isinstance(value, (tuple, list)):
+        return [database_value(item) for item in value]
+    return value
+
+
 def database_image(connection):
     schema = connection.execute("SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name").fetchall()
     tables = {row[1] for row in schema if row[0] == "table"}
     if (tables - {"planned_items", "acceptance_criteria", "active_work", "board", "plan_id_sequence"}
             or any(row[0] in ("trigger", "view") for row in schema)):
         raise ValueError("unrecognized database tables or executable schema")
-    return purge.digest({"schema": schema, "rows": {name: connection.execute(
-        'SELECT * FROM "' + name + '" ORDER BY rowid').fetchall() for name in sorted(tables)}})
+    return purge.digest({"schema": database_value(schema), "rows": {name: database_value(connection.execute(
+        'SELECT * FROM "' + name + '" ORDER BY rowid').fetchall()) for name in sorted(tables)}})
 
 
 def template_inventory():

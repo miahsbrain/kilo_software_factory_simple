@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Preserve BLOB identity in clean-slate preview
+**Type:** Fix
+**Board:** BOARD-157 | **Branch:** fix/fix-factory-clean-slate-preview-json
+**Changed:** `.opencode/skills/git-worktree/scripts/project_reset.py`, `task_purge.py`, `test_project_reset.py`, `docs/HANDOVER.md`, engineering log.
+**Why:** `database_image` passed SQLite BLOB bytes to the shared JSON digest, so the read-only preview failed with `Object of type bytes is not JSON serializable`. Encode only BLOB values as tagged hexadecimal data before hashing, preserving their exact bytes without changing reset targets or digest semantics for other values.
+**Impact:** Clean-slate preview can serialize boards containing BLOB values. Shared file inventory ignores atime-only changes but still refuses content or stable-metadata changes. Target representation, factory-only boundary, and read-only behavior remain unchanged; no reset or preview retry was performed. The earlier `target changed during inventory` refusal did not identify a path, so no trigger is attributed.
+**Verification:** The single authorized command, `python3 .opencode/skills/git-worktree/scripts/test_project_reset.py`, ran 41 tests and failed with one error: `AttributeError: 'MutatingReader' object has no attribute 'fileno'` in the new content-mutation fixture before the guard comparison. The fixture was corrected afterward; no second verification or preview was run. This WIP checkpoint is unverified.
+
 ## [2026-11-13] Use Playwright for QA and visual critique
 **Type:** Docs
 **Board:** BOARD-156 | **Branch:** docs/use-playwright-for-qa-and-ui-critique
