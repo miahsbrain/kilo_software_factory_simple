@@ -1,5 +1,12 @@
 # HANDOVER — software factory
 
+> **Session Notes — BOARD-156 Playwright QA policy, 2026-11-13**
+> Branch `docs/use-playwright-for-qa-and-ui-critique`, worktree
+> `.opencode/worktrees/use-playwright-for-qa-and-ui-critique/`.
+> Both reviewers now use the existing Playwright capture script and configured MCP; policy,
+> commands and current project template are aligned. The 10-round same-task review and UI gates remain.
+> Next action: review the documentation diff and hand off the committed worktree for human integration.
+
 > **Session Notes — BOARD-153 independent QA and source review complete, 2026-11-13**
 > Completed implementation on `feat/add-human-confirmed-project-clean-slate`,
 > `.opencode/worktrees/add-human-confirmed-project-clean-slate/`.
@@ -852,10 +859,10 @@ node .opencode/skills/qa-review/scripts/browser-review.mjs --base-url http://127
 | `.opencode/skills/git-worktree/scripts/env.py` | Provisions the local env files of a worktree. `sync`, `status`, `clean`. |
 | `.opencode/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.opencode/skills/git-worktree/scripts/scope.py` | The generated pointer a work surface carries, and the local exclude rule that keeps it out of every commit. |
-| `.opencode/skills/qa-review/scripts/browser-review.mjs` | Historical Playwright capture tool, retained unchanged; not UI verification/review evidence. Built-in browser workflow: QA skill and §B4.2. |
+| `.opencode/skills/qa-review/scripts/browser-review.mjs` | Canonical Playwright UI QA capture tool, unchanged; writes screenshots, logs and summary to primary checkout. QA skill and §B4.2 govern review. |
 | `.opencode/skills/qa-review/scripts/check-finding.py` | Validates a QA finding and prints its fingerprint. |
 | `.opencode/skills/qa-review/scripts/ledger.py` | Opens, closes and reports the QA↔fix rounds of a row. |
-| `.opencode/skills/unslop/scripts/snapshot.mjs` | Retained historical page snapshot tool, not UI QA or a built-in browser fallback. Live URLs follow the same §B4.2 browser policy. |
+| `.opencode/skills/unslop/scripts/snapshot.mjs` | Retained page snapshot tool, not canonical UI QA capture or a replacement for the Playwright script. Live URLs follow §B4.2. |
 
 ## 4. Modules and functions
 
@@ -901,7 +908,7 @@ gallery-only layout/CSS themes. These do not execute JS or prove browser behavio
 | `guard.py` | `.opencode/skills/git-worktree/scripts/guard.py` | The guard rails and the sync that carries them into an app repository. | effectful (git, filesystem) |
 | `check-finding.py` | `.opencode/skills/qa-review/scripts/check-finding.py` | Validates a finding and derives its fingerprint. | pure |
 | `ledger.py` | `.opencode/skills/qa-review/scripts/ledger.py` | The round ledger of a row under `<primary-checkout>/.factory-state/reviews/`; fails closed when the state path cannot be resolved. | effectful (file I/O) |
-| `browser-review.mjs` | `.opencode/skills/qa-review/scripts/browser-review.mjs` | Historical capture tool; not UI verification/review. Source unchanged. | effectful (browser, filesystem) |
+| `browser-review.mjs` | `.opencode/skills/qa-review/scripts/browser-review.mjs` | Canonical Playwright UI QA capture; source unchanged. Capture completion is not a verdict. | effectful (browser, filesystem) |
 | `snapshot.mjs` | `.opencode/skills/unslop/scripts/snapshot.mjs` | Saves a live page or a local file as one standalone HTML file with its assets inlined, and saves a screenshot next to it. Resolves Playwright and chromium the same way the QA script does. | effectful (browser, filesystem) |
 
 ## 5. Data
@@ -953,8 +960,8 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 | Dependency | Why |
 |---|---|
 | Python 3.9+ standard library | Every script. No third-party package. |
-| Playwright (global install in the dev container) | Retained historical/test tooling; not UI QA. |
-| Chromium (`/usr/bin/chromium`) | Retained historical/test tooling; not UI QA. |
+| Playwright (global install in the dev container) | Canonical UI QA capture script and configured MCP investigation. |
+| Chromium (`/usr/bin/chromium`) | Browser for Playwright UI QA and review. |
 | The unslop skill | CC BY 4.0 — Damir Sokolovsky ([@heydamir](https://x.com/heydamir)). The credit line must survive in every copied file of `.opencode/skills/unslop/`. |
 | The plan skill | MIT — © 2025 Jeffallan (https://github.com/Jeffallan), upstream skills `feature-forge` and `architecture-designer`. The credit line must survive in every copied file of `.opencode/skills/plan/`. |
 | The superpowers research documents | MIT — © Jesse Vincent (obra/superpowers), copied into `.opencode/skills/plan/references/`. The credit line must survive in both files. |
@@ -962,10 +969,10 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 
 ## 10. Testing
 
-UI verification/review uses only OpenCode's built-in browser (§B4.2, QA skill). Browser evidence
-stays under `artifacts/<scope>/qa/<date>/<task-id>/` with route, viewport, theme, steps, expected
-and observed results. Screenshot/`files.get` paths are server-local; desktop file IDs require
-transfer. Unavailable browser access or measurements hold criteria, with no fallback or pass claim.
+UI verification/review uses the existing Playwright capture script and configured MCP (§B4.2,
+QA skill). Evidence stays under `artifacts/<scope>/qa/<date>/<task-id>/` with route, viewport,
+theme, steps, expected and observed results. Capture exit 0 does not prove a pass; unavailable
+tool access or measurements hold criteria without substitution.
 
 Focused script tests are the available verification; there is no general test suite. Each change
 uses the smallest relevant script run, recorded with

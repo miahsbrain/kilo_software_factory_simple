@@ -192,11 +192,12 @@ npm --prefix .opencode/skills/board/ui run build   # -> .opencode/skills/board/s
 The runtime serves the CSS and the two self-hosted Geist fonts from `.opencode/skills/board/static/`.
 
 Before a task, apply `AGENTS.md` §A7's catalogue selection/reporting rule. UI verification/review
-of the board and gallery follows §B4.2 and the QA skill: load `browser` first, use only OpenCode's
-built-in browser interactions, screenshots, DOM measurements, console and network observations.
+of the board and gallery follows §B4.2 and the QA skill: run the existing Playwright capture
+script for screenshots, console and network evidence and use configured Playwright MCP for
+interactions and DOM measurements.
 Store evidence under `artifacts/factory/qa/<date>/<task-id>/` with route, viewport, theme, steps,
-expected and observed results. Transfer captures using returned server-local paths; do not assume
-a shared desktop/server disk. Hold unavailable access/measurements without fallback. Gallery
+expected and observed results. The script writes server-local files in the primary checkout.
+Hold unavailable access/measurements without substitution. Gallery
 approval, independent review, accessibility and unslop gates remain mandatory.
 
 - An **app bar** carries the wordmark, the live refresh clock, Pause, Refresh now, and the

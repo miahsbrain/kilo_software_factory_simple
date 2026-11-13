@@ -97,9 +97,9 @@ Passing the anti-slop rules is not enough — the result also has to serve the u
 
 ## QA and UI/UX review
 
-The QA lane produces evidence, not assertions. For UI verification and review, load the `browser`
-skill and use only OpenCode's built-in browser. Do not use Playwright, browser MCP alternatives, or
-`browser-review.mjs`. Spec: `docs/UI-UX.md` §5 and root `AGENTS.md` §B4.2.
+The QA lane produces evidence, not assertions. For UI verification and review, use the existing
+Playwright `browser-review.mjs` for canonical capture and configured Playwright MCP for interaction.
+Spec: `docs/UI-UX.md` §5 and root `AGENTS.md` §B4.2.
 
 - Full-page screenshot per route per viewport: 390×844, 834×1112, 1440×900, 1920×1080, and
   320×800 as the overflow floor.

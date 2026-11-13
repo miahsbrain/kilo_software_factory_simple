@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Use Playwright for QA and visual critique
+**Type:** Docs
+**Board:** BOARD-156 | **Branch:** docs/use-playwright-for-qa-and-ui-critique
+**Changed:** Root and project-template rules, QA/unslop/board skills, reviewer and builder agents, derived commands, web scope, UI/stack/architecture/state/handover/decision/roadmap docs.
+**Why:** The user prefers the main-branch Playwright workflow over the limited built-in browser; reuse existing script and configured MCP.
+**Impact:** Canonical captures come from `browser-review.mjs`, interactive review from Playwright MCP; 10-round same-task loop, artifacts and UI gates remain. No source, scripts, dependencies or historical QA evidence changed.
+**Verification:** Verification limited to file review because this was a low-risk documentation/policy change.
+
 ## [2026-11-13] Record clean-slate independent QA and source review
 **Type:** Docs
 **Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate

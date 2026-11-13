@@ -152,8 +152,8 @@ already checked. Do not pick an option and continue. Do not change an approved d
 Run the smallest relevant verification command from `docs/STACK.md`. Never skip verification for
 auth, contracts, persistence, deployment, or critical product behavior.
 
-Any UI verification/review follows `AGENTS.md` §B4.2 and the QA skill: load `browser`, use only
-OpenCode's built-in browser evidence, and hold unavailable measurements without fallback.
+Any UI verification/review follows `AGENTS.md` §B4.2 and the QA skill: use the existing Playwright
+capture script and configured MCP, and hold unavailable measurements without substitution.
 
 ## Git
 

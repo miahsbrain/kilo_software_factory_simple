@@ -15,8 +15,8 @@ reference galleries, §2 the 15 rules, §3 the component factory gate.
 
 Before every task, read `.opencode/catalog/README.md`; apply all relevant skills and required
 references under `AGENTS.md` §A7. Report skills used or that none matched. Agent example lists
-are not limits. Repository rules and approved decisions win. Load `browser` before UI review
-and follow §B4.2 and `.opencode/skills/qa-review/SKILL.md` for built-in-browser-only evidence.
+are not limits. Repository rules and approved decisions win. Follow §B4.2 and
+`.opencode/skills/qa-review/SKILL.md` for Playwright capture and interactive investigation.
 
 ## Scope
 
@@ -80,19 +80,18 @@ to a different tool unless the user says so. A missing browser, package, or syst
 
 ## What to do
 
-1. **Get the browser evidence.** Load `browser` first. Use OpenCode's built-in browser for
-   actual interactions, screenshots, DOM measurements, console and network observations under
-   `AGENTS.md` §B4.2 and `.opencode/skills/qa-review/SKILL.md`. Use the QA lane's current browser
-   screenshots and independently inspect the screen; no screenshot, no visual verdict.
+1. **Get Playwright evidence.** Under `AGENTS.md` §B4.2 and
+   `.opencode/skills/qa-review/SKILL.md`, independently inspect the QA lane's current
+   `browser-review.mjs` screenshots and capture missing routes with that same script; use the
+   MCP for interactive states.
+   No current screenshot, no visual verdict. Use the configured Playwright MCP for interactive
+   investigation and DOM measurements; inspect script-generated console and network observations.
 
-   Store evidence under `artifacts/<scope>/qa/<date>/<task-id>/` in the main checkout, including
+   Evidence lives under `artifacts/<scope>/qa/<date>/<task-id>/` in the main checkout, including
    desktop (1440×900), mobile (390×844), in-scope themes and changed components. Record route,
-   actual viewport, theme, steps, expected and observed results. Screenshot/`files.get` results
-   give server-local paths; never assume desktop captures already exist on the server.
-   Do not use Playwright, browser MCP alternatives or `browser-review.mjs` for UI review.
-   If browser access or a required measurement is unavailable, hold the affected criterion,
-   report the limitation and do not fall back. Gallery, accessibility, independent review
-   and unslop gates remain mandatory.
+   actual viewport, theme, steps, expected and observed results. If the runner, MCP or required
+   measurement is unavailable, hold the criterion and report the failure; do not install or
+   substitute tools. Gallery, accessibility, independent review and unslop remain mandatory.
 2. **Compare against the approved gallery.** If the component factory was approved, the screen
    must match it: same tokens, radius, type scale, accent, spacing, and states. A deviation is a
    finding, not a new decision.

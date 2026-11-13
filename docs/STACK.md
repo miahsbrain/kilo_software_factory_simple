@@ -16,8 +16,8 @@ Tailwind stylesheet, and it produces a committed file — the viewer itself need
 | Local review records | Markdown | `<primary-checkout>/.factory-state/reviews/`, outside task worktrees |
 | OpenCode | V2 | `opencode.jsonc`, `.opencode/agents/`, `.opencode/commands/`, five discoverable skills |
 | Node.js | 22 | the dev container, the Playwright MCP, the Tailwind build |
-| Playwright | the global install in the dev container | retained historical/test tooling, not UI QA |
-| Chromium | `/usr/bin/chromium` in the dev container | retained historical/test tooling, not UI QA |
+| Playwright | the global install in the dev container | canonical QA capture script and configured MCP investigation |
+| Chromium | `/usr/bin/chromium` in the dev container | browser for Playwright UI QA and review |
 | Tailwind CSS | 4.3.5 (`@tailwindcss/cli`) | `.opencode/skills/board/ui/`, builds the board stylesheet |
 | Geist Sans / Geist Mono | variable woff2, SIL OFL | `.opencode/skills/board/static/fonts/` |
 
@@ -70,8 +70,9 @@ type the exact task ID at the terminal prompt. Cancelled orphan evidence is repe
 `--orphan <registered-repo-id> <exact-worktree-path> <exact-branch>`.
 No unattended confirmation flag exists. POSIX `fcntl` supplies the apply lock.
 
-UI verification/review uses only OpenCode's built-in browser (`AGENTS.md` §B4.2, QA skill).
-Load `browser` first. An unavailable browser or measurement holds the criterion; no fallback.
+UI verification/review uses the existing Playwright `browser-review.mjs` for canonical capture
+and configured Playwright MCP for interaction (`AGENTS.md` §B4.2, QA skill). An unavailable tool
+or measurement holds the criterion; do not install or substitute without approval.
 
 ```bash
 # Board viewer (read-only dashboard on port 15180)

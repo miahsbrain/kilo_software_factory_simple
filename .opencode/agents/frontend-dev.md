@@ -151,9 +151,9 @@ limited to file review because this was a low-risk visual/static change."
 **Never run a production build.** `npm run build`, `buildProd`, `buildProd2`, `buildDev` and
 `npx react-scripts build` are not verification steps. Read the run command in `docs/RUNNING.md` and
 `docs/STACK.md` first, start the app with it, and verify against the running development server.
-For UI work, load `browser` and prove the result only with OpenCode's built-in browser under
-`AGENTS.md` §B4.2 and `.opencode/skills/qa-review/SKILL.md`. Hold unavailable measurements without
-fallback; gallery approval, independent review, accessibility and unslop gates remain.
+For UI work, follow `AGENTS.md` §B4.2 and `.opencode/skills/qa-review/SKILL.md`: use the existing
+Playwright capture script and configured MCP. Hold unavailable measurements without substitution;
+gallery approval, independent review, accessibility and unslop gates remain.
 A production build runs only when the user asks for one by name.
 
 ## Git

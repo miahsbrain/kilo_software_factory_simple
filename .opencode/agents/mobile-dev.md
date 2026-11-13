@@ -142,9 +142,9 @@ className, spacing, or static UI changes, skip command verification only; UI bro
 review gates below still apply. For non-UI static changes with no checks run, say: "Verification
 limited to file review because this was a low-risk visual/static change."
 
-For UI verification or review, load `browser` and use only OpenCode's built-in browser under
-`AGENTS.md` §B4.2 and `.opencode/skills/qa-review/SKILL.md`. If a native UI or measurement is not
-accessible there, hold the criterion and report the limitation; do not switch tools. Gallery
+For UI verification or review, follow `AGENTS.md` §B4.2 and `.opencode/skills/qa-review/SKILL.md`:
+use the existing Playwright capture script and configured MCP. If a native UI or measurement is not
+accessible, hold the criterion and report the limitation; do not switch tools. Gallery
 approval, independent review, accessibility and unslop gates remain mandatory.
 
 ## Git

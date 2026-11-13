@@ -17,7 +17,7 @@ This is the **frontend UI gate** from `AGENTS.md` §A7. Run it before building a
 4. **The gallery imports the same module paths the screens use.** No forked copy. The registry
    is strictly typed against the component props so an unlisted variant fails type-checking.
 5. **Verify**: apply `AGENTS.md` §A7's catalogue selection/reporting rule. For UI verification,
-   load `browser` first and use only OpenCode's built-in browser under §B4.2 and the QA skill.
+    use the Playwright capture script and configured MCP under §B4.2 and the QA skill.
    Prove the gallery renders, capture desktop (1440×900) and mobile (390×844), and record route,
    actual viewport, theme, steps, expected and observed results in the canonical artifact folder.
    Hold unavailable measurements without fallback. Run an assigned non-UI check from `docs/STACK.md`

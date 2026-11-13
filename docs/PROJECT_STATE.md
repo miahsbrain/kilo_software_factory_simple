@@ -1,5 +1,16 @@
 # PROJECT STATE — software factory
 
+## Current session — BOARD-156 Playwright UI QA policy (2026-11-13)
+
+- Branch `docs/use-playwright-for-qa-and-ui-critique`, worktree
+  `.opencode/worktrees/use-playwright-for-qa-and-ui-critique/`.
+- Existing `browser-review.mjs` now provides canonical UI capture; configured Playwright MCP
+  supports interaction for QA and UI critique. No browser tool or dependency added.
+- Current policy, reviewers, commands, skill, scope pointer and project template updated.
+  Historical versioned reset snapshots and prior QA records remain unchanged.
+- Review the diff, commit locally and hand off for human inspection/integration. No UI runtime
+  was changed; verification is limited to document consistency and diff review.
+
 ## Current session — BOARD-153 independent QA and source review complete (2026-11-13)
 
 - Branch `feat/add-human-confirmed-project-clean-slate`, worktree

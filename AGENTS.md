@@ -349,7 +349,7 @@ creating a worktree, editing a board row, validating a finding body, or
 checking whether a destructive command is allowed — the script performs it and the agent supplies
 the intent. Never have an agent hand-run the underlying command when a script covers it.
 
-UI evidence is the exception: OpenCode's built-in browser owns capture and review (§B4.2).
+UI evidence is the exception: Playwright owns capture and review (§B4.2).
 
 | Rule | Script that owns it |
 |---|---|
@@ -474,7 +474,7 @@ Specify whether verification is required.
 - Before running anything, read the documented run command in `docs/RUNNING.md` and `docs/STACK.md`.
   Do not invent a command from memory and do not substitute your own.
 - Verify against the running development server, started with the documented command.
-- For UI work, prove the result with OpenCode's built-in browser (§B4.2).
+- For UI work, prove the result with Playwright (§B4.2).
 - A production build runs only when the user asks for one by name.
 - Never reduce verification on security, auth, contracts, persistence, deployment, or critical
   product behavior.
@@ -603,7 +603,7 @@ Use the dedicated agents rather than ad-hoc prompts where one fits:
 | `frontend-dev` | Web UI work — component factory, screens, styling, accessibility |
 | `backend-dev` | API and service work — routes, domain logic, persistence, integrations |
 | `mobile-dev` | Mobile UI and platform work |
-| `qa-reviewer` | Verification lane — built-in browser UI evidence against acceptance criteria |
+| `qa-reviewer` | Verification lane — Playwright UI evidence against acceptance criteria |
 | `ui-critic` | Visual critique lane — anti-slop rules and gallery conformance |
 | `docs-writer` | The application memory map — one handover per application plus the global index |
 
@@ -778,7 +778,7 @@ each file genuinely needs its own short reference. Do not turn them into impleme
 | `docs/handover/` | The application memory map: one handover per application plus the global index |
 | `docs/ARCHITECTURE.md` | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap |
 | `docs/BUSINESS-LOGIC.md` | Every business rule as question → answer (see B2) |
-| `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, built-in browser QA spec |
+| `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, Playwright QA spec |
 | `artifacts/<scope>/qa/<date>/<task-id>/` | Shared QA/UI reports and evidence, outside task worktrees |
 | `<primary-checkout>/.factory-state/reviews/*-ledger.md` | Local bounded-loop ledger, outside task worktrees |
 | `<primary-checkout>/.factory-state/factory-board.sqlite3` | Local live board; Markdown is export only (see B3) |
@@ -1327,13 +1327,12 @@ Keep all written output in the same plain, verifiable style:
 
 ## B4.2 QA and UI/UX review
 
-All UI verification and UI/UX review must use OpenCode’s built-in browser. Load the browser skill first. Use actual interactions, screenshots, DOM measurements, console and network observations as evidence. Do not use Playwright, browser MCP alternatives, or `browser-review.mjs` for UI verification or review.
+UI verification and UI/UX review use Playwright. Run the existing `.opencode/skills/qa-review/scripts/browser-review.mjs` for canonical viewport, screenshot, console and network evidence; use the configured Playwright MCP for interactive investigation, keyboard behavior and DOM measurements. QA and UI critique review the same current capture. A successful capture is not a passing verdict. Do not substitute another browser or install tools without approval.
 
 Store new reports and evidence under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` in the primary checkout, outside task worktrees. QA owns `qa.md` and QA evidence; the UI critic owns `ui.md`; builders own only `builder/`. These rules constrain file tools only; shell remains trusted-agent authority, not blocked by this map. Record route, viewport, theme, steps, expected result and observed result. The ledger alone stays at `<primary-checkout>/.factory-state/reviews/<task-id>-ledger.md` and may be changed only through `ledger.py`. Never claim an unchecked criterion passed. If browser access or a required measurement is unavailable, report the limitation and hold the affected criterion. Gallery approval, independent review, accessibility and unslop gates remain mandatory.
 
-This replaces earlier scripted UI capture directions, including scope-level directions. Existing
-capture scripts and Playwright test tools remain historical/not UI QA; do not delete them or
-historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser workflow.
+This supersedes the built-in-browser-only directions, including scope-level directions. Preserve
+historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the Playwright workflow.
 
 - **Capture:** interact with the running development app and collect browser evidence per route,
   viewport (390×844, 834×1112, 1440×900, 1920×1080, plus 320×800 as the overflow floor) and
@@ -1359,9 +1358,8 @@ historical evidence. See `.opencode/skills/qa-review/SKILL.md` for the browser w
                 notes.md            # what was checked, expected vs actual
 
   The artifacts folder belongs to the **main checkout**, so worktree captures land in one place.
-  Screenshot and `files.get` results provide server-local paths; desktop file IDs are not paths.
-  Transfer desktop-owned captures with the built-in browser, then store the returned bytes under
-  the canonical path. Never assume desktop and server filesystems are shared.
+  The existing capture script writes server-local evidence into this canonical path from a
+  worktree. Its generated logs and summary describe bounded observations, not a verdict.
   **Reports and evidence are shared artifacts, outside the task worktree:**
   `<primary-checkout>/artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/`. QA writes `qa.md` and evidence;
   UI critique writes `ui.md`; builders write only under `builder/`. Only the ledger stays in
@@ -1393,7 +1391,7 @@ independent of the builder's claims:
 
 | Agent | Role | Output |
 |---|---|---|
-| `qa-reviewer` | Verifies behavior against the acceptance criteria; uses the built-in browser for UI | `qa.md` and QA evidence under `artifacts/<scope>/qa/<date>/<task-id>/` |
+| `qa-reviewer` | Verifies behavior against the acceptance criteria; uses Playwright for UI | `qa.md` and QA evidence under `artifacts/<scope>/qa/<date>/<task-id>/` |
 | `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `ui.md` under `artifacts/<scope>/qa/<date>/<task-id>/` |
 
 Both are read-only against application code. They report; they do not fix.

@@ -1,24 +1,23 @@
 ---
-description: Run the QA and UI/UX review lane with the built-in browser and produce evidence
+description: Run the QA and UI/UX review lane with Playwright and produce evidence
 ---
 
 Run the QA lane and the UI/UX critique for a frontend row. Evidence, not assertions.
 Spec: `docs/UI-UX.md` §3 and §5.
 
 Follow `AGENTS.md` §A7: read the catalogue index, apply all relevant skills and required references,
-and report skills used or that none matched. For UI verification/review, load `browser` first
-and use only OpenCode's built-in browser under §B4.2 and `.opencode/skills/qa-review/SKILL.md`.
-Do not use Playwright, browser MCP alternatives or `browser-review.mjs` for UI verification/review.
+and report skills used or that none matched. Follow §B4.2 and
+`.opencode/skills/qa-review/SKILL.md` for Playwright capture and MCP investigation.
 
 1. **Confirm the app runs.** Use the dev command from `docs/STACK.md`. If it does not start,
    report the blocker; do not fake a review.
-2. **Interact and capture with the built-in browser.** Collect screenshots, DOM measurements,
-   console and network observations per route and in-scope theme. Viewports: 390×844 (mobile),
+2. **Capture and investigate with Playwright.** Run the existing `browser-review.mjs` for
+   screenshots, console, page-error and network evidence; use Playwright MCP for actual interactions
+   and DOM measurements per route and in-scope theme. Viewports: 390×844 (mobile),
    834×1112 (tablet), 1440×900 (desktop), 1920×1080 (wide), and 320×800 as the overflow floor.
-   Record actual viewport and theme. If browser access or any required measurement is unavailable,
-   report the limitation and hold the affected criterion without fallback.
-   Transfer desktop-owned captures with the built-in browser; screenshot/`files.get` results
-   supply server-local paths. Never assume a shared desktop/server filesystem.
+   Record actual viewport and theme. Capture exit 0 is not a passing verdict. If the runner, MCP
+   or any required measurement is unavailable, report the failure and hold the affected criterion;
+   do not install or substitute tools without approval.
 3. **Check the round ledger** — a row may go through at most 10 QA↔fix rounds. Round 10 is the
    last. If it still fails, move the row to `Blocked` with what was tried and the question for the
    human; do not open an eleventh round. Each round's
