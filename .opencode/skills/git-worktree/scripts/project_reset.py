@@ -362,7 +362,7 @@ def validate_record(record, root, repo, templates, database):
     if len(db) != 1 or (plan["repository_kind"] == "project" and documents != {str(root / name) for name in DOCUMENTS}):
         raise ValueError("incomplete closed reset inventory")
     seen = set()
-    for step in record["steps"]:
+    for index, step in enumerate(record["steps"]):
         path = purge.safe_path(step["path"], root)
         if step["path"] in seen or step["phase"] not in ("pending", "running", "done"):
             raise ValueError("invalid reset step phase or duplicate")
@@ -371,6 +371,11 @@ def validate_record(record, root, repo, templates, database):
             if (step["path"] not in documents or step["template"] != str(path.relative_to(root))
                     or step["replacement_sha256"] != templates[step["template"]]):
                 raise ValueError("unapproved document step")
+            attempts = step.get("replacement_attempts", [])
+            if (not isinstance(attempts, list) or len(set(attempts)) != len(attempts)
+                    or any(not isinstance(attempt, str) or not re.fullmatch(
+                        "replacement-" + str(index) + r"-[a-f0-9]{32}", attempt) for attempt in attempts)):
+                raise ValueError("invalid replacement preparation attempts")
         elif step["kind"] not in ("delete", "rmdir") or not any(path == parent or parent in path.parents for parent in roots):
             raise ValueError("unapproved delete step")
     if not ({str(path) for path in roots} | documents) <= seen:
@@ -479,18 +484,24 @@ def execute_step(step, index, record, operation, manifest, wt, root):
         if step["phase"] == "running" and path.exists() and replacement_image(path, root) == step["post"]:
             pass
         else:
-            staged = purge.safe_path(operation / ("replacement-" + str(index)), root)
             source = BUNDLE / step["template"]
             content = source.read_bytes()
             if hashlib.sha256(content).hexdigest() != step["replacement_sha256"]:
                 raise ValueError("replacement template changed")
-            if not staged.exists():
+            if step["phase"] == "pending":
+                attempt = "replacement-" + str(index) + "-" + uuid.uuid4().hex
+                step.setdefault("replacement_attempts", []).append(attempt)
+                purge.save_manifest(wt, manifest, record)
+                staged = purge.safe_path(operation / attempt, operation)
                 descriptor = os.open(staged, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
                 with os.fdopen(descriptor, "wb") as stream:
                     stream.write(content)
                     stream.flush()
                     os.fsync(stream.fileno())
                 sync_directory(operation)
+            else:
+                attempts = step.get("replacement_attempts", [])
+                staged = purge.safe_path(operation / (attempts[-1] if attempts else "replacement-" + str(index)), operation)
             checked_content(staged, root)
             post = replacement_image(staged, root)
             if post[1] != step["replacement_sha256"] or (step.get("post") is not None and step["post"] != post):

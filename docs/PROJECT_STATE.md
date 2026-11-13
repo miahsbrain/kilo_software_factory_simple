@@ -1,15 +1,18 @@
 # PROJECT STATE — software factory
 
-## Current session — BOARD-153 execution/recovery chunk 2 (2026-11-13)
+## Current session — BOARD-153 round-1 staging recovery correction (2026-11-13)
 
 - Branch `feat/add-human-confirmed-project-clean-slate`, worktree
   `.opencode/worktrees/add-human-confirmed-project-clean-slate/`.
 - Added human-only named TTY apply, mandatory durable metadata, optional verified private backup,
   atomic document replacements and explicit same-manifest recovery. Source/harness/secrets/history,
   historical copies and monotonic ID high-water remain protected by the closed inventory.
-- Targeted verification passed 31 tests in 7.873s on attempt 2 after three architect-approved
-  corrections. No live-state operations, board edits, production builds or other-worktree inspection.
-- Next action: architect diff review, then fresh independent destructive-flow QA. Not merge-ready.
+- Fixed pending replacement preparation with durable unique attempt tracking and fresh exclusive
+  staging on resume. Retain interrupted files; refuse changed saved stages or published targets.
+- Targeted verification passed 37 tests in 10.408s on the first correction attempt, including real
+  isolated SQLite contention and stale reset/resume revalidation under the writer lock.
+  No live-state operations, board/ledger edits, production builds or other-worktree inspection.
+- Next action: architect diff review and fresh independent re-QA for the finding. Not merge-ready.
 - BOARD-152 notes below are historical, not a claim about this task's current merge readiness.
 
 ## Current session — BOARD-152 structure map and QA round 2 (2026-11-13)

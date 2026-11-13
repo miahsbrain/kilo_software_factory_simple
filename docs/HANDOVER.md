@@ -1,9 +1,9 @@
 # HANDOVER — software factory
 
-> **Session Notes — BOARD-153 chunk 2, 2026-11-13**
+> **Session Notes — BOARD-153 round-1 staging recovery correction, 2026-11-13**
 > In flight on `feat/add-human-confirmed-project-clean-slate`,
 > `.opencode/worktrees/add-human-confirmed-project-clean-slate/`.
-> Added human-only execution, durable recovery and isolated interruption tests over the closed preview.
+> Corrected interrupted unpublished replacement preparation; added real isolated SQLite contention/stale-operation tests.
 > No live board/reset, backup or runtime migration performed. No other-session worktrees inspected.
 > Next action: architect diff review and fresh independent destructive-flow QA before any merge claim.
 
@@ -17,10 +17,10 @@
 - Effectful terminal boundaries `require_terminal`, `confirm` are at
   `.opencode/skills/git-worktree/scripts/project_reset.py:282-294`; read/validation boundaries
   `replacement_image`, `expand_steps`, `validate_record`, `validate_files` are at
-  `.opencode/skills/git-worktree/scripts/project_reset.py:305-412`.
+  `.opencode/skills/git-worktree/scripts/project_reset.py:305-417`.
 - Effectful `sync_directory`, `empty_database`, `backup_record`, `execute_step`, `apply_locked`,
   `command` are at `.opencode/skills/git-worktree/scripts/project_reset.py:297`,
-  `.opencode/skills/git-worktree/scripts/project_reset.py:415-631`. They publish private durable metadata,
+  `.opencode/skills/git-worktree/scripts/project_reset.py:420-642`. They publish private durable metadata,
   verify optional backups, advance exact filesystem steps, and transactionally empty canonical state.
 - `worktree.py clean-slate --repo <id> [--backup]` remains side-effect-free preview. Human-only
   `--apply` requires the selected primary checkout and exact repository ID plus canonical path on a TTY.
@@ -33,15 +33,26 @@
   `pending → committing → committed`. Documents use staged atomic new-inode replacement;
   evidence is removed file-by-file, then only inventoried empty directories are removed.
   The canonical SQLite `BEGIN IMMEDIATE` writer lock covers reset execution; commit is last.
+- `validate_record` checks operation-owned `replacement-<step-index>-<uuid>` attempt names at
+  `.opencode/skills/git-worktree/scripts/project_reset.py:330-383`. Effectful `execute_step` at
+  `.opencode/skills/git-worktree/scripts/project_reset.py:479-527` durably records an attempt before
+  exclusive creation. Pending retries retain incomplete preparations and create fresh files; a saved
+  running postimage must still match exactly, and changed targets/stages are never overwritten.
 - Optional backups use verified private `content-<uuid>` attempts and a consistent SQLite snapshot.
   Failed attempts and historical recovery/migration sources remain. `--resume <operation-id>` requires
   fresh exact confirmation and the original backup choice, uses saved ownership even after DB commit,
   and refuses changed/recreated targets. No implicit operation selection or automatic rollback.
 - Verification: `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'`
-  passed 31 tests in 7.873s on attempt 2. Attempt 1 exited 1 with two existing-directory fixture errors,
-  a Path/string backup-reader mismatch and an expected refusal wording mismatch. Architect approved
-  those narrow corrections. Fixtures assert independent primary/database identity before writes;
-  no production build or live maintenance ran. Independent QA/review remain outstanding.
+  passed 37 tests in 10.408s on the correction's first attempt. New staging tests at
+  `.opencode/skills/git-worktree/scripts/test_project_reset.py:243-308` interrupt actual exclusive-file
+  preparation with empty/partial bytes, require fresh confirmation, retain previous attempts and
+  reject saved-stage/target changes. Effectful fixture adapter `competing_database_writer` at
+  `.opencode/skills/git-worktree/scripts/test_project_reset.py:311-333` opens a second real SQLite
+  connection only in the asserted independent fixture. Tests at
+  `.opencode/skills/git-worktree/scripts/test_project_reset.py:335-379` prove writer contention refuses
+  before effects and stale reset/resume images refuse inside the acquired writer transaction while
+  preserving the competing commit. No live maintenance/build or thread writing live state.
+  Independent re-QA/review remain outstanding; prior chunk-2 test history stays in the engineering log.
 
 > **Session Notes — BOARD-152 structure map and QA round 2, 2026-11-13**
 > In flight on `feat/add-human-confirmed-task-purge`, `.opencode/worktrees/add-human-confirmed-task-purge/`.

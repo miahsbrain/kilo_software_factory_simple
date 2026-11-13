@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-13] Recover interrupted clean-slate replacement preparation
+**Type:** Fix
+**Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate
+**Changed:** `project_reset.py`, `test_project_reset.py`, handover/state/stack/structure/architecture docs.
+**Why:** Round-1 finding `bug|functional|/clean-slate|an-interrupted-replacement-staging-write-leaves-clean-slate`: deterministic preparation could strand same-manifest resume before a saved postimage. Extend existing `execute_step` and `validate_record`; reuse the durable unique-attempt pattern in `backup_record`, without changing purge or reset authority. No new application functions, files, tools or dependencies.
+**Impact:** Persist unique replacement attempt names before exclusive creation; retain interrupted attempts and use fresh staging only while pending. Saved running stages and changed targets retain strict refusal. Source/harness/secrets/history/non-reset boundaries unchanged. Correct stale structure comments that still described preview-only behavior. Independent re-QA/review pending; no live reset/board/ledger/other-worktree operations.
+**Verification:** `python3 -m unittest discover -s .opencode/skills/git-worktree/scripts -p 'test_project_reset.py'` passed 37 tests in 10.408s on correction attempt 1. Added actual empty/partial staging-write interruption, fresh named resume, retained attempts, changed-stage/target refusal; real second-connection SQLite writer contention plus stale reset/resume checks inside the writer transaction preserve the competing commit. Fixtures are independent repositories confined to the task worktree; no live writer, production build or alternate verification command.
+
 ## [2026-11-13] Add human-only clean-slate execution and recovery
 **Type:** Feature
 **Board:** BOARD-153 | **Branch:** feat/add-human-confirmed-project-clean-slate

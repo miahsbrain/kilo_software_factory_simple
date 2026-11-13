@@ -28,8 +28,8 @@ and is never tracked here (ADR-053).
     │   │   └── git-worktree/scripts/
     │   │       ├── task_purge.py      # task inventory, human confirmation, resumable purge
     │   │       ├── test_task_purge.py # repository-local purge safety/fault regressions
-    │   │       ├── project_reset.py   # closed read-only clean-slate inventory; apply unavailable
-    │   │       └── test_project_reset.py # independent repository preview fixtures
+    │   │       ├── project_reset.py   # closed clean-slate preview, confirmed apply and durable resume
+    │   │       └── test_project_reset.py # independent preview/apply/interruption/contention fixtures
     │   │   └── git-worktree/templates/project-v1/ # 14 portable document templates + hash manifest
     │   └── worktrees/                # one worktree per board row (git-ignored)
     ├── docs/

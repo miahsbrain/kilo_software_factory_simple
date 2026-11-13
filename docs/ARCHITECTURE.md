@@ -41,6 +41,10 @@ adapter, and the canonical SQLite writer transaction (`BEGIN IMMEDIATE`). Mandat
 `.factory-state/clean-slates/<operation-id>/manifest.json` records exact filesystem and logical DB
 pre/postimages before reset effects. Optional private backup attempts finish and verify first.
 Per-node deletion avoids ambiguous partially deleted trees; replacements publish staged new inodes.
+Each unpublished document preparation records its unique `replacement-<step-index>-<uuid>` attempt
+before exclusive creation. A pending interrupted write is retained, never overwritten or deleted;
+confirmed resume prepares a fresh exclusive attempt. After a running postimage is durable, resume
+requires that exact stage or already-published inode; modified stages and targets still refuse.
 Canonical emptying commits last, preserving schemas and ID high-water while replacing stale
 projection prose with the canonical empty view. Crash recovery requires explicit
 `--resume <operation-id>` plus fresh named confirmation, verifies saved ownership/pre/postimages

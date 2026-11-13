@@ -240,6 +240,143 @@ class ProjectResetTests(unittest.TestCase):
         self.assertEqual(self.apply(resume=manifest.parent.name)[0], wt.OK)
         self.assert_empty()
 
+    def test_unpublished_staging_creation_and_partial_write_resume_with_fresh_attempts(self):
+        original = reset.os.fdopen
+        operation_id = None
+        retained = []
+        for partial in (b"", b"interrupted replacement"):
+            @contextlib.contextmanager
+            def interrupted(descriptor, mode, **kwargs):
+                with original(descriptor, mode, **kwargs) as stream:
+                    if mode == "wb":
+                        stream.write(partial)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                        raise OSError("injected staging-write interruption")
+                    yield stream
+            with patch.object(reset.os, "fdopen", side_effect=interrupted):
+                result, error = self.apply(resume=operation_id)
+            self.assertEqual(result, wt.REFUSED)
+            self.assertIn("injected staging-write interruption", error)
+            manifest, record = self.manifest()
+            operation_id = manifest.parent.name
+            step = record["steps"][0]
+            self.assertEqual(step["phase"], "pending")
+            self.assertNotIn("post", step)
+            staged = manifest.parent / step["replacement_attempts"][-1]
+            self.assertEqual(staged.read_bytes(), partial)
+            retained.append((staged, staged.stat().st_ino, partial))
+            self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+            self.assertEqual((self.repo / "ROADMAP.md").read_text(), "project plans")
+            with sqlite3.connect(self.database) as connection:
+                self.assertEqual(connection.execute("SELECT count(*) FROM planned_items").fetchone()[0], 1)
+        self.assertIn("confirmation did not match", self.apply(resume=operation_id, answer="yes\n")[1])
+        self.assertEqual(self.apply(resume=operation_id)[0], wt.OK)
+        self.assert_empty()
+        self.assertEqual(len(self.manifest()[1]["steps"][0]["replacement_attempts"]), 3)
+        for staged, identity, partial in retained:
+            self.assertEqual((staged.stat().st_ino, staged.read_bytes()), (identity, partial))
+
+    def test_saved_staging_postimage_change_is_not_overwritten(self):
+        original = reset.os.replace
+        def interrupt(source, target):
+            if Path(source).name.startswith("replacement-"):
+                raise OSError("injected pre-publication interruption")
+            return original(source, target)
+        with patch.object(reset.os, "replace", side_effect=interrupt):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, record = self.manifest()
+        step = record["steps"][0]
+        self.assertEqual(step["phase"], "running")
+        staged = manifest.parent / step["replacement_attempts"][-1]
+        staged.write_text("externally changed preparation")
+        result, error = self.apply(resume=manifest.parent.name)
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("staged replacement changed", error)
+        self.assertEqual(staged.read_text(), "externally changed preparation")
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+        self.assertEqual(len(self.manifest()[1]["steps"][0]["replacement_attempts"]), 1)
+
+    def test_unpublished_staging_retry_refuses_changed_target(self):
+        with self.interrupt_manifest(lambda record: bool(record["steps"][0].get("replacement_attempts"))):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, _ = self.manifest()
+        self.write("DOMAIN.md", "changed target")
+        result, error = self.apply(resume=manifest.parent.name)
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("document pre/postimage changed", error)
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "changed target")
+
+    @contextlib.contextmanager
+    def competing_database_writer(self, commit_change=False):
+        original = self.board.connect
+        @contextlib.contextmanager
+        def connect(path):
+            self.assertEqual(Path(path), self.database)
+            self.assertEqual(Path(self.state.primary_checkout(str(self.repo))), self.repo)
+            with original(path) as connection:
+                writer = sqlite3.connect(path, isolation_level=None, timeout=0)
+                try:
+                    writer.execute("BEGIN IMMEDIATE")
+                    if commit_change:
+                        writer.execute("UPDATE planned_items SET task='concurrent change' WHERE id='BOARD-910'")
+                        writer.execute("COMMIT")
+                    else:
+                        connection.execute("PRAGMA busy_timeout=1")
+                    yield connection
+                finally:
+                    if writer.in_transaction:
+                        writer.execute("ROLLBACK")
+                    writer.close()
+        with patch.object(wt, "load_board_module", return_value=self.board), \
+                patch.object(self.board, "connect", side_effect=connect):
+            yield
+
+    def test_sqlite_writer_contention_refuses_before_effects_then_resumes(self):
+        with self.competing_database_writer(), patch.object(reset, "apply_locked", wraps=reset.apply_locked) as apply_locked:
+            result, error = self.apply()
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("database is locked", error)
+        apply_locked.assert_not_called()
+        manifest, record = self.manifest()
+        self.assertTrue(all(step["phase"] == "pending" for step in record["steps"]))
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+        self.assertEqual(self.apply(resume=manifest.parent.name)[0], wt.OK)
+        self.assert_empty()
+
+    def test_stale_concurrent_reset_revalidates_under_writer_lock(self):
+        original = reset.apply_locked
+        def locked(*args):
+            self.assertTrue(args[-1].in_transaction)
+            return original(*args)
+        with self.competing_database_writer(commit_change=True), patch.object(reset, "apply_locked", side_effect=locked) as check:
+            result, error = self.apply()
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("database pre/postimage changed", error)
+        check.assert_called_once()
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute("SELECT task FROM planned_items").fetchone()[0], "concurrent change")
+        self.assertTrue(all(step["phase"] == "pending" for step in self.manifest()[1]["steps"]))
+
+    def test_stale_concurrent_resume_revalidates_under_writer_lock(self):
+        with self.interrupt_manifest(lambda record: bool(record.get("database_post"))):
+            self.assertEqual(self.apply()[0], wt.REFUSED)
+        manifest, record = self.manifest()
+        original = reset.apply_locked
+        def locked(*args):
+            self.assertTrue(args[-1].in_transaction)
+            return original(*args)
+        with self.competing_database_writer(commit_change=True), patch.object(reset, "apply_locked", side_effect=locked) as check:
+            result, error = self.apply(resume=manifest.parent.name)
+        self.assertEqual(result, wt.REFUSED)
+        self.assertIn("database pre/postimage changed", error)
+        check.assert_called_once()
+        self.assertEqual(self.manifest()[1], record)
+        self.assertEqual((self.repo / "DOMAIN.md").read_text(), "project domain")
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute("SELECT task FROM planned_items").fetchone()[0], "concurrent change")
+
     def test_database_commit_interruption_recovers_without_rediscovery(self):
         with self.interrupt_manifest(lambda record: record["complete"]):
             self.assertEqual(self.apply()[0], wt.REFUSED)
