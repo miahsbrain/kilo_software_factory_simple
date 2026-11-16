@@ -299,6 +299,16 @@
   ],
   "edit": [
     {
+  "pattern": "artifacts/reviews/**",
+  "action": "allow",
+  "reason": "Allow shared ignored review evidence; later protected-path rules still apply."
+},
+{
+  "pattern": "**/artifacts/reviews/**",
+  "action": "allow",
+  "reason": "Allow absolute paths to shared ignored review evidence; later protected-path rules still apply."
+},
+    {
       "pattern": "*",
       "workspace_default": true,
       "action": "deny",
@@ -454,6 +464,11 @@
       "action": "deny",
       "reason": "A private key is never written by an agent."
     },
+    {
+  "pattern": "**/id_rsa*",
+  "action": "deny",
+  "reason": "Protect SSH private keys at nested paths, including review evidence."
+},
     {
       "pattern": ".env.example",
       "action": "allow",

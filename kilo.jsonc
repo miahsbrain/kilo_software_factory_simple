@@ -78,6 +78,8 @@
     },
     "edit": {
       "*": "deny",
+      "artifacts/reviews/**": "allow",
+      "**/artifacts/reviews/**": "allow",
       ".kilo/worktrees/**": "allow",
       "**/.kilo/worktrees/**": "allow",
       "AGENTS.md": "ask",
@@ -108,6 +110,7 @@
       "*.key": "deny",
       "*.p12": "deny",
       "id_rsa*": "deny",
+      "**/id_rsa*": "deny",
       ".env.example": "allow",
       "**/.env.example": "allow"
     },
