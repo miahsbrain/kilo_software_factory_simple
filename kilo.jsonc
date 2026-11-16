@@ -73,7 +73,8 @@
       "git reflog delete*": "deny",
       "git gc*": "deny",
       "git update-ref -d*": "deny",
-      "rm -rf *": "ask"
+      "rm -rf *": "ask",
+      "*worktree.py*--apply*": "ask"
     },
     "edit": {
       "*": "deny",
@@ -86,8 +87,10 @@
       ".kilo/skills/*.md": "ask",
       ".kilo/policies/*.json": "ask",
       ".kilo/scopes/*.md": "ask",
-      "docs/BOARD.md": "ask",
-      "**/docs/BOARD.md": "ask",
+      "docs/BOARD.md": "deny",
+      "**/docs/BOARD.md": "deny",
+      "templates/project/docs/BOARD.md": "ask",
+      "**/templates/project/docs/BOARD.md": "ask",
       ".env": "deny",
       "**/.env": "deny",
       ".env.*": "deny",

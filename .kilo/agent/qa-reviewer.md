@@ -12,10 +12,23 @@ Read the root `AGENTS.md` (Parts A and B apply to you) and `docs/UI-UX.md` §3 a
 
 ## Scope
 
-- Work read-only against the code under review, except for the QA artifacts and the review
-  report you write.
+- Application source is read-only. Write QA evidence/reports and perform approved authenticated
+  navigation; read-only does not prohibit authorized test interactions.
 - Do not modify application source code. A bug you find is reported, not fixed.
-- Do not inspect parent folders or `.devcontainer/`.
+- Read assigned local `AGENTS.md` and explicitly permitted shared governance/contracts,
+  including parent paths when needed. No unrelated scanning or `.devcontainer/` inspection.
+- Reuse the change's original repo-specific workspace set, never a new review worktree.
+  Optional mode changes workspace requirement only, not assigned scopes or secret protections.
+- For authenticated capture use `browser-review.mjs --storage-state <ignored-local.json>` and/or
+  `--navigation <ignored-local.json>` per the QA skill. Ask for authorized test access if absent;
+  MFA/SSO login is manual by the user, never bypassed. `--allow-destructive` needs explicit user
+  authorization for the actions. Never put secrets in CLI, commits or evidence. Known credentials
+  and sessions are masked, not arbitrary sensitive content; inspect evidence before sharing.
+- Storage-state or login capture requires an app-specific `authenticatedSelector` in the ignored
+  navigation config. Verify the signed-in marker is visible after navigation settles, before
+  capture; route-only checks can mistake same-URL MFA/SSO gates for login. Never use password-input
+  presence/absence as auth proof: password forms can be legitimate after login. Page-changing
+  navigation must declare the final destination with an existing `waitForURL` step.
 - Read only the files needed to understand the routes, flows, and components under review.
 
 ## The bounded loop
@@ -180,4 +193,4 @@ return to `In Progress`.
 Do not edit `docs/BOARD.md` — the orchestrator owns the board and creates the rows from your
 findings.
 
-Never push. Never merge into `main`. Never create a pull request.
+Never push, merge into any branch, or create a pull request.

@@ -21,7 +21,7 @@ it does not impose it.
     │   ├── repos.json         # repo id → path map
     │   ├── scopes/<id>.md     # canonical scope rules
     │   ├── skills/            # skills and their scripts
-    │   └── worktrees/         # one worktree per board row (git-ignored)
+    │   └── worktrees/         # original repo-specific change workspace sets (git-ignored)
     ├── apps/                  # one folder per application or microservice
     ├── artifacts/             # UI evidence, under artifacts/<scope>/qa/<date>/<task-id>/
     └── docs/
@@ -48,6 +48,12 @@ it does not impose it.
 |---|---|
 
 ## Rules
+
+- Seven specialists: frontend-dev, backend-dev, mobile-dev, qa-reviewer, ui-critic, docs-writer,
+  merge-conflict-resolver. Assign actual repos/paths; specializations are not fixed folder bans.
+- Required mode is default; optional permits assigned nonprotected current checkout edits/commits.
+  Reuse original paths across all lanes/findings; new workspaces need an explicit request or the
+  next approved task after the previous change merged. Never create an empty one after merge.
 
 - The map in `.kilo/repos.json` is the only way into a repository. Never address one by path.
 - One application per folder under `apps/`. Never a folder inside another application.

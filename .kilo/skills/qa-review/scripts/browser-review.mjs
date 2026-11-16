@@ -26,9 +26,9 @@
  * Exit codes: 0 capture completed, 2 fatal error.
  */
 import {createRequire} from 'node:module';
-import {resolve, join, dirname} from 'node:path';
+import {resolve, join, dirname, relative, isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {writeFile, mkdir, readdir, readFile} from 'node:fs/promises';
+import {writeFile, mkdir, readdir, readFile, realpath, lstat} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 
@@ -64,6 +64,13 @@ function usage() {
     '  --component    CSS selector whose matched elements are captured as crops. Repeatable.',
     '  --compare      Directory holding a previous capture; writes a before | after sheet.',
     '  --chromium     Path to a chromium binary. Overrides $PLAYWRIGHT_CHROMIUM_PATH.',
+    '  --storage-state Ignored local Playwright state JSON (read only; never saved).',
+    '  --navigation   Ignored local JSON: approved:true, login:[], steps:[].',
+    '                 Actions: goto/path, fill/selector/env, click/selector/intent,',
+    '                 waitForURL/path, waitForSelector/selector. No literal fill values.',
+    '                 Login requires authenticatedPath. State/login require authenticatedSelector.',
+    '                 Steps run after each target goto; page changes require waitForURL.',
+    '  --allow-destructive Explicit authorization for steps with intent:destructive.',
     '  --help         Show this message and exit.',
   ].join('\n');
 }
@@ -73,8 +80,10 @@ function abort(message) {
   process.exit(2);
 }
 
+class ReviewError extends Error {}
+
 function fail(message) {
-  abort('browser-review: ' + message);
+  throw new ReviewError('browser-review: ' + message);
 }
 
 function today() {
@@ -111,7 +120,7 @@ function taskDirectory(options) {
   return join(mainCheckoutRoot(), 'artifacts', options.scope, 'qa', options.date, options.taskId);
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const options = {
     routes: [],
     viewports: DEFAULT_VIEWPORTS,
@@ -127,7 +136,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     const next = () => {
       const value = argv[i + 1];
-      if (value === undefined) fail('missing value for ' + arg);
+      if (value === undefined) fail('missing option value');
       i += 1;
       return value;
     };
@@ -176,8 +185,17 @@ function parseArgs(argv) {
       case '--chromium':
         options.chromium = next();
         break;
+      case '--storage-state':
+        options.storageState = next();
+        break;
+      case '--navigation':
+        options.navigation = next();
+        break;
+      case '--allow-destructive':
+        options.allowDestructive = true;
+        break;
       default:
-        fail('unknown argument: ' + arg);
+        fail('unknown argument (literal credentials are not accepted)');
     }
   }
   if (!options.baseUrl) fail('--base-url is required');
@@ -188,14 +206,11 @@ function parseArgs(argv) {
   if (!['light', 'dark', 'both'].includes(options.scheme)) {
     fail('--scheme must be light, dark, or both');
   }
-  try {
-    new URL(options.baseUrl);
-  } catch {
-    fail('--base-url is not a valid URL: ' + options.baseUrl);
-  }
+  safeUrl(options.baseUrl);
+  for (const route of options.routes) safeUrl(joinUrl(options.baseUrl, route));
   const viewports = options.viewports.split(',').map(part => part.trim()).filter(Boolean).map(part => {
     const match = /^(\d+)x(\d+)$/.exec(part);
-    if (!match) fail('invalid viewport: ' + part + ' (expected WIDTHxHEIGHT)');
+    if (!match) fail('invalid viewport (expected WIDTHxHEIGHT)');
     return {width: Number(match[1]), height: Number(match[2]), name: part};
   });
   if (!viewports.length) fail('--viewports produced no usable entries');
@@ -212,6 +227,127 @@ function joinUrl(baseUrl, route) {
   const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
   const path = route.startsWith('/') ? route : '/' + route;
   return base + path;
+}
+
+const ACCESS_REQUEST = 'Ask the user for authorized test access via named environment variables or an ignored local Playwright storage-state file. For MFA/SSO, ask the user to log in manually and supply that state; never bypass authentication.';
+
+export function safeUrl(value, baseUrl) {
+  let url;
+  try { url = new URL(value, baseUrl); } catch { fail('invalid navigation URL'); }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash ||
+      (baseUrl && url.origin !== new URL(baseUrl).origin)) {
+    fail('navigation URLs must be HTTP(S), same-origin, and contain no credentials, query or fragment');
+  }
+  return url.href;
+}
+
+export function validateNavigation(config, baseUrl, allowDestructive = false, usesStorageState = false) {
+  if (!config || typeof config !== 'object' || Array.isArray(config) || config.approved !== true ||
+      Object.keys(config).some(key => !['approved', 'login', 'steps', 'authenticatedPath', 'authenticatedSelector'].includes(key))) {
+    fail('navigation JSON requires approved:true and only login, steps, authenticatedPath, authenticatedSelector');
+  }
+  for (const [phase, steps] of [['login', config.login || []], ['steps', config.steps || []]]) {
+    if (!Array.isArray(steps) || steps.length > 50) fail('navigation steps must be an array of at most 50 actions');
+    for (const step of steps) {
+      const fields = {
+        goto: ['action', 'path'], fill: ['action', 'selector', 'env'],
+        click: ['action', 'selector', 'intent'], waitForURL: ['action', 'path'],
+        waitForSelector: ['action', 'selector'],
+      };
+      const allowed = step && fields[step.action];
+      if (!allowed || Object.keys(step).some(key => !allowed.includes(key)) ||
+          allowed.some(key => typeof step[key] !== 'string' || !step[key])) {
+        fail('invalid navigation action; literal values and executable code are forbidden');
+      }
+      if (step.path) safeUrl(step.path, baseUrl);
+      if (step.env && !/^[A-Za-z_][A-Za-z0-9_]*$/.test(step.env)) fail('fill requires an environment variable name');
+      if (step.intent && (!['navigation', 'login', 'destructive'].includes(step.intent) ||
+          (step.intent === 'login' && phase !== 'login') ||
+          (step.intent === 'destructive' && !allowDestructive))) {
+        fail('click requires reviewed navigation/login intent or explicit --allow-destructive authorization');
+      }
+    }
+  }
+  if (config.login?.length && !config.authenticatedPath) fail('login requires authenticatedPath');
+  if ((usesStorageState || config.login?.length || config.authenticatedSelector !== undefined) &&
+      (typeof config.authenticatedSelector !== 'string' || !config.authenticatedSelector.trim())) {
+    fail('authenticated review requires an app-specific authenticatedSelector in --navigation. ' + ACCESS_REQUEST);
+  }
+  if (config.authenticatedPath) safeUrl(config.authenticatedPath, baseUrl);
+  return config;
+}
+
+export async function localJson(path, projectDir, state = false) {
+  try {
+    const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: projectDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    const absolute = resolve(projectDir, path);
+    const canonical = await realpath(absolute);
+    const rel = relative(root, canonical);
+    if (rel.startsWith('..') || isAbsolute(rel) || canonical !== absolute || !(await lstat(absolute)).isFile()) {
+      fail('local authentication files must be regular, non-symlink files inside the project repository');
+    }
+    const tracked = execFileSync('git', ['ls-files', '--', rel], {
+      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    if (tracked.trim()) fail('local authentication files must not be tracked');
+    execFileSync('git', ['check-ignore', '-q', '--', rel], {cwd: root, stdio: 'ignore'});
+    const data = JSON.parse(await readFile(absolute, 'utf8'));
+    if (state && (!data || !Array.isArray(data.cookies) || !Array.isArray(data.origins))) {
+      fail('invalid Playwright storage state');
+    }
+    return data;
+  } catch {
+    fail('cannot use local authentication JSON: require an existing, ignored, untracked regular file inside --project. ' + ACCESS_REQUEST);
+  }
+}
+
+export async function runSteps(page, steps, baseUrl, env) {
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index];
+    try {
+      if (step.action !== 'goto') safeUrl(page.url(), baseUrl);
+      if (step.action === 'goto') await page.goto(safeUrl(step.path, baseUrl), {waitUntil: 'load'});
+      if (step.action === 'fill') {
+        const value = env[step.env];
+        if (!value) fail('missing login environment variable. ' + ACCESS_REQUEST);
+        await page.locator(step.selector).fill(value);
+      }
+      if (step.action === 'click') await page.locator(step.selector).click();
+      if (step.action === 'waitForURL') await page.waitForURL(safeUrl(step.path, baseUrl), {waitUntil: 'load'});
+      if (step.action === 'waitForSelector') await page.locator(step.selector).waitFor({state: 'visible'});
+      safeUrl(page.url(), baseUrl);
+    } catch {
+      fail('approved navigation step ' + (index + 1) + ' failed (details withheld). ' + ACCESS_REQUEST);
+    }
+  }
+}
+
+async function proveAuthentication(page, config) {
+  if (!config.authenticatedSelector) return;
+  try {
+    await page.waitForLoadState('load');
+    await page.locator(config.authenticatedSelector).waitFor({state: 'visible', timeout: 15000});
+  } catch {
+    fail('signed-in marker was not visible; protected interaction and capture withheld. ' + ACCESS_REQUEST);
+  }
+}
+
+export function stateSecrets(state) {
+  return [...(state.cookies || []).map(cookie => cookie.value),
+    ...(state.origins || []).flatMap(origin => (origin.localStorage || []).map(item => item.value))]
+    .filter(value => typeof value === 'string' && value.length);
+}
+
+export function redact(text, secrets = []) {
+  let result = String(text);
+  for (const secret of secrets.filter(Boolean).sort((a, b) => b.length - a.length)) {
+    result = result.split(secret).join('[REDACTED]').split(encodeURIComponent(secret)).join('[REDACTED]');
+  }
+  return result.replace(/https?:\/\/[^\s"'<>]+/gi, value => {
+    try { return new URL(value).origin; } catch { return '[URL withheld]'; }
+  }).replace(/\b(authorization|cookie|set-cookie|password|token|secret)\b[^\n]*/gi, '[sensitive details withheld]');
 }
 
 function schemeList(scheme) {
@@ -377,7 +513,7 @@ function launchFailureMessage(resolution, error) {
     'browser-review: the chromium binary was found but failed to start.',
     '',
     'Browser: ' + resolution.path,
-    'Error: ' + String(error && error.message ? error.message : error),
+    'Error: browser launch failed (details withheld to protect credentials).',
     '',
     'This script does not install a browser and does not fall back to another driver.',
     'Ask the user to point at a working binary, then re-run:',
@@ -404,21 +540,24 @@ function boxesExpression(selectors) {
     '})()';
 }
 
-class PlaywrightPage {
-  constructor(context, page) {
+export class PlaywrightPage {
+  constructor(context, page, secrets = []) {
     this.context = context;
     this.page = page;
+    this.secrets = secrets;
     this.consoleErrors = [];
     this.pageErrors = [];
     this.networkFailures = [];
+    this.accessDenied = false;
     page.on('console', message => {
-      if (message.type() === 'error') this.consoleErrors.push(message.text());
+      if (message.type() === 'error') this.consoleErrors.push('Console error (text withheld to protect private payloads)');
     });
-    page.on('pageerror', error => this.pageErrors.push(String(error.stack || error)));
+    page.on('pageerror', () => this.pageErrors.push('Page error (details withheld to protect private payloads)'));
     page.on('response', response => {
+      if ([401, 403].includes(response.status())) this.accessDenied = true;
       if (response.status() >= 400) {
         this.networkFailures.push({
-          url: response.url(),
+          url: redact(response.url(), this.secrets),
           status: response.status(),
           method: response.request().method(),
         });
@@ -426,28 +565,31 @@ class PlaywrightPage {
     });
     page.on('requestfailed', request => {
       this.networkFailures.push({
-        url: request.url(),
+        url: redact(request.url(), this.secrets),
         status: null,
         method: request.method(),
-        error: request.failure() ? request.failure().errorText : 'request failed',
+        error: 'request failed (details withheld)',
       });
     });
   }
 
   async setup() {
-    return undefined;
+    this.consoleErrors = [];
+    this.pageErrors = [];
+    this.networkFailures = [];
+    this.accessDenied = false;
   }
 
   async goto(url) {
     try {
-      await this.page.goto(url, {waitUntil: 'networkidle', timeout: 30000});
-      return {ok: true, waitUntil: 'networkidle'};
+      const response = await this.page.goto(url, {waitUntil: 'networkidle', timeout: 30000});
+      return {ok: ![401, 403].includes(response?.status()), waitUntil: 'networkidle'};
     } catch (error) {
       try {
-        await this.page.goto(url, {waitUntil: 'load', timeout: 30000});
-        return {ok: true, waitUntil: 'load', note: 'networkidle timed out, fell back to load'};
+        const response = await this.page.goto(url, {waitUntil: 'load', timeout: 30000});
+        return {ok: ![401, 403].includes(response?.status()), waitUntil: 'load', note: 'networkidle timed out, fell back to load'};
       } catch (fallbackError) {
-        return {ok: false, waitUntil: 'load', error: String(fallbackError.message || fallbackError)};
+        return {ok: false, waitUntil: 'load', error: 'navigation failed (details withheld)'};
       }
     }
   }
@@ -457,17 +599,25 @@ class PlaywrightPage {
   }
 
   async screenshotFull() {
-    return this.page.screenshot({fullPage: true});
+    return this.page.screenshot({fullPage: true, mask: this.masks()});
+  }
+
+  masks() {
+    const masks = [this.page.locator('input, textarea, [contenteditable], [data-qa-sensitive]')];
+    for (const secret of this.secrets) masks.push(this.page.getByText(secret, {exact: false}));
+    return masks;
   }
 
   async screenshotClip(box) {
     try {
       return await this.page.screenshot({
         fullPage: true,
+        mask: this.masks(),
         clip: {x: box.x, y: box.y, width: box.width, height: box.height},
       });
     } catch {
       return this.page.screenshot({
+        mask: this.masks(),
         clip: {x: box.x, y: box.y, width: box.width, height: box.height},
       });
     }
@@ -478,7 +628,7 @@ class PlaywrightPage {
   }
 
   async close() {
-    await this.context.close();
+    await this.page.close();
   }
 }
 
@@ -550,7 +700,7 @@ function renderNotes(options, summary) {
   const lines = [];
   lines.push('# QA capture — ' + options.taskId);
   lines.push('');
-  lines.push('- Command: `' + process.argv.join(' ') + '`');
+  lines.push('- Command: `browser-review.mjs` (arguments omitted to protect local access configuration)');
   lines.push('- Scope: ' + options.scope);
   lines.push('- Task: ' + options.taskId);
   lines.push('- Date: ' + options.date);
@@ -571,7 +721,7 @@ function renderNotes(options, summary) {
   return lines.join('\n') + '\n';
 }
 
-async function captureEntry(session, options, route, viewport, scheme, allSchemes) {
+export async function captureEntry(session, options, route, viewport, scheme, allSchemes) {
   const url = joinUrl(options.baseUrl, route);
   const dir = join(options.artifactRoot, routeSlug(route), viewport.name, scheme);
   await mkdir(dir, {recursive: true});
@@ -604,7 +754,19 @@ async function captureEntry(session, options, route, viewport, scheme, allScheme
     await session.setup(viewport, scheme);
     const navigation = await session.goto(url);
     entry.navigation = navigation;
+    if (!navigation.ok) fail('target navigation failed. ' + ACCESS_REQUEST);
+    await proveAuthentication(session.page, options.navigationConfig);
+    await runSteps(session.page, options.navigationConfig.steps || [], options.baseUrl, options.loginEnv);
+    const finalStep = [...(options.navigationConfig.steps || [])].reverse().find(step => step.action === 'waitForURL');
+    const expectedUrl = finalStep ? safeUrl(finalStep.path, options.baseUrl) : safeUrl(url);
     await new Promise(resolveWait => setTimeout(resolveWait, 750));
+    await proveAuthentication(session.page, options.navigationConfig);
+    if (safeUrl(session.page.url(), options.baseUrl) !== expectedUrl) {
+      fail('final navigation URL did not match; declare page changes with waitForURL. ' + ACCESS_REQUEST);
+    }
+    if (session.accessDenied) fail('an authenticated request was denied; capture withheld. ' + ACCESS_REQUEST);
+    session.secrets = [...new Set([...session.secrets, ...stateSecrets(await session.context.storageState()),
+      ...await session.page.evaluate(() => Object.values(sessionStorage))])];
 
     const overflow = await session.evaluate(OVERFLOW_EXPRESSION);
     entry.horizontal_overflow = typeof overflow === 'boolean' ? overflow : null;
@@ -643,7 +805,7 @@ async function captureEntry(session, options, route, viewport, scheme, allScheme
     await writeFile(join(dir, 'page-errors.log'), logs.pageErrors.join('\n') + (logs.pageErrors.length ? '\n' : ''));
     await writeFile(join(dir, 'network.json'), JSON.stringify(logs.networkFailures, null, 2));
   } catch (error) {
-    entry.error = String(error.message || error);
+    entry.error = error instanceof ReviewError ? error.message + ' ' + ACCESS_REQUEST : 'capture failed (details withheld)';
     await writeFile(join(dir, 'console.log'), '').catch(() => {});
     await writeFile(join(dir, 'page-errors.log'), '').catch(() => {});
     await writeFile(join(dir, 'network.json'), '[]').catch(() => {});
@@ -653,6 +815,17 @@ async function captureEntry(session, options, route, viewport, scheme, allScheme
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  options.navigationConfig = validateNavigation(options.navigation
+    ? await localJson(options.navigation, resolve(options.project)) : {approved: true, steps: [], login: []},
+  options.baseUrl, options.allowDestructive, Boolean(options.storageState));
+  const storageState = options.storageState ? await localJson(options.storageState, resolve(options.project), true) : undefined;
+  options.loginEnv = {};
+  for (const step of [...(options.navigationConfig.login || []), ...(options.navigationConfig.steps || [])]) {
+    if (step.env) {
+      if (!process.env[step.env]) fail('missing environment variable ' + step.env + '. ' + ACCESS_REQUEST);
+      options.loginEnv[step.env] = process.env[step.env];
+    }
+  }
   const playwright = await loadPlaywright(options.project);
   const allSchemes = options.scheme === 'both';
   const schemes = schemeList(options.scheme);
@@ -699,18 +872,28 @@ async function main() {
   }
 
   try {
+    const context = await browser.handle.newContext({
+      viewport: {width: options.viewports[0].width, height: options.viewports[0].height},
+      locale: 'en-US', timezoneId: 'UTC', colorScheme: schemes[0], storageState,
+    });
+    const page = await context.newPage();
+    page.setDefaultTimeout(15000);
+    if (options.navigationConfig.login?.length) {
+      await runSteps(page, options.navigationConfig.login, options.baseUrl, options.loginEnv);
+      try {
+        await page.waitForURL(safeUrl(options.navigationConfig.authenticatedPath, options.baseUrl), {timeout: 30000, waitUntil: 'load'});
+      } catch {
+        fail('authenticated route was not reached. ' + ACCESS_REQUEST);
+      }
+      await proveAuthentication(page, options.navigationConfig);
+    }
+    const secrets = [...Object.values(options.loginEnv), ...stateSecrets(await context.storageState())];
+    const session = new PlaywrightPage(context, page, secrets);
     for (const route of options.routes) {
       for (const viewport of options.viewports) {
         for (const scheme of schemes) {
-          const context = await browser.handle.newContext({
-            viewport: {width: viewport.width, height: viewport.height},
-            locale: 'en-US',
-            timezoneId: 'UTC',
-            colorScheme: scheme,
-          });
-          const page = await context.newPage();
-          page.setDefaultTimeout(15000);
-          const session = new PlaywrightPage(context, page);
+          await page.setViewportSize({width: viewport.width, height: viewport.height});
+          await page.emulateMedia({colorScheme: scheme});
 
           const entry = await captureEntry(session, options, route, viewport, scheme, allSchemes);
           summary.results.push(entry);
@@ -730,15 +913,16 @@ async function main() {
                 );
                 entry.compare = sheetPath;
               } catch (error) {
-                entry.compare_error = String(error.message || error);
+                entry.compare_error = 'comparison failed (details withheld)';
               }
             }
           }
 
-          await session.close();
         }
       }
     }
+    await session.close();
+    await context.close();
   } finally {
     await browser.handle.close().catch(() => {});
   }
@@ -747,8 +931,11 @@ async function main() {
   await writeFile(join(options.taskDir, 'summary.json'), JSON.stringify(summary, null, 2));
   await writeFile(join(options.taskDir, 'notes.md'), renderNotes(options, summary));
   process.stdout.write(JSON.stringify(summary) + '\n');
+  if (summary.results.some(entry => entry.error)) process.exitCode = 2;
 }
 
-main().catch(error => {
-  fail(String(error && error.stack ? error.stack : error));
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch(error => {
+    abort(error instanceof ReviewError ? error.message : 'browser-review: operation failed (details withheld to protect credentials)');
+  });
+}

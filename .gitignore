@@ -12,6 +12,7 @@ artifacts/**/*.log
 artifacts/**/network.json
 
 # Local scratch
+.kilo/qa-local/
 .tmp/
 **/__pycache__/
 *.pyc

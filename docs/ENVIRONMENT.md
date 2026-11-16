@@ -11,6 +11,8 @@ The user populates real secrets.
 | `OPENROUTER_API_KEY` | the agent's model provider | no | — | Value lives in the host environment and is passed through `remoteEnv`. |
 | `DEEPSEEK_API_KEY` | the agent's model provider | no | — | Value lives in the host environment and is passed through `remoteEnv`. |
 | `CARGO_BUILD_JOBS` | Rust builds | no | `2` | Passed through `remoteEnv` from `FACTORY_CARGO_JOBS`. |
+| `QA_TEST_EMAIL` | approved QA navigation `fill.env` example | no | none | User supplies authorized test access outside CLI/evidence/commits. |
+| `QA_TEST_PASSWORD` | approved QA navigation `fill.env` example | no | none | Name only; never read or print the value. MFA/SSO is manual user login. |
 
 ## Config keys
 
@@ -19,11 +21,13 @@ The user populates real secrets.
 | `/home/node/.kilo-redact.sh` | the whole dev container | The startup file. It scrubs credentials from command output and refuses `bash -c` commands that name a protected file. Installed by `postCreateCommand` from `.devcontainer/kilo-redact.sh`. |
 | `/home/node/.git-credentials` | the whole dev container | The git credential store, mode `600`. Never commit it and never read it into a transcript. |
 | `/home/node/.gitconfig` | the whole dev container | Holds `credential.helper`, `user.*` and `safe.directory`. It must not hold a `url.*.insteadOf` rewrite that embeds a credential. |
+| `mode` | control repo common Git directory `kilo-workspace.json` | Project-local `required` (default) or `optional`; regenerate permissions and restart Kilo after changing. |
+| `approved`, `login`, `authenticatedPath`, `authenticatedSelector`, `steps` | ignored local QA navigation JSON | Storage-state or login requires an app-specific visible signed-in marker checked after navigation settles; page-changing navigation declares final destination via waitForURL. No password-input heuristic. Never commit credential/session JSON. |
 
 ## Rules
 
 - Builders may create or update `.env.example` files.
-- Builders may create `.env` files only with empty values or dummy placeholders.
+- Builders do not edit real `.env` files; use `.env.example` placeholders only.
 - Real secrets are never generated, requested, stored, or committed by an agent.
 - Stack, commands, and ports belong in `docs/STACK.md`, not here.
 - A credential never goes in a URL, a command line, a config value that a command prints, or a

@@ -13,8 +13,21 @@ reference galleries, §2 the 15 rules, §3 the component factory gate.
 
 ## Scope
 
-- Read-only against the code. The only files you write are the review report and, if needed,
-  extra screenshots.
+- Application source is read-only. Write review reports/evidence and perform approved auth and
+  navigation using the capture script; authorized interactions are not source edits.
+- Read assigned local `AGENTS.md` and explicitly permitted shared governance/contracts, including
+  parent paths when needed. Reuse the original repo-specific workspace set, never a review worktree.
+  Optional mode permits the assigned nonprotected checkout, not broader scope or secret access.
+- Use `browser-review.mjs --storage-state <ignored-local.json>` and/or `--navigation
+  <ignored-local.json>` per the QA skill for authenticated routes. Ask for test access if absent;
+  MFA/SSO is manual user login, never bypassed. Destructive actions require explicit user approval
+  and `--allow-destructive`. No secret literals in CLI/commits/evidence. Known credentials/session
+  values are masked, not arbitrary sensitive content; inspect evidence before sharing.
+- Storage-state or login capture requires an app-specific `authenticatedSelector` in the ignored
+  navigation config. Verify the signed-in marker is visible after navigation settles, before
+  capture; route-only checks can mistake same-URL MFA/SSO gates for login. Never use password-input
+  presence/absence as auth proof: password forms can be legitimate after login. Page-changing
+  navigation must declare the final destination with an existing `waitForURL` step.
 - Do not modify application source code, and do not edit `docs/BOARD.md`.
 
 ## The bounded loop
@@ -191,4 +204,4 @@ The verdict, the findings list with severity, the screenshot paths, and the sing
 change. Say plainly which findings should become board rows of type `Fix`. Do not edit
 `docs/BOARD.md` — the orchestrator owns the board and creates the rows from your findings.
 
-Never push. Never merge into `main`. Never create a pull request.
+Never push, merge into any branch, or create a pull request.

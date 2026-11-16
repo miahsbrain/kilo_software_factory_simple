@@ -1,18 +1,31 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** 2026-11-04 — the live board viewer became a vertical accordion: collapsible
->   lanes, compact cards that expand to their detail, the last 10 merged rows with a "Show all"
->   control, and folds kept in the browser. BOARD-102, branch
->   `feat/compact-accordion-redesign-of-the-live`.
-> - **In flight:** that branch waits for the user to merge it. The board file and the JSON
->   endpoints are unchanged; the viewer still writes nothing.
-> - **Next action:** the user reviews and merges the branch. The earlier factory/project split
->   (2026-11-02) also still waits for a merge.
-> - **Before:** 2026-11-02 — split the factory from the project. The factory repository now
->   holds only the harness; the Inhouz Cloud AI platform moved to its own git repository at
->   `project/`, with its own board, documentation set and 75 microservice repositories under
->   `project/apps/`. ADR-053, ADR-054 and ADR-055 record the split.
+> - **2026-11-16:** BOARD-103 and its fixes BOARD-104 through BOARD-112 share
+>   `.kilo/worktrees/configurable-shared-workspace-lifecycle-and-authenticated`, branch
+>   `feat/configurable-shared-workspace-lifecycle-and-authenticated`. Includes CLI lifecycle,
+>   assigned scopes, authenticated review and `merge-conflict-resolver`; no product changes.
+> - **Verification:** BOARD-107 follow-up passed 33 lifecycle tests in the builder run and in an
+>   independent run (14.190s, exit 0, nonzero discovery). Independent current-source review found
+>   no blocking defect; the orchestrator inspected the baseline diff. Auth remains independently
+>   verified at 19 tests with local login/navigation evidence; its source is unchanged.
+> - **Final lifecycle corrections:** directory-changing shell routing is rejected, and newly
+>   created checkout maps are initialized from saved project mode. The authorized follow-up fixes
+>   inherited-map order validation at `.kilo/skills/git-worktree/scripts/worktree.py:642` by reusing
+>   guard's extracted ordered-items comparison. The capped parent review history is preserved;
+>   BOARD-107 follow-up is verified. The parent review history was not reset or reopened.
+> - **Template hold resolved:** after the user's permission changes and latest reload, the approved
+>   `templates/project/docs/BOARD.md` edit succeeded. It now describes optional mode, the original
+>   shared workspace set, clean human merge/cleanup, partial outcomes and explicit discard.
+>   Final changes are documentation only; existing lifecycle/auth source and evidence are unchanged.
+> - **Handoff:** BOARD-103 through BOARD-112 share one final documentation commit and clean-source
+>   handoff for human review/merge. The approved temporary policy edits were restored in both
+>   checkouts. Restoring main `kilo.jsonc` was tool-denied; the human may restore its temporary
+>   live-board `ask` values before reloading. The main tracked diff is live-board metadata. Generate
+>   `worktree.py handoff --board BOARD-103` using the feature script until it is merged.
+>   No actual mode change, merge or discard has run. Live-board prose still retains old guidance;
+>   root rules and lifecycle CLI are authoritative, with script-managed row metadata current.
+> - **Previous work:** BOARD-101 and BOARD-102 are Merged on the live factory board.
 
 ## 1. Overview
 
@@ -20,12 +33,12 @@
   builder and reviewer agents, and a loop that carries every task from decision to merged branch.
   There is no application runtime here.
 - **Who uses it:** one human owner and the Kilo Code agents that act for them. The owner approves
-  decisions and merges branches; the agents build and review inside worktrees.
+  decisions and merges branches; agents build and review in the assigned workspace set.
 - **Tech stack:** Markdown rules plus the Kilo Code agent and command system (`.kilo/agent/`,
   `.kilo/command/`) running on git worktrees. Python 3.9+ standard library for the scripts.
   Details in `docs/STACK.md`.
 - **How to use it:** open the factory in Kilo Code. Read `AGENTS.md` at the root. Run `/board` to
-  see the live board, `/decide` to approve a decision, `/run` to build a row in a worktree, `/ui`
+  see the live board, `/decide` to approve a decision, `/run` to build in the assigned workspace, `/ui`
   for the QA lane, `/closeout` to refresh docs, `/handover` to refresh the application memory map.
 
 ## 2. Directory map
@@ -34,13 +47,13 @@
 |---|---|
 | `AGENTS.md` | Root rules for the architect, orchestrator, and every builder (Part A, Part B). |
 | `README.md` | The front page: what the factory is, how to point it at a project, quick start. |
-| `.kilo/agent/` | The six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
+| `.kilo/agent/` | Seven specialists: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`, `merge-conflict-resolver`. |
 | `.kilo/command/` | The eight slash commands: `decide`, `board`, `board-view`, `run`, `components`, `ui`, `handover`, `closeout`. |
 | `.kilo/policies/` | The canonical guard-rail policy: `git-policy.json`. |
 | `.kilo/repos.json` | The repo map of this repository. The only way into a repository. |
-| `.kilo/scopes/` | The canonical scope rules, one file per scope. `guard.py sync` writes them into a project's app repositories as their `AGENTS.md`. |
+| `.kilo/scopes/` | Canonical specialization rules; generated ignored pointers expose them to assigned work surfaces. |
 | `.kilo/skills/` | The three skills with their scripts: `board`, `git-worktree`, `qa-review`. |
-| `.kilo/worktrees/` | Agent worktrees, one per task. Git-ignored. |
+| `.kilo/worktrees/` | Original repo-specific workspace set reused by all lanes and finding rows. Git-ignored. Optional mode also permits assigned nonprotected current checkouts. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, the redaction script. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
 | `.kilo/scopes/service.md` | The default scope rules for a work surface with no scope file of its own. A work surface carries a pointer to this file, never a copy of it. |
@@ -55,10 +68,11 @@
 | `.kilo/command/*.md` | Slash commands that package the workflow. |
 | `.kilo/skills/board/scripts/board.py` | The board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`. |
 | `.kilo/skills/board/scripts/board_serve.py` | The read-only board viewer on port 15180. Vertical accordion of collapsible lanes, compact cards that expand to their detail, folds remembered in the browser. |
-| `.kilo/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. |
+| `.kilo/skills/git-worktree/scripts/worktree.py` | Creates/reuses workspaces; `mode required\|optional\|status`, `handoff`, `merge`, `discard`, `list`, `verify`, `cleanup`. Merge/discard/cleanup preview by default; applying them is a human CLI operation. |
 | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.kilo/skills/git-worktree/scripts/scope.py` | The generated pointer a work surface carries, and the local exclude rule that keeps it out of every commit. |
-| `.kilo/skills/qa-review/scripts/browser-review.mjs` | The only UI evidence capture path. Drives Playwright. |
+| `.kilo/skills/qa-review/scripts/browser-review.mjs` | The only UI capture path. Supports ignored local storage state/approved navigation; destructive actions require explicit approval. |
+| `.kilo/agent/merge-conflict-resolver.md:1` | Specialist for existing conflicted merges; assigned edits/checks only, no commit/merge/abort/reset/rebase/push/discard. |
 | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a QA finding and prints its fingerprint. |
 | `.kilo/skills/qa-review/scripts/ledger.py` | Opens, closes and reports the QA↔fix rounds of a row. |
 
@@ -74,6 +88,114 @@
 | `ledger.py` | `.kilo/skills/qa-review/scripts/ledger.py` | The round ledger of a row. | effectful (file I/O) |
 | `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs` | Captures screenshots, console, page errors and network for a route. | effectful (browser, filesystem) |
 
+### Lifecycle tooling inventory (2026-11-16)
+
+`.kilo/skills/git-worktree/scripts/guard.py:758` exposes pure
+`permission_maps_match(current, expected)`, extracted from the existing `cmd_check_policy()`
+ordered-items comparison. It checks tool-key membership and each nested rule's insertion order;
+both `cmd_check_policy()` and `cmd_create()` use it with the existing generated permission map.
+Reordered inherited maps fail closed without rewriting them: the new checkout/branch and journaled
+initialization error survive, and the board stays unchanged. The two new lifecycle test methods
+cover reordered `edit`, `bash` and `read` rules and ordered inherited app maps in both modes,
+with no app-local config. All test mutations are confined to disposable standard-temp fixtures.
+
+In `.kilo/skills/git-worktree/scripts/worktree.py`, `checked_git()` fails closed on command
+errors; `confined()` rejects path escapes and symlink components; `local_state()` atomically
+reads/writes `.git/kilo-workspace.json` in the control repository's common Git directory.
+`workspace_mode()` reads that project-local mode and `cmd_mode()` regenerates canonical,
+linked and existing mapped/inherited configurations from the control policy through the
+existing guard generator. It preflights every effective map, restores prior map contents on
+write failure, and saves mode only after the maps are written. Missing/malformed effective
+configuration or an external `KILO_CONFIG` override is refused. These functions are effectful.
+
+`load_guard_policy(root)` at `.kilo/skills/git-worktree/scripts/worktree.py:122` extracts the
+existing mode policy loader for reuse by creation; it validates the control policy (effectful).
+`cmd_create()` at `.kilo/skills/git-worktree/scripts/worktree.py:519` uses the existing generator
+to initialize only the new checkout's local `kilo.jsonc` from saved project mode before success.
+Inherited maps must already match; base/canonical configs remain unchanged. App checkouts
+without a local config retain inheritance and generated scope pointers, not a copied harness.
+Invalid initialization preserves the created branch/worktree, records the error locally,
+reports incomplete creation, and leaves the board unchanged for human recovery.
+The authorized follow-up resolves the former inherited-map order blocker by calling
+`permission_maps_match(current, expected)` at `.kilo/skills/git-worktree/scripts/worktree.py:642`.
+Independent proof: 33 tests passed, including six reordered-rule cases and two ordered success
+cases at `.kilo/skills/git-worktree/scripts/test_lifecycle.py:246-300`. The template hold is resolved.
+
+`lifecycle_selection()` resolves board rows and mapped repo IDs; `validate_workspace()`
+checks registered linked workspaces, branches, confinement and locks; `require_clean()` allows
+only `docs/BOARD.md` dirt in the control checkout. `related_rows()` and
+`update_lifecycle_board()` use the existing board parser/writer, never manual table replacement.
+`cmd_lifecycle()` sequences preflight, merge/discard, cleanup and journal updates.
+`require_committed_merge()` checks named-target ancestry, cleanliness and absence of
+`MERGE_HEAD` before cleanup. These functions are effectful. Board association uses branch
+and recorded board identities, and terminal historical rows do not adopt reused-path outcomes.
+`cmd_verify()` uses the saved original base unless `--base` overrides it.
+
+The guard's `generated_permission(policy, mode="required")` is pure;
+`write_permission_map()` supports non-writing preview and atomic file replacement.
+`git_commands()` resolves separated, attached, empty and repeated relative `-C` arguments,
+refuses unsupported directory routing and missing values, and passes actual destinations
+to the effectful `context_verdict()`. Protected-branch commits remain denied in both modes.
+Directory-changing chains (`cd`, `pushd`, `popd`, wrapper/subshell routing and shell evaluation)
+are refused rather than interpreted; supported direct Git `-C` forms remain available.
+
+Human CLI examples, from the project root:
+
+```sh
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode status
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode optional
+python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-002 --reuse BOARD-001 --repo api
+python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board BOARD-001
+python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board BOARD-001 --board BOARD-002
+python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board BOARD-001 --apply
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board BOARD-001 --repo api
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board BOARD-001 --repo api --apply --discard
+```
+
+`--repo` can repeat and disambiguates identical slugs; omitted means all row repositories.
+`--target` overrides the saved base, otherwise each repository uses its own resolved base.
+Fix rows reuse their single parent's workspace automatically, or use explicit `--reuse`.
+Merge requires every related row to be review-ready and every selected source/target clean,
+with commits ahead of target. The target branch must already be checked out.
+
+Multi-repository merges are not atomic. A failure halts the batch and records the error and
+completed work locally; conflicted and unprocessed workspaces remain. Resolve a conflict in
+the affected target and have the human commit the existing merge before retrying. Recovery
+requires the exact saved source/target identity and merge parents; unrelated subsequent
+commits are refused. Interrupted post-merge cleanup can resume with the same command.
+Merge explicitly requests a commit and independently proves it before deleting anything.
+A row becomes Merged or Dropped only after all its entries have that outcome.
+No command untracks the board or board writer. A preview does not change the journal or board.
+
+### Authenticated Review And Assigned Scopes
+
+Agent specialization is not a fixed folder boundary. Prompts assign mapped repos/paths and permit
+local rules/shared governance reads explicitly. All lanes use the original paths; new reviewer
+sessions do not create new worktrees. Optional mode changes workspace requirements, not scope.
+
+The effectful `browser-review.mjs` entrypoint accepts `--storage-state <ignored-local.json>` and
+`--navigation <ignored-local.json>`. Navigation requires `approved:true`, uses `login`,
+`authenticatedPath`, `authenticatedSelector`, `steps`, and accepts goto/fill-from-env/click-with-intent/waitForURL/
+waitForSelector. Login or storage state requires a visible application-specific authenticated marker;
+page-changing navigation declares its final URL with waitForURL. See the QA skill for the exact schema.
+Login needs authenticatedPath; same-origin
+URLs forbid credentials/query/fragment. Only explicit user approval permits destructive actions
+with `--allow-destructive`. Ask for test access; MFA/SSO is manual user login, never bypassed.
+Known credentials/session values are masked, not arbitrary sensitive content. Inspect evidence
+before sharing; all viewport/count/accessibility checks remain. No new dependency or auth service.
+
+| Symbol | Source | Responsibility | Kind |
+|---|---|---|---|
+| `safeUrl`, `validateNavigation` | `.kilo/skills/qa-review/scripts/browser-review.mjs:234-279` | Validate same-origin paths, approved actions and explicit auth/final-route proof. | pure |
+| `stateSecrets`, `redact` | `.kilo/skills/qa-review/scripts/browser-review.mjs:337-351` | Extract session values for masking and redact known sensitive strings. | pure |
+| `localJson` | `.kilo/skills/qa-review/scripts/browser-review.mjs:280-304` | Load only confined ignored local state/navigation JSON. | effectful |
+| `runSteps`, `proveAuthentication` | `.kilo/skills/qa-review/scripts/browser-review.mjs:306-335` | Apply authorized browser actions and prove the visible ready marker. | effectful |
+| `PlaywrightPage`, `captureEntry` | `.kilo/skills/qa-review/scripts/browser-review.mjs:543`, `.kilo/skills/qa-review/scripts/browser-review.mjs:724` | Reuse the browser session and write sanitized per-viewport evidence. | effectful |
+
+Conflict resolution uses base/ours/theirs and both branch intents in the existing conflicted
+checkout, preserving unrelated changes. The specialist reports exact staged/unstaged files and
+smallest-check evidence. Human reviews/completes the merge, then reruns the lifecycle command.
+
 ## 5. Data
 
 | Artefact | Where | What it holds |
@@ -88,8 +210,8 @@
 
 The board's lanes are the state machine of the factory:
 `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merge` → `Merged`, plus `Blocked`
-and `Dropped`. A row may not reach `Pending Merge` while a `Fix` row it spawned is open, and the
-QA↔fix loop is capped at three rounds. Full rules in `AGENTS.md` §B4.
+and `Dropped`. Unresolved findings block handoff; verified shared parent/Fix rows may reach
+`Pending Merge` together. The QA↔fix loop is capped at three rounds. Full rules in `AGENTS.md` §B4.
 
 ## 7. Public interfaces
 
@@ -111,7 +233,39 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 
 ## 10. Testing
 
-No test suite. The verification of a change is the smallest relevant script run, recorded with
+Lifecycle stdlib regression tests use only disposable repositories in Python's default
+temporary directory:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -v
+```
+
+2026-11-16 final-correction result: 31 tests passed in 12.054s, exit 0, on one focused suite
+run. New regressions cover unsupported directory chains, both saved-mode/base-map directions,
+app inheritance/pointers and existing local maps, unchanged base configs, and failed creation
+preserving its partial workspace and board bytes. Prior coverage includes attached/repeated `-C`, no-commit merge options,
+uncommitted zero-exit merge refusal, human-completed conflict retry and unrelated-commit
+rejection, control/linked/app mode transitions, malformed maps and write rollback, historical
+board integrity, and saved-base verification. Printed injected cleanup/unfinished-merge
+failures are expected passing test cases. No actual mode or permission-map regeneration was
+performed on actual repositories in this correction; earlier permission regeneration belongs
+to the original chunk. That round's independent discovery reported `Ran 0 tests in 0.000s` and
+provided no pass. The subsequently authorized BOARD-107 follow-up supersedes that evidence:
+absolute-path discovery in the correct workspace ran 33 tests in 14.190s, `OK`, exit 0, and
+independent current-source review found no blocking issue. The final template alignment is
+documentation only; verification is limited to file review and `git diff --check` for that change.
+
+Authenticated capture regressions:
+
+```sh
+node --test .kilo/skills/qa-review/scripts/browser-review.test.mjs
+```
+
+2026-11-16: 19 tests passed, including the canonical capture script against a temporary local HTTP
+fixture. It proves one login, a protected password-settings page, shared cookies/session storage
+across two viewports, and PNG artifact creation. It does not prove external SSO/MFA or real accounts.
+
+The verification of other changes is the smallest relevant script run, recorded with
 its result and a `file:line` proof (AGENTS.md §B4 "Verification cost rule"). The dev container
 ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup file.
 
@@ -120,12 +274,24 @@ ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup fi
 - The factory has no remote, so the harness cannot be shared yet. The user decides where it goes.
 - A project copies the harness by hand, so a factory change does not reach the project
   automatically (ADR-054). The copy is deliberate: the project owns its copy from then on.
+- Multi-repo merge is non-atomic; preserve partial outcomes and rerun only after human conflict
+  completion/review. Discard is irreversible for uncommitted content and needs explicit loss approval.
+- Required-mode edit permissions may block resolution in a preexisting conflicted target outside
+  linked worktrees. Do not bypass the guard; request an approved assignment/permission decision.
+- Lifecycle handoff/merge/discard currently validate linked mapped worktrees; optional current
+  checkout edits/commits do not imply those commands accept a nonlinked source checkout.
+- Approved temporary permission edits were restored in both policy files and the feature config.
+  Main `kilo.jsonc` restoration was tool-denied; its temporary live-board `ask` values require human
+  cleanup. The feature policy keeps live-board denies plus narrow template-only `ask` exceptions.
+- Live `docs/BOARD.md` prose still describes the old workflow. Row updates remain script-managed;
+  root rules and lifecycle CLI are authoritative. No direct live-board prose edit was attempted.
+- Authenticated captures may contain sensitive page content beyond known credentials/session masks.
 
 ## 12. Open questions
 
 - Where the factory repository is published, and where the project repository is pushed.
-- Whether the factory's `.kilo/` changes reach the project by a command the user runs, or by a
-  hook. Today it is `guard.py sync --repo project --apply`.
+- When the owner chooses to copy this factory harness into a project. Factory updates do not
+  propagate automatically; `guard.py sync` refreshes work-surface pointers, not project harnesses.
 
 ## 13. Document map
 

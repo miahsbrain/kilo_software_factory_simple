@@ -4,6 +4,9 @@ description: Run the QA and UI/UX review lane with Playwright and produce eviden
 
 Run the QA lane and the UI/UX critique for a frontend row. Evidence, not assertions.
 Spec: `docs/UI-UX.md` §3 and §5.
+Use the original assigned repo-specific workspace set, including fixes and fresh reviewer sessions;
+never create a review worktree. Read local rules and explicitly permitted shared governance.
+Application source stays read-only; approved auth/navigation and evidence writes are allowed.
 
 1. **Confirm the app runs.** Use the dev command from `docs/STACK.md`. If it does not start,
    report the blocker; do not fake a review.
@@ -31,7 +34,12 @@ Spec: `docs/UI-UX.md` §3 and §5.
    `--compare <dir>` (before | after sheet), `--label <slug>` (names the round's capture),
    `--chromium <path>` (the path of a chromium binary handed to Playwright's launch; it
    overrides `PLAYWRIGHT_CHROMIUM_PATH`). When no chromium is found at all, the script exits 2
-   with the list of places it searched.
+    with the list of places it searched.
+   Authenticated routes use `--storage-state <ignored-local.json>` and/or `--navigation
+   <ignored-local.json>` with the approved schema in the QA skill. Ask for test access if absent;
+   MFA/SSO is manual user login, never bypassed. `--allow-destructive` requires explicit action
+   approval. No secret literals in CLI, commits or evidence. Masking covers known credentials/session
+   values, not arbitrary sensitive content; inspect evidence before sharing. All counts/checks remain.
 3. **Check the round ledger** — a row goes through at most 3 QA↔fix rounds, and each round's
    review is done by a fresh reviewer who reads the ledger, not the previous reviewer's
    reasoning:

@@ -3,6 +3,85 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-16] Align board template after permission reload
+**Type:** Docs
+**Board:** BOARD-103 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `templates/project/docs/BOARD.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/reviews/BOARD-103-review.md`, this log.
+**Why:** The latest authorized retry succeeded after human permission changes and reload. Remove stale mandatory per-row worktree/manual merge instructions from the project template.
+**Impact:** Template uses the approved shared workspace, optional mode, clean human merge/cleanup and explicit discard rules. Source code and existing 33 lifecycle/19 auth test proof are unchanged. No actual merge, discard or mode change. User approved restoring temporary live-board permission edits; both policies and the feature config were restored. Main generated-config restoration was tool-denied and remains human cleanup.
+**Evidence:** Template file review against approved rules; final documentation whitespace check and clean local commit required for handoff. Parent ledger remains capped and unchanged.
+
+## [2026-11-16] Preserve verified fix after confirmed-reload template denial
+**Type:** Docs
+**Board:** BOARD-103, BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/reviews/BOARD-103-review.md`, this log; live board evidence recorded separately.
+**Why:** Code checkpoint `f0b9c95` resolves the ordered-map defect with 33 independently passing tests. The user confirmed a task-worktree reload, but one authorized template retry still hit project `**/docs/BOARD.md: deny`.
+**Impact:** Template unchanged; parent remains Blocked pending effective edit permission. No bypass, repeated retry, actual merge, discard or mode change. Preserve the verified fix and clean checkpoints.
+
+## [2026-11-16] Independently verify ordered-map follow-up
+**Type:** Docs
+**Board:** BOARD-107, BOARD-103 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/reviews/BOARD-103-review.md`, this log; live board evidence recorded separately.
+**Why:** Distinguish the authorized focused follow-up from the capped parent rounds and supersede earlier zero-test discovery with real independent proof.
+**Impact:** Rule-order defect resolved; template edit remains blocked until Kilo loads the task-worktree permission exception. No merge, discard or mode change; parent ledger preserved.
+**Evidence:** Independent absolute-path lifecycle discovery ran 33 tests in 14.190s, `OK`, exit 0. Independent current-source review found no blocking issue; orchestrator inspected the baseline diff. Auth source is unchanged from its independent 19-test pass.
+
+## [2026-11-16] Validate inherited permission rule order through existing guard logic
+**Type:** Fix
+**Board:** BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `.kilo/skills/git-worktree/scripts/{guard,worktree,test_lifecycle}.py`, `docs/HANDOVER.md`, this log.
+**Why:** Dictionary equality ignored nested rule order. Extract the existing guard ordered-items comparison into pure `permission_maps_match(current, expected)` and reuse it in `cmd_check_policy()` and `cmd_create()`; the existing generator remains the only rule source.
+**Impact:** Reordered inherited maps fail closed without rewriting inherited/base config. Partial checkout/branch and journal error survive with unchanged board. Correctly ordered inherited maps still succeed. This is a newly user-authorized small follow-up, not a fourth parent review round; capped ledger and board statuses remain untouched. No real mode/map/lifecycle actions, commits, template/rules/policy/config edits, dependencies or new tooling.
+**Verification:** One run in `/projects/kilo_inhouz_ai/.kilo/worktrees/configurable-shared-workspace-lifecycle-and-authenticated`: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -v`. Discovered and passed **33 tests** (31 existing plus 2 new methods) in 14.361s, exit **0**; discovery count is nonzero. New methods cover six reordered nested edit/bash/read cases and two ordered-map success cases across optional/required mode transitions, using inherited apps without local config. All mutations used disposable standard-temp repositories; existing injected cleanup/unfinished-merge failures were expected passing cases. No broader verification or parent-review pass claimed.
+
+## [2026-11-16] Stop at final permission-order review gate
+**Type:** Docs
+**Board:** BOARD-103, BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/reviews/BOARD-103-{review,ledger}.md`, this log. Live board status updated separately by the orchestrator.
+**Why:** Final source review found inherited permission dictionary equality ignores rule order and may accept a secret-weakening wildcard. The repeated mode-map finding reached the three-round cap.
+**Impact:** Blocked, not merge-ready or safe to enable. Preserve checkpoint work for a human follow-up decision; template BOARD also needs session permission reload. No fourth round or actual merge, discard or mode change.
+**Evidence:** `worktree.py:640-643`; existing ordered-items check `guard.py:775-778`. Builder lifecycle suite passed 31; final independent discovery ran zero tests and provides no independent pass. Auth was independently verified at 19 tests. Final report and ledger record the hold.
+
+## [2026-11-16] Final shell-routing and new-checkout permission corrections
+**Type:** Fix
+**Board:** BOARD-104, BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `.kilo/skills/git-worktree/scripts/{guard,worktree,test_lifecycle}.py`, `docs/HANDOVER.md`, this log.
+**Why:** Extend `git_commands()` to reject unsupported directory-changing chains instead of interpreting shell state. Extract the existing validated guard-policy loader as effectful `load_guard_policy(root)` so `cmd_create()` and `cmd_mode()` use the same policy/generator, not a duplicate permission implementation.
+**Impact:** New checkout local maps reflect saved project mode in either direction; inherited maps are checked without changing base/canonical configs. Apps keep inheritance and scope pointers without harness copies. Invalid initialization preserves branch/worktree and records incomplete creation without changing board rows. No real lifecycle/mode, policy/config edits, commits, board/product/dependency changes in this correction. Ready for fresh round-three review, not merge.
+**Verification:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -v`: 31 tests passed in 12.054s, exit 0, one suite run. Six added regressions cover directory chains, both mode/base directions, mapped-app inheritance/pointers/local maps, base preservation and invalid-map partial creation. All mutations used disposable standard-temp repositories; printed injected cleanup/unfinished-merge failures were expected.
+
+## [2026-11-16] Authenticated capture proof and workflow closeout
+**Type:** Fix
+**Board:** BOARD-103, BOARD-110 through BOARD-112 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** canonical browser capture/test, QA skill, agent/root/template rules, environment/stack/structure/state/handover docs, ADR-068, review report/ledger, policy and generated config, `.gitignore`.
+**Why:** Reuse the existing capture path with explicit final URL and authenticated-ready assertions; no new client, dependency or login service. The new adjacent test file covers parser/privacy behavior and real canonical capture against an isolated HTTP fixture.
+**Impact:** Authenticated password-settings pages work; same-URL gates no longer qualify as access proof. Template uses ignored generated pointers. Template BOARD edits get a narrow ask exception while live boards remain denied; this session still needs a reload before that correction. No board writer or board was untracked. No real workspace merge/discard or actual mode change ran.
+**Verification:** Browser suite passed 19 tests, including real login/protected-navigation/shared-session PNG capture at two viewports; lifecycle suite passed 25 disposable-repo tests. External SSO/MFA and real accounts were not exercised. Corrected-state review and the template permission hold remain tracked on the live board.
+
+## [2026-11-16] Correct lifecycle safety review findings
+**Type:** Fix
+**Board:** BOARD-104 through BOARD-109 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `.kilo/skills/git-worktree/scripts/{worktree,guard,test_lifecycle}.py`, `docs/HANDOVER.md`, this log.
+**Why:** Extend existing argument parsing, lifecycle journal, board association, verification and permission generator; add no parallel tool or dependency. The new effectful `require_committed_merge()` centralizes checks needed both before workspace cleanup and before source-branch deletion.
+**Impact:** Resolve attached/repeated Git directory options before protected-branch checks. Prove committed named-target ancestry and clean merge state before cleanup; resume exact human-completed recorded conflicts, refusing unrelated changes. Regenerate all effective project maps from control policy with preflight/rollback. Preserve terminal board history on slug reuse. Verify against the saved base unless explicitly overridden. No actual mode/maps, live board, product, real branch/workspace or unrelated files changed by this correction; no commits.
+**Verification:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -v`: 25 tests passed in 9.981s, exit 0, one suite run. All mutations used disposable standard-temp repositories. Injected cleanup and uncommitted-merge failures were expected passing cases.
+
+## [2026-11-16] Shared-workspace rules and authenticated review guidance
+**Type:** Docs
+**Board:** BOARD-103 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** root/template `AGENTS.md`; `.kilo/agent/*.md`, `.kilo/scopes/*.md`, affected commands and skill markdown; factory structure, handover, state, stack, environment and decisions; project-template architecture, risks, QA, environment, stack and structure examples. Template BOARD edit was denied by session policy and remains a reported contradiction.
+**Why:** Replace contradictory per-row worktrees/fixed folder bans/raw merge guidance with approved lifecycle and assigned-scope rules. Reuse existing docs/tools. New `merge-conflict-resolver.md` is required because no existing specialist resolves preexisting conflicts without completing merges.
+**Impact:** Required/optional mode, shared findings workspaces, human CLI merge/discard, authenticated navigation and conflict handoff documented. No mechanics edits, live board actions, product edits, commits, merges or discards in this chunk. Historical ADRs/log entries preserved.
+**Verification:** Static file review only at this point; no build or runtime verification claimed. Mechanics limitations are recorded in HANDOVER.
+
+## [2026-11-16] Configurable shared-workspace lifecycle mechanics
+**Type:** Feature
+**Board:** BOARD-103 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `.kilo/skills/git-worktree/scripts/{worktree,guard,test_lifecycle}.py`, `.kilo/policies/git-policy.json`, generated `kilo.jsonc`, `docs/HANDOVER.md`, this log.
+**Why:** Extend the existing lifecycle, guard generator and board parser instead of adding another workspace tool. The new test module isolates regression fixtures in Python's default temporary directory; no existing test module covered lifecycle mechanics.
+**Impact:** Required mode remains the default; optional mode changes the edit fallback and outside-worktree commit check without relaxing secret/protected-file rules or protected-branch commits. Shared rows reuse workspaces. Human CLI merge/discard is preview-first, confined, fail-closed and records partial progress. Board-only control dirt is allowed; unrelated tracked/untracked dirt is refused. Kilo restart required after generated permission changes. No live board edits, real merges/discards, commits, installs, untracking, or rules/agent markdown changes in this chunk.
+**Verification:** Permission-map regeneration completed. The initial combined unittest attempt could not create fixtures under `/tmp/kilo`. After explicit approval to use Python's default temporary directory, the same command (`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -v`) passed all 17 tests in 5.475s, exit 0. No permission changes or additional retry were needed. The lifecycle module docstring now describes explicit discard and the local progress journal rather than obsolete never-delete/TSV claims.
+
 ## [2026-11-04] Board heading gets the page gutter
 **Type:** Fix
 **Board:** BOARD-102 | **Branch:** feat/compact-accordion-redesign-of-the-live

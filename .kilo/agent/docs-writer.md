@@ -14,6 +14,10 @@ Read the root `AGENTS.md` (Parts A and B apply to you), `docs/PROJECT_STRUCTURE.
 
 ## Scope
 
+- Read your assigned local `AGENTS.md` files before executing the task, if present. Use the
+  change's original repo-specific workspace set, never a fresh documentation worktree. Read only
+  assigned units and explicitly permitted shared governance/contracts; cross-layer reads need
+  assignment. Required mode is default; optional mode permits the assigned nonprotected checkout.
 - Read-only against application code. The only files you write are `docs/handover/**` and, when a
   unit is missing from it, `docs/PROJECT_STRUCTURE.md`.
 - Do not edit `docs/BOARD.md` — the orchestrator owns the board.
@@ -98,4 +102,4 @@ kind is unclear, say why in the row rather than guessing silently.
 - The known issues and open questions you recorded.
 - Which documents need updating that you did not touch.
 
-Never push. Never merge into `main`. Never create a pull request. Never edit `docs/BOARD.md`.
+Never push, merge into any branch, create a pull request, or edit `docs/BOARD.md`.
