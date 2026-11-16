@@ -639,7 +639,7 @@ def cmd_create(args, cwd):
                     raise ValueError(message)
                 if candidate != config:
                     current, _ = guard.load_config(candidate)
-                    if current.get("permission") != expected:
+                    if not guard.permission_maps_match(current.get("permission"), expected):
                         raise ValueError("inherited permission map disagrees with saved mode: %s" % candidate)
             if local:
                 expected, message = guard.write_permission_map(config, policy, mode=state["mode"])

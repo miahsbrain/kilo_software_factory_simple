@@ -38,8 +38,10 @@ and password forms are rejected. The template still describes a duplicate harnes
   beside the existing reviewed scripts.
 
 ## Acceptance criteria
-- [ ] Destination protection and committed-merge cleanup have disposable-repo regression proof.
-- [ ] Conflict retry, consistent mode/maps, board incarnation and saved-base regressions pass.
+- [x] Destination protection and committed-merge cleanup have disposable-repo regression proof.
+  Proof: authorized BOARD-107 independent follow-up suite, 33 discovered/passed, exit 0; includes the existing guard and committed-merge regressions.
+- [x] Conflict retry, consistent mode/maps, board incarnation and saved-base regressions pass.
+  Proof: same 33-test independent suite, including reordered inherited rule regressions at `.kilo/skills/git-worktree/scripts/test_lifecycle.py:246-300`.
 - [x] Successful nested navigation and explicit authenticated-ready proof pass capture tests.
   Proof: independent Round 2 run of `node --test .kilo/skills/qa-review/scripts/browser-review.test.mjs`, 19 passed, exit 0; test source at lines 222-250,279-288,359-387.
 - [x] The project template matches the existing ignored-pointer model.
@@ -86,3 +88,22 @@ BOARD-107 and parent BOARD-103 are Blocked. The round cap is reached; no fourth 
 review is authorized. The template BOARD permission hold also remains. Preserve the original
 workspace and checkpoint commits; do not merge, discard or enable the feature. A human follow-up
 decision and permission reload are required. No actual merge, discard or mode change was run.
+
+## Authorized BOARD-107 Follow-Up
+The user explicitly authorized a separate focused follow-up after the capped parent review.
+The original three-round ledger is preserved. Existing ordered-items comparison was extracted
+to pure `permission_maps_match(current, expected)` at
+`.kilo/skills/git-worktree/scripts/guard.py:758-762` and reused by `check-policy` at line 782 and
+inherited validation at `.kilo/skills/git-worktree/scripts/worktree.py:642`.
+
+Independent current-source review found no blocking defect. Its sole command used the correct
+workspace and absolute discovery path:
+`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s /projects/kilo_inhouz_ai/.kilo/worktrees/configurable-shared-workspace-lifecycle-and-authenticated/.kilo/skills/git-worktree/scripts -p test_lifecycle.py -v`.
+Result: `Ran 33 tests in 14.190s`, `OK`, exit 0, nonzero discovery. The orchestrator inspected the
+baseline diff separately; the independent reviewer did not run `git diff 08ac314`.
+Tests cover reordered edit/bash/read maps in both modes, ordered maps accepted, inherited/base
+configuration and board unchanged on refusal, preserved partial tree/branch/journal error, and
+no copied app harness. All lifecycle effects used disposable temporary repositories.
+
+The former BOARD-107 rule-order defect is resolved and verified. The unchanged, denied BOARD
+template remains the parent hold. No merge-readiness claim, actual lifecycle action or mode change.

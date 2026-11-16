@@ -3,6 +3,22 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-16] Independently verify ordered-map follow-up
+**Type:** Docs
+**Board:** BOARD-107, BOARD-103 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/reviews/BOARD-103-review.md`, this log; live board evidence recorded separately.
+**Why:** Distinguish the authorized focused follow-up from the capped parent rounds and supersede earlier zero-test discovery with real independent proof.
+**Impact:** Rule-order defect resolved; template edit remains blocked until Kilo loads the task-worktree permission exception. No merge, discard or mode change; parent ledger preserved.
+**Evidence:** Independent absolute-path lifecycle discovery ran 33 tests in 14.190s, `OK`, exit 0. Independent current-source review found no blocking issue; orchestrator inspected the baseline diff. Auth source is unchanged from its independent 19-test pass.
+
+## [2026-11-16] Validate inherited permission rule order through existing guard logic
+**Type:** Fix
+**Board:** BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `.kilo/skills/git-worktree/scripts/{guard,worktree,test_lifecycle}.py`, `docs/HANDOVER.md`, this log.
+**Why:** Dictionary equality ignored nested rule order. Extract the existing guard ordered-items comparison into pure `permission_maps_match(current, expected)` and reuse it in `cmd_check_policy()` and `cmd_create()`; the existing generator remains the only rule source.
+**Impact:** Reordered inherited maps fail closed without rewriting inherited/base config. Partial checkout/branch and journal error survive with unchanged board. Correctly ordered inherited maps still succeed. This is a newly user-authorized small follow-up, not a fourth parent review round; capped ledger and board statuses remain untouched. No real mode/map/lifecycle actions, commits, template/rules/policy/config edits, dependencies or new tooling.
+**Verification:** One run in `/projects/kilo_inhouz_ai/.kilo/worktrees/configurable-shared-workspace-lifecycle-and-authenticated`: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -v`. Discovered and passed **33 tests** (31 existing plus 2 new methods) in 14.361s, exit **0**; discovery count is nonzero. New methods cover six reordered nested edit/bash/read cases and two ordered-map success cases across optional/required mode transitions, using inherited apps without local config. All mutations used disposable standard-temp repositories; existing injected cleanup/unfinished-merge failures were expected passing cases. No broader verification or parent-review pass claimed.
+
 ## [2026-11-16] Stop at final permission-order review gate
 **Type:** Docs
 **Board:** BOARD-103, BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated

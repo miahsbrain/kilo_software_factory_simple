@@ -17,16 +17,20 @@
   BOARD-112; corrections and focused regression checks reuse this same workspace. Round 2
   auth/rules review passed; two lifecycle fingerprints repeated. The user approved their
   focused corrections and a third/final review after the rows were escalated to Blocked.
-  Final review found inherited permission-map equality ignores rule order; BOARD-107 and
-  parent BOARD-103 are Blocked at the three-round cap. The feature is not safe to enable.
+  Final review found inherited permission-map equality ignores rule order. The parent ledger
+  remains stopped at three rounds. The user subsequently authorized a focused BOARD-107
+  follow-up in this same workspace; it now passes 33 tests independently and current-source
+  review finds no blocking issue. BOARD-103 remains Blocked on the template permission hold.
 - **Previous work:** BOARD-101 (no-production-build rule) and BOARD-102 (accordion board viewer)
   are recorded as Merged on the live factory board. They are not active tasks.
 - **Permission blocker:** the session still denies `templates/project/docs/BOARD.md` after the
   user approved enabling its edit. Do not bypass the denial or claim its old instructions aligned.
-- **Next action:** human follow-up decision for order-sensitive inherited-map validation and
-  task-worktree permission reload for the template. Preserve local checkpoint commits; no
-  fourth correction/review round. Builder lifecycle tests passed 31; final independent discovery
-  ran zero tests. Auth passed 19 independently. No real merge, discard or mode change has run.
+- **Next action:** open/reload Kilo in the task worktree for the template-only permission exception;
+  the main checkout still has the broad deny. Then align the project BOARD template. Preserve
+  checkpoint commits `b63d6e7` and `08ac314` and the follow-up checkpoint; do not reset the parent
+  ledger. Follow-up proof supersedes the earlier zero-test discovery: 33 passed in 14.190s,
+  exit 0. Auth passed 19 independently. No actual merge, discard or mode change has run.
+  The feature is not merge-ready until the template hold is resolved.
 
 ## Open questions
 

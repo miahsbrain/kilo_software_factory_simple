@@ -243,6 +243,62 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual((self.root / "kilo.jsonc").read_bytes(), main_config)
         self.assertEqual(self.git(api, "rev-parse", "HEAD").stdout, base)
 
+    def test_create_app_rejects_reordered_inherited_rules_and_preserves_partial_state(self):
+        config_path = self.root / "kilo.jsonc"
+        for mode in ("optional", "required"):
+            self.cli("mode", mode)
+            ordered = config_path.read_bytes()
+            for kind in ("edit", "bash", "read"):
+                with self.subTest(mode=mode, kind=kind):
+                    repo = "api-" + mode + "-" + kind
+                    api = self.add_repo(repo)
+                    base = self.git(api, "rev-parse", "HEAD").stdout
+                    control_base = self.git(self.root, "show", "main:kilo.jsonc").stdout
+                    config = json.loads(ordered)
+                    mapping = config["permission"][kind]
+                    first = next(iter(mapping))
+                    mapping[first] = mapping.pop(first)
+                    self.assertEqual(config["permission"], json.loads(ordered)["permission"])
+                    config_path.write_text(json.dumps(config))
+                    inherited = config_path.read_bytes()
+                    board = (self.root / "docs/BOARD.md").read_bytes()
+                    self.cli("check-policy", guard=True, success=False)
+                    result = self.cli("create", "--board", "BOARD-001", "--repo", repo,
+                                      success=False)
+                    self.assertIn("inherited permission map disagrees", result.stderr)
+                    self.assertIn("board unchanged, creation incomplete", result.stderr)
+                    path = api / ".kilo/worktrees/shared-lifecycle"
+                    self.assertTrue(path.is_dir())
+                    self.git(api, "rev-parse", "--verify", "refs/heads/feat/shared-lifecycle")
+                    self.assertFalse((path / "kilo.jsonc").exists())
+                    self.assertFalse((api / "kilo.jsonc").exists())
+                    self.assertEqual(config_path.read_bytes(), inherited)
+                    self.assertEqual(self.git(api, "rev-parse", "HEAD").stdout, base)
+                    self.assertEqual(self.git(self.root, "show", "main:kilo.jsonc").stdout,
+                                     control_base)
+                    self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), board)
+                    self.assertEqual(self.status(), "Ready")
+                    state = WORKTREE.local_state(str(self.root))["workspaces"][str(path)]
+                    self.assertEqual(state["outcome"], "active")
+                    self.assertIn("permission initialization failed", state["error"])
+                    config_path.write_bytes(ordered)
+
+    def test_create_app_accepts_ordered_inherited_rules_in_both_modes(self):
+        for mode in ("optional", "required"):
+            with self.subTest(mode=mode):
+                self.cli("mode", mode)
+                repo = "api-" + mode
+                api = self.add_repo(repo)
+                inherited = (self.root / "kilo.jsonc").read_bytes()
+                base = self.git(api, "rev-parse", "HEAD").stdout
+                self.cli("check-policy", guard=True)
+                path = self.create(repo=repo, change=False)
+                self.assertFalse((path / "kilo.jsonc").exists())
+                self.assertFalse((api / "kilo.jsonc").exists())
+                self.assertEqual((self.root / "kilo.jsonc").read_bytes(), inherited)
+                self.assertEqual(self.git(api, "rev-parse", "HEAD").stdout, base)
+                self.assertEqual(self.status(), "In Progress")
+
     def test_create_app_refreshes_existing_local_map_without_modifying_base(self):
         api = self.add_repo("api")
         config = json.loads((self.root / "kilo.jsonc").read_text())

@@ -755,6 +755,13 @@ def write_permission_map(config_path, policy, create_missing=False, mode=None, p
     return expected, ("updated" if existed else "created")
 
 
+def permission_maps_match(current, expected):
+    current = current or {}
+    return (set(current) == set(expected)
+            and all(list((current.get(kind) or {}).items()) == list(mapping.items())
+                    for kind, mapping in expected.items()))
+
+
 def cmd_check_policy(write, cwd, ctx):
     root, path = find_policy(ctx)
     if not path:
@@ -772,10 +779,7 @@ def cmd_check_policy(write, cwd, ctx):
               file=sys.stderr)
         return USAGE
 
-    current = config.get("permission") or {}
-    same = (set(current) == set(expected)
-            and all(list((current.get(kind) or {}).items()) == list(mapping.items())
-                    for kind, mapping in expected.items()))
+    same = permission_maps_match(config.get("permission"), expected)
 
     if same and not write:
         print("policy in sync")

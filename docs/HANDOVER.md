@@ -5,22 +5,22 @@
 >   `.kilo/worktrees/configurable-shared-workspace-lifecycle-and-authenticated`, branch
 >   `feat/configurable-shared-workspace-lifecycle-and-authenticated`. Includes CLI lifecycle,
 >   assigned scopes, authenticated review and `merge-conflict-resolver`; no product changes.
-> - **Verification:** 31 disposable-repo lifecycle regressions and 19 browser regressions passed.
->   The 31-test result is builder evidence; final independent discovery ran zero tests. Auth was
->   independently verified with a real local login/navigation fixture across two viewports.
+> - **Verification:** BOARD-107 follow-up passed 33 lifecycle tests in the builder run and in an
+>   independent run (14.190s, exit 0, nonzero discovery). Independent current-source review found
+>   no blocking defect; the orchestrator inspected the baseline diff. Auth remains independently
+>   verified at 19 tests with local login/navigation evidence; its source is unchanged.
 > - **Final lifecycle corrections:** directory-changing shell routing is rejected, and newly
->   created checkout maps are initialized from saved project mode. Final review found a blocking
->   inherited-map order comparison defect at `worktree.py:640-643`. BOARD-107 and parent BOARD-103
->   are Blocked at the three-round cap. Do not merge or enable this implementation.
+>   created checkout maps are initialized from saved project mode. The authorized follow-up fixes
+>   inherited-map order validation at `.kilo/skills/git-worktree/scripts/worktree.py:642` by reusing
+>   guard's extracted ordered-items comparison. The capped parent review history is preserved;
+>   BOARD-107 follow-up is verified, but BOARD-103 remains Blocked on the template permission hold.
 > - **Permission hold:** the template BOARD edit remains denied in this session. Its narrow `ask`
 >   exception is in the feature policy/generated config, not loaded session permissions. Live board
 >   prose also retains old guidance; only script-owned row metadata has changed there.
-> - **Next action:** obtain a human follow-up decision for order-sensitive inherited-map validation
->   and reload the task-worktree permissions before the template edit. Preserve this workspace and
->   local checkpoint commits. No fourth fix/review round is authorized.
-> - **Next action:** finish corrected-state review, then reload Kilo from this worktree configuration
->   to apply the template correction. Local feature commits are authorized. Do not merge while the
->   row is blocked. No real workspace was merged/discarded and no actual mode was changed.
+> - **Next action:** open/reload Kilo in this task worktree, not the main checkout, to load the
+>   approved template-only edit exception. Then align the template with approved workspace and
+>   human lifecycle rules. Preserve local checkpoints and the capped ledger; no fourth parent
+>   review round was opened. No actual mode change, merge or discard has run.
 > - **Previous work:** BOARD-101 and BOARD-102 are Merged on the live factory board.
 
 ## 1. Overview
@@ -86,6 +86,15 @@
 
 ### Lifecycle tooling inventory (2026-11-16)
 
+`.kilo/skills/git-worktree/scripts/guard.py:758` exposes pure
+`permission_maps_match(current, expected)`, extracted from the existing `cmd_check_policy()`
+ordered-items comparison. It checks tool-key membership and each nested rule's insertion order;
+both `cmd_check_policy()` and `cmd_create()` use it with the existing generated permission map.
+Reordered inherited maps fail closed without rewriting them: the new checkout/branch and journaled
+initialization error survive, and the board stays unchanged. The two new lifecycle test methods
+cover reordered `edit`, `bash` and `read` rules and ordered inherited app maps in both modes,
+with no app-local config. All test mutations are confined to disposable standard-temp fixtures.
+
 In `.kilo/skills/git-worktree/scripts/worktree.py`, `checked_git()` fails closed on command
 errors; `confined()` rejects path escapes and symlink components; `local_state()` atomically
 reads/writes `.git/kilo-workspace.json` in the control repository's common Git directory.
@@ -103,11 +112,10 @@ Inherited maps must already match; base/canonical configs remain unchanged. App 
 without a local config retain inheritance and generated scope pointers, not a copied harness.
 Invalid initialization preserves the created branch/worktree, records the error locally,
 reports incomplete creation, and leaves the board unchanged for human recovery.
-Known blocker: inherited-map dictionary equality at
-`.kilo/skills/git-worktree/scripts/worktree.py:640-643` ignores rule insertion order. A trailing
-wildcard allow can override secret denies while passing equality. Reuse the existing ordered-items
-validation in `.kilo/skills/git-worktree/scripts/guard.py:775-778` in an approved follow-up;
-the current implementation is not safe to enable.
+The authorized follow-up resolves the former inherited-map order blocker by calling
+`permission_maps_match(current, expected)` at `.kilo/skills/git-worktree/scripts/worktree.py:642`.
+Independent proof: 33 tests passed, including six reordered-rule cases and two ordered success
+cases at `.kilo/skills/git-worktree/scripts/test_lifecycle.py:246-300`. The template hold remains.
 
 `lifecycle_selection()` resolves board rows and mapped repo IDs; `validate_workspace()`
 checks registered linked workspaces, branches, confinement and locks; `require_clean()` allows
@@ -237,9 +245,11 @@ rejection, control/linked/app mode transitions, malformed maps and write rollbac
 board integrity, and saved-base verification. Printed injected cleanup/unfinished-merge
 failures are expected passing test cases. No actual mode or permission-map regeneration was
 performed on actual repositories in this correction; earlier permission regeneration belongs
-to the original chunk. Final independent discovery reported `Ran 0 tests in 0.000s`, so it does
-not independently reproduce the 31 passes. Final source review found the inherited-map rule-order
-blocker; BOARD-103 remains Blocked, not merge-ready.
+to the original chunk. That round's independent discovery reported `Ran 0 tests in 0.000s` and
+provided no pass. The subsequently authorized BOARD-107 follow-up supersedes that evidence:
+absolute-path discovery in the correct workspace ran 33 tests in 14.190s, `OK`, exit 0, and
+independent current-source review found no blocking issue. The template permission hold still
+keeps BOARD-103 Blocked, not merge-ready.
 
 Authenticated capture regressions:
 
