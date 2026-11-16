@@ -3,6 +3,22 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-16] Stop at final permission-order review gate
+**Type:** Docs
+**Board:** BOARD-103, BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/reviews/BOARD-103-{review,ledger}.md`, this log. Live board status updated separately by the orchestrator.
+**Why:** Final source review found inherited permission dictionary equality ignores rule order and may accept a secret-weakening wildcard. The repeated mode-map finding reached the three-round cap.
+**Impact:** Blocked, not merge-ready or safe to enable. Preserve checkpoint work for a human follow-up decision; template BOARD also needs session permission reload. No fourth round or actual merge, discard or mode change.
+**Evidence:** `worktree.py:640-643`; existing ordered-items check `guard.py:775-778`. Builder lifecycle suite passed 31; final independent discovery ran zero tests and provides no independent pass. Auth was independently verified at 19 tests. Final report and ledger record the hold.
+
+## [2026-11-16] Final shell-routing and new-checkout permission corrections
+**Type:** Fix
+**Board:** BOARD-104, BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `.kilo/skills/git-worktree/scripts/{guard,worktree,test_lifecycle}.py`, `docs/HANDOVER.md`, this log.
+**Why:** Extend `git_commands()` to reject unsupported directory-changing chains instead of interpreting shell state. Extract the existing validated guard-policy loader as effectful `load_guard_policy(root)` so `cmd_create()` and `cmd_mode()` use the same policy/generator, not a duplicate permission implementation.
+**Impact:** New checkout local maps reflect saved project mode in either direction; inherited maps are checked without changing base/canonical configs. Apps keep inheritance and scope pointers without harness copies. Invalid initialization preserves branch/worktree and records incomplete creation without changing board rows. No real lifecycle/mode, policy/config edits, commits, board/product/dependency changes in this correction. Ready for fresh round-three review, not merge.
+**Verification:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -v`: 31 tests passed in 12.054s, exit 0, one suite run. Six added regressions cover directory chains, both mode/base directions, mapped-app inheritance/pointers/local maps, base preservation and invalid-map partial creation. All mutations used disposable standard-temp repositories; printed injected cleanup/unfinished-merge failures were expected.
+
 ## [2026-11-16] Authenticated capture proof and workflow closeout
 **Type:** Fix
 **Board:** BOARD-103, BOARD-110 through BOARD-112 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated

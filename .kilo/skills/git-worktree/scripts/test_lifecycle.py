@@ -167,7 +167,112 @@ class LifecycleTests(unittest.TestCase):
             with self.subTest(arguments=arguments):
                 self.cli("check-git", "--", "git " + arguments, cwd=path, guard=True, success=False)
         self.cli("check-git", "--", "git commit -m test", cwd=self.temporary.name,
-                 guard=True, success=False)
+                  guard=True, success=False)
+
+    def test_guard_rejects_directory_chains_without_executing_commits(self):
+        path = self.create(change=False)
+        before = self.git(self.root, "rev-parse", "HEAD").stdout
+        direct = "git -C . commit -m example"
+        commands = (
+            "cd %s && %s" % (self.root, direct),
+            "cd %s; %s" % (self.root, direct),
+            "pushd %s && %s" % (self.root, direct),
+            "popd; " + direct,
+            "(cd %s && %s)" % (self.root, direct),
+            "{ cd %s; %s; }" % (self.root, direct),
+            "builtin cd %s && %s" % (self.root, direct),
+            "command -- cd %s && %s" % (self.root, direct),
+            "bash -c 'cd %s && %s'" % (self.root, direct),
+            "env --chdir=%s %s" % (self.root, direct),
+            "sudo -D %s %s" % (self.root, direct),
+            "git status && cd %s; %s" % (self.root, direct),
+            'echo "$(cd %s && %s)"' % (self.root, direct),
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                result = self.cli("check-git", "--", command, cwd=path, guard=True, success=False)
+                self.assertIn("manual review" if "$(" in command else "directory-changing shell chain",
+                              result.stderr)
+        for command in ("git commit -m cd", "git -C . commit -m example",
+                        "git -C. commit -m example", 'git -C.. -C shared-lifecycle -C "" commit -m example',
+                        "pwd && git -C. commit -m example"):
+            self.cli("check-git", "--", command, cwd=path, guard=True)
+        self.assertEqual(self.git(self.root, "rev-parse", "HEAD").stdout, before)
+
+    def test_create_refreshes_required_base_map_in_optional_mode(self):
+        base = self.git(self.root, "show", "main:kilo.jsonc").stdout
+        self.assertEqual(json.loads(base)["permission"]["edit"]["*"], "deny")
+        self.cli("mode", "optional")
+        main_config = (self.root / "kilo.jsonc").read_bytes()
+        path = self.create(change=False)
+        config = json.loads((path / "kilo.jsonc").read_text())
+        policy = json.loads((self.root / ".kilo/policies/git-policy.json").read_text())
+        self.assertEqual(config["permission"], GUARD.generated_permission(policy, "optional"))
+        self.assertEqual(config["permission"]["edit"][".env"], "deny")
+        self.assertEqual((self.root / "kilo.jsonc").read_bytes(), main_config)
+        self.assertEqual(self.git(self.root, "show", "main:kilo.jsonc").stdout, base)
+
+    def test_create_refreshes_optional_base_map_in_required_mode(self):
+        self.cli("mode", "optional")
+        self.commit(self.root)
+        base = self.git(self.root, "show", "main:kilo.jsonc").stdout
+        self.assertEqual(json.loads(base)["permission"]["edit"]["*"], "allow")
+        self.cli("mode", "required")
+        main_config = (self.root / "kilo.jsonc").read_bytes()
+        path = self.create(change=False)
+        config = json.loads((path / "kilo.jsonc").read_text())
+        policy = json.loads((self.root / ".kilo/policies/git-policy.json").read_text())
+        self.assertEqual(config["permission"], GUARD.generated_permission(policy, "required"))
+        self.assertEqual((self.root / "kilo.jsonc").read_bytes(), main_config)
+        self.assertEqual(self.git(self.root, "show", "main:kilo.jsonc").stdout, base)
+
+    def test_create_app_preserves_inheritance_and_scope_pointer_without_harness_copy(self):
+        api = self.add_repo("api")
+        scopes = self.root / ".kilo/scopes"
+        scopes.mkdir()
+        (scopes / "api.md").write_text("# Fixture scope\n")
+        self.cli("mode", "optional")
+        main_config = (self.root / "kilo.jsonc").read_bytes()
+        base = self.git(api, "rev-parse", "HEAD").stdout
+        path = self.create(repo="api", change=False)
+        self.assertFalse((path / "kilo.jsonc").exists())
+        self.assertFalse((api / "kilo.jsonc").exists())
+        self.assertFalse((path / ".kilo").exists())
+        self.assertIn(".kilo/scopes/api.md", (path / "AGENTS.md").read_text())
+        self.git(path, "check-ignore", "AGENTS.md")
+        self.assertEqual((self.root / "kilo.jsonc").read_bytes(), main_config)
+        self.assertEqual(self.git(api, "rev-parse", "HEAD").stdout, base)
+
+    def test_create_app_refreshes_existing_local_map_without_modifying_base(self):
+        api = self.add_repo("api")
+        config = json.loads((self.root / "kilo.jsonc").read_text())
+        policy = json.loads((self.root / ".kilo/policies/git-policy.json").read_text())
+        config["permission"] = GUARD.generated_permission(policy, "optional")
+        (api / "kilo.jsonc").write_text(json.dumps(config))
+        self.commit(api)
+        self.cli("mode", "required")
+        main_config = (api / "kilo.jsonc").read_bytes()
+        base = self.git(api, "show", "main:kilo.jsonc").stdout
+        path = self.create(repo="api", change=False)
+        self.assertEqual(json.loads((path / "kilo.jsonc").read_text())["permission"],
+                         GUARD.generated_permission(policy, "required"))
+        self.assertEqual((api / "kilo.jsonc").read_bytes(), main_config)
+        self.assertEqual(self.git(api, "show", "main:kilo.jsonc").stdout, base)
+        self.assertFalse((path / ".kilo").exists())
+
+    def test_create_invalid_map_reports_partial_and_preserves_new_workspace(self):
+        (self.root / "kilo.jsonc").write_text("{invalid")
+        self.commit(self.root)
+        board = (self.root / "docs/BOARD.md").read_bytes()
+        result = self.cli("create", "--board", "BOARD-001", success=False)
+        self.assertIn("creation incomplete", result.stderr)
+        path = self.root / ".kilo/worktrees/shared-lifecycle"
+        self.assertTrue(path.is_dir())
+        self.git(self.root, "rev-parse", "--verify", "refs/heads/feat/shared-lifecycle")
+        self.assertEqual((path / "kilo.jsonc").read_text(), "{invalid")
+        self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), board)
+        self.assertEqual(self.status(), "Ready")
+        self.assertIn("permission initialization failed", WORKTREE.local_state(str(self.root))["workspaces"][str(path)]["error"])
 
     def test_fix_reuses_parent_and_discard_updates_all_shared_rows(self):
         self.add_row("BOARD-002", "Fix shared lifecycle", "Fix", "BOARD-001")

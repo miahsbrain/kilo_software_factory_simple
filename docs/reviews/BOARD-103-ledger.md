@@ -8,7 +8,13 @@ Round cap: 3. The ledger is the only state carried between rounds.
 - Stop reason: -
 
 ## Round 2
-- Findings: -
-- Fix rows: -
+- Findings: bug|functional|/factory|attached-git-directory — docs/reviews/BOARD-103-review.md, bug|functional|/factory|mode-map-consistency — docs/reviews/BOARD-103-review.md
+- Fix rows: BOARD-104, BOARD-107
 - Fix rows merged: -
-- Stop reason: -
+- Stop reason: Repeat fingerprints escalated BOARD-104/107 and parent to Blocked. User explicitly approved both focused corrections and a third/final review; no fourth round.
+
+## Round 3
+- Findings: bug|functional|/factory|mode-map-consistency — docs/reviews/BOARD-103-review.md
+- Fix rows: BOARD-107
+- Fix rows merged: -
+- Stop reason: BLOCKED at final round: inherited permission dict equality ignores rule order and may weaken secret denies. BOARD-107 repeat; no fourth round. Final reviewer discovered zero tests; no independent31-test proof. Template edit also requires permission reload. Human follow-up decision required.

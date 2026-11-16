@@ -5,12 +5,19 @@
 >   `.kilo/worktrees/configurable-shared-workspace-lifecycle-and-authenticated`, branch
 >   `feat/configurable-shared-workspace-lifecycle-and-authenticated`. Includes CLI lifecycle,
 >   assigned scopes, authenticated review and `merge-conflict-resolver`; no product changes.
-> - **Verification:** 25 disposable-repo lifecycle regressions and 19 browser regressions passed.
->   Browser proof includes a real local login/navigation fixture across two viewports. Fresh
->   corrected-state independent review is in progress; the live board owns final lane status.
+> - **Verification:** 31 disposable-repo lifecycle regressions and 19 browser regressions passed.
+>   The 31-test result is builder evidence; final independent discovery ran zero tests. Auth was
+>   independently verified with a real local login/navigation fixture across two viewports.
+> - **Final lifecycle corrections:** directory-changing shell routing is rejected, and newly
+>   created checkout maps are initialized from saved project mode. Final review found a blocking
+>   inherited-map order comparison defect at `worktree.py:640-643`. BOARD-107 and parent BOARD-103
+>   are Blocked at the three-round cap. Do not merge or enable this implementation.
 > - **Permission hold:** the template BOARD edit remains denied in this session. Its narrow `ask`
 >   exception is in the feature policy/generated config, not loaded session permissions. Live board
 >   prose also retains old guidance; only script-owned row metadata has changed there.
+> - **Next action:** obtain a human follow-up decision for order-sensitive inherited-map validation
+>   and reload the task-worktree permissions before the template edit. Preserve this workspace and
+>   local checkpoint commits. No fourth fix/review round is authorized.
 > - **Next action:** finish corrected-state review, then reload Kilo from this worktree configuration
 >   to apply the template correction. Local feature commits are authorized. Do not merge while the
 >   row is blocked. No real workspace was merged/discarded and no actual mode was changed.
@@ -88,6 +95,20 @@ existing guard generator. It preflights every effective map, restores prior map 
 write failure, and saves mode only after the maps are written. Missing/malformed effective
 configuration or an external `KILO_CONFIG` override is refused. These functions are effectful.
 
+`load_guard_policy(root)` at `.kilo/skills/git-worktree/scripts/worktree.py:122` extracts the
+existing mode policy loader for reuse by creation; it validates the control policy (effectful).
+`cmd_create()` at `.kilo/skills/git-worktree/scripts/worktree.py:519` uses the existing generator
+to initialize only the new checkout's local `kilo.jsonc` from saved project mode before success.
+Inherited maps must already match; base/canonical configs remain unchanged. App checkouts
+without a local config retain inheritance and generated scope pointers, not a copied harness.
+Invalid initialization preserves the created branch/worktree, records the error locally,
+reports incomplete creation, and leaves the board unchanged for human recovery.
+Known blocker: inherited-map dictionary equality at
+`.kilo/skills/git-worktree/scripts/worktree.py:640-643` ignores rule insertion order. A trailing
+wildcard allow can override secret denies while passing equality. Reuse the existing ordered-items
+validation in `.kilo/skills/git-worktree/scripts/guard.py:775-778` in an approved follow-up;
+the current implementation is not safe to enable.
+
 `lifecycle_selection()` resolves board rows and mapped repo IDs; `validate_workspace()`
 checks registered linked workspaces, branches, confinement and locks; `require_clean()` allows
 only `docs/BOARD.md` dirt in the control checkout. `related_rows()` and
@@ -103,6 +124,8 @@ The guard's `generated_permission(policy, mode="required")` is pure;
 `git_commands()` resolves separated, attached, empty and repeated relative `-C` arguments,
 refuses unsupported directory routing and missing values, and passes actual destinations
 to the effectful `context_verdict()`. Protected-branch commits remain denied in both modes.
+Directory-changing chains (`cd`, `pushd`, `popd`, wrapper/subshell routing and shell evaluation)
+are refused rather than interpreted; supported direct Git `-C` forms remain available.
 
 Human CLI examples, from the project root:
 
@@ -205,13 +228,18 @@ temporary directory:
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -v
 ```
 
-2026-11-16 independent-review correction result: 25 tests passed in 9.981s, exit 0, on one
-focused suite run. Coverage includes attached/repeated `-C`, no-commit merge options,
+2026-11-16 final-correction result: 31 tests passed in 12.054s, exit 0, on one focused suite
+run. New regressions cover unsupported directory chains, both saved-mode/base-map directions,
+app inheritance/pointers and existing local maps, unchanged base configs, and failed creation
+preserving its partial workspace and board bytes. Prior coverage includes attached/repeated `-C`, no-commit merge options,
 uncommitted zero-exit merge refusal, human-completed conflict retry and unrelated-commit
 rejection, control/linked/app mode transitions, malformed maps and write rollback, historical
 board integrity, and saved-base verification. Printed injected cleanup/unfinished-merge
 failures are expected passing test cases. No actual mode or permission-map regeneration was
-performed in this correction; earlier permission regeneration belongs to the original chunk.
+performed on actual repositories in this correction; earlier permission regeneration belongs
+to the original chunk. Final independent discovery reported `Ran 0 tests in 0.000s`, so it does
+not independently reproduce the 31 passes. Final source review found the inherited-map rule-order
+blocker; BOARD-103 remains Blocked, not merge-ready.
 
 Authenticated capture regressions:
 

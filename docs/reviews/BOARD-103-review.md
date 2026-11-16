@@ -40,10 +40,49 @@ and password forms are rejected. The template still describes a duplicate harnes
 ## Acceptance criteria
 - [ ] Destination protection and committed-merge cleanup have disposable-repo regression proof.
 - [ ] Conflict retry, consistent mode/maps, board incarnation and saved-base regressions pass.
-- [ ] Successful nested navigation and explicit authenticated-ready proof pass capture tests.
-- [ ] The project template matches the existing ignored-pointer model.
+- [x] Successful nested navigation and explicit authenticated-ready proof pass capture tests.
+  Proof: independent Round 2 run of `node --test .kilo/skills/qa-review/scripts/browser-review.test.mjs`, 19 passed, exit 0; test source at lines 222-250,279-288,359-387.
+- [x] The project template matches the existing ignored-pointer model.
+  Proof: independent Round 2 source review of `templates/project/AGENTS.md:1236-1250`.
 - [ ] Corrected current state receives an independent review before merge readiness.
 
 ## Risk
 High: faulty lifecycle checks can lose source work or misreport merges. Discard and source deletion
 are one-way; corrective code/config/documentation edits are two-way. No real merge or discard was run.
+
+## Round 2
+Independent lifecycle review passed 25 tests but found two uncovered repeats:
+- BOARD-104: `.kilo/skills/git-worktree/scripts/guard.py:494-502` ignores shell directory changes.
+  A `cd` chain can make the real Git destination differ from the checked feature workspace.
+- BOARD-107: `.kilo/skills/git-worktree/scripts/worktree.py:599-611` creates a new checkout from
+  base configuration without regenerating its map for the saved project mode.
+The existing rows and parent were Blocked, not duplicated. The user then explicitly approved
+rejecting unsupported directory-changing chains, regenerating maps during creation, focused
+regressions and one third/final independent review in this original workspace.
+
+Independent auth/rules review found no blocking BOARD-110 through BOARD-112 defects. Its single
+`node --test .kilo/skills/qa-review/scripts/browser-review.test.mjs` run passed 19 tests, exit 0.
+Proof: `.kilo/skills/qa-review/scripts/browser-review.mjs:271-303,758-775`,
+`.kilo/skills/qa-review/scripts/browser-review.test.mjs:222-250,279-288,359-387`, and
+`templates/project/AGENTS.md:1236-1250`. The canonical-script fixture proves one login, retained
+cookie/sessionStorage authentication and two settings-page visits across two viewports, PNG
+creation, and no fixture password/session values in console/page-error/network/stdout/stderr.
+No screenshot pixels, external SSO/MFA, real account or real-browser imported-state flow were
+reviewed; arbitrary private page content still needs human evidence inspection.
+
+## Round 3: Blocked
+P1 repeat `bug|functional|/factory|mode-map-consistency`: inherited permission validation at
+`.kilo/skills/git-worktree/scripts/worktree.py:640-643` compares dictionaries without insertion
+order. In optional mode, moving `permission.edit["*"]: "allow"` after secret-deny entries leaves
+dictionary equality unchanged but changes effective protection. An app checkout inheriting that
+map is accepted instead of preserving an incomplete creation. The existing ordered-items check
+at `.kilo/skills/git-worktree/scripts/guard.py:775-778` is the reuse candidate for a follow-up.
+
+Builder evidence: the authorized lifecycle suite passed 31 tests in 12.054 seconds, exit 0.
+Final independent attempt reported `Ran 0 tests in 0.000s`, exit 0; this is no regression proof.
+The finding is established by current-source inspection, not an executed exploit.
+
+BOARD-107 and parent BOARD-103 are Blocked. The round cap is reached; no fourth correction or
+review is authorized. The template BOARD permission hold also remains. Preserve the original
+workspace and checkpoint commits; do not merge, discard or enable the feature. A human follow-up
+decision and permission reload are required. No actual merge, discard or mode change was run.

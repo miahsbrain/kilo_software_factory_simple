@@ -493,6 +493,8 @@ def git_commands(command, cwd=None):
     found = []
     for tokens in segments(command):
         directory = cwd or os.getcwd()
+        if any("$(" in token or "`" in token for token in tokens):
+            raise ValueError("shell evaluation requires manual review; use direct git -C")
         while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
             if tokens[0].startswith("GIT_"):
                 raise ValueError("git environment overrides require manual review")
@@ -500,6 +502,10 @@ def git_commands(command, cwd=None):
         while tokens and tokens[0] in ("sudo", "command", "nice", "time", "xargs"):
             tokens = tokens[1:]
         if not tokens or os.path.basename(tokens[0]) != "git":
+            if any(os.path.basename(token) in ("cd", "pushd", "popd", "git", "eval", "source", ".",
+                                              "sh", "bash", "dash", "zsh", "ksh", "fish")
+                   or token.startswith("--chdir") or token in ("-C", "-D") for token in tokens):
+                raise ValueError("unsupported directory-changing shell chain; use direct git -C")
             continue
         args = tokens[1:]
         i = 0

@@ -119,22 +119,27 @@ def workspace_mode(cwd):
     return local_state(control_root(cwd))["mode"]
 
 
+def load_guard_policy(root):
+    spec = importlib.util.spec_from_file_location("guard", os.path.join(
+        script_root(), ".kilo", "skills", "git-worktree", "scripts", "guard.py"))
+    guard = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(guard)
+    if not guard.is_control_repo(root):
+        raise ValueError("workspace permissions require a control repository with a board and repo map")
+    policy = guard.load_policy(confined(os.path.join(root, guard.POLICY_REL), root))
+    if (not isinstance(policy, dict) or not policy.get("protected_branches") or
+            not isinstance(policy.get("bash"), list) or not isinstance(policy.get("edit"), list) or
+            not isinstance(policy.get("hidden_paths"), dict) or
+            not any(rule.get("workspace_default") for rule in policy["edit"])):
+        raise ValueError("control policy is missing required workspace/secret protections")
+    return guard, policy
+
+
 def cmd_mode(args, cwd):
     root = control_root(cwd)
     state = local_state(root)
     if args.value != "status":
-        spec = importlib.util.spec_from_file_location("guard", os.path.join(
-            script_root(), ".kilo", "skills", "git-worktree", "scripts", "guard.py"))
-        guard = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(guard)
-        if not guard.is_control_repo(root):
-            raise ValueError("mode requires a control repository with a board and repo map")
-        policy = guard.load_policy(confined(os.path.join(root, guard.POLICY_REL), root))
-        if (not isinstance(policy, dict) or not policy.get("protected_branches") or
-                not isinstance(policy.get("bash"), list) or not isinstance(policy.get("edit"), list) or
-                not isinstance(policy.get("hidden_paths"), dict) or
-                not any(rule.get("workspace_default") for rule in policy["edit"])):
-            raise ValueError("control policy is missing required workspace/secret protections")
+        guard, policy = load_guard_policy(root)
         repos, error = load_repos(root)
         if error or repos.get("control") != ".":
             raise ValueError(error or "repo map must register control as '.'")
@@ -596,11 +601,12 @@ def cmd_create(args, cwd):
         if args.base and args.base != saved_base:
             raise ValueError("reused workspace keeps its original base: %s" % saved_base)
         base = saved_base
+    guard, policy = load_guard_policy(root)
+    state = local_state(root)
     code, _, err = (0, "", "") if shared else git(target, "worktree", "add", path, "-b", branch, base)
     if code != 0:
         print("git worktree add failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         return REFUSED
-    state = local_state(root)
     if not shared:
         state["workspaces"][path] = {"base": base, "branch": branch, "outcome": "active", "boards": [args.board]}
     else:
@@ -609,6 +615,42 @@ def cmd_create(args, cwd):
         if args.board not in boards:
             boards.append(args.board)
     local_state(root, state)
+    if not shared:
+        try:
+            config = confined(os.path.join(path, "kilo.jsonc"), path)
+            inherited = set()
+            if os.path.commonpath([path, root]) == root:
+                for parent in Path(path).parents:
+                    if os.path.commonpath([str(parent), root]) != root:
+                        break
+                    ancestor = confined(os.path.join(parent, "kilo.jsonc"), root)
+                    if os.path.exists(ancestor):
+                        inherited.add(ancestor)
+            local = os.path.exists(config)
+            if not local and (repo_id == "control" or not inherited):
+                raise ValueError("new checkout has no effective project configuration")
+            candidates = inherited | ({config} if local else set())
+            override = os.environ.get("KILO_CONFIG")
+            if override and os.path.abspath(override) not in candidates:
+                raise ValueError("KILO_CONFIG is outside the new checkout's effective configurations")
+            for candidate in sorted(candidates):
+                expected, message = guard.write_permission_map(candidate, policy, mode=state["mode"], preview=True)
+                if expected is None:
+                    raise ValueError(message)
+                if candidate != config:
+                    current, _ = guard.load_config(candidate)
+                    if current.get("permission") != expected:
+                        raise ValueError("inherited permission map disagrees with saved mode: %s" % candidate)
+            if local:
+                expected, message = guard.write_permission_map(config, policy, mode=state["mode"])
+                if expected is None:
+                    raise ValueError(message)
+        except (ValueError, OSError) as exc:
+            state["workspaces"][path]["error"] = "permission initialization failed: %s" % exc
+            local_state(root, state)
+            print("worktree %s and branch %s preserved; permission initialization failed: %s; "
+                  "board unchanged, creation incomplete" % (path, branch, exc), file=sys.stderr)
+            return REFUSED
     scope = load_scope_module(script_root())
     if scope is not None:
         content = scope.pointer_content(root, repo_id, path)
