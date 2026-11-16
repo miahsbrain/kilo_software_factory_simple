@@ -17,7 +17,10 @@ Then, if asked to start it:
 - Add the row with the script:
   `python3 .kilo/skills/board/scripts/board.py add --id BOARD-00X --task "..." --type Feature \
       --status Ready --priority P2 --risk "🟡 medium — one line" --blocked-by "None."`
-- Create the worktree from the row — the name and branch type are derived from it:
+- Reuse the change's original repo-specific workspace set for all lanes/findings. Link a finding
+  using `worktree.py create --board FIX --reuse PARENT --repo ID`. Required mode is default;
+  optional mode permits assigned nonprotected current checkouts, not broader scopes. Create a
+  new workspace only on explicit request or for the next approved task after the previous merged:
   `python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main`
   The script writes the row's `Branch/Worktree` cell and moves it to `In Progress`.
 - Delegate the work to a builder agent working inside that worktree. The builder does **not**
@@ -28,4 +31,11 @@ Then, if asked to start it:
   green — including the QA and UI/UX review lanes for frontend work (`/ui`). `Pending Merge`
   means the work is waiting for human approval to merge.
 - Print the review and merge commands for the user. Never merge, push, or open a PR yourself.
-- After the user merges, set `Merged` and clean up the worktree.
+- Generate `worktree.py handoff --board ID` for all repository diffs and human batch merge commands.
+  The human runs `merge --board ID --apply` (repeat --board for batches); lifecycle preflights all
+  clean sources/targets except control-board metadata, readiness and commits, records non-atomic
+  partial outcomes, marks Merged only after all required surfaces complete and cleans up automatically.
+  Conflicts stay in existing workspaces for the specialist; human completes/retries after checks.
+- Explicit human discard previews `discard --board ID --repo ID`; only approved loss permits
+  `--apply --discard`. Fully discarded linked rows become Dropped, partial outcomes stay recorded.
+  Never untrack board.py/BOARD.md, discard unasked, or create an empty workspace after merge.

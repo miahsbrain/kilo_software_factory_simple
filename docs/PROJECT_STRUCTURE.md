@@ -22,7 +22,7 @@ and is never tracked here (ADR-053).
     │   ├── repos.json                # repo map of this repository: control only
     │   ├── scopes/<id>.md            # canonical scope rules, one per scope
     │   ├── skills/                   # board, git-worktree, qa-review + their scripts
-    │   └── worktrees/                # one worktree per board row (git-ignored)
+    │   └── worktrees/                # shared repo-specific change workspaces (git-ignored)
     ├── docs/
     │   ├── README.md                 # index of the factory documentation set
     │   ├── PROJECT_STRUCTURE.md      # this file
@@ -31,6 +31,7 @@ and is never tracked here (ADR-053).
     │   ├── DECISIONS.md              # append-only factory decisions (ADR-001…)
     │   ├── PROJECT_STATE.md          # current phase, progress, next step
     │   ├── STACK.md                  # the tools the factory needs, and the commands they run
+    │   ├── reviews/                  # task review findings and bounded-round ledger
     │   └── changelog/                # engineering log: CHANGELOG.md + one file per change
     ├── templates/
     │   └── project/                  # blank project skeleton a new project starts from
@@ -48,12 +49,15 @@ and is never tracked here (ADR-053).
 | Path | Purpose |
 |---|---|
 | `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
-| `.kilo/agent/` | Six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
+| `.kilo/agent/` | Seven definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`, `merge-conflict-resolver`. The last resolves preexisting conflicts without completing merges. |
 | `.kilo/command/` | Eight slash commands that package the workflow. Derived from `AGENTS.md`, never a source of rules. |
 | `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
 | `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
 | `.kilo/repos.json` | The repo map of this repository. The only way into a repository. |
-| `.kilo/scopes/` | The canonical scope rules, one file per scope. `guard.py sync` writes them into a project's app repositories as their `AGENTS.md`. |
+| `.kilo/scopes/` | Canonical specialization rules. Work surfaces receive an ignored generated `AGENTS.md` pointer; task assignments define repository/path boundaries. |
+| `.kilo/skills/git-worktree/scripts/test_lifecycle.py` | Disposable-repository regression tests for lifecycle mechanics. |
+| `.kilo/skills/qa-review/scripts/browser-review.test.mjs` | Focused authenticated-navigation and evidence-capture regression tests. |
+| `docs/reviews/` | BOARD-103 independent findings and its review-round ledger; not UI artifacts. |
 | `templates/project/` | The blank project skeleton. A new project copies it, then fills it in. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
 | `kilo.jsonc` | Kilo settings: the Playwright MCP server and the generated permission map. |

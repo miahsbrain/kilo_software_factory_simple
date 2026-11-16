@@ -7,9 +7,12 @@ stays in the main checkout and only you write it.
 
 1. **Pick** the row: highest-priority `Ready`, not blocked by another row. Grade it
    low/medium/high (§B4 "Task grading") to set the rigor of review.
-2. **Build** in the worktree named after the feature. Create it from the board row if it does not
-   exist: `python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <ID> --base main`
-   (the branch type and slug are derived from the row).
+2. **Build** in the original assigned repo-specific workspace set. Reuse it for fixes, QA,
+   critique, docs and conflict resolution. Link findings with `worktree.py create --board <FIX>
+   --reuse <PARENT> --repo <ID>`. Create only for an explicitly requested workspace or the next
+   approved task after the previous merged, never automatically after merge. Required mode is
+   default; optional permits the assigned nonprotected current checkout. Use `worktree.py mode
+   required|optional|status` to select/report mode and restart Kilo after permissions regenerate.
    - Implement the smallest change that satisfies every acceptance criterion.
    - Update the scope docs (`HANDOVER.md`, `BUSINESS-LOGIC.md`, `ARCHITECTURE.md`,
      `DECISIONS.md`, `changelog/`) in the same change set (§B1).
@@ -20,7 +23,11 @@ stays in the main checkout and only you write it.
      command that changes history or the remote. A denied command is not run; a command that needs
      approval waits for the user.
 3. **QA** — produce evidence, not assertion. One observable check per acceptance criterion,
-   with the command and result and `file:line`. For UI work, capture screenshots.
+    with the command and result and `file:line`. For UI work, capture screenshots.
+    - Application source stays read-only; approved auth/navigation and evidence writes are allowed.
+      Use existing capture `--storage-state`/`--navigation` ignored local JSON per the QA skill.
+      Ask for test access if absent, leave MFA/SSO to the user, and never bypass auth. Explicit
+      destructive authorization is required for `--allow-destructive`; no secrets in evidence/CLI.
    - The capture script is the only way to capture UI evidence. Ad-hoc `chromium`, `npx playwright
      screenshot`, `curl`-and-guess, or any other browser command from bash is not acceptable
      evidence. The script never installs a browser and never falls back to another driver. If
@@ -51,11 +58,13 @@ stays in the main checkout and only you write it.
    clean, docs updated, and `worktree.py verify <slug>` printing `READY FOR MERGE` → set the row
    to `Pending Merge` with `board.py set-status`.
    That state means the work is waiting for human approval to merge.
-6. **Hand off.** Report the worktree path, the branch, the commits, and the review commands.
-   Print the merge command for the user:
-
-       git merge --no-ff <type>/<feature-slug> -m "merge: <feature-slug>"
-
-   Never merge, push, or open a PR yourself.
+6. **Hand off.** Run `python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <ID>`
+   to print all repo diffs and human `merge --board <ID> --apply` commands (repeat `--board` for
+   batches). Preflight all sources/targets clean except live board metadata, readiness and commits.
+   Multi-repo merge is non-atomic: preserve partial state and stop on conflict. Assign the specialist
+   to the existing conflicted checkout; the human completes it after review/checks then retries.
+   Only full completion marks rows Merged; cleanup is automatic. Never merge, push or open a PR.
+   Discard is separate: human preview `discard --board <ID> --repo <ID>`, then only explicit loss
+   approval permits `--apply --discard`. Never discard unasked. Do not untrack board.py or BOARD.md.
 
 Report in this order: what was done, what is proven, what is not done and why, next action.

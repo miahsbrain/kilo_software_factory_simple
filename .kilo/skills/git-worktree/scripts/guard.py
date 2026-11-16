@@ -46,6 +46,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 RM_CMDS = {"rm", "rmdir", "unlink", "trash"}
 TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
@@ -437,7 +438,11 @@ def protected_branch_names(repo, policy=None):
     through ``origin/HEAD`` is always included.
     """
     names = set((policy or {}).get("protected_branches") or PROTECTED_BRANCHES)
-    head = git_out(repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    result = subprocess.run(["git", "-C", repo, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+                            capture_output=True, text=True, timeout=30)
+    if result.returncode not in (0, 1):
+        raise ValueError("cannot resolve protected default branch")
+    head = result.stdout.strip()
     if head:
         names.add(head.split("/", 1)[1] if "/" in head else head)
     return names
@@ -479,17 +484,18 @@ def load_policy(path):
 
 
 def pattern_matches(command, pattern):
-    """True when the command equals the pattern or starts with the part before its first '*'."""
-    if "*" not in pattern:
-        return command == pattern
-    return command.startswith(pattern.split("*", 1)[0])
+    """Match the same glob patterns used by the generated permission map."""
+    return fnmatch.fnmatchcase(command, pattern)
 
 
-def git_commands(command):
-    """[(reconstructed, subcommand, args)] for every git command in the shell command."""
+def git_commands(command, cwd=None):
+    """[(reconstructed, subcommand, args, directory)] for each git command."""
     found = []
     for tokens in segments(command):
+        directory = cwd or os.getcwd()
         while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+            if tokens[0].startswith("GIT_"):
+                raise ValueError("git environment overrides require manual review")
             tokens = tokens[1:]
         while tokens and tokens[0] in ("sudo", "command", "nice", "time", "xargs"):
             tokens = tokens[1:]
@@ -498,15 +504,30 @@ def git_commands(command):
         args = tokens[1:]
         i = 0
         while i < len(args) and args[i].startswith("-"):
-            if args[i] == "-C" or args[i] in GIT_VALUE_OPTS:
+            if args[i].startswith(("--git-dir", "--work-tree")):
+                raise ValueError("git directory overrides require manual review")
+            option = args[i]
+            if option == "-C" or option in GIT_VALUE_OPTS:
+                if i + 1 >= len(args):
+                    raise ValueError("missing argument for git %s" % option)
+                if option == "-C" and args[i + 1]:
+                    directory = os.path.abspath(os.path.join(directory, args[i + 1]))
                 i += 2
-            else:
+            elif option.startswith("-C"):
+                directory = os.path.abspath(os.path.join(directory, option[2:]))
                 i += 1
+            elif (option.startswith("-c") or option.startswith(("--config-env=", "--namespace=", "--exec-path="))
+                  or option in ("--bare", "--no-pager", "--paginate", "-p", "-P", "--no-replace-objects",
+                                "--literal-pathspecs", "--glob-pathspecs", "--noglob-pathspecs",
+                                "--icase-pathspecs", "--no-optional-locks", "--no-lazy-fetch")):
+                i += 1
+            else:
+                raise ValueError("unsupported git global option: %s" % option)
         if i >= len(args):
             continue
         sub = args[i]
         rest = args[i + 1:]
-        found.append(("git %s%s" % (sub, (" " + " ".join(rest)) if rest else ""), sub, rest))
+        found.append(("git %s%s" % (sub, (" " + " ".join(rest)) if rest else ""), sub, rest, directory))
     return found
 
 
@@ -538,10 +559,12 @@ def context_verdict(policy, command, cwd, ctx):
             fired = True
         elif check == "protected_branch":
             branch = git_out(cwd, "rev-parse", "--abbrev-ref", "HEAD")
+            if not branch or branch == "HEAD":
+                raise ValueError("cannot establish a named branch; refusing commit")
             top = git_out(cwd, "rev-parse", "--show-toplevel") or cwd
             fired = branch in protected_branch_names(top, policy)
         elif check == "in_worktree":
-            fired = not is_linked_worktree(cwd)
+            fired = load_worktree_module().workspace_mode(cwd) == "required" and not is_linked_worktree(cwd)
         elif check == "branch_switch_in_worktree":
             parts = command.split()
             sub = parts[1] if len(parts) > 1 else ""
@@ -578,13 +601,17 @@ def cmd_check_git(command, cwd, ctx):
         return USAGE
     policy = load_policy(path)
 
-    commands = git_commands(command)
+    commands = git_commands(command, cwd)
     if not commands:
         print("no git command")
         return OK
 
-    for reconstructed, _sub, _rest in commands:
-        rule = context_verdict(policy, reconstructed, cwd, ctx)
+    for reconstructed, _sub, _rest, directory in commands:
+        context = repo_context(directory)
+        if not context:
+            print("blocked: cannot establish git repository context", file=sys.stderr)
+            return DENIED
+        rule = context_verdict(policy, reconstructed, directory, context)
         if rule:
             action = rule.get("action", "deny")
             reason = rule.get("reason", "")
@@ -660,7 +687,7 @@ def load_config(path):
 FILE_TOOLS = ("read", "grep", "glob", "list")
 
 
-def generated_permission(policy):
+def generated_permission(policy, mode="required"):
     """The permission block generated from the policy: fallback first, then rules in file order.
 
     `hidden_paths` is expanded into one deny rule per path for every file-reading tool, so a git
@@ -671,7 +698,10 @@ def generated_permission(policy):
     for kind in ("bash", "edit"):
         mapping = {FALLBACK_KEY: fallback}
         for rule in policy.get(kind, []):
-            mapping[rule["pattern"]] = rule["action"]
+            action = rule["action"]
+            if kind == "edit" and rule.get("workspace_default") and mode == "optional":
+                action = "allow"
+            mapping[rule["pattern"]] = action
         block[kind] = mapping
     hidden = policy.get("hidden_paths") or {}
     tools = hidden.get("tools") or FILE_TOOLS
@@ -685,25 +715,37 @@ def generated_permission(policy):
     return block
 
 
-def permission_block_text(policy):
-    return json.dumps({"permission": generated_permission(policy)}, indent=2)
+def permission_block_text(policy, mode="required"):
+    return json.dumps({"permission": generated_permission(policy, mode)}, indent=2)
 
 
-def write_permission_map(config_path, policy, create_missing=False):
+def write_permission_map(config_path, policy, create_missing=False, mode=None, preview=False):
     """(expected, message). Writes the generated permission block into config_path."""
-    expected = generated_permission(policy)
+    if mode is None:
+        mode = load_worktree_module().workspace_mode(os.path.dirname(config_path))
+    expected = generated_permission(policy, mode)
     existed = os.path.exists(config_path)
     config, bad_line = load_config(config_path)
     if config is None:
-        if not create_missing:
+        if not create_missing or existed:
             return None, ("cannot parse %s%s" %
                           (config_path, (" at line %d" % bad_line) if bad_line else ""))
         config = {"$schema": SCHEMA_URL}
+    if not isinstance(config, dict):
+        return None, "config must be an object: %s" % config_path
     updated = {k: v for k, v in config.items() if k != "permission"}
     updated["permission"] = expected
-    with open(config_path, "w", encoding="utf-8") as fh:
-        json.dump(updated, fh, indent=2, ensure_ascii=False)
-        fh.write("\n")
+    text = json.dumps(updated, indent=2, ensure_ascii=False) + "\n"
+    if preview:
+        return expected, text
+    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(config_path), prefix=".permissions-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(temporary, config_path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
     return expected, ("updated" if existed else "created")
 
 
@@ -713,7 +755,8 @@ def cmd_check_policy(write, cwd, ctx):
         print("policy file not found: %s" % POLICY_REL, file=sys.stderr)
         return USAGE
     policy = load_policy(path)
-    expected = generated_permission(policy)
+    mode = load_worktree_module().workspace_mode(cwd)
+    expected = generated_permission(policy, mode)
 
     config_path = os.path.join(root, "kilo.jsonc")
     config, bad_line = load_config(config_path)
@@ -738,7 +781,7 @@ def cmd_check_policy(write, cwd, ctx):
         return OK
 
     print("policy out of sync: %s does not match %s" % (config_path, path))
-    print(permission_block_text(policy))
+    print(permission_block_text(policy, mode))
     return DENIED
 
 
@@ -747,7 +790,7 @@ def cmd_policy(cwd, ctx):
     if not path:
         print("policy file not found: %s" % POLICY_REL, file=sys.stderr)
         return USAGE
-    print(permission_block_text(load_policy(path)))
+    print(permission_block_text(load_policy(path), load_worktree_module().workspace_mode(cwd)))
     return OK
 
 
@@ -1226,8 +1269,8 @@ def main(argv):
     cwd = os.getcwd()
     ctx = repo_context(cwd)
     if ctx is None:
-        print("not inside a git repository; nothing to guard against")
-        return OK
+        print("not inside a git repository; refusing operation", file=sys.stderr)
+        return DENIED
 
     env = dict(os.environ)
     if args.command == "check-delete":
@@ -1249,6 +1292,6 @@ if __name__ == "__main__":
         sys.exit(main(sys.argv[1:]))
     except SystemExit:
         raise
-    except Exception as exc:  # a broken guard must never block unrelated work
-        print("guard.py internal error, not blocking: %s" % exc, file=sys.stderr)
-        sys.exit(OK)
+    except Exception as exc:
+        print("guard.py internal error; refusing operation: %s" % exc, file=sys.stderr)
+        sys.exit(DENIED)

@@ -15,6 +15,26 @@ python3 .kilo/skills/board/scripts/board_serve.py --port 15180
 The board viewer is read-only: it serves the board and the live worktree state, and never writes
 to either. It re-reads `docs/BOARD.md` on every request, so the page is always current.
 
+## Workspace Lifecycle
+
+```bash
+# Project-local mode, required default; restart Kilo after a change
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode status
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode optional
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode required
+# Shared finding workspace; reuse the original mapped repository path
+python3 .kilo/skills/git-worktree/scripts/worktree.py create --board FIX --reuse PARENT --repo ID
+# All-repo review output; human-only apply, repeat --board for batches
+python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board ID
+python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board ID --apply
+# Preview first; --apply --discard only after explicit human loss approval
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board ID --repo ID
+```
+
+All lanes reuse original workspace paths; optional mode does not expand assignment. New workspace
+only on explicit request or next approved task after previous merge, not automatically afterward.
+No agent merges/pushes/PRs; preserve partial multi-repo state for human completion/retry.
+
 ## <Application or scope>
 
 Stack: TBD
@@ -52,6 +72,16 @@ Browser resolution, highest priority first:
 When no chromium is found, the capture script exits 2 and prints the list of places it searched
 plus the commands that point it at a binary. It never installs a browser and never falls back to
 another driver.
+
+Authenticated capture: `--storage-state <ignored-local.json>` and/or `--navigation
+<ignored-local.json>`; exact env-backed schema in QA skill. `--allow-destructive` requires explicit
+user approval of those actions. Ask for test access; manual user MFA/SSO only. Known credentials/
+session masking is not arbitrary sensitive-content protection; inspect evidence before sharing.
+Storage-state or login also requires ignored navigation config with an app-specific
+`authenticatedSelector`, for example `"authenticatedSelector": "[data-testid='signed-in-shell']"`.
+Check the signed-in marker is visible after navigation settles, before capture; route-only proof
+can accept a same-URL MFA/SSO gate. Do not use password-input heuristics. Page-changing navigation
+declares the final destination via an existing step, e.g. `{"action":"waitForURL","path":"/app"}`.
 
 ## Mobile
 

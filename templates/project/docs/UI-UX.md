@@ -257,6 +257,42 @@ Per route and viewport it writes `full.png`, `console.log`, `page-errors.log`, a
 `network.json`, plus a top-level `summary.json` with the counts and the horizontal-overflow
 result.
 
+### Authenticated Capture
+
+Use the same script in the original assigned workspace, with `--storage-state <ignored-local.json>`
+and/or `--navigation <ignored-local.json>`. JSON must be local and ignored, never committed.
+Navigation includes `approved`, `login`, `authenticatedPath`, `authenticatedSelector`, `steps`;
+each array has at most 50 actions. Actions are `goto`/`path`, `fill`/`selector`/`env`,
+`click`/`selector`/`intent`
+(`login|navigation|destructive`), `waitForURL`/`path`, `waitForSelector`/`selector`. Login requires
+authenticatedPath. URLs are same-origin with no credentials/query/fragment. See the QA skill's
+full JSON example. Credentials are supplied by environment variable name, not literal values.
+
+Storage-state or login capture requires an app-specific `authenticatedSelector` in the ignored
+navigation config. Verify its signed-in marker is visible after navigation settles, before
+capturing evidence. A route alone can mistake a same-URL MFA/SSO gate for login. Never infer
+authentication from password-input presence/absence: password forms can be valid after login.
+Navigation that changes pages declares its final destination using an existing `waitForURL` step.
+For example, with authorized storage state, adapt the marker and final path to the application:
+
+```json
+{
+  "approved": true,
+  "authenticatedSelector": "[data-testid='signed-in-shell']",
+  "steps": [
+    {"action": "goto", "path": "/app/settings"},
+    {"action": "waitForURL", "path": "/app/settings"}
+  ]
+}
+```
+
+Ask the user for authorized test access if absent; MFA/SSO requires manual user login, never a
+bypass. Destructive actions require explicit user authorization and `--allow-destructive`.
+Never put secrets in CLI/commits/evidence. Only known credentials/session values are masked,
+not arbitrary sensitive page content; inspect artifacts before sharing. Reviewers are read-only
+against application source, not prohibited from approved auth/navigation/evidence interactions.
+All existing viewport, count, overflow, network and accessibility criteria still apply.
+
 ### Artifact layout
 
 There is one canonical artifacts folder, at the repository root:

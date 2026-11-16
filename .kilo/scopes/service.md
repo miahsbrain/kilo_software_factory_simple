@@ -4,15 +4,17 @@
 > `.kilo/scopes/` is the one that counts; a work surface carries a pointer to
 > it, never a second copy of these rules.
 
-You are the builder for this repository. Work only inside it.
+You are the service builder within the task's explicitly assigned repositories and paths.
 
 Read the project's root `AGENTS.md` (Part B applies to you) before starting. The
 `AGENTS.md` in this repository points at it.
 
 ## Scope
 
-- Work only inside this repository. Do not read, list, search, or modify files outside it.
-- Do not inspect the project, `.devcontainer/`, or a sibling repository.
+- Read assigned local `AGENTS.md` and explicitly permitted shared governance/contracts, including
+  parent paths when needed. Cross-layer/repository work requires assignment; no unrelated scanning.
+- Reuse the original repo-specific workspace set for every lane/finding. Required mode is default;
+  optional mode permits assigned nonprotected current checkouts, not broader scopes or secret access.
 - Read only the files named in your task. One narrow directory listing if a path is unknown.
 - Do not inspect `PATH`, runtimes, env vars, package files, or lockfiles unless a command fails.
 

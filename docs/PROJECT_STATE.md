@@ -11,14 +11,17 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **In flight:** two branches wait for the user to merge. `feat/compact-accordion-redesign-of-the-live`
-  (BOARD-102) turns the live board viewer into a vertical accordion of collapsible lanes with compact
-  cards and folds kept in the browser; `docs/add-the-no-production-build-rule` (BOARD-101) adds the
-  no-production-build rule. The split from the previous single-repository layout is committed on the
-  current branch and waiting for the user to merge.
-- **Next action:** the user reviews and merges the two branches. Then pick the first project row
-  from the project's board — `project/docs/RISKS.md` holds the ranked defect list, and the top one
-  is the cross-tenant credential bleed in `payment_gateway_ms`.
+- **Active task:** configurable shared-workspace lifecycle/authenticated review in
+  `.kilo/worktrees/configurable-shared-workspace-lifecycle-and-authenticated` (BOARD-103).
+  Seven agents include the conflict specialist. Independent review produced BOARD-104 through
+  BOARD-112; corrections and focused regression checks reuse this same workspace.
+- **Previous work:** BOARD-101 (no-production-build rule) and BOARD-102 (accordion board viewer)
+  are recorded as Merged on the live factory board. They are not active tasks.
+- **Permission blocker:** the session still denies `templates/project/docs/BOARD.md` after the
+  user approved enabling its edit. Do not bypass the denial or claim its old instructions aligned.
+- **Next action:** finish corrected-state verification and independent review, then resolve the
+  template permission before merge readiness. Local feature commits are authorized. No real
+  workspace merge or discard has run, and no new workspace is needed.
 
 ## Open questions
 

@@ -10,6 +10,10 @@ or a failing command is not a finding — it is an opinion.
 
 **The script captures. You judge.** The script does the mechanical work; you decide what is a
 defect, what the severity is, and what the fix should be.
+Read assigned local `AGENTS.md` and explicitly permitted shared governance/contracts. Reuse the
+original repo-specific workspace set across all lanes and findings; fresh reviewer sessions do not
+mean fresh worktrees. Optional mode permits assigned nonprotected current checkouts, not wider scope.
+Application source remains read-only; approved auth/navigation and evidence writes are permitted.
 
 ---
 
@@ -40,7 +44,8 @@ node .kilo/skills/qa-review/scripts/browser-review.mjs \
 ```
 
 The script exits 0 when the capture completed, even when errors were found. Findings are your
-job. It exits 2 on a fatal failure (browser launch, bad URL) — report that, do not fake a review.
+job. It exits 2 on a capture/authentication failure or fatal failure (browser launch, bad URL).
+Report that, do not fake a review.
 
 ### The script is the only way to capture UI evidence
 
@@ -62,6 +67,52 @@ reviewed change, not a silent patch mid-review. Do not work around it with anoth
 | `--compare <dir>` | A **before \| after** sheet against a previous capture, per scheme. |
 | `--label <slug>` | Names the capture, so round 0, round 1 and round 2 can be compared. |
 | `--chromium <path>` | The path of a chromium binary handed to Playwright's launch. Overrides `PLAYWRIGHT_CHROMIUM_PATH`. |
+| `--storage-state <path>` | Ignored local Playwright storage-state JSON; never commit or print its contents. |
+| `--navigation <path>` | Ignored local approved login/navigation JSON, schema below. |
+| `--allow-destructive` | Only after explicit user authorization for the destructive actions. |
+
+### Authenticated Routes
+
+Ask the user for authorized test access if absent. MFA/SSO is a manual user login, not an auth
+bypass. Reuse a user-provided ignored local storage state or approved navigation file. Do not
+put passwords/tokens/session values in CLI arguments, committed JSON or evidence. Example schema
+(placeholders and environment-variable names only; actual navigation JSON stays local/ignored):
+
+```json
+{
+  "approved": true,
+  "login": [
+    { "action": "goto", "path": "/login" },
+    { "action": "fill", "selector": "#email", "env": "QA_TEST_EMAIL" },
+    { "action": "fill", "selector": "#password", "env": "QA_TEST_PASSWORD" },
+    { "action": "click", "selector": "button[type=submit]", "intent": "login" },
+    { "action": "waitForURL", "path": "/app" }
+  ],
+  "authenticatedPath": "/app",
+  "authenticatedSelector": "[data-testid='signed-in-user-menu']",
+  "steps": [
+    { "action": "click", "selector": "a[href='/settings']", "intent": "navigation" },
+    { "action": "waitForURL", "path": "/settings" },
+    { "action": "waitForSelector", "selector": "main" }
+  ]
+}
+```
+
+Only `approved`, `login`, `steps`, `authenticatedPath`, `authenticatedSelector` are supported top-level fields. Each action
+array has at most 50 steps. Allowed actions: `goto/path`, `fill/selector/env`, `click/selector/intent`
+(`login|navigation|destructive`), `waitForURL/path`, `waitForSelector/selector`. Login requires
+`authenticatedPath`; URLs stay same-origin with no credentials, query or fragment. A destructive
+intent additionally requires `--allow-destructive` AND explicit user approval of those actions.
+Whenever login or `--storage-state` is used, `--navigation` must supply an app-specific
+`authenticatedSelector` that is visible only when signed in. The marker must be visible after
+login, before interacting with the protected target, and after navigation settles before capture.
+A matching URL or absence of a password input is not authentication proof; password-settings
+pages remain capturable when the signed-in marker is visible. Missing configuration or proof
+requires user-supplied test access; MFA/SSO remains manual, never bypassed. Public captures without
+login/state do not require a marker. Page-changing steps must declare the final destination with
+`waitForURL` (as above for `--route /app`); `waitForSelector` alone does not declare a URL.
+Masking covers known credential/session values, not arbitrary sensitive page content; inspect
+screenshots/logs before sharing. Authentication does not waive viewport, count or accessibility rules.
 
 ### Artifact layout
 
@@ -127,8 +178,8 @@ script launches `/usr/bin/chromium` when Playwright has no downloaded browser.
 
 **When no chromium is found, the script exits 2** and prints the list of places it searched plus
 the commands that point it at a binary. It never installs a browser and never falls back to
-another driver. A binary that exists but fails to start is reported the same way, with the
-underlying error.
+another driver. A binary that exists but fails to start is reported with its path and a generic
+failure message; raw launch errors are withheld to protect credentials.
 
 ### When something fails, report it — do not route around it
 
@@ -287,6 +338,9 @@ opening.
 
 **The board is written by the orchestrator in the main checkout.** A reviewer working in a
 worktree reports its findings; the orchestrator creates the rows.
+Link Fix rows with `worktree.py create --board FIX --reuse PARENT --repo ID`; re-verify the original
+criterion after the fix in the same workspace, before combined parent/Fix handoff. No separate fix
+merge is required. Use ledger `merged` only after the human has actually merged the linked rows.
 
 ---
 

@@ -1,15 +1,18 @@
 # AGENTS.md — Web Builder
 
-> Source of truth for this scope. `guard.py sync --repo <id>` keeps each repository's copy in step.
+> Canonical specialization rules. `guard.py sync --repo <id>` generates an ignored pointer here,
+> not a duplicate rules file. Task assignments define repository/path boundaries.
 
-You are the web builder for this workspace. Work only inside `apps/web/`.
+You are the web builder, specializing in web UI within the task's assigned repositories/paths.
 
 Read the root `AGENTS.md` (Part B applies to you) before starting.
 
 ## Scope
 
-- Work only inside `apps/web/`. Do not read, list, search, or modify files outside it.
-- Do not inspect parent folders, `.devcontainer/`, or API/mobile code.
+- Read assigned local `AGENTS.md` and explicitly permitted shared governance/contracts, including
+  parent paths when needed. Cross-layer work requires explicit assignment; no unrelated scanning.
+- Reuse the original repo-specific workspace set for every lane/finding. Required mode is default;
+  optional mode permits assigned nonprotected current checkouts, not broader scopes or secret access.
 - Read only the files named in your task. One narrow directory listing if a path is unknown.
 - Do not inspect `PATH`, runtimes, env vars, package files, or lockfiles unless a command fails.
 

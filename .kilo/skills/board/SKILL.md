@@ -13,6 +13,8 @@ checkout**, and the orchestrator is its **only writer**.
 - The script is the only sanctioned way to change it. Hand-editing the table loses the column
   alignment and risks corrupting a row.
 - One orchestrator at a time. Never two agents writing the board.
+- `board.py` and `docs/BOARD.md` remain tracked. Human lifecycle commands also write outcomes
+  through the board parser; agents never untrack either file or hand-edit lifecycle cells.
 
 ---
 
@@ -74,10 +76,10 @@ plus `Blocked` (parked for a human) and `Dropped` (abandoned).
 |---|---|
 | `Backlog` | Identified, not started |
 | `Ready` | Scoped, has acceptance criteria, can be picked up |
-| `In Progress` | Worktree exists, Build lane running |
+| `In Progress` | Assigned workspace exists, Build lane running (optional mode may use current checkout) |
 | `In Review` | Build done, QA and Review lanes running |
 | `Pending Merge` | Green. **Waiting for human approval to merge** |
-| `Merged` | The user merged it; the worktree can be cleaned up |
+| `Merged` | Human CLI completed all required repo surfaces and automatic cleanup |
 | `Blocked` | Parked for a human: needs a decision, unclear scope, or duplicate |
 | `Dropped` | Abandoned; the reason is recorded |
 
@@ -118,8 +120,8 @@ python3 .kilo/skills/board/scripts/board.py set-status BOARD-005 "In Progress"
 python3 .kilo/skills/board/scripts/board.py set-status BOARD-005 "In Review"
 python3 .kilo/skills/board/scripts/board.py set-status BOARD-005 "Pending Merge"
 
-# 4. after the human merges
-python3 .kilo/skills/board/scripts/board.py set-status BOARD-005 "Merged"
+# 4. generate all-repository diffs and human merge commands
+python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board BOARD-005
 ```
 
 When the worktree exists, record it:
@@ -135,6 +137,9 @@ python3 .kilo/skills/board/scripts/board.py set-field BOARD-005 \
 
 A QA or UI/UX finding is a **bug-fix unit of work**. The reviewer reports it; the orchestrator
 creates the row:
+Link its original repo-specific workspace with `worktree.py create --board FIX --reuse PARENT
+--repo ID`. Build, fixes, QA, critique, docs and conflict resolution reuse those paths. After
+re-verification, shared rows may hand off together; no per-finding worktree or separate merge.
 
 - `Type: Fix`
 - `Status: Ready` — or `Blocked` when the finding needs a product decision
@@ -174,6 +179,15 @@ The port is forwarded by the devcontainer as **Factory Board (15180)**.
 - **Never silently drop a row.** A task that cannot proceed moves to `Blocked` with a one-line
   reason and what unblocks it.
 - **`Merged` means the user merged it.** Never "the agent finished".
+- Human `worktree.py merge --board ID --apply` (repeat --board for batches) preflights every
+  clean source/target except control-board metadata, readiness and commits, records partial
+  non-atomic progress, marks rows Merged only after all required surfaces finish, then cleans up.
+  Conflict resolution uses existing workspaces; the human completes/retries after checks.
+- Explicit human discard previews `discard --board ID --repo ID`; `--apply --discard` can remove
+  selected dirty/unmerged mapped linked worktrees/feature branches, never protected/outside paths.
+  Fully discarded linked rows become Dropped; record partial outcomes. Never discard unasked.
+- New workspace only on explicit request or the next approved task after the previous merged;
+  do not create an empty one automatically after merge. Optional mode never expands assignment.
 - **`Blocked by` defines the order of work.** Settle shared contracts, schemas, and file layouts
   on the base branch before fanning out to parallel worktrees.
 - **One orchestrator.** Never run two orchestrators against the same board.

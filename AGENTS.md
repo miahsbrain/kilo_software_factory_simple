@@ -321,7 +321,11 @@ yourself — if a builder fails, create a focused corrective task.
 
 Use the web builder for the web scope, mobile builder for the mobile scope, and API builder for
 the API/services scope, with the actual paths from `docs/PROJECT_STRUCTURE.md`. Include the
-workspace path in every builder prompt.
+workspace paths and mapped repository IDs in every builder prompt. Specializations guide routing,
+not folder permissions: agents may cross layers only within explicitly assigned repositories and
+paths. Permit named shared governance/contracts reads, including parent locations when needed.
+Read assigned local `AGENTS.md` files. Reuse the change's original repo-specific workspace set
+for build, fixes, QA, UI critique, documentation and conflict resolution; never create review worktrees.
 
 Builders must read their nearest applicable `AGENTS.md`, stay inside the assigned scope, and
 report changed files, verification, assumptions, blockers, and limitations.
@@ -335,7 +339,7 @@ the intent. Never have an agent hand-run the underlying command when a script co
 
 | Rule | Script that owns it |
 |---|---|
-| Every change gets a worktree with a feature-named path and branch | `.kilo/skills/git-worktree/scripts/worktree.py` |
+| Project-local workspace mode, shared workspace reuse and human lifecycle CLI | `.kilo/skills/git-worktree/scripts/worktree.py` |
 | Deletion only inside the worktree; worktree paths confined to `.kilo/worktrees/` | `.kilo/skills/git-worktree/scripts/guard.py` |
 | The board is edited by lane and cell, never hand-written | `.kilo/skills/board/scripts/board.py` |
 | QA evidence capture: screenshots, console, page errors, network, overflow | `.kilo/skills/qa-review/scripts/browser-review.mjs` |
@@ -386,7 +390,8 @@ question and a recommended default, and the user is asked.
 - maximum verification commands (one);
 - no environment discovery unless a command fails;
 - no broad directory scanning;
-- do not inspect parent folders, `.devcontainer/`, `PATH`, runtimes, or env vars;
+- permit explicitly assigned local rules/shared governance reads; no unrelated parent scanning,
+  `.devcontainer/`, `PATH`, runtimes, or env var discovery;
 - do not read package files or lockfiles just to discover commands.
 
 ### Delegation efficiency & prompt economy
@@ -514,7 +519,8 @@ When the user provides a reference (image, mockup, HTML, screenshot), do **not**
 reinterpret it yourself unless asked. Pass it to the relevant client builder as part of the prompt.
 If it is a URL, include the URL. If it is a local file, place it in
 `apps/<scope>/.builder-references/` first and pass the in-scope path. Reference files are for UI
-tasks only; do not use them for API tasks. Do not let a client agent read outside its workspace.
+tasks only; do not use them for API tasks. Client reads stay within assigned paths and explicitly
+permitted local rules/shared governance; do not scan unrelated locations.
 
 ### Runtime logging governance (backend)
 
@@ -549,8 +555,8 @@ in `docs/RISKS.md`.
 
 ### API builder guidance
 
-Work only inside the assigned API scope. Do not read, list, search, or modify anything outside it;
-do not inspect parent folders; do not touch web or mobile code. Use the stack from
+Work inside the explicitly assigned repositories and paths, including other layers only when
+assigned. Read local rules and explicitly permitted shared governance/contracts. Use the stack from
 `docs/STACK.md` — do not assume FastAPI, Flask, Django, Express, NestJS, Go, Rails, or any
 framework unless confirmed. Keep routes, controllers, services, repositories, schemas, middleware,
 config, integration clients, and tests in their proper responsibilities. Avoid generic
@@ -560,7 +566,8 @@ weaken security controls unless explicitly required by approved acceptance crite
 
 ### Web builder guidance
 
-Work only inside the web scope. Do not touch API or mobile code. Use the web stack from
+Work inside the explicitly assigned repositories and paths; other layers require assignment.
+Read local rules and explicitly permitted shared governance/contracts. Use the web stack from
 `docs/STACK.md`. Keep pages, components, services, hooks, stores/context, lib, styles, assets, and
 tests in their proper responsibilities. Avoid unnecessary abstractions, wrapper components, state
 layers, and dependencies not justified by the task. Preserve existing UI, auth/session, and API
@@ -570,7 +577,8 @@ or inaccessible in the assigned workspace.
 
 ### Mobile builder guidance
 
-Work only inside the mobile scope. Do not touch web or API code. Use the mobile stack from
+Work inside the explicitly assigned repositories and paths; other layers require assignment.
+Read local rules and explicitly permitted shared governance/contracts. Use the mobile stack from
 `docs/STACK.md`. Preserve platform conventions, permissions, notifications, deep links,
 accessibility, responsive layouts, and offline behavior. Never invent or change API contracts
 without approval. Avoid unnecessary abstractions, wrapper components, state layers, and dependencies
@@ -588,6 +596,7 @@ Use the dedicated agents rather than ad-hoc prompts where one fits:
 | `qa-reviewer` | Verification lane — Playwright evidence against acceptance criteria |
 | `ui-critic` | Visual critique lane — anti-slop rules and gallery conformance |
 | `docs-writer` | The application memory map — one handover per application plus the global index |
+| `merge-conflict-resolver` | Resolve an existing conflicted merge in assigned existing workspaces; the human completes the merge |
 
 Each agent file carries the scope, style, production, verification, git, and reporting rules that
 apply to it, so a delegated prompt can stay short and specific.
@@ -859,8 +868,9 @@ going on, including work that has not been merged yet.
   `changelog/`) and reports its status; the orchestrator writes the board.
 - **Why:** the main checkout's board stays current during in-flight work, and parallel
   worktrees can never conflict on the board file.
-- **After the user merges a branch**, the orchestrator marks the row `Merged` on `main`. That
-  board edit is the only uncommitted change the user has to commit after a merge.
+- **After the human CLI merges every required surface**, the lifecycle script marks linked rows
+  `Merged` and cleans up the merged worktrees. Partial completion stays recorded, not `Merged`.
+- `board.py` and `docs/BOARD.md` remain tracked. Do not untrack either without a new user decision.
 - **If a worktree needs to record its own lane transition**, it does so in the changelog entry
   and in its report — not in the board file.
 
@@ -906,9 +916,11 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Bra
 
 ## B4. Worktree workflow (every change, every session)
 
-**Every change happens inside a git worktree. There is no exception.** The worktree *is* the unit
-of work and it carries the code **and** every documentation update for that change. `main` stays
-clean and untouched by agents.
+**One workspace set per change.** Worktree mode is project-local: `required` by default;
+`optional` permits edits and local commits in the assigned current checkout on a nonprotected
+branch. Neither mode relaxes assigned scopes, secret protection or protected-branch commits.
+Use `python3 .kilo/skills/git-worktree/scripts/worktree.py mode required|optional|status`
+(choose one value). Restart Kilo after a change to reload generated permissions.
 
 This is **CLI only**: plain `git`, no extension, no `gh`, no browser. The executable procedure is
 the `git-worktree` skill at `.kilo/skills/git-worktree/SKILL.md`. Read it before creating a
@@ -918,23 +930,25 @@ worktree.
 
 | Rule | Consequence if broken |
 |---|---|
-| Every change happens in a worktree | The change is unsanctioned work and does not exist for review |
+| Required mode uses linked worktrees; optional mode also permits the assigned current checkout | Unassigned work is outside scope |
 | The worktree is named after the feature | Unfindable; the board row cannot point at it |
-| Work only inside the worktree | Edits in the main checkout are invisible to the merge |
+| Work only in the assigned workspace set | Other checkouts are outside scope |
 | **Never commit to `main`/`master`/`base`** | The human loses control of the base branch |
-| **Never commit to an existing branch from a worktree** | Two worktrees on one branch corrupt each other |
+| Reuse the assigned branch/workspace; never create a second checkout of that branch | Concurrent checkouts corrupt each other |
 | **Never merge, push, or open a PR** | The human's approval step is skipped |
 | Local commits on the worktree branch are required | There is nothing for the human to merge |
-| Never delete a worktree holding unmerged work | Work is destroyed |
+| Dirty/unmerged deletion requires the human's explicit discard CLI | Work would otherwise be destroyed |
 
 ### Rules
 
 1. **Board first.** Pick the task from `docs/BOARD.md`. If it is not on the board, **add the row
    first** — work not on the board is unsanctioned work.
-2. **One worktree per task.** Never mix two features in one worktree. Never work directly in the
-   main checkout for application changes.
-3. **The worktree carries the feature name.** The name is **derived from the board row**, never
-   typed by hand, so a bug fix can never land on `feat/…`:
+2. **One workspace set per change.** Reuse the original repo-specific paths for every lane and
+   spawned finding. Do not mix unrelated changes. New workspaces require explicit user request
+   or the next approved task after the previous change merged. Never create an empty workspace
+   automatically after merge. Optional mode permits the assigned nonprotected current checkout.
+3. **A new worktree carries the change name.** The name is **derived from the original board row**.
+   Fix rows reuse that original branch and path rather than renaming them:
    - the **branch type** comes from the row's `Type` — `Feature` → `feat`, `Fix` → `fix`,
      `Chore` → `chore`, `Docs` → `docs`, `Research` → `chore`
    - the **slug** comes from the row's task title, kebab-cased, trimmed to the first 6 words
@@ -944,9 +958,10 @@ worktree.
    - examples: `feat/user-login`, `fix/session-timeout`, `docs/handover-template`
    - The script records the exact worktree path and branch back onto the board row, so the row
      and the worktree can never drift apart.
-4. **Create it with the script, from the board row:**
+4. **Create only when needed; otherwise reuse with the script:**
 
        python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
+       python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-FIX --reuse BOARD-PARENT --repo ID
 
    The script reads the row, derives the type and slug, creates
    `.kilo/worktrees/<slug>/` on branch `<type>/<slug>`, writes the row's `Branch/Worktree` and
@@ -958,8 +973,8 @@ worktree.
    repo, and the row's `Branch/Worktree` cell records the worktree path relative to the control
    repo. The repo id comes from `.kilo/repos.json` — the map is the only way into another
    repository.
-6. **Work only inside the worktree.** Every code edit, every doc edit, every verification run
-   happens there. The worktree must contain the code change **and** the matching scope-doc
+6. **Work only inside the assigned workspace set.** Every code edit, doc edit and verification
+   uses the assigned repo-specific paths. The set must contain the code change **and** matching scope-doc
    updates (§B1) so it can be reviewed as one self-contained unit.
    **Never edit `docs/BOARD.md` from a worktree** — the orchestrator owns the live board (§B3).
 7. **Three lanes, in order.** For meaningful work the board drives lanes:
@@ -976,8 +991,21 @@ worktree.
    sets the board row to `Pending Merge` and **asks the user to review and merge**. The merge
    target is the human's choice — `main` or a feature branch. Never merge into any branch on your
    own initiative, never push, never open a PR (§B11).
-10. **After the merge**, the orchestrator marks the row `Merged` in the main checkout, and the
-    worktree is cleaned up by the human (or by the agent once the branch is confirmed merged).
+10. **Human lifecycle CLI:** `worktree.py handoff --board ID` prints every repository's diff
+    commands and the batch `merge --board ID --apply` command. Repeat `--board` for a batch;
+    `--repo ID` selects surfaces and `--target` overrides their saved base. Merge preflights all
+    sources/targets for clean state (except live control-board metadata), readiness and commits.
+    Multi-repo merge is not atomic: halt on conflict, preserve partial state, and mark `Merged`
+    only after all required surfaces finish. Cleanup of merged worktrees is automatic.
+11. **Conflict handling:** assign `merge-conflict-resolver` to the existing conflicted checkout
+    and original workspace set. It resolves files, checks markers and the smallest existing
+    verification, then reports staged/unstaged state. It never commits or completes the merge.
+    The human completes the preexisting merge after review/checks, then reruns the lifecycle command.
+12. **Explicit discard:** preview with `worktree.py discard --board ID --repo ID`; only the
+    human's explicit request permits `--apply --discard`. This may remove selected dirty/unmerged
+    linked worktrees and their feature branches, never main/protected checkouts or paths outside
+    mapped `.kilo/worktrees/`. Fully discarded linked rows become `Dropped`; partial outcomes
+    remain recorded. Agents never discard unasked.
 
 ### Board lanes
 
@@ -1028,14 +1056,14 @@ met**, proven by evidence. The lanes repeat until then.
 
 **The rules that make it a loop, not a pipeline:**
 
-1. **A row cannot reach `Pending Merge` while any Fix row it spawned is open.** Every finding
-   becomes a Fix row with `Blocked by: BOARD-xxx`. The original row waits.
+1. **A row cannot reach `Pending Merge` with unresolved findings.** Every finding becomes a Fix
+   row with `Blocked by: BOARD-xxx`, linked to the original repo-specific workspace set. Once all
+   criteria pass, shared parent/Fix rows may become `Pending Merge` together for one human merge.
 2. **Every Fix row runs the same three lanes.** A fix is not trusted because it looks right. It
    goes through QA with the finding's acceptance criteria, then review. A fix that fixes the
    symptom but breaks the flow is caught here.
-3. **After the Fix rows merge, the original row is re-verified.** The QA lane re-runs against the
-   merged result — the criterion that failed must now pass, and nothing around it may have
-   regressed. Only then can the original row go to `Pending Merge`.
+3. **After fixes in the shared workspace, re-verify the original row there before handoff.** The
+   failed criterion must pass without regressions. Do not require a separate fix merge or worktree.
 4. **The loop is bounded at 3 rounds.** A row gets at most three QA↔fix rounds. When the third
    round still fails, the row moves to `Blocked` with what was tried and the question the human
    needs to answer. There is no fourth round.
@@ -1181,12 +1209,12 @@ reason on one line.
 
 - Do not use `git stash` or autostash to move work between worktrees — stashes are shared and
   cause conflicts. Resolve conflicts inside the worktree instead.
-- For conflict-heavy work, bring the base branch into the worktree, resolve there, re-run
-  verification, then offer for merge.
+- Never start a merge to resolve conflicts. Resolve only the human's preexisting conflicted
+  merge in its assigned existing checkout; the human completes it and reruns the lifecycle CLI.
 - If several worktrees depend on the same contract, schema, or file layout, settle that shared
   shape on the base branch **before** fanning out.
-- Never delete a worktree that holds unmerged or dirty work. Preserve it and report it.
-- Clean up a worktree only after its row reaches `Merged`.
+- Preserve dirty/unmerged work except an explicitly requested human discard through the CLI.
+- Lifecycle merge cleans up merged worktrees; discard records full/partial outcomes separately.
 - Never create, move, or use a worktree outside `.kilo/worktrees/`.
 
 ### Guard rules (enforced by the guard script, not by discipline)
@@ -1230,7 +1258,7 @@ carries a second copy of it.
   commit. A work surface's committed content is its application code alone.
 - The board lives in the control repo only. A row names the repos it touches in its `Repos` cell.
   The harness finds the board from a work surface by walking up to the control repo.
-- The builder works in the app repo's scope; the orchestrator works in the control repo. The
+- The builder works in assigned repositories/paths; the orchestrator works in the control repo. The
   documentation, the board and the memory map stay in the control repo.
 
 ### Merge gate
@@ -1333,6 +1361,24 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
 - **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
   recording what was checked and expected vs actual. Commit `notes.md` and small component shots;
   leave full-page captures out of git.
+- **Authenticated review:** use the same script with `--storage-state <ignored-local.json>`
+  and/or `--navigation <ignored-local.json>`. Navigation JSON is `{ "approved": true,
+  "login": [{ "action": "goto", "path": "/login" }, { "action": "fill", "selector":
+  "#email", "env": "QA_TEST_EMAIL" }], "authenticatedPath": "/app",
+  "authenticatedSelector": "[data-testid='signed-in-shell']", "steps": [] }`.
+  Storage-state or login capture requires an app-specific `authenticatedSelector` in the ignored
+  navigation config. Check that signed-in marker is visible after navigation settles, before
+  evidence capture. Route-only checks can mistake a same-URL MFA/SSO gate for authentication.
+  Never infer auth from password-input presence/absence; password forms can be valid after login.
+  Navigation changing pages must declare its final destination using an existing `waitForURL` step.
+  Allowed actions: `goto/path`, `fill/selector/env`, `click/selector/intent` (login, navigation,
+  destructive), `waitForURL/path`, `waitForSelector/selector`. Login requires authenticatedPath;
+  URLs are same-origin without credentials/query/fragment. `--allow-destructive` requires explicit
+  user authorization for those actions. Ask for test access when absent; MFA/SSO is manual user
+  login, never a bypass. Never put secret literals in CLI, commits or evidence. Known credentials
+  and session values are masked, not arbitrary sensitive content; inspect evidence before sharing.
+  Reviewers remain read-only against application source, but may perform approved auth/navigation
+  and write evidence. All viewport, error-count and accessibility requirements still apply.
 - **Check:** keyboard focus and focus trapping, contrast, accessible names, tap target size
   (≥24×24 CSS px), console errors, unexpected network failures, horizontal overflow at 320px,
   and whether the screen matches the approved gallery (tokens, states, density).
@@ -1386,8 +1432,7 @@ A review finding is a **bug-fix unit of work**, so it becomes a board row.
 3. The reviewed row's status depends on the verdict:
    - **FAIL** → the reviewed row returns to `In Progress` with the failing findings restated.
    - **PASS** → the reviewed row may proceed to `Pending Merge`.
-4. The new `Fix` rows are picked up in the normal order: `/decide` → worktree → build → QA →
-   review → `Pending Merge`.
+4. Fix rows follow `/decide` → original shared workspace → build → QA → review → `Pending Merge`.
 
 The reviewers never edit `docs/BOARD.md`. The orchestrator writes every row, so the board keeps a
 single writer.
@@ -1565,7 +1610,8 @@ the port values.
   owns the base branch. `.kilo/policies/git-policy.json` names the protected branches
   (`protected_branches`), and the repository's own default branch from `origin/HEAD` is always
   included — the microservices base on `dev`, so `dev` is protected too.
-- **Never commit to a branch that already has a worktree.** One branch, one worktree, one task.
+- **Use only the assigned branch/workspace.** Reuse it across lanes and findings; never create
+  a second checkout for the same branch. Optional mode permits the assigned nonprotected checkout.
 - **Never merge.** Not into `main`, not into a feature branch, not with `--no-ff`, not at all.
 - **Never push.** No `git push`, no force push, no `--all`/`--mirror`, to any branch.
 - **Never create a pull request.** There is no remote workflow in this factory.
@@ -1639,14 +1685,11 @@ Work lands on a branch. A human reviews it and decides where it goes:
 - The agent finishes the work, commits it on the worktree branch, and sets the board row to
   `Pending Merge`. That state means **waiting for human approval to merge**.
 - The agent reports the worktree path, the branch, the commits, and the diff command.
-- The human reviews, then merges into `main` or into a feature branch:
-
-      git merge --no-ff <type>/<feature-slug> -m "merge: <feature-slug>"
-
-- Then the human (or the agent, once the branch is confirmed merged) cleans up:
-
-      git worktree remove .kilo/worktrees/<feature-slug>
-      git branch -d <type>/<feature-slug>
+- Generate the all-repository handoff: `python3 .kilo/skills/git-worktree/scripts/worktree.py
+  handoff --board ID`. The human previews `merge --board ID` then runs `merge --board ID --apply`.
+  Repeat `--board ID` for batches. Cleanup is automatic; partial failures preserve state (§B4).
+- Discard is a separate human decision: preview `discard --board ID --repo ID`, then only with
+  explicit loss approval run `discard --board ID --repo ID --apply --discard`.
 
 The agent stops at `Pending Merge`. It does not merge, does not push, and does not open a PR.
 
@@ -1658,7 +1701,7 @@ The agent stops at `Pending Merge`. It does not merge, does not push, and does n
 | What changed in mine? | `git -C .kilo/worktrees/<slug> status` and `git -C .kilo/worktrees/<slug> diff main` |
 | What is on my branch? | `git -C .kilo/worktrees/<slug> log --oneline main..HEAD` |
 | Is it mergeable? | `git -C .kilo/worktrees/<slug> merge-base --is-ancestor main HEAD && echo "no conflicts expected"` |
-| Clean it up after merge | `git worktree remove .kilo/worktrees/<slug>` and `git branch -d <branch>` |
+| Review every repository and lifecycle command | `python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board ID` |
 | Which row owns it? | The board row's `Branch/Worktree` column |
 
 Worktrees live under `.kilo/worktrees/<feature-slug>/` and are git-ignored. The full procedure is
@@ -1666,7 +1709,7 @@ the `git-worktree` skill at `.kilo/skills/git-worktree/SKILL.md`.
 
 ## B12. Definition of Done
 
-- [ ] Code change is complete and reviewed in its worktree.
+- [ ] Change is complete and reviewed in its assigned shared workspace set (or optional checkout).
 - [ ] Every implementation decision was put to the user and approved — none were assumed (§A6).
 - [ ] The smallest relevant verification command passes.
 - [ ] `docs/HANDOVER.md` reflects the new reality.

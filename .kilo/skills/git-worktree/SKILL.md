@@ -1,12 +1,20 @@
 ---
 name: git-worktree
-description: Create, verify, and clean up the isolated git worktree that carries every change in this factory. Use before editing any file in a project that follows the worktree rule. The script does the work — the agent supplies the slug and the judgment.
+description: Manage project-local workspace mode, original workspace reuse, verification and human lifecycle handoff. The script owns mechanics; the agent supplies intent and judgment.
 ---
 
 # Git Worktree
 
-Every change in this factory happens in an isolated git worktree. The worktree carries the code
-**and** the documentation for that change. `main` is never edited by an agent.
+Use one assigned repo-specific workspace set per change, carrying code and documentation across
+build, fixes, QA, critique, docs and conflict resolution. Required mode (default) uses linked
+worktrees. Optional mode permits the assigned current checkout on a nonprotected branch; scopes,
+secret protection and protected-branch commit checks remain. Never create a fresh review/fix
+workspace or an empty workspace immediately after merge. New workspaces require an explicit user
+request or the next approved task after the previous change merged.
+
+`python3 .kilo/skills/git-worktree/scripts/worktree.py mode required|optional|status` selects or
+reports project-local mode (choose one value). Mode changes regenerate permissions; restart Kilo.
+`board.py` and `docs/BOARD.md` remain tracked pending user clarification.
 
 This is **CLI only**: plain `git`, no extension, no `gh`, no browser, no pull requests.
 
@@ -19,7 +27,7 @@ the script can do it — the script is where the naming rules and the refusals l
 
 | Script | Does |
 |---|---|
-| `.kilo/skills/git-worktree/scripts/worktree.py` | create · list · verify · cleanup |
+| `.kilo/skills/git-worktree/scripts/worktree.py` | mode · create/reuse · list · verify · handoff · merge · discard · cleanup |
 | `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · install-hooks · policy |
 
 Python 3.9+, standard library only.
@@ -34,9 +42,10 @@ and records the path and branch back onto the row.
 
 ```bash
 python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> [--base <branch>]
+python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <FIX-ID> --reuse <PARENT-ID> --repo <ID>
 ```
 
-- The **branch type** comes from the row's `Type`: `Feature` → `feat`, `Fix` → `fix`,
+- For a new workspace the **branch type** comes from the row's `Type`: `Feature` → `feat`, `Fix` → `fix`,
   `Chore` → `chore`, `Docs` → `docs`, `Research` → `chore`.
 - The **slug** comes from the task title, kebab-cased, trimmed to the first 6 words when it is
   longer than 48 characters.
@@ -46,7 +55,9 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <BOARD-ID> 
   branch it names as `origin/HEAD` (the microservices use `dev`). Name one with `--base` to
   override. Use a feature branch only when the row's `Blocked by` says so.
 
-The script refuses when the row does not exist, when the branch or directory already exists, or
+Reuse links a finding to the original repo-specific branch/path; it does not rename or duplicate
+it. Inspect existing row links before creating anything. The script refuses unknown rows, or,
+for new workspaces, when the branch or directory already exists, or
 when the row's type is unknown. It never deletes anything. It writes the board row in the **main
 checkout**, so the live board always points at the running worktree.
 
@@ -119,15 +130,14 @@ python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
 - `sync --all` does the same for every repository in the map except the control repo.
 - A pointer that is already current is left alone, and a hand-written `AGENTS.md` is never
   replaced.
-- The scope rules live in `.kilo/scopes/<id>.md`. `sync --repo <id>` writes that file to the
-  scope's repository as its `AGENTS.md`. For the control repo itself the scope rules go to
-  `apps/<id>/AGENTS.md`.
+- Canonical scope rules live in `.kilo/scopes/<id>.md`. Work surfaces receive a generated ignored
+  `AGENTS.md` pointer to those rules and shared governance, not a committed duplicate harness.
 - The **slice source** is the **tree the shell is in**, the same rule `check-policy` follows: a
   sync run in a worktree copies that worktree's `.kilo/` slice and scope rules.
 - The **target repository** is resolved in the control repo's **main checkout**, because a nested
   app repository under `apps/` is not tracked by the control repo and exists only there. The
   exception is `control` itself, which is the tree the shell is in, so `sync --repo control` in a
-  worktree updates that worktree's own `apps/<id>/AGENTS.md` copies and never the main checkout's.
+   worktree targets that worktree's control configuration, never the main checkout's.
 - A file that is already its own destination is skipped, so `sync --repo control` is safe to run.
 
 ---
@@ -157,16 +167,16 @@ keyword list:
 | Context check | Fires when |
 |---|---|
 | `protected_branch` | the current branch is on the policy's `protected_branches` list, or is the branch the repository names as its default through `origin/HEAD` |
-| `in_worktree` | the shell is **not** in a linked worktree under `.kilo/worktrees/` — `git commit` is denied in the main checkout |
+| `in_worktree` | required mode denies commits outside linked `.kilo/worktrees/`; optional mode permits assigned nonprotected current checkouts |
 | `branch_switch_in_worktree` | the shell is in a linked worktree and the command switches branches |
 | `always` | always — used for the raw `git worktree remove` |
 
 Then the `bash` rules apply with **last match wins**, exactly like Kilo.
 
-The `edit` map is the deterministic file-change gate. Its fallback is `deny`; the only allow is
-`**/.kilo/worktrees/**`. So a file tool cannot write anywhere except inside a linked worktree,
-whatever the model decides. `docs/BOARD.md` is `deny` for file tools; the board is written only by
-`board.py`. The map is loaded at Kilo start, so a policy change takes effect on the next session.
+The generated edit map follows project-local mode: required confines edits to worktrees; optional
+permits the current checkout while preserving secret and rules-file protections. Task assignments
+still confine allowed paths; mode is not authorization to edit unrelated files. `docs/BOARD.md`
+is denied to file tools and written by `board.py`. Restart Kilo after regeneration.
 
 The same commit rule is enforced without the model: `guard.py install-hooks` writes a fail-closed
 `pre-commit` hook into the control repo and every repository in the map. The hook finds the
@@ -209,18 +219,18 @@ command**. The permission map is the coarse net; the guard is the enforcement po
 
 ## 4. Work inside it
 
-Every edit, command, and verification run happens with the worktree as the working directory.
+Every edit, command and verification uses the assigned repo-specific workspace path.
 
 ```bash
 git -C .kilo/worktrees/<slug> status
 git -C .kilo/worktrees/<slug> diff
 ```
 
-- Do not edit files in the main checkout. The only exception is `docs/BOARD.md`, which the
-  orchestrator writes in the main checkout.
+- Required mode uses linked worktrees; optional permits the assigned nonprotected current
+  checkout. The orchestrator alone writes the live board through its script in the control checkout.
 - Do not `git checkout` another branch inside the worktree.
-- Do not `git merge` the base branch in unless the task needs it; resolve conflicts inside the
-  worktree. Never use `git stash` — stashes are shared across worktrees.
+- Never start a merge. Assign `merge-conflict-resolver` only to the existing conflicted checkout;
+  the human reviews/completes that merge and reruns the lifecycle command. Never use `git stash`.
 - Keep the diff minimal: one logical change per commit.
 
 ---
@@ -251,7 +261,8 @@ python3 .kilo/skills/git-worktree/scripts/guard.py check-worktree -- "git worktr
 
 ## 6. Commit locally
 
-Local commits on the worktree branch are required — they are what the human reviews and merges.
+Local commits on the assigned nonprotected branch are expected for clean handoff, unless the
+current task explicitly says not to commit yet. Never stage unrelated changes.
 
 ```bash
 git -C .kilo/worktrees/<slug> add -A
@@ -297,23 +308,21 @@ The agent **never** merges.
 1. The orchestrator sets the board row to `Pending Merge` in the main checkout, with the
    worktree path and branch in the `Branch/Worktree` column.
 2. The agent reports: what was done, what is proven, what is not done and why, the next action.
-3. The agent prints the review and merge commands for the human.
+3. Generate the all-repository handoff and let the human run the printed lifecycle commands.
 
 ```bash
-# review
-python3 .kilo/skills/git-worktree/scripts/worktree.py list
-git -C .kilo/worktrees/<slug> log --oneline main..HEAD
-git -C .kilo/worktrees/<slug> diff main
-
-# merge — run by the human, in the main checkout
-git merge --no-ff <type>/<slug> -m "merge: <slug>"
-
-# cleanup — run by the human, after the merge
-python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply
+python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <ID>
+# human: preview, then apply; repeat --board for a batch
+python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board <ID>
+python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board <ID> --apply
 ```
 
-The merge target is the human's call: `main`, or a feature branch when the work is part of a
-larger feature.
+The human may select `--repo <ID>` and `--target <branch>`; the saved base is default. ALL clean
+sources/targets (except live control-board metadata), readiness and commits are preflighted before
+mutation. Multi-repo merge is non-atomic: halt on conflict and preserve partial state. The human
+completes a preexisting conflicted merge after specialist resolution/review/checks, then reruns
+the command. Rows become `Merged` only when every required surface completes; merged worktrees
+and feature branches are cleaned up automatically. Shared parent/Fix rows can hand off together.
 
 ---
 
@@ -326,7 +335,17 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup <slug> --apply   #
 
 The script refuses when the branch has commits not reachable from the base, or when the worktree
 is dirty. It writes a recovery record to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before
-acting. **Never delete a worktree holding unmerged work.**
+acting. Preserve dirty/unmerged work unless the human explicitly requested destructive discard:
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board <ID> --repo <ID>
+# human only, after explicit approval of loss:
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board <ID> --repo <ID> --apply --discard
+```
+
+Discard previews by default; only selected mapped linked `.kilo/worktrees/` and feature branches
+may be removed, even dirty/unmerged. Never main/protected/outside-map checkouts. Fully discarded
+linked rows become `Dropped`; partial outcomes stay recorded. Agents never discard unasked.
 
 ---
 
@@ -335,10 +354,10 @@ acting. **Never delete a worktree holding unmerged work.**
 | Symptom | Cause | Fix |
 |---|---|---|
 | `fatal: invalid reference: HEAD` | The repository has no commits | The base branch needs one commit before any worktree exists |
-| `branch ... is already checked out` | The branch already has a worktree | Use a new branch, or clean up the old worktree first |
-| `worktree.py create` refuses | The slug, branch, or directory already exists | Pick another slug, or clean up first |
+| `branch ... is already checked out` | The branch already has a workspace | Reuse the assigned existing path; do not duplicate it |
+| `worktree.py create` refuses | The slug, branch, or directory already exists | Inspect the existing assignment and reuse if it belongs to this change |
 | `guard.py check-delete` denies | The target is outside the worktree | Delete inside the worktree, use a temp dir, or ask the user |
-| Merge conflict at merge time | The base branch moved since the worktree started | Merge the base into the worktree, resolve there, re-verify, hand off again |
+| Merge conflict at merge time | Both branches changed the same area | Preserve partial state; specialist resolves the existing conflict, human completes/retries |
 | `git stash` conflicts across worktrees | Stashes are shared | Do not stash. Resolve conflicts inside the worktree |
 | `worktree.py create --repo x` refuses | `x` is unknown in `.kilo/repos.json`, or its path is not a git repository | Register the repo in the map, or make the folder a repository first |
 | `guard.py sync --repo x` refuses to apply | The target is not a git repository | Make the folder a repository, then sync again |
@@ -347,8 +366,9 @@ acting. **Never delete a worktree holding unmerged work.**
 
 ## 11. Relationship to the rest of the factory
 
-- The board row is the work item; the worktree is where it happens; the row records the path.
-- The builder agents (`frontend-dev`, `backend-dev`, `mobile-dev`) work inside the worktree.
-- The reviewer agents (`qa-reviewer`, `ui-critic`) run against the worktree state and report
+- The board row is the work item; linked findings share its original repo-specific workspace set.
+- The builder agents (`frontend-dev`, `backend-dev`, `mobile-dev`) use assigned original paths,
+  including assigned nonprotected checkouts in optional mode.
+- The reviewer agents (`qa-reviewer`, `ui-critic`) use the same state and report
   findings; the orchestrator turns findings into `Type: Fix` board rows.
 - The root `AGENTS.md` owns the rules. This skill is the executable procedure for them.

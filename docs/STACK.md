@@ -27,6 +27,19 @@ python3 .kilo/skills/board/scripts/board.py show
 # Create the worktree for a board row
 python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
 
+# Project-local mode (required default); restart Kilo after a change
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode status
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode optional
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode required
+# Link a finding to the original repo-specific workspace
+python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-FIX --reuse BOARD-PARENT --repo ID
+# All-repository handoff; human previews/applies lifecycle actions
+python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board BOARD-ID
+python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board BOARD-ID --apply
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board BOARD-ID --repo ID
+# Explicit human loss approval only:
+python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board BOARD-ID --repo ID --apply --discard
+
 # Guard rails
 python3 .kilo/skills/git-worktree/scripts/guard.py check-git -- "git merge feat/x"
 python3 .kilo/skills/git-worktree/scripts/guard.py check-policy
@@ -34,6 +47,17 @@ python3 .kilo/skills/git-worktree/scripts/guard.py check-repos
 ```
 
 ## Ports
+
+Lifecycle `--board`/`--repo` may repeat; `--target` overrides the saved base. Merge preflights all
+clean sources/targets except live board metadata, readiness and commits; non-atomic failures
+preserve progress. Human completes conflicts in existing checkouts, then retries. No agent merges.
+QA capture uses the existing `browser-review.mjs` flags `--storage-state <ignored-local.json>` and
+`--navigation <ignored-local.json>`; schema and destructive-approval rules are in the QA skill.
+Storage-state or login also requires ignored navigation config with an app-specific
+`authenticatedSelector`, for example `"authenticatedSelector": "[data-testid='signed-in-shell']"`.
+Check the signed-in marker is visible after navigation settles, before capture; route-only proof
+can accept a same-URL MFA/SSO gate. Do not use password-input heuristics. Page-changing navigation
+declares the final destination via an existing step, e.g. `{"action":"waitForURL","path":"/app"}`.
 
 | Port | What | Notes |
 |---|---|---|

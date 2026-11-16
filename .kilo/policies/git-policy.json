@@ -290,13 +290,19 @@
       "pattern": "rm -rf *",
       "action": "ask",
       "reason": "A recursive delete cannot be undone. The guard allows it only inside a worktree or a temp dir."
+    },
+    {
+      "pattern": "*worktree.py*--apply*",
+      "action": "ask",
+      "reason": "Lifecycle apply operations are explicit human CLI commands. Agents preview only."
     }
   ],
   "edit": [
     {
       "pattern": "*",
+      "workspace_default": true,
       "action": "deny",
-      "reason": "Every file change happens inside a linked worktree under .kilo/worktrees/. Edit the file in its worktree, never in the main checkout."
+      "reason": "Required mode confines edits to linked worktrees. Optional mode changes only this fallback; protected-file and secret rules still apply."
     },
     {
       "pattern": ".kilo/worktrees/**",
@@ -352,6 +358,16 @@
       "pattern": "**/docs/BOARD.md",
       "action": "deny",
       "reason": "The board has one writer. Use board.py; never edit it with a file tool."
+    },
+    {
+      "pattern": "templates/project/docs/BOARD.md",
+      "action": "ask",
+      "reason": "The project template board is not a live board. Template edits need the user's approval."
+    },
+    {
+      "pattern": "**/templates/project/docs/BOARD.md",
+      "action": "ask",
+      "reason": "The project template board is not a live board. Template edits need the user's approval."
     },
     {
       "pattern": ".env",

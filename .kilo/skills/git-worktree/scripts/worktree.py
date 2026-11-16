@@ -5,11 +5,16 @@
     worktree.py list
     worktree.py verify <slug> [--base main]
     worktree.py cleanup <slug> [--apply]
+    worktree.py mode required|optional|status
+    worktree.py handoff --board BOARD-00X
+    worktree.py merge --board BOARD-00X [--target <branch>] [--apply]
+    worktree.py discard --board BOARD-00X [--repo <id>] [--apply --discard]
 
 create reads the board row named by --board from docs/BOARD.md, derives the
 branch type from its Type column and the slug from its task title, then makes
 .kilo/worktrees/<slug> on branch <type>/<slug> and records the worktree on the
-row. It never overwrites: an existing branch or directory is a refusal.
+row. Existing workspaces can be shared with --reuse; Fix rows reuse their parent.
+Otherwise an existing branch or directory is a refusal.
 
 --repo picks the repository the worktree is created in. The id comes from
 .kilo/repos.json in the control repo; the default is "control", the control
@@ -20,21 +25,25 @@ verify reports branch, commits ahead of base, changed files and dirty state,
 and exits 0 only when the tree is clean and the branch has at least one commit
 ahead of base.
 
-cleanup is a dry run by default. --apply removes the worktree and deletes the
-branch, but refuses when the branch has commits that are not reachable from the
-base or when the worktree is dirty. Unmerged work is never deleted. Every run
-writes a recovery TSV to <git-common-dir>/cleanup-wt/<timestamp>.tsv.
+cleanup, merge and discard preview by default. cleanup --apply requires clean,
+merged work. Human-run discard --apply --discard explicitly permits removal of
+selected dirty or unmerged workspaces and their feature branches. Protected
+branches, main checkouts, locks and paths outside mapped workspace roots are refused.
+Merge preflights every selected repository; progress and errors are recorded in
+the control repository's common Git directory at kilo-workspace.json.
 
 Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 """
 import argparse
-import datetime
 import importlib.util
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 TYPE_MAP = {"Feature": "feat", "Fix": "fix", "Chore": "chore", "Docs": "docs",
             "Research": "chore"}
@@ -67,6 +76,122 @@ def git_out(cwd, *args):
     return out if code == 0 else None
 
 
+def checked_git(cwd, *args):
+    code, out, err = git(cwd, *args)
+    if code:
+        raise ValueError("git %s failed (exit %s): %s" % (" ".join(args), code, err))
+    return out
+
+
+def confined(path, root):
+    path, root = os.path.abspath(path), os.path.abspath(root)
+    if os.path.commonpath([path, root]) != root:
+        raise ValueError("path escapes permitted root: %s" % path)
+    for part in [Path(path)] + list(Path(path).parents):
+        if part.is_symlink():
+            raise ValueError("symlink path refused: %s" % path)
+    return path
+
+
+def local_state(root, value=None):
+    common = checked_git(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    path = confined(os.path.join(common, "kilo-workspace.json"), common)
+    if value is None:
+        if not os.path.exists(path):
+            return {"mode": "required", "workspaces": {}}
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        if data.get("mode") not in ("required", "optional") or not isinstance(data.get("workspaces"), dict):
+            raise ValueError("invalid local workspace state")
+        return data
+    fd, temporary = tempfile.mkstemp(dir=common, prefix=".workspace-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(value, fh, indent=2)
+            fh.write("\n")
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def workspace_mode(cwd):
+    return local_state(control_root(cwd))["mode"]
+
+
+def cmd_mode(args, cwd):
+    root = control_root(cwd)
+    state = local_state(root)
+    if args.value != "status":
+        spec = importlib.util.spec_from_file_location("guard", os.path.join(
+            script_root(), ".kilo", "skills", "git-worktree", "scripts", "guard.py"))
+        guard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(guard)
+        if not guard.is_control_repo(root):
+            raise ValueError("mode requires a control repository with a board and repo map")
+        policy = guard.load_policy(confined(os.path.join(root, guard.POLICY_REL), root))
+        if (not isinstance(policy, dict) or not policy.get("protected_branches") or
+                not isinstance(policy.get("bash"), list) or not isinstance(policy.get("edit"), list) or
+                not isinstance(policy.get("hidden_paths"), dict) or
+                not any(rule.get("workspace_default") for rule in policy["edit"])):
+            raise ValueError("control policy is missing required workspace/secret protections")
+        repos, error = load_repos(root)
+        if error or repos.get("control") != ".":
+            raise ValueError(error or "repo map must register control as '.'")
+        configs, checkouts = set(), set()
+        for repo_id in repos:
+            target, error = resolve_repo(root, repos, repo_id)
+            if error or not is_git_repo(target):
+                raise ValueError(error or "mapped repository is missing: %s" % repo_id)
+            for entry in list_worktrees(target):
+                tree = confined(entry["path"], target)
+                if not os.path.isdir(tree) or entry.get("prunable"):
+                    raise ValueError("mapped checkout is missing or prunable: %s" % tree)
+                checkouts.add(tree)
+                config = confined(os.path.join(tree, "kilo.jsonc"), tree)
+                if os.path.exists(config) or repo_id == "control":
+                    configs.add(config)
+                if repo_id != "control":
+                    inherited = os.path.exists(config)
+                    if os.path.commonpath([tree, root]) == root:
+                        for parent in Path(tree).parents:
+                            if os.path.commonpath([str(parent), root]) != root:
+                                break
+                            ancestor_config = confined(os.path.join(parent, "kilo.jsonc"), root)
+                            if os.path.exists(ancestor_config):
+                                configs.add(ancestor_config)
+                                inherited = True
+                    if not inherited:
+                        raise ValueError("mapped checkout has no effective project config: %s" % tree)
+        if checked_git(cwd, "rev-parse", "--show-toplevel") not in checkouts:
+            raise ValueError("caller is not a mapped project checkout")
+        override = os.environ.get("KILO_CONFIG")
+        if override and os.path.abspath(override) not in configs:
+            raise ValueError("KILO_CONFIG is outside the project's effective configurations")
+        originals = {}
+        for config in sorted(configs):
+            expected, message = guard.write_permission_map(config, policy, mode=args.value, preview=True)
+            if expected is None:
+                raise ValueError(message)
+            with open(config, "rb") as fh:
+                originals[config] = fh.read()
+        try:
+            for config in originals:
+                expected, message = guard.write_permission_map(config, policy, mode=args.value)
+                if expected is None:
+                    raise ValueError(message)
+            state["mode"] = args.value
+            local_state(root, state)
+        except (ValueError, OSError):
+            for config, content in originals.items():
+                with open(config, "wb") as fh:
+                    fh.write(content)
+            raise
+    print("workspace mode: %s (project-local)" % state["mode"])
+    print("Restart Kilo after changing mode to reload the generated edit permission map.")
+    return OK
+
+
 def repo_root(cwd):
     """The main checkout's root, from it or from any linked worktree."""
     top = git_out(cwd, "rev-parse", "--show-toplevel")
@@ -79,12 +204,12 @@ def repo_root(cwd):
 
 def main_checkout_root(cwd):
     """The main working tree of the repository, from it or from any linked worktree."""
-    out = git_out(cwd, "worktree", "list", "--porcelain") or ""
+    out = checked_git(cwd, "worktree", "list", "--porcelain")
     for line in out.splitlines():
         key, _, value = line.partition(" ")
         if key == "worktree" and value:
             return os.path.abspath(value)
-    return script_root()
+    raise ValueError("cannot resolve main checkout")
 
 
 def control_root(cwd):
@@ -109,12 +234,12 @@ def control_root(cwd):
         path = parent
     if found is None:
         return main_checkout_root(cwd)
-    out = git_out(found, "worktree", "list", "--porcelain") or ""
+    out = checked_git(found, "worktree", "list", "--porcelain")
     for line in out.splitlines():
         key, _, value = line.partition(" ")
         if key == "worktree" and value:
             return os.path.abspath(value)
-    return found
+    raise ValueError("cannot resolve control checkout")
 
 
 def script_root():
@@ -162,6 +287,10 @@ def resolve_repo(root, repos, repo_id):
                       (repo_id, ", ".join(sorted(repos))))
     rel = repos[repo_id]
     target = os.path.abspath(os.path.join(root, rel))
+    try:
+        confined(target, target if os.path.isabs(rel) else root)
+    except ValueError as exc:
+        return None, str(exc)
     inside = target == root or target.startswith(root.rstrip(os.sep) + os.sep)
     if not os.path.isabs(rel) and not inside:
         return None, ("repo %r resolves to %s, outside the control repo %s; the map in %s "
@@ -290,7 +419,7 @@ def common_dir(cwd):
 
 
 def list_worktrees(cwd):
-    out = git_out(cwd, "worktree", "list", "--porcelain") or ""
+    out = checked_git(cwd, "worktree", "list", "--porcelain")
     wts = []
     for block in out.split("\n\n"):
         wt = {"path": "", "head": "", "branch": None, "bare": False}
@@ -304,6 +433,8 @@ def list_worktrees(cwd):
                 wt["branch"] = val[len("refs/heads/"):] if val.startswith("refs/heads/") else val
             elif key == "bare":
                 wt["bare"] = True
+            elif key in ("locked", "prunable"):
+                wt[key] = True
         if wt["path"]:
             wts.append(wt)
     return wts
@@ -406,6 +537,7 @@ def cmd_create(args, cwd):
         print("%s is not a git repository; the repo id %r cannot hold a worktree"
               % (target, repo_id), file=sys.stderr)
         return REFUSED
+    confined(board_file, root)
     branch_index = board.field_index(table, "branch-worktree")
     repos_index = board.field_index(table, "repos")
     if branch_index is None:
@@ -428,30 +560,55 @@ def cmd_create(args, cwd):
         print("row %s has an empty task title; the task title needs a real name" % args.board,
               file=sys.stderr)
         return INVALID
-    slug = args.slug or derived
+    reuse = getattr(args, "reuse", None)
+    if row_type == "Fix" and not reuse:
+        dependency = board.field_index(table, "blocked-by")
+        parents = re.findall(r"BOARD-\d+", cells[dependency]) if dependency is not None else []
+        if len(parents) != 1:
+            raise ValueError("Fix rows reuse a shared workspace; select its board ID with --reuse")
+        reuse = parents[0]
+    shared = None
+    if reuse:
+        shared = lifecycle_selection(root, board, [reuse], [repo_id])[0]
+        validate_workspace(shared, root)
+    slug = os.path.basename(shared["path"]) if shared else args.slug or derived
     if not SLUG_RE.match(slug):
         print("invalid slug %r: use kebab-case, e.g. user-login" % slug, file=sys.stderr)
         return INVALID
     if args.slug and args.slug != derived:
         print("derived slug: %s" % derived)
         print("used slug:    %s" % slug)
-    branch = "%s/%s" % (branch_type, slug)
-    if git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
+    branch = shared["branch"] if shared else "%s/%s" % (branch_type, slug)
+    if not shared and git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
         print("branch %s already exists in %s; pick another slug or type"
               % (branch, target), file=sys.stderr)
         return REFUSED
-    path = worktree_path(target, slug)
-    if os.path.exists(path):
+    path = confined(worktree_path(target, slug), os.path.join(target, WORKTREES_DIR))
+    if not shared and os.path.exists(path):
         print("directory %s already exists; refusing to overwrite it" % path, file=sys.stderr)
         return REFUSED
     base, base_err = resolve_base(target, args.base)
     if base_err:
         print(base_err, file=sys.stderr)
         return REFUSED
-    code, _, err = git(target, "worktree", "add", path, "-b", branch, base)
+    if shared:
+        saved_base = local_state(root)["workspaces"].get(path, {}).get("base", base)
+        if args.base and args.base != saved_base:
+            raise ValueError("reused workspace keeps its original base: %s" % saved_base)
+        base = saved_base
+    code, _, err = (0, "", "") if shared else git(target, "worktree", "add", path, "-b", branch, base)
     if code != 0:
         print("git worktree add failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         return REFUSED
+    state = local_state(root)
+    if not shared:
+        state["workspaces"][path] = {"base": base, "branch": branch, "outcome": "active", "boards": [args.board]}
+    else:
+        associated = state["workspaces"].setdefault(path, {"base": base, "branch": branch, "outcome": "active"})
+        boards = associated.setdefault("boards", [reuse])
+        if args.board not in boards:
+            boards.append(args.board)
+    local_state(root, state)
     scope = load_scope_module(script_root())
     if scope is not None:
         content = scope.pointer_content(root, repo_id, path)
@@ -502,6 +659,328 @@ def cmd_create(args, cwd):
     return OK
 
 
+def lifecycle_selection(root, board, ids=None, repo_ids=None, slug=None):
+    repos, error = load_repos(root)
+    if error:
+        raise ValueError(error)
+    targets = {}
+    for repo_id, rel in repos.items():
+        target, error = resolve_repo(root, repos, repo_id)
+        if error:
+            raise ValueError(error)
+        targets[repo_id] = target
+    if repo_ids and any(repo_id not in repos for repo_id in repo_ids):
+        raise ValueError("unknown repo ID")
+    table, error = board.read_table(confined(os.path.join(root, "docs", "BOARD.md"), root))
+    if table is None:
+        raise ValueError(error)
+    column = board.field_index(table, "branch-worktree")
+    repo_column = board.field_index(table, "repos")
+    if column is None or repo_column is None:
+        raise ValueError("board requires Branch/Worktree and Repos columns")
+    selected, found = {}, set()
+    for index in table["rows"]:
+        cells = board.cell_texts(table["lines"], index)
+        if ids and cells[0] not in ids:
+            continue
+        if not ids and cells[STATUS_INDEX] in ("Merged", "Dropped"):
+            continue
+        found.add(cells[0])
+        represented = set()
+        for path, branch in parse_worktree_entries(cells[column]):
+            absolute = os.path.abspath(os.path.join(root, path))
+            matches = [key for key, target in targets.items()
+                       if os.path.dirname(absolute) == os.path.join(target, WORKTREES_DIR)]
+            if len(matches) != 1:
+                raise ValueError("workspace is outside mapped .kilo/worktrees or ambiguous: %s" % path)
+            repo_id = matches[0]
+            represented.add(repo_id)
+            if repo_ids and repo_id not in repo_ids:
+                continue
+            if slug and os.path.basename(absolute) != slug:
+                continue
+            confined(absolute, os.path.join(targets[repo_id], WORKTREES_DIR))
+            item = {"repo_id": repo_id, "repo": targets[repo_id], "path": absolute,
+                    "branch": branch_name(branch), "boards": [cells[0]]}
+            if absolute in selected and selected[absolute]["branch"] != item["branch"]:
+                raise ValueError("board has inconsistent branch references")
+            if absolute in selected:
+                selected[absolute]["boards"].append(cells[0])
+            else:
+                selected[absolute] = item
+        required = {value.strip() for value in cells[repo_column].split(",") if value.strip() not in ("", "-")}
+        if ids and not required.issubset(represented):
+            raise ValueError("board %s has required repos without workspace entries" % cells[0])
+    if ids and found != set(ids):
+        raise ValueError("unknown board ID: %s" % ", ".join(sorted(set(ids) - found)))
+    if not selected:
+        raise ValueError("no selected board workspace")
+    if repo_ids and not set(repo_ids).issubset({item["repo_id"] for item in selected.values()}):
+        raise ValueError("selected repo has no workspace on these board rows")
+    if slug and not repo_ids and len(selected) > 1:
+        raise ValueError("ambiguous slug; select --repo")
+    return list(selected.values())
+
+
+def validate_workspace(item, root, allow_removed=False):
+    path, repo, branch = item["path"], item["repo"], item["branch"]
+    confined(repo, repo)
+    confined(path, os.path.join(repo, WORKTREES_DIR))
+    if not is_git_repo(repo):
+        raise ValueError("mapped path is not a repository: %s" % repo)
+    with open(os.path.join(script_root(), ".kilo", "policies", "git-policy.json"), encoding="utf-8") as fh:
+        protected = set(json.load(fh)["protected_branches"])
+    code, default, err = git(repo, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
+    if code not in (0, 1):
+        raise ValueError("cannot resolve repository default: %s" % err)
+    if default:
+        protected.add(default.split("/", 1)[-1])
+    if not branch or branch in protected:
+        raise ValueError("protected or detached branch cannot be removed: %s" % branch)
+    checked_git(repo, "check-ref-format", "refs/heads/" + branch)
+    worktrees = list_worktrees(repo)
+    matches = [entry for entry in worktrees if os.path.abspath(entry["path"]) == path]
+    if allow_removed and not matches and not os.path.lexists(path):
+        return None
+    if len(matches) != 1 or path == os.path.abspath(worktrees[0]["path"]):
+        raise ValueError("not a linked workspace: %s" % path)
+    entry = matches[0]
+    if entry["branch"] != branch or entry.get("locked") or entry.get("prunable"):
+        raise ValueError("workspace branch mismatch, locked or prunable: %s" % path)
+    if checked_git(path, "rev-parse", "--show-toplevel") != path:
+        raise ValueError("workspace repository mismatch")
+    return entry
+
+
+def require_clean(path, control):
+    excluded = [":(exclude)docs/BOARD.md"] if path == control else []
+    dirty = checked_git(path, "status", "--porcelain=v1", "--untracked-files=all", "--", ".", *excluded)
+    if dirty:
+        raise ValueError("dirty checkout refused: %s\n%s" % (path, dirty))
+
+
+def related_rows(board, root, identities):
+    table, error = board.read_table(confined(os.path.join(root, "docs", "BOARD.md"), root))
+    if table is None:
+        raise ValueError(error)
+    column = board.field_index(table, "branch-worktree")
+    rows = []
+    for index in table["rows"]:
+        cells = board.cell_texts(table["lines"], index)
+        entries = parse_worktree_entries(cells[column])
+        if cells[STATUS_INDEX] in ("Merged", "Dropped"):
+            continue
+        if any((os.path.abspath(os.path.join(root, path)), branch_name(branch)) in identities
+               for path, branch in entries):
+            rows.append((index, cells, entries))
+    return table, rows
+
+
+def update_lifecycle_board(board, root, state, paths):
+    identities = {(path, state["workspaces"][path].get("branch")) for path in paths
+                  if path in state["workspaces"]}
+    table, rows = related_rows(board, root, identities)
+    lines = list(table["lines"])
+    for index, cells, entries in rows:
+        outcomes = []
+        for path, branch in entries:
+            record = state["workspaces"].get(os.path.abspath(os.path.join(root, path)), {})
+            same = record.get("branch") == branch_name(branch) and cells[0] in record.get("boards", [cells[0]])
+            outcomes.append(record.get("outcome") if same else None)
+        status = ("Merged" if all(value == "merged" for value in outcomes) else
+                  "Dropped" if all(value == "discarded" for value in outcomes) else None)
+        if status:
+            lines[index] = board.replace_cell(lines[index], STATUS_INDEX, status)
+    board.write_atomic(os.path.join(root, "docs", "BOARD.md"), lines)
+
+
+def require_committed_merge(item, control, pending=None):
+    target = item["target"]
+    if checked_git(target, "symbolic-ref", "--short", "HEAD") != item["base"]:
+        raise ValueError("target branch changed after preflight")
+    code, _out, error = git(target, "rev-parse", "--quiet", "--verify", "MERGE_HEAD")
+    if code == 0:
+        raise ValueError("target has an unfinished merge; human must commit it before cleanup")
+    if code != 1:
+        raise ValueError("cannot establish target merge state: %s" % error)
+    require_clean(target, control)
+    checked_git(item["repo"], "merge-base", "--is-ancestor", item["sha"], "refs/heads/" + item["base"])
+    if pending:
+        parents = checked_git(target, "show", "-s", "--format=%P", "HEAD").split()
+        if parents != [pending.get("target_sha"), pending.get("sha")]:
+            raise ValueError("pending merge was not completed with the saved source and target parents")
+
+
+def cmd_lifecycle(args, cwd):
+    root = control_root(cwd)
+    board = load_board_module(script_root())
+    if board is None:
+        raise ValueError("board parser missing")
+    items = lifecycle_selection(root, board, getattr(args, "board", None), args.repo,
+                                getattr(args, "slug", None))
+    state = local_state(root)
+    command = args.command
+    script = os.path.join(script_root(), ".kilo", "skills", "git-worktree", "scripts", "worktree.py")
+    apply = getattr(args, "apply", False)
+    discard = command == "discard"
+    if discard and apply and not args.discard:
+        raise ValueError("discard requires both --apply and --discard")
+    if command != "handoff":
+        require_clean(root, root)
+    table, rows = related_rows(board, root, {(item["path"], item["branch"]) for item in items})
+    if command == "merge":
+        for index, cells, _entries in rows:
+            if cells[STATUS_INDEX] not in ("Pending Merge", "Merged"):
+                raise ValueError("board %s is not review-ready (Pending Merge required)" % cells[0])
+            dependency = board.field_index(table, "blocked-by")
+            if dependency is not None:
+                for other_index in table["rows"]:
+                    other = board.cell_texts(table["lines"], other_index)
+                    if cells[0] in re.findall(r"BOARD-\d+", other[dependency]) and other[2] == "Fix":
+                        other_paths = {os.path.abspath(os.path.join(root, path)) for path, _ in
+                                       parse_worktree_entries(other[board.field_index(table, "branch-worktree")])}
+                        selected_paths = {item["path"] for item in items}
+                        if (other[STATUS_INDEX] not in ("Merged", "Dropped") and
+                                (other[STATUS_INDEX] != "Pending Merge" or not other_paths or
+                                 not other_paths.issubset(selected_paths))):
+                            raise ValueError("open fix row blocks merge: %s" % other[0])
+    plans = []
+    for item in items:
+        record = state["workspaces"].get(item["path"], {})
+        if record and (record.get("branch") != item["branch"] or
+                       (record.get("boards") and not set(item["boards"]).issubset(record["boards"]))):
+            raise ValueError("workspace incarnation does not match selected board entries")
+        if record.get("outcome") in ("merged", "discarded"):
+            if os.path.lexists(item["path"]):
+                raise ValueError("completed workspace path has been recreated; refusing stale state")
+            print("%s: already %s" % (item["path"], record["outcome"]))
+            continue
+        resuming = record.get("outcome") in ("merged-pending-cleanup", "discarded-pending-cleanup")
+        pending_merge = command == "merge" and record.get("outcome") == "pending" and record.get("operation") == "merge"
+        if resuming and command != "handoff" and record.get("operation") != command:
+            raise ValueError("unfinished cleanup must resume its original operation")
+        entry = validate_workspace(item, root, allow_removed=resuming)
+        base, error = resolve_base(item["repo"], getattr(args, "target", None) or record.get("base"))
+        if error:
+            raise ValueError(error)
+        if base == item["branch"]:
+            raise ValueError("source and target are identical")
+        item["base"] = base
+        item["sha"] = checked_git(item["repo"], "rev-parse", "refs/heads/" + item["branch"])
+        item["resuming"] = resuming
+        item["removed"] = entry is None
+        if resuming and item["sha"] != record.get("sha"):
+            raise ValueError("branch changed since interrupted cleanup")
+        if (resuming or pending_merge) and (record.get("branch") != item["branch"] or base != record.get("base")
+                                           or item["sha"] != record.get("sha")):
+            raise ValueError("saved operation source or target identity changed")
+        if command == "handoff":
+            print(shlex.join(["git", "-C", item["repo"], "diff", base + "..." + item["branch"]]))
+            print(shlex.join(["git", "-C", item["repo"], "diff", "--stat", base + "..." + item["branch"]]))
+            print("workspace: %s" % item["path"])
+            continue
+        if not discard and not item["removed"]:
+            require_clean(item["path"], root)
+        if command == "merge":
+            targets = [entry for entry in list_worktrees(item["repo"]) if entry["branch"] == base]
+            if len(targets) != 1:
+                raise ValueError("target branch must be checked out exactly once: %s" % base)
+            target = confined(targets[0]["path"], item["repo"])
+            if targets[0].get("locked") or targets[0].get("prunable"):
+                raise ValueError("target checkout is locked or prunable")
+            require_clean(target, root)
+            item["target"] = target
+            item["target_sha"] = checked_git(target, "rev-parse", "HEAD")
+            ahead = checked_git(item["repo"], "rev-list", base + ".." + item["branch"])
+            if pending_merge:
+                if target != record.get("target"):
+                    raise ValueError("pending merge target checkout changed")
+                if not ahead:
+                    require_committed_merge(item, root, pending=record)
+                    item["resuming"] = resuming = True
+                elif item["target_sha"] != record.get("target_sha"):
+                    raise ValueError("pending merge target changed without completing the saved merge")
+            if resuming:
+                require_committed_merge(item, root)
+                item["target_sha"] = record.get("target_sha", item["target_sha"])
+            if resuming and ahead:
+                raise ValueError("previously merged source is no longer reachable from target")
+            if not resuming and not ahead:
+                raise ValueError("source has no commits ahead of target")
+        elif not discard:
+            if checked_git(item["repo"], "rev-list", base + ".." + item["branch"]):
+                raise ValueError("unmerged branch refused; use explicit discard instead")
+        plans.append(item)
+        print("%s: %s %s (%s) -> %s" % ("apply" if apply else "preview", command,
+              item["repo_id"], item["branch"], base))
+    if command == "handoff":
+        for verb in ("merge", "discard"):
+            invocation = ["python3", script, verb]
+            for board_id in args.board:
+                invocation.extend(["--board", board_id])
+            for repo_id in args.repo or []:
+                invocation.extend(["--repo", repo_id])
+            if args.target:
+                invocation.extend(["--target", args.target])
+            print(shlex.join(invocation))
+            print(shlex.join(invocation + ["--apply"] + (["--discard"] if verb == "discard" else [])))
+        return OK
+    if not apply:
+        print("dry run; human CLI only: add --apply" + (" --discard" if discard else ""))
+        return OK
+    target_heads = {item["target"]: (checked_git(item["target"], "rev-parse", "HEAD")
+                                    if item["resuming"] else item["target_sha"])
+                    for item in plans if command == "merge"}
+    for item in plans:
+        record = dict(state["workspaces"].get(item["path"], {}))
+        record.update({"base": item["base"], "branch": item["branch"], "sha": item["sha"],
+                       "outcome": "pending", "operation": command})
+        if command == "merge":
+            record.update({"target": item["target"], "target_sha": item["target_sha"]})
+        state["workspaces"][item["path"]] = record
+        local_state(root, state)
+        try:
+            validate_workspace(item, root, allow_removed=item["resuming"])
+            if checked_git(item["repo"], "rev-parse", "refs/heads/" + item["branch"]) != item["sha"]:
+                raise ValueError("source branch changed after preflight")
+            if not discard and not item["removed"]:
+                require_clean(item["path"], root)
+            if command == "merge" and not item["resuming"]:
+                require_clean(item["target"], root)
+                if checked_git(item["target"], "symbolic-ref", "--short", "HEAD") != item["base"]:
+                    raise ValueError("target branch changed after preflight")
+                current_target = checked_git(item["target"], "rev-parse", "HEAD")
+                if current_target != target_heads[item["target"]]:
+                    raise ValueError("target commit changed after preflight")
+                record["target_sha"] = current_target
+                local_state(root, state)
+                checked_git(item["target"], "-c", "merge.autoStash=false", "merge", "--no-ff", "--no-edit", "--commit", item["sha"])
+            if command == "merge":
+                require_committed_merge(item, root)
+                target_heads[item["target"]] = checked_git(item["target"], "rev-parse", "HEAD")
+            record["outcome"] = "discarded-pending-cleanup" if discard else "merged-pending-cleanup"
+            local_state(root, state)
+            if not item["removed"]:
+                remove_args = ["worktree", "remove"] + (["--force"] if discard else []) + [item["path"]]
+                checked_git(item["repo"], *remove_args)
+            if checked_git(item["repo"], "rev-parse", "refs/heads/" + item["branch"]) != item["sha"]:
+                raise ValueError("source branch changed during cleanup; branch preserved")
+            if command == "merge":
+                require_committed_merge(item, root)
+            checked_git(item["repo"], "branch", "-D", item["branch"])
+            record["outcome"] = "discarded" if discard else "merged"
+            record.pop("error", None)
+            local_state(root, state)
+            update_lifecycle_board(board, root, state, {item["path"]})
+        except (ValueError, OSError) as exc:
+            record["error"] = str(exc)
+            local_state(root, state)
+            print("halted; partial state recorded in local workspace state: %s" % exc, file=sys.stderr)
+            return REFUSED
+    update_lifecycle_board(board, root, state, {item["path"] for item in items})
+    return OK
+
+
 def cmd_list(args, cwd):
     root = repo_root(cwd)
     if not root:
@@ -538,19 +1017,23 @@ def cmd_verify(args, cwd):
         return REFUSED
     board = load_board_module(script_root())
     control = control_root(cwd)
-    path, board_branch = find_worktree_for_slug(board, control, args.slug, cwd)
+    item = lifecycle_selection(control, board, repo_ids=args.repo, slug=args.slug)[0]
+    validate_workspace(item, control)
+    path, board_branch = item["path"], item["branch"]
     if not path:
         print("no worktree with slug %s" % args.slug, file=sys.stderr)
         return REFUSED
     branch = board_branch or (git_out(path, "rev-parse", "--abbrev-ref", "HEAD") or "(detached)")
     repo = repo_of_path(path) or root
-    base, base_err = resolve_base(repo, args.base)
+    record = local_state(control)["workspaces"].get(path, {})
+    saved_base = record.get("base") if record.get("branch") == branch else None
+    base, base_err = resolve_base(repo, args.base or saved_base)
     if base_err:
         print(base_err, file=sys.stderr)
         return REFUSED
-    ahead = git_out(path, "log", "--oneline", "%s..HEAD" % base) or ""
-    changed = git_out(path, "diff", "--stat", base) or ""
-    dirty = git_out(path, "status", "--short") or ""
+    ahead = checked_git(path, "log", "--oneline", "%s..HEAD" % base)
+    changed = checked_git(path, "diff", "--stat", base)
+    dirty = checked_git(path, "status", "--short")
 
     print("worktree: %s" % os.path.abspath(path))
     print("branch:   %s" % branch)
@@ -572,100 +1055,9 @@ def cmd_verify(args, cwd):
     return OK
 
 
-def recovery_tsv(common, rows):
-    stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    path = os.path.join(common, "cleanup-wt", stamp + ".tsv")
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as fh:
-        fh.write("when\tkind\tname\tsha\tpath\taction\treason\n")
-        for r in rows:
-            fh.write("\t".join(str(r[k]) for k in
-                                ("when", "kind", "name", "sha", "path", "action", "reason")) + "\n")
-    return path
-
-
 def cmd_cleanup(args, cwd):
-    root = repo_root(cwd)
-    if not root:
-        print("not inside a git repository", file=sys.stderr)
-        return REFUSED
-    board = load_board_module(script_root())
-    control = control_root(cwd)
-    path, board_branch = find_worktree_for_slug(board, control, args.slug, cwd)
-    if not path:
-        print("no worktree with slug %s" % args.slug, file=sys.stderr)
-        return REFUSED
-    branch = board_branch or (git_out(path, "rev-parse", "--abbrev-ref", "HEAD") or "")
-    sha = git_out(path, "rev-parse", "HEAD") or ""
-    repo = repo_of_path(path) or root
-    common = common_dir(repo)
-    base, base_err = resolve_base(repo, args.base)
-    if base_err:
-        print(base_err, file=sys.stderr)
-        return REFUSED
-    now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
-
-    dirty = git_out(path, "status", "--short") or ""
-    unmerged = git_out(path, "log", "--oneline", "%s..%s" % (base, branch)) if branch else None
-    reason = None
-    if dirty:
-        reason = "worktree is dirty; uncommitted work would be lost"
-    elif not branch:
-        reason = "worktree has a detached HEAD; no branch to delete"
-    elif unmerged:
-        reason = "branch %s has %d commit(s) not reachable from %s" % (
-            branch, len(unmerged.splitlines()), base)
-
-    actions = []
-    if reason is None:
-        actions = [("worktree", branch or "(detached)", sha, path, "remove-worktree",
-                    "merged into %s and clean" % base),
-                   ("branch", branch, sha, path, "delete-branch",
-                    "merged into %s" % base)]
-
-    rows = [{"when": now, "kind": k, "name": n, "sha": s, "path": p,
-             "action": (a if args.apply else "would-" + a), "reason": r}
-            for k, n, s, p, a, r in actions]
-    if reason is not None:
-        rows.append({"when": now, "kind": "worktree", "name": branch or "(detached)", "sha": sha,
-                     "path": path, "action": "keep", "reason": reason})
-    tsv = recovery_tsv(common, rows) if common else None
-
-    print("worktree: %s" % os.path.abspath(path))
-    print("branch:   %s" % (branch or "(detached)"))
-    if reason is not None:
-        print("refused: %s" % reason)
-        print("no work was deleted")
-        if tsv:
-            print("recovery TSV: %s" % tsv)
-        return REFUSED
-
-    print("plan:")
-    for k, n, s, p, a, r in actions:
-        print("  %s %s (%s) - %s" % (a, n, p, r))
-
-    if not args.apply:
-        print("dry run; re-run with --apply to act")
-        if tsv:
-            print("recovery TSV: %s" % tsv)
-        return OK
-
-    done = []
-    code, _, err = git(repo, "worktree", "remove", path)
-    if code != 0:
-        print("worktree remove failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
-        print("recovery TSV: %s" % tsv)
-        return REFUSED
-    done.append("removed worktree " + path)
-    code, _, err = git(repo, "branch", "-D", branch)
-    if code == 0:
-        done.append("deleted branch " + branch)
-    else:
-        done.append("kept branch %s: %s" % (branch, (err.splitlines() or ["?"])[-1]))
-    for d in done:
-        print(d)
-    print("recovery TSV: %s" % tsv)
-    return OK
+    args.target = args.base
+    return cmd_lifecycle(args, cwd)
 
 
 def main(argv):
@@ -673,28 +1065,48 @@ def main(argv):
         prog="worktree.py", description="Deterministic git worktree lifecycle.")
     sub = parser.add_subparsers(dest="command")
 
+    p = sub.add_parser("mode", help="project-local workspace requirement; restart Kilo after changes")
+    p.add_argument("value", choices=("required", "optional", "status"))
+
     p = sub.add_parser("create", help="create a worktree named from a board row")
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
     p.add_argument("--slug", help="override the slug derived from the task title")
     p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
+    p.add_argument("--reuse", help="reuse the workspace of another board row")
 
     sub.add_parser("list", help="list worktrees")
 
     p = sub.add_parser("verify", help="check whether a worktree is ready to merge")
     p.add_argument("slug")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
+    p.add_argument("--repo", action="append", help="disambiguate repo ID")
 
     p = sub.add_parser("cleanup", help="remove a merged worktree and its branch")
     p.add_argument("slug")
     p.add_argument("--apply", action="store_true", help="act; without it this is a dry run")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
+    p.add_argument("--repo", action="append", help="disambiguate repo ID")
+
+    for command in ("handoff", "merge", "discard"):
+        p = sub.add_parser(command, help="human CLI workspace %s (preview by default)" % command)
+        p.add_argument("--board", action="append", required=True, help="board ID; repeat for a batch")
+        p.add_argument("--repo", action="append", help="select repo IDs; default all required repos")
+        p.add_argument("--target", help="explicit target branch; otherwise each workspace's own base")
+        if command != "handoff":
+            p.add_argument("--apply", action="store_true", help="human CLI only: execute previewed operations")
+        if command == "discard":
+            p.add_argument("--discard", action="store_true", help="explicit consent to lose dirty/unmerged work")
 
     args = parser.parse_args(argv)
     if not args.command:
         parser.print_help()
         return USAGE
     cwd = os.getcwd()
+    if args.command == "mode":
+        return cmd_mode(args, cwd)
+    if args.command in ("handoff", "merge", "discard"):
+        return cmd_lifecycle(args, cwd)
     if args.command == "create":
         return cmd_create(args, cwd)
     if args.command == "list":
