@@ -24,16 +24,28 @@ Lanes: `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merg
   (`test: path:line`, or the exact manual step).
 - **Risk** is a level plus one line of reasoning.
 - **Blocked by** lists board IDs, or exactly `- None.`
-- **Every change happens in a worktree named after the feature:**
-  `.kilo/worktrees/<feature-slug>/` on branch `feat|fix|chore|docs/<feature-slug>`.
-  Record the exact worktree path and branch here.
+- **Record the original workspace set for the change.** Build, fixes, QA, critique and docs
+  reuse its branches and paths. Never create a worktree just for a finding or review.
+- **Project-local mode controls the worktree requirement:**
+  `python3 .kilo/skills/git-worktree/scripts/worktree.py mode required|optional|status`.
+  Required is the default; optional permits the assigned checkout. Restart Kilo after changing
+  mode. Protected branches, secrets and assigned scopes remain protected in either mode.
+- Create a new workspace only on explicit user request or for the next approved task after
+  the previous change merged. Record every mapped repository, path and branch here.
 - Move the row the moment the status changes. `In Progress` → `In Review` → `Pending Merge`.
-- `Pending Merge` means green and waiting for the user to inspect and merge into `main`.
-  The agent never merges, pushes, or opens a PR.
+- `Pending Merge` means verified, reviewed, documented and clean, waiting for the human to
+  choose the merge target. The agent never merges, pushes, or opens a PR.
+- Use `worktree.py handoff --board <ID>` for every repository's diff and the batch merge command.
+  The human previews `worktree.py merge --board <ID>` and explicitly applies it with `--apply`.
+  The CLI preflights clean workspaces, updates the board and removes merged source worktrees.
+  Multi-repository merges are not atomic: stop on conflict and preserve partial outcomes.
 - **Frontend rows** must clear the UI gate first (component factory + user-approved gallery) and
   the QA + UI/UX critique lane (`/ui`, Playwright evidence) before they can reach
   `Pending Merge`.
-- `Merged` means the user actually merged it. The orchestrator sets this on `main` after the
-  merge; that board edit is the only change left uncommitted for the user.
+- `Merged` means the human lifecycle command completed all required repositories. Partial
+  outcomes stay recorded; never mark the parent merged while a required surface is unfinished.
+- Destructive abandonment is human-only: preview `worktree.py discard --board <ID> --repo <ID>`,
+  then use `--apply --discard` only for explicitly selected worktrees, even dirty or unmerged.
+  Never discard protected or main checkouts. Fully abandoned linked rows become `Dropped`.
 - `Blocked` = parked for a human. Record the one-line reason and what unblocks it.
 - `Dropped` = abandoned. Record why.

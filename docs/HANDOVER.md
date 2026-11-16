@@ -13,17 +13,18 @@
 >   created checkout maps are initialized from saved project mode. The authorized follow-up fixes
 >   inherited-map order validation at `.kilo/skills/git-worktree/scripts/worktree.py:642` by reusing
 >   guard's extracted ordered-items comparison. The capped parent review history is preserved;
->   BOARD-107 follow-up is verified, but BOARD-103 remains Blocked on the template permission hold.
-> - **Permission hold:** the template BOARD edit remains denied in this session. Its narrow `ask`
->   exception is in the feature policy/generated config, but active permissions still deny the
->   file after the user confirmed a task-worktree reload and one authorized retry. Exact error:
->   `{"permission":"edit","pattern":"**/docs/BOARD.md","action":"deny","source":"project"}`.
->   The template is unchanged. Do not bypass the denial or retry in this unchanged session.
-> - **Next action:** start a session whose effective project permissions load the approved
->   template-only exception, then align that template with approved workspace and human lifecycle
->   rules. Preserve clean code checkpoint `f0b9c95` and subsequent documentation checkpoints and
->   the capped parent ledger. No actual mode change, merge or discard has run. Live-board prose
->   still retains old guidance; script-owned row metadata is current.
+>   BOARD-107 follow-up is verified. The parent review history was not reset or reopened.
+> - **Template hold resolved:** after the user's permission changes and latest reload, the approved
+>   `templates/project/docs/BOARD.md` edit succeeded. It now describes optional mode, the original
+>   shared workspace set, clean human merge/cleanup, partial outcomes and explicit discard.
+>   Final changes are documentation only; existing lifecycle/auth source and evidence are unchanged.
+> - **Handoff:** BOARD-103 through BOARD-112 share one final documentation commit and clean-source
+>   handoff for human review/merge. The approved temporary policy edits were restored in both
+>   checkouts. Restoring main `kilo.jsonc` was tool-denied; the human may restore its temporary
+>   live-board `ask` values before reloading. The main tracked diff is live-board metadata. Generate
+>   `worktree.py handoff --board BOARD-103` using the feature script until it is merged.
+>   No actual mode change, merge or discard has run. Live-board prose still retains old guidance;
+>   root rules and lifecycle CLI are authoritative, with script-managed row metadata current.
 > - **Previous work:** BOARD-101 and BOARD-102 are Merged on the live factory board.
 
 ## 1. Overview
@@ -118,7 +119,7 @@ reports incomplete creation, and leaves the board unchanged for human recovery.
 The authorized follow-up resolves the former inherited-map order blocker by calling
 `permission_maps_match(current, expected)` at `.kilo/skills/git-worktree/scripts/worktree.py:642`.
 Independent proof: 33 tests passed, including six reordered-rule cases and two ordered success
-cases at `.kilo/skills/git-worktree/scripts/test_lifecycle.py:246-300`. The template hold remains.
+cases at `.kilo/skills/git-worktree/scripts/test_lifecycle.py:246-300`. The template hold is resolved.
 
 `lifecycle_selection()` resolves board rows and mapped repo IDs; `validate_workspace()`
 checks registered linked workspaces, branches, confinement and locks; `require_clean()` allows
@@ -251,8 +252,8 @@ performed on actual repositories in this correction; earlier permission regenera
 to the original chunk. That round's independent discovery reported `Ran 0 tests in 0.000s` and
 provided no pass. The subsequently authorized BOARD-107 follow-up supersedes that evidence:
 absolute-path discovery in the correct workspace ran 33 tests in 14.190s, `OK`, exit 0, and
-independent current-source review found no blocking issue. The template permission hold still
-keeps BOARD-103 Blocked, not merge-ready.
+independent current-source review found no blocking issue. The final template alignment is
+documentation only; verification is limited to file review and `git diff --check` for that change.
 
 Authenticated capture regressions:
 
@@ -279,9 +280,9 @@ ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup fi
   linked worktrees. Do not bypass the guard; request an approved assignment/permission decision.
 - Lifecycle handoff/merge/discard currently validate linked mapped worktrees; optional current
   checkout edits/commits do not imply those commands accept a nonlinked source checkout.
-- `templates/project/docs/BOARD.md` retains stale mandatory per-row worktree/manual Merged text:
-  the session deny still applies after two attempts. A narrow template-only `ask` exception is
-  included in the feature config but requires a reload before the edit. Never bypass it.
+- Approved temporary permission edits were restored in both policy files and the feature config.
+  Main `kilo.jsonc` restoration was tool-denied; its temporary live-board `ask` values require human
+  cleanup. The feature policy keeps live-board denies plus narrow template-only `ask` exceptions.
 - Live `docs/BOARD.md` prose still describes the old workflow. Row updates remain script-managed;
   root rules and lifecycle CLI are authoritative. No direct live-board prose edit was attempted.
 - Authenticated captures may contain sensitive page content beyond known credentials/session masks.

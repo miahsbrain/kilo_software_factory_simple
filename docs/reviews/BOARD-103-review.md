@@ -46,7 +46,10 @@ and password forms are rejected. The template still describes a duplicate harnes
   Proof: independent Round 2 run of `node --test .kilo/skills/qa-review/scripts/browser-review.test.mjs`, 19 passed, exit 0; test source at lines 222-250,279-288,359-387.
 - [x] The project template matches the existing ignored-pointer model.
   Proof: independent Round 2 source review of `templates/project/AGENTS.md:1236-1250`.
-- [ ] Corrected current state receives an independent review before merge readiness.
+- [x] Corrected current state receives an independent review before merge readiness.
+  Proof: authorized BOARD-107 follow-up independently reviewed current source and passed 33 tests;
+  auth/rules independently passed in Round 2. Subsequent changes are documentation only, reviewed
+  against approved rules by the orchestrator; no further parent review round was opened.
 
 ## Risk
 High: faulty lifecycle checks can lose source work or misreport merges. Discard and source deletion
@@ -113,3 +116,16 @@ template-edit retry. `apply_patch` still returned the project rule
 `{"permission":"edit","pattern":"**/docs/BOARD.md","action":"deny","source":"project"}`.
 The template is unchanged. No alternate-tool bypass or repeat attempt was made. A session with
 effective permission for the approved template-only edit is still required; parent stays Blocked.
+
+## Template Hold Resolved
+After the user's permission edits and latest reload, the approved template update succeeded.
+`templates/project/docs/BOARD.md:27-49` now documents shared workspace reuse, required/optional
+mode, clean human merge with automatic cleanup/board outcomes, partial failures and explicit
+dirty/unmerged discard. The orchestrator reviewed these changes against approved root rules.
+Verification limited to file review because this was a low-risk visual/static change; whitespace
+is checked with `git diff --check`. No lifecycle/auth source changed after the verified fix.
+The capped ledger remains historical; no fourth parent round or real lifecycle action was run.
+After the documentation commit and clean-source check, shared rows can be Pending Merge together.
+The approved temporary policy edits were restored in both checkouts and the feature config.
+Main generated-config restoration was tool-denied and remains human cleanup; the only tracked
+target diff is live-board metadata. The verified feature policy/map are unchanged from checkpoint.

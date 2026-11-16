@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-16] Align board template after permission reload
+**Type:** Docs
+**Board:** BOARD-103 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `templates/project/docs/BOARD.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/reviews/BOARD-103-review.md`, this log.
+**Why:** The latest authorized retry succeeded after human permission changes and reload. Remove stale mandatory per-row worktree/manual merge instructions from the project template.
+**Impact:** Template uses the approved shared workspace, optional mode, clean human merge/cleanup and explicit discard rules. Source code and existing 33 lifecycle/19 auth test proof are unchanged. No actual merge, discard or mode change. User approved restoring temporary live-board permission edits; both policies and the feature config were restored. Main generated-config restoration was tool-denied and remains human cleanup.
+**Evidence:** Template file review against approved rules; final documentation whitespace check and clean local commit required for handoff. Parent ledger remains capped and unchanged.
+
 ## [2026-11-16] Preserve verified fix after confirmed-reload template denial
 **Type:** Docs
 **Board:** BOARD-103, BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
