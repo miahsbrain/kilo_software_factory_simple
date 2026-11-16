@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-16] Preserve verified fix after confirmed-reload template denial
+**Type:** Docs
+**Board:** BOARD-103, BOARD-107 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated
+**Changed:** `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/reviews/BOARD-103-review.md`, this log; live board evidence recorded separately.
+**Why:** Code checkpoint `f0b9c95` resolves the ordered-map defect with 33 independently passing tests. The user confirmed a task-worktree reload, but one authorized template retry still hit project `**/docs/BOARD.md: deny`.
+**Impact:** Template unchanged; parent remains Blocked pending effective edit permission. No bypass, repeated retry, actual merge, discard or mode change. Preserve the verified fix and clean checkpoints.
+
 ## [2026-11-16] Independently verify ordered-map follow-up
 **Type:** Docs
 **Board:** BOARD-107, BOARD-103 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated

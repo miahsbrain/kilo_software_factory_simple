@@ -15,12 +15,15 @@
 >   guard's extracted ordered-items comparison. The capped parent review history is preserved;
 >   BOARD-107 follow-up is verified, but BOARD-103 remains Blocked on the template permission hold.
 > - **Permission hold:** the template BOARD edit remains denied in this session. Its narrow `ask`
->   exception is in the feature policy/generated config, not loaded session permissions. Live board
->   prose also retains old guidance; only script-owned row metadata has changed there.
-> - **Next action:** open/reload Kilo in this task worktree, not the main checkout, to load the
->   approved template-only edit exception. Then align the template with approved workspace and
->   human lifecycle rules. Preserve local checkpoints and the capped ledger; no fourth parent
->   review round was opened. No actual mode change, merge or discard has run.
+>   exception is in the feature policy/generated config, but active permissions still deny the
+>   file after the user confirmed a task-worktree reload and one authorized retry. Exact error:
+>   `{"permission":"edit","pattern":"**/docs/BOARD.md","action":"deny","source":"project"}`.
+>   The template is unchanged. Do not bypass the denial or retry in this unchanged session.
+> - **Next action:** start a session whose effective project permissions load the approved
+>   template-only exception, then align that template with approved workspace and human lifecycle
+>   rules. Preserve clean code checkpoint `f0b9c95` and subsequent documentation checkpoints and
+>   the capped parent ledger. No actual mode change, merge or discard has run. Live-board prose
+>   still retains old guidance; script-owned row metadata is current.
 > - **Previous work:** BOARD-101 and BOARD-102 are Merged on the live factory board.
 
 ## 1. Overview

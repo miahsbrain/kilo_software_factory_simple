@@ -107,3 +107,9 @@ no copied app harness. All lifecycle effects used disposable temporary repositor
 
 The former BOARD-107 rule-order defect is resolved and verified. The unchanged, denied BOARD
 template remains the parent hold. No merge-readiness claim, actual lifecycle action or mode change.
+
+After code checkpoint `f0b9c95`, the user confirmed a task-worktree reload and authorized one
+template-edit retry. `apply_patch` still returned the project rule
+`{"permission":"edit","pattern":"**/docs/BOARD.md","action":"deny","source":"project"}`.
+The template is unchanged. No alternate-tool bypass or repeat attempt was made. A session with
+effective permission for the approved template-only edit is still required; parent stays Blocked.

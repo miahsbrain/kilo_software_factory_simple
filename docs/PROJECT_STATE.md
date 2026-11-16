@@ -24,10 +24,11 @@
 - **Previous work:** BOARD-101 (no-production-build rule) and BOARD-102 (accordion board viewer)
   are recorded as Merged on the live factory board. They are not active tasks.
 - **Permission blocker:** the session still denies `templates/project/docs/BOARD.md` after the
-  user approved enabling its edit. Do not bypass the denial or claim its old instructions aligned.
-- **Next action:** open/reload Kilo in the task worktree for the template-only permission exception;
-  the main checkout still has the broad deny. Then align the project BOARD template. Preserve
-  checkpoint commits `b63d6e7` and `08ac314` and the follow-up checkpoint; do not reset the parent
+  user confirmed reloading the task worktree and authorized one retry. The retry still returned
+  project `**/docs/BOARD.md: deny`; the template is unchanged. No bypass or repeated retry.
+- **Next action:** start a session with effective permission for the approved template-only edit,
+  then align the project BOARD template. Preserve checkpoints `b63d6e7`, `08ac314`, `f0b9c95`
+  and subsequent documentation checkpoints; do not reset the parent
   ledger. Follow-up proof supersedes the earlier zero-test discovery: 33 passed in 14.190s,
   exit 0. Auth passed 19 independently. No actual merge, discard or mode change has run.
   The feature is not merge-ready until the template hold is resolved.
