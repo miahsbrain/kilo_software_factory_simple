@@ -34,7 +34,7 @@ reference galleries, §2 the 15 rules, §3 the component factory gate.
 
 A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
 
-The state of each round lives in one short file per row: `docs/reviews/<task-id>-ledger.md` —
+The state of each round lives in one short file per row: `artifacts/reviews/<task-id>-ledger.md` —
 the round number, the findings filed in that round, the Fix row IDs created, the Fix rows merged
 since, and the stop reason when it stops.
 
@@ -45,6 +45,15 @@ on screen now — not what the previous reviewer concluded.
 ```bash
 python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 ```
+
+Resolve the shared control main-checkout directory from the ledger path printed by `status`.
+Reports, findings and ledgers belong there, never in a worktree-local directory; never stage or
+commit any artifacts. Use `<task-id>-qa.md`, `<task-id>-ui.md`, `<task-id>-review.md` and
+`<task-id>-ledger.md`; name separate findings `<task-id>-finding-<n>.md`.
+
+If round 3 ends with unresolved blocking findings, stop automatically. Highlight the remaining problems, severity, user impact, evidence and attempted fixes. Record the stop reason and request Blocked status from the orchestrator. Ask the user how to proceed, directly in an interactive review or through the orchestrator for delegated reviews. Offer a revised approach, defer/drop, or explicitly scoped follow-up. Do not silently start round 4, reset the ledger or claim completion.
+A successful round 3 is not automatically Blocked; report the normal verdict and merge-gate evidence.
+Critical-path failure, a repeated finding or a human stop still requires immediate escalation (§B4.4).
 
 ## Ask before building a tool
 
@@ -150,7 +159,7 @@ to a different tool unless the user says so. A missing browser, package, or syst
 
 ## Submit your review
 
-Write it to `docs/reviews/<task-id>-ui.md`:
+Write it to shared control-root `artifacts/reviews/<task-id>-ui.md`:
 
     # UI/UX review — <task-id> <task name>
     **Reviewed commit:** <sha>   **Verdict:** PASS | FAIL

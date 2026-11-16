@@ -676,6 +676,48 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(GUARD.bash_verdict(policy, "python3 worktree.py merge --board BOARD-001 --apply")[0], "ask")
         self.assertEqual(GUARD.bash_verdict(policy, "git status")[0], "allow")
 
+    def test_review_artifact_permissions_preserve_protections_in_both_modes(self):
+        policy = json.loads((SOURCE / ".kilo/policies/git-policy.json").read_text())
+        for mode in ("required", "optional"):
+            with self.subTest(mode=mode):
+                expected = GUARD.generated_permission(policy, mode)
+                mapping = expected["edit"]
+                patterns = list(mapping)
+                for pattern in ("artifacts/reviews/**", "**/artifacts/reviews/**"):
+                    self.assertGreater(patterns.index(pattern), patterns.index("**/.kilo/worktrees/**"))
+                    self.assertLess(patterns.index(pattern), patterns.index("docs/BOARD.md"))
+                    self.assertLess(patterns.index(pattern), patterns.index("**/.env"))
+                cases = {}
+                for prefix in ("", str(self.root) + "/"):
+                    for name in ("BOARD-113-qa.md", "BOARD-113-review.md", "BOARD-113-ledger.md"):
+                        cases[prefix + "artifacts/reviews/" + name] = "allow"
+                    for name in (".env", ".env.local", ".npmrc", "private.pem", "private.key",
+                                 "private.p12", "id_rsa", ".git/config", ".git-credentials"):
+                        cases[prefix + "artifacts/reviews/" + name] = "deny"
+                    cases[prefix + "artifacts/reviews/docs/BOARD.md"] = "deny"
+                    cases[prefix + "docs/BOARD.md"] = "deny"
+                    for name in ("apps/web/src/main.ts", "artifacts/other/report.md"):
+                        cases[prefix + name] = "allow" if mode == "optional" else "deny"
+                    cases[prefix + ".kilo/worktrees/assigned/apps/web/src/main.ts"] = "allow"
+                for path, action in cases.items():
+                    with self.subTest(path=path):
+                        actual = None
+                        for pattern, verdict in mapping.items():
+                            if GUARD.pattern_matches(path, pattern):
+                                actual = verdict
+                        self.assertEqual(actual, action)
+                config_path = self.root / "kilo.jsonc"
+                GUARD.write_permission_map(str(config_path), policy, mode=mode)
+                config = json.loads(config_path.read_text())
+                self.assertTrue(GUARD.permission_maps_match(config["permission"], expected))
+                with mock.patch.object(GUARD, "load_worktree_module") as loader:
+                    loader.return_value.workspace_mode.return_value = mode
+                    self.assertEqual(GUARD.cmd_check_policy(False, str(self.root),
+                                                          GUARD.repo_context(str(self.root))), 0)
+        config = json.loads((SOURCE / "kilo.jsonc").read_text())
+        self.assertTrue(GUARD.permission_maps_match(config["permission"],
+                                                   GUARD.generated_permission(policy)))
+
 
 if __name__ == "__main__":
     unittest.main()

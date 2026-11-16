@@ -106,9 +106,11 @@ The QA lane uses **Playwright** and produces evidence, not assertions. Spec: `do
   320×800 as the overflow floor.
 - Component screenshots for each changed component, at desktop and mobile.
 - Artifacts under `artifacts/web/qa/<date>/<task-id>/` with `notes.md` recording what was
-  checked and expected vs actual. Commit `notes.md` and small component shots; leave full-page
-  captures out of git. Review reports stay in `docs/reviews/<task-id>-qa.md` and
-  `docs/reviews/<task-id>-ui.md` — those are documents, not artifacts.
+  checked and expected vs actual. Never stage or commit artifacts, including notes and shots.
+  Reports, findings and ledgers live in the control main checkout's ignored `artifacts/reviews/`,
+  shared by worktrees: `<task-id>-qa.md`, `<task-id>-ui.md`, `<task-id>-review.md`, `<task-id>-ledger.md`.
+  Resolve that shared directory from `ledger.py status --task-id <task-id>`; see root §B4.4
+  for round-three blocker escalation and the human decision gate.
 - Check: keyboard focus and trapping, contrast, accessible names, tap targets ≥24×24 CSS px,
   console errors, unexpected network failures, no horizontal overflow at 320px, and whether the
   screen matches the approved gallery.

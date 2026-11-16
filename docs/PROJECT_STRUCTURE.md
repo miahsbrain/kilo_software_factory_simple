@@ -31,8 +31,10 @@ and is never tracked here (ADR-053).
     │   ├── DECISIONS.md              # append-only factory decisions (ADR-001…)
     │   ├── PROJECT_STATE.md          # current phase, progress, next step
     │   ├── STACK.md                  # the tools the factory needs, and the commands they run
-    │   ├── reviews/                  # task review findings and bounded-round ledger
     │   └── changelog/                # engineering log: CHANGELOG.md + one file per change
+    ├── artifacts/                    # ignored evidence in the control main checkout, shared by worktrees
+    │   ├── reviews/                  # review reports, findings and bounded-round ledgers; never commit
+    │   └── <scope>/qa/<date>/<task>/  # existing dated screenshot/capture hierarchy
     ├── templates/
     │   └── project/                  # blank project skeleton a new project starts from
     │       ├── AGENTS.md             # the rules, copied into the project
@@ -57,7 +59,8 @@ and is never tracked here (ADR-053).
 | `.kilo/scopes/` | Canonical specialization rules. Work surfaces receive an ignored generated `AGENTS.md` pointer; task assignments define repository/path boundaries. |
 | `.kilo/skills/git-worktree/scripts/test_lifecycle.py` | Disposable-repository regression tests for lifecycle mechanics. |
 | `.kilo/skills/qa-review/scripts/browser-review.test.mjs` | Focused authenticated-navigation and evidence-capture regression tests. |
-| `docs/reviews/` | BOARD-103 independent findings and its review-round ledger; not UI artifacts. |
+| `.kilo/skills/qa-review/scripts/test_ledger.py` | Isolated stdlib tests for shared ledger paths, ignored output, migration preservation, overrides and the three-round cap. |
+| `artifacts/reviews/` | Ignored review reports, findings and ledgers in the control main checkout, shared by all worktrees. Includes migrated BOARD-102/103 evidence; never stage or commit. |
 | `templates/project/` | The blank project skeleton. A new project copies it, then fills it in. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
 | `kilo.jsonc` | Kilo settings: the Playwright MCP server and the generated permission map. |

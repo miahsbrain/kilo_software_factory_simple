@@ -318,12 +318,16 @@ artifacts/
 The script computes that path itself, so no agent has to remember it. The artifacts folder
 belongs to the **main checkout**, so a capture taken from a worktree still lands in one place.
 
-Review reports and the ledger are **documents, not artifacts**. They stay where documents live:
-`docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
-`docs/reviews/<task-id>-ledger.md`.
+Review reports, findings and round ledgers live in the control repository’s ignored `artifacts/reviews/` directory, using `<task-id>-qa.md`, `<task-id>-ui.md`, `<task-id>-review.md` and `<task-id>-ledger.md`. Worktrees share that location. Never stage or commit these artifacts.
+Resolve the shared directory from `ledger.py status --task-id <task-id>` before writing reports
+or `<task-id>-finding-<n>.md`; never write them into a worktree-local artifact directory.
 
-Commit `notes.md` and small component shots. Keep full-page captures out of git unless the team
-wants a visual record — they are large and churn.
+Never stage or commit artifacts, including `notes.md`, summaries and component shots.
+The dated screenshot hierarchy is unchanged. If round 3 ends with unresolved blocking findings,
+follow root §B4.4: stop, record the reason, request `Blocked`, highlight severity, user impact,
+evidence and attempted fixes, and ask the user (through the orchestrator when delegated) to choose
+a revised approach, defer/drop or explicitly scoped follow-up. No round 4, ledger reset or false
+completion. A successful round 3 follows the normal merge gate.
 
 ### Checks
 

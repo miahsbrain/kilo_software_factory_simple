@@ -140,9 +140,13 @@ The script computes that path itself — `--scope`, `--task-id` and `--date` nam
 agent has to remember it. The artifacts folder belongs to the **main checkout**: a capture taken
 from a worktree still lands in the same place.
 
-**Review reports and the ledger are documents, not artifacts.** They stay where documents live:
-`docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
-`docs/reviews/<task-id>-ledger.md`.
+Review reports, findings and round ledgers live in the control repository’s ignored `artifacts/reviews/` directory, using `<task-id>-qa.md`, `<task-id>-ui.md`, `<task-id>-review.md` and `<task-id>-ledger.md`. Worktrees share that location. Never stage or commit these artifacts.
+Use `ledger.py status --task-id <task-id>` to resolve the shared directory from its printed
+ledger path before writing reports or `<task-id>-finding-<n>.md`. The default reuses the existing
+control-root resolver and fails clearly if the root is unknown. An explicit `--ledger-dir <dir>`
+before the subcommand overrides it; relative paths remain relative to the caller. Never fall back
+to `docs/reviews/`. Dated screenshots keep their existing hierarchy. Never stage or commit any
+artifacts, including capture notes, summaries or component shots.
 
 Per route, viewport, and scheme:
 
@@ -243,10 +247,10 @@ expanding one? Name the existing code if it does.
 
 ## 5. Write the finding
 
-One file per finding, in the scope you reviewed:
+One file per finding, in the shared control main checkout:
 
 ```
-artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md
+artifacts/reviews/<task-id>-finding-<n>.md
 ```
 
 Required sections — the validator enforces this:
@@ -285,7 +289,7 @@ Validate before submitting:
 
 ```bash
 python3 .kilo/skills/qa-review/scripts/check-finding.py \
-  --body-file artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md \
+  --body-file artifacts/reviews/<task-id>-finding-<n>.md \
   --kind bug --priority medium --category functional --route /settings
 ```
 
@@ -348,7 +352,7 @@ merge is required. Use ledger `merged` only after the human has actually merged 
 
 A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
 
-Each round's state lives in one short file per row: `docs/reviews/<task-id>-ledger.md`. It holds
+Each round's state lives in one short file per row: shared `artifacts/reviews/<task-id>-ledger.md`. It holds
 the round number, the findings filed in that round, the Fix row IDs created, the Fix rows merged
 since, and the stop reason when it stops.
 
@@ -360,19 +364,21 @@ reasoning.
 python3 .kilo/skills/qa-review/scripts/ledger.py next-round --task-id BOARD-005
 python3 .kilo/skills/qa-review/scripts/ledger.py finding  --task-id BOARD-005 \
     --fingerprint "bug|functional|/settings/export-button-stays-enabled" \
-    --evidence artifacts/web/qa/2026-10-29/BOARD-005/finding-1.md --fix-row BOARD-006
+    --evidence artifacts/reviews/BOARD-005-finding-1.md --fix-row BOARD-006
 python3 .kilo/skills/qa-review/scripts/ledger.py merged   --task-id BOARD-005 --fix-row BOARD-006
 python3 .kilo/skills/qa-review/scripts/ledger.py stop     --task-id BOARD-005 --reason "..."
 python3 .kilo/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
 ```
 
-`next-round` refuses to open round 4.
+`next-round` refuses to open round 4 without changing the ledger. It does not infer blockers.
+If round 3 ends with unresolved blocking findings, stop automatically. Highlight the remaining problems, severity, user impact, evidence and attempted fixes. Record the stop reason and request Blocked status from the orchestrator. Ask the user how to proceed, directly in an interactive review or through the orchestrator for delegated reviews. Offer a revised approach, defer/drop, or explicitly scoped follow-up. Do not silently start round 4, reset the ledger or claim completion.
+A successful round 3 follows the normal merge gate, not automatic `Blocked` status.
 
 **Stop conditions** — the loop stops at whichever comes first:
 
 | Stop condition | What happens |
 |---|---|
-| Round cap reached (3 rounds, row still failing) | Row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round. |
+| Round 3 ends with unresolved blocking findings | Record the stop reason, request `Blocked` from the orchestrator, and ask the human how to proceed with the context and options above. No round 4 or reset. |
 | A critical path is red (money, data loss, auth, security) | Row is `Blocked` immediately. Never retried silently. |
 | The same fingerprint is filed twice | The existing row is escalated to `Blocked` rather than a new one opening. |
 | The human says stop | Row is `Blocked` with the reason recorded in the ledger's stop reason. |
@@ -384,7 +390,7 @@ python3 .kilo/skills/qa-review/scripts/ledger.py status   --task-id BOARD-005
 - **PASS** — every criterion verified with a proof line, no findings. The row may proceed to
   `Pending Merge`.
 - **FAIL** — any finding, or any criterion without a proof. The row returns to `In Progress` with
-  the failing findings restated.
+  the failing findings restated, unless a stop condition requires `Blocked` and a human decision.
 
 Never mark an unchecked criterion as done. Never write a "not verified" section on the finding —
 an unchecked acceptance criterion plus a one-line reason replaces it.

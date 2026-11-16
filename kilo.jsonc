@@ -80,6 +80,8 @@
       "*": "deny",
       ".kilo/worktrees/**": "allow",
       "**/.kilo/worktrees/**": "allow",
+      "artifacts/reviews/**": "allow",
+      "**/artifacts/reviews/**": "allow",
       "AGENTS.md": "ask",
       "apps/*/AGENTS.md": "ask",
       ".kilo/agent/*.md": "ask",
@@ -107,6 +109,7 @@
       "*.pem": "deny",
       "*.key": "deny",
       "*.p12": "deny",
+      "**/id_rsa*": "deny",
       "id_rsa*": "deny",
       ".env.example": "allow",
       "**/.env.example": "allow"

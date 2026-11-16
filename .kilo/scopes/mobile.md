@@ -96,8 +96,11 @@ Passing the anti-slop rules is not enough — the result also has to serve the u
 The QA lane captures evidence through `.kilo/skills/qa-review/scripts/browser-review.mjs`, which
 computes the canonical path itself: `artifacts/mobile/qa/<date>/<task-id>/` in the **main
 checkout**. The task directory holds `notes.md` with what was checked and the expected vs actual
-result. Review reports stay in `docs/reviews/<task-id>-qa.md` and
-`docs/reviews/<task-id>-ui.md` — those are documents, not artifacts.
+result. Reports, findings and ledgers live in the control main checkout's ignored
+`artifacts/reviews/`, shared by worktrees: `<task-id>-qa.md`, `<task-id>-ui.md`,
+`<task-id>-review.md`, `<task-id>-ledger.md`. Never stage or commit any artifacts.
+Resolve that shared directory from `ledger.py status --task-id <task-id>`; see root §B4.4
+for round-three blocker escalation and the human decision gate.
 
 ## Production expectations
 
