@@ -46,11 +46,13 @@ Application source stays read-only; approved auth/navigation and evidence writes
 
        python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 
-   The ledger lives at `docs/reviews/<task-id>-ledger.md`.
+   The ledger lives at shared control-root `artifacts/reviews/<task-id>-ledger.md`.
+   `status` prints the resolved path; use its directory for all reports and findings.
 4. **Store artifacts** under `artifacts/<scope>/qa/<YYYY-MM-DD>/<task-id>/` with a
-   `notes.md` recording what was checked and expected vs actual. Commit `notes.md` and small
-   component shots only. Review reports stay in `docs/reviews/<task-id>-qa.md` and
-   `docs/reviews/<task-id>-ui.md` — those are documents, not artifacts.
+   `notes.md` recording what was checked and expected vs actual. Never stage or commit artifacts,
+   including notes and component shots. Reports, findings and ledgers live in the control main
+   checkout's ignored `artifacts/reviews/`, shared by worktrees: `<task-id>-qa.md`, `<task-id>-ui.md`,
+   `<task-id>-review.md`, `<task-id>-ledger.md` and `<task-id>-finding-<n>.md`.
 5. **Check** and report findings as expected-vs-actual:
    - keyboard focus, visible focus ring, focus trapping in dialogs
    - contrast, accessible names on controls, alt text
@@ -70,8 +72,12 @@ Application source stays read-only; approved auth/navigation and evidence writes
    Exit 0 prints the fingerprint on stdout. Pass it to `board.py add --fingerprint`; a repeat
    fingerprint is refused and the existing row is escalated to `Blocked` instead.
 8. **Verdict**: a frontend row cannot leave `In Review` until both QA and the critique are
-   green. Any finding returns the row to `In Progress` with the finding restated. The round cap
-   is 3 — when it is reached and the row still fails, the row moves to `Blocked` with a summary
-   of what was tried and the question the human must answer.
+   green. Findings request `In Progress` unless a §B4.4 stop condition applies. If round 3 ends
+   with unresolved blocking findings, stop automatically. Highlight remaining problems, severity,
+   user impact, evidence and attempted fixes. Record the stop reason and request `Blocked` from
+   the orchestrator. Ask the user how to proceed, directly when interactive or through the
+   orchestrator when delegated. Offer a revised approach, defer/drop, or explicitly scoped
+   follow-up. Never start round 4, reset the ledger or claim completion. Round 3 success follows
+   the normal merge gate, not automatic `Blocked` status.
 
 Report in this order: what was done, what is proven, what is not done and why, next action.

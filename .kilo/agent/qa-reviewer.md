@@ -35,7 +35,7 @@ Read the root `AGENTS.md` (Parts A and B apply to you) and `docs/UI-UX.md` §3 a
 
 A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
 
-The state of each round lives in one short file per row: `docs/reviews/<task-id>-ledger.md` —
+The state of each round lives in one short file per row: `artifacts/reviews/<task-id>-ledger.md` —
 the round number, the findings filed in that round, the Fix row IDs created, the Fix rows merged
 since, and the stop reason when it stops.
 
@@ -49,7 +49,15 @@ Before you review, read the ledger:
 python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 ```
 
-The loop stops at whichever comes first: the round cap is reached, a critical path is red (money,
+Resolve the shared control main-checkout directory from the ledger path printed by `status`.
+Reports, findings and ledgers belong there, never in a worktree-local directory; never stage or
+commit any artifacts. Use `<task-id>-qa.md`, `<task-id>-ui.md`, `<task-id>-review.md` and
+`<task-id>-ledger.md`; name separate findings `<task-id>-finding-<n>.md`.
+
+If round 3 ends with unresolved blocking findings, stop automatically. Highlight the remaining problems, severity, user impact, evidence and attempted fixes. Record the stop reason and request Blocked status from the orchestrator. Ask the user how to proceed, directly in an interactive review or through the orchestrator for delegated reviews. Offer a revised approach, defer/drop, or explicitly scoped follow-up. Do not silently start round 4, reset the ledger or claim completion.
+A successful round 3 is not automatically Blocked; report the normal verdict and merge-gate evidence.
+
+The loop also stops when a critical path is red (money,
 data loss, auth, security — that is an immediate `Blocked`, never retried), the same fingerprint
 is filed twice (the existing row is escalated to `Blocked`), or the human says stop.
 
@@ -150,7 +158,7 @@ fake a review.
    - **Reuse** — does the diff duplicate an existing function, component, or state instead of
      expanding one? Name the existing code if it does.
 6. **Write one finding file per defect** under
-   `artifacts/<scope>/qa/<date>/<task-id>/finding-<n>.md` in the main checkout, in the template
+   `artifacts/reviews/<task-id>-finding-<n>.md` in the shared control main checkout, in the template
    from `docs/UI-UX.md` §5, and **validate it**:
 
        python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file <finding.md> \
@@ -163,7 +171,7 @@ fake a review.
 
 ## Submit your review
 
-Write the review to `docs/reviews/<task-id>-qa.md` in the scope you reviewed:
+Write the review to shared control-root `artifacts/reviews/<task-id>-qa.md`:
 
     # QA review — <task-id> <task name>
     **Reviewed commit:** <sha>   **Verdict:** PASS | FAIL
@@ -188,7 +196,7 @@ a repro, and the evidence that proves it.
 
 The verdict, the acceptance-criteria table, the findings list, and the artifact paths. Then say
 plainly: which findings should become board rows of type `Fix`, and which criterion (if any) must
-return to `In Progress`.
+return to `In Progress`, unless a stop condition requires requesting `Blocked` and a human decision.
 
 Do not edit `docs/BOARD.md` — the orchestrator owns the board and creates the rows from your
 findings.

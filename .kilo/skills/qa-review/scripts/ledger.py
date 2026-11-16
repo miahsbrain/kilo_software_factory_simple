@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """ledger.py — the bounded QA/fix ledger for one board row.
 
-One short file per row, docs/reviews/<task-id>-ledger.md, carries the state
+One ignored file per row, artifacts/reviews/<task-id>-ledger.md, carries the state
 between rounds: the round number, the findings filed in that round, the Fix
 row IDs created, the Fix rows merged since, and the stop reason when it stops.
 
 A row may go through at most 3 rounds. `next-round` refuses to open round 4;
-the row moves to Blocked instead.
+unresolved blockers require a human decision, not an automatic extension.
 
 Usage:
-  ledger.py status      --task-id BOARD-005 [--ledger-dir docs/reviews]
+  ledger.py [--ledger-dir <directory>] status --task-id BOARD-005
   ledger.py next-round  --task-id BOARD-005
   ledger.py finding     --task-id BOARD-005 --fingerprint "kind|category|route|subject"
                          [--evidence <path>] [--fix-row BOARD-010]
@@ -20,6 +20,7 @@ Usage:
 Exit codes: 0 ok, 1 refused, 2 usage error.
 """
 import argparse
+import importlib.util
 import os
 import re
 import sys
@@ -31,6 +32,19 @@ ROUND_RE = re.compile(r"^## Round (\d+)\s*$")
 
 def ledger_path(ledger_dir, task_id):
     return os.path.join(ledger_dir, "%s-ledger.md" % task_id)
+
+
+def default_ledger_dir(cwd):
+    source = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
+                                          "git-worktree", "scripts", "worktree.py"))
+    spec = importlib.util.spec_from_file_location("ledger_worktree", source)
+    worktree = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(worktree)
+    root = worktree.control_root(cwd)
+    if not (os.path.isfile(os.path.join(root, ".kilo", "repos.json"))
+            and os.path.isfile(os.path.join(root, "docs", "BOARD.md"))):
+        raise ValueError("cannot resolve control root: repo map and board are required")
+    return os.path.join(root, "artifacts", "reviews")
 
 
 def parse_ledger(text):
@@ -67,7 +81,7 @@ def read_ledger(path):
     try:
         with open(path, "r", encoding="utf-8") as handle:
             return handle.read()
-    except OSError:
+    except FileNotFoundError:
         return ""
 
 
@@ -123,8 +137,13 @@ def cmd_next_round(args):
     if len(rounds) >= MAX_ROUNDS:
         print("refused: the round cap of %d is reached for %s" % (MAX_ROUNDS, args.task_id),
               file=sys.stderr)
-        print("move the row to Blocked with a summary of what was tried and the question "
-              "the human has to answer", file=sys.stderr)
+        print("No round 4 or ledger reset. If round 3 has unresolved blocking findings, "
+              "highlight remaining problems, severity, user impact, evidence and attempted fixes; "
+              "record the stop reason with 'stop', request Blocked status from the orchestrator, "
+              "and ask the user how to proceed (through the orchestrator when delegated). "
+              "Offer a revised approach, defer/drop, or explicitly scoped follow-up. "
+              "A successful round 3 does not imply blockers or require Blocked status.",
+              file=sys.stderr)
         return REFUSED
     number = len(rounds) + 1
     rounds.append({"number": number, "fields": {field: "-" for field in FIELDS}})
@@ -195,8 +214,9 @@ def main(argv):
     parser = argparse.ArgumentParser(
         prog="ledger.py",
         description="Track the bounded QA/fix rounds of one board row.")
-    parser.add_argument("--ledger-dir", default="docs/reviews",
-                        help="directory that holds the ledger files (default: docs/reviews)")
+    parser.add_argument("--ledger-dir",
+                        help="explicit directory, relative to cwd when not absolute; "
+                             "default: shared control-root artifacts/reviews (never commit)")
     sub = parser.add_subparsers(dest="command")
 
     for name, help_text in (
@@ -232,7 +252,13 @@ def main(argv):
         "stop": cmd_stop,
         "show": cmd_show,
     }[args.command]
-    return handler(args)
+    try:
+        if args.ledger_dir is None:
+            args.ledger_dir = default_ledger_dir(os.getcwd())
+        return handler(args)
+    except (OSError, ValueError) as error:
+        print("refused: %s" % error, file=sys.stderr)
+        return REFUSED
 
 
 if __name__ == "__main__":

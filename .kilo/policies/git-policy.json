@@ -325,6 +325,16 @@
       "reason": "A linked worktree is the only place an agent edits files."
     },
     {
+      "pattern": "artifacts/reviews/**",
+      "action": "allow",
+      "reason": "Allow shared ignored review evidence; later protected-path rules still apply."
+    },
+    {
+      "pattern": "**/artifacts/reviews/**",
+      "action": "allow",
+      "reason": "Allow absolute paths to shared ignored review evidence; later protected-path rules still apply."
+    },
+    {
       "pattern": "AGENTS.md",
       "action": "ask",
       "reason": "The root rules file. Changes to it need the user's approval."

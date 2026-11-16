@@ -3,6 +3,33 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-16] Resolve review-artifact permission hold
+**Type:** Fix
+**Board:** BOARD-113 | **Branch:** chore/store-reviews-as-ignored-artifacts
+**Changed:** Approved user policy wording/order, regenerated task config, handover and project state.
+**Why:** The latest reload enabled normal shared report writes. User explicitly approved moving only the two review allowances back to tested placement while preserving their values/reasons and SSH denial edits.
+**Impact:** No weakened source, board or secret protection. No ledger reset, new worktree, artifact staging, agent merge or main-config edit. Earlier hold remains historical, not current status.
+**Verification:** Builder focused permission test: 1 passed in 0.065s, exit 0. Independent final delta: 1 passed in 0.053s, exit 0; maps in sync, no blocking findings. Normal `apply_patch` report creation and update both succeeded at shared ignored `artifacts/reviews/BOARD-113-review.md`. Earlier independent 6-test ledger and byte-preserving migration evidence is unchanged.
+
+## [2026-11-16] Permit shared review evidence writes
+**Type:** Fix
+**Board:** BOARD-113 | **Branch:** chore/store-reviews-as-ignored-artifacts
+**Changed:** Canonical git policy, generated task `kilo.jsonc`, existing `test_lifecycle.py` permission tests, ADR-071 and handover note.
+**Why:** Approved narrow exception for relative/absolute `artifacts/reviews/` evidence writes; reuse existing generator and pattern matcher, no new tools or dependencies.
+**Impact:** Required-mode main source remains denied; optional assigned-checkout behavior unchanged. Later secret/live-board protections still win. Added approved `**/id_rsa*` deny beside existing `id_rsa*` to preserve SSH-key protection at nested paths. Main config, guard/lifecycle source, artifacts and existing staging untouched. Active reviewer sessions require reload.
+**Verification:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -k review_artifact -v` second/final attempt: 1 test passed in 0.063s, exit 0, both modes and generated maps in sync. First attempt failed four nested SSH-key subtests; the approved nested denial resolves them without weakening the test. Only task config regenerated through existing `guard.py check-policy --write`; no real mode changes, artifact writes, staging or commits.
+**Independent review:** No blocking findings; the same focused regression passed 1 test in 0.070s, exit 0. After the user confirmed task-config reload, one authorized reviewer `apply_patch` retry still failed with project `edit` pattern `*`, action `deny`. No alternate write was attempted. BOARD-113 remains Blocked pending effective runtime permission; preserve a clean local checkpoint, not a merge-ready claim.
+
+## [2026-11-16] Store reviews as ignored shared artifacts
+**Type:** Chore
+**Board:** BOARD-113 | **Branch:** chore/store-reviews-as-ignored-artifacts
+**Changed:** `ledger.py`, new adjacent `test_ledger.py`, root/template rules, QA/UI agents, run/ui commands, web/mobile scopes, QA skill, template UI/structure docs, `.gitignore` comment, governance and this log. Removed four tracked `docs/reviews/` originals after preservation.
+**Why:** Approved ADR-069/070: evidence is local and shared across worktrees; unresolved round-three blockers need a contextual human decision, not an automatic extension. The existing ledger/control-root implementation is extended, not duplicated. A new stdlib test file is needed because no ledger suite existed.
+**Impact:** Default ledger directory is control main-checkout `artifacts/reviews/`; explicit absolute/relative `--ledger-dir` overrides remain. Read/root failures refuse clearly. The cap stays three, with no writes on fourth-round refusal and no inference of blockers on success. No artifacts may be staged/committed; dated screenshots unchanged. No lifecycle/auth/policy/config changes or new dependencies.
+**Migration:** `docs/reviews/BOARD-102-ledger.md`, `BOARD-102-qa.md`, `BOARD-103-ledger.md`, `BOARD-103-review.md` each copied to `/projects/kilo_inhouz_ai/artifacts/reviews/<same-name>`. Existing main and feature versions were byte-identical; `cp -n -p` plus `cmp` preserved bytes without overwrites. Main originals untouched; feature deletions retain Git history. Historical internal references are intentionally unchanged; old report basenames resolve in the new directory. BOARD-103 remains capped with its original stop reason.
+**Verification:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/qa-review/scripts -p test_ledger.py -v`, builder 6 tests in 0.129s; independent reviewer 6 tests in 0.107s; both exit 0. Reviewer confirmed ignored/untracked artifacts and all four migrated files against main originals and Git blobs, byte-for-byte. Nested separate-app discovery was source-reviewed, not fixture-tested.
+**Checkpoint:** Intended source/docs staged, including explicit new-test inclusion despite shared `.git/info/exclude` rule `.kilo/`. No ignored artifacts staged. Local checkpoint commit is authorized; runtime report-write hold prevents Pending Merge. Permission correction is recorded above.
+
 ## [2026-11-16] Align board template after permission reload
 **Type:** Docs
 **Board:** BOARD-103 | **Branch:** feat/configurable-shared-workspace-lifecycle-and-authenticated

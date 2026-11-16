@@ -23,7 +23,9 @@ it does not impose it.
     │   ├── skills/            # skills and their scripts
     │   └── worktrees/         # original repo-specific change workspace sets (git-ignored)
     ├── apps/                  # one folder per application or microservice
-    ├── artifacts/             # UI evidence, under artifacts/<scope>/qa/<date>/<task-id>/
+    ├── artifacts/             # ignored, control main checkout only; shared by worktrees, never commit
+    │   ├── reviews/           # <task-id>-qa/ui/review/ledger.md and findings
+    │   └── <scope>/qa/<date>/<task-id>/  # existing dated UI capture hierarchy
     └── docs/
         ├── PROJECT_STRUCTURE.md
         ├── HANDOVER.md
@@ -38,7 +40,6 @@ it does not impose it.
         ├── API_CONTRACTS.md
         ├── ENVIRONMENT.md
         ├── README.md
-        ├── reviews/           # QA and UI/UX reports and round ledgers
         ├── handover/          # memory map: README.md index + one file per unit
         └── changelog/         # engineering log
 

@@ -1,31 +1,33 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **2026-11-16:** BOARD-103 and its fixes BOARD-104 through BOARD-112 share
->   `.kilo/worktrees/configurable-shared-workspace-lifecycle-and-authenticated`, branch
->   `feat/configurable-shared-workspace-lifecycle-and-authenticated`. Includes CLI lifecycle,
->   assigned scopes, authenticated review and `merge-conflict-resolver`; no product changes.
-> - **Verification:** BOARD-107 follow-up passed 33 lifecycle tests in the builder run and in an
->   independent run (14.190s, exit 0, nonzero discovery). Independent current-source review found
->   no blocking defect; the orchestrator inspected the baseline diff. Auth remains independently
->   verified at 19 tests with local login/navigation evidence; its source is unchanged.
-> - **Final lifecycle corrections:** directory-changing shell routing is rejected, and newly
->   created checkout maps are initialized from saved project mode. The authorized follow-up fixes
->   inherited-map order validation at `.kilo/skills/git-worktree/scripts/worktree.py:642` by reusing
->   guard's extracted ordered-items comparison. The capped parent review history is preserved;
->   BOARD-107 follow-up is verified. The parent review history was not reset or reopened.
-> - **Template hold resolved:** after the user's permission changes and latest reload, the approved
->   `templates/project/docs/BOARD.md` edit succeeded. It now describes optional mode, the original
->   shared workspace set, clean human merge/cleanup, partial outcomes and explicit discard.
->   Final changes are documentation only; existing lifecycle/auth source and evidence are unchanged.
-> - **Handoff:** BOARD-103 through BOARD-112 share one final documentation commit and clean-source
->   handoff for human review/merge. The approved temporary policy edits were restored in both
->   checkouts. Restoring main `kilo.jsonc` was tool-denied; the human may restore its temporary
->   live-board `ask` values before reloading. The main tracked diff is live-board metadata. Generate
->   `worktree.py handoff --board BOARD-103` using the feature script until it is merged.
->   No actual mode change, merge or discard has run. Live-board prose still retains old guidance;
->   root rules and lifecycle CLI are authoritative, with script-managed row metadata current.
-> - **Previous work:** BOARD-101 and BOARD-102 are Merged on the live factory board.
+> - **BOARD-113 policy correction:** Approved review-only relative/absolute write exceptions precede
+>   protected-path denials. Task config regenerated; main config untouched. Active reviewer sessions
+>   now permit normal reviewer report writes after the user's latest reload. The report and final
+>   delta evidence were saved with `apply_patch`; no alternate write method was used.
+>   Resolved nested SSH-key gap with approved `**/id_rsa*` denial beside existing `id_rsa*`.
+>   Final independent permission regression passed: 1 test, both modes, 0.053s, exit 0; maps in sync.
+>   Ledger/source review passed 6 tests in 0.107s, exit 0, with no blocking source findings.
+> - **2026-11-16, BOARD-113:** Implemented approved shared ignored review storage in
+>   `.kilo/worktrees/store-reviews-as-ignored-artifacts`, branch `chore/store-reviews-as-ignored-artifacts`.
+>   Ledger defaults reuse control-root discovery; explicit directory overrides remain. Rules,
+>   reviewer prompts and templates require contextual human escalation for round-three blockers,
+>   not automatic blocking on success. BOARD-113 has no unresolved review or runtime-write blocker.
+> - **Migration:** Four BOARD-102/103 reports/ledgers copied byte-for-byte from main to shared
+>   `artifacts/reviews/`; main and feature originals were identical. Only feature originals removed.
+>   Historical links inside evidence remain unchanged; resolve old `docs/reviews/<name>` references
+>   to `artifacts/reviews/<name>`. BOARD-103's three rounds and stop reason remain intact.
+> - **Next action:** review and merge the clean BOARD-113 branch through the human lifecycle CLI.
+>   The report is shared ignored `artifacts/reviews/BOARD-113-review.md`. The user's reason text
+>   and SSH-denial order are preserved; review allows were normalized with explicit approval.
+>   Focused verification is recorded in §10 below. No agent merge or cleanup was performed.
+>   The shared Git exclude `.kilo/` hides the new test from normal status; the orchestrator must
+>   explicitly include only `test_ledger.py` when staging, never ignored artifacts. Excludes unchanged.
+> - **Previous work:** the human resolved conflicts and committed lifecycle/authenticated review
+>   on main at `d5ace2f`, including feature commit `44ca90b`. BOARD-103 through BOARD-112 are now
+>   Merged; their old worktree remains pending human cleanup. BOARD-101/102 are also Merged.
+>   The historical capped review and subsequent authorized follow-up remain preserved in artifacts
+>   and the engineering log. This change does not reopen those rounds or modify lifecycle/auth code.
 
 ## 1. Overview
 
@@ -56,6 +58,7 @@
 | `.kilo/worktrees/` | Original repo-specific workspace set reused by all lanes and finding rows. Git-ignored. Optional mode also permits assigned nonprotected current checkouts. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, the redaction script. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
+| `artifacts/reviews/` | Ignored reports, findings and round ledgers in the control main checkout, shared by worktrees. Never stage or commit. |
 | `.kilo/scopes/service.md` | The default scope rules for a work surface with no scope file of its own. A work surface carries a pointer to this file, never a copy of it. |
 | `templates/project/` | The blank project skeleton a new project starts from. |
 | `project/` | A project repository in this workspace. Its own git repository. Never tracked here. |
@@ -74,7 +77,7 @@
 | `.kilo/skills/qa-review/scripts/browser-review.mjs` | The only UI capture path. Supports ignored local storage state/approved navigation; destructive actions require explicit approval. |
 | `.kilo/agent/merge-conflict-resolver.md:1` | Specialist for existing conflicted merges; assigned edits/checks only, no commit/merge/abort/reset/rebase/push/discard. |
 | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a QA finding and prints its fingerprint. |
-| `.kilo/skills/qa-review/scripts/ledger.py` | Opens, closes and reports the QA↔fix rounds of a row. |
+| `.kilo/skills/qa-review/scripts/ledger.py` | Reports/updates QA↔fix rounds; defaults to shared control-root `artifacts/reviews/`; `--ledger-dir` before subcommand overrides it. |
 
 ## 4. Modules and functions
 
@@ -85,7 +88,11 @@
 | `worktree.py` | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. | effectful (git, filesystem) |
 | `guard.py` | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails and the sync that carries them into an app repository. | effectful (git, filesystem) |
 | `check-finding.py` | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a finding and derives its fingerprint. | pure |
-| `ledger.py` | `.kilo/skills/qa-review/scripts/ledger.py` | The round ledger of a row. | effectful (file I/O) |
+| `default_ledger_dir(cwd)` | `.kilo/skills/qa-review/scripts/ledger.py:37` | Imports and reuses `worktree.control_root(cwd)`; validates board/map presence, returns shared ignored directory, refuses unknown roots. | effectful (Git, filesystem) |
+| `ledger_path(ledger_dir, task_id)` | `.kilo/skills/qa-review/scripts/ledger.py:33` | Computes the existing ledger filename within the chosen directory. | pure |
+| `read_ledger(path)` | `.kilo/skills/qa-review/scripts/ledger.py:80` | Missing files are empty; other read errors refuse instead of resetting history. | effectful (file I/O) |
+| `cmd_next_round(args)` | `.kilo/skills/qa-review/scripts/ledger.py:135` | Opens rounds 1–3; refuses round 4 without writes and explains conditional escalation. | effectful (file I/O, output) |
+| `main(argv)` | `.kilo/skills/qa-review/scripts/ledger.py:213` | Resolves default directory only without override; dispatches existing commands, reports root/I/O failures clearly. | effectful (Git, filesystem, output) |
 | `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs` | Captures screenshots, console, page errors and network for a route. | effectful (browser, filesystem) |
 
 ### Lifecycle tooling inventory (2026-11-16)
@@ -233,6 +240,32 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 
 ## 10. Testing
 
+BOARD-113 ledger regressions use disposable temp repositories and ledgers only:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/qa-review/scripts -p test_ledger.py -v
+```
+
+2026-11-16: builder **6 tests passed in 0.129s, exit 0**; independent reviewer reproduced
+**6 tests in 0.107s, exit 0** with no blocking findings.
+`.kilo/skills/qa-review/scripts/test_ledger.py:15` covers main/linked/nested shared control-root
+resolution, ignored report paths, round 1–3 and immutable fourth-round refusal, contextual
+escalation without false successful-cap blocking, absolute/relative overrides, unknown roots,
+read failures and byte-preserving migrated capped history. No real ledger was mutated by tests.
+Migration used existing `cp -n -p` and `cmp`: main/feature versions of the four BOARD-102/103
+files were identical and shared copies matched byte-for-byte before feature originals were removed.
+No browser, full lifecycle/auth suite or production build was run for BOARD-113. A separate
+permission regression passed independently on the final delta with **1 test in 0.053s, exit 0**:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -k review_artifact -v
+```
+
+It checks relative/absolute review access, ordered secret/live-board denials, source restrictions
+in both modes and generated-map consistency. Normal reviewer file-tool writes succeeded after the
+latest reload, including the final delta report update. Earlier failed writes remain in history;
+they were not bypassed. The reviewed policy delta changes reasons and equivalent SSH-denial order.
+
 Lifecycle stdlib regression tests use only disposable repositories in Python's default
 temporary directory:
 
@@ -280,9 +313,10 @@ ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup fi
   linked worktrees. Do not bypass the guard; request an approved assignment/permission decision.
 - Lifecycle handoff/merge/discard currently validate linked mapped worktrees; optional current
   checkout edits/commits do not imply those commands accept a nonlinked source checkout.
-- Approved temporary permission edits were restored in both policy files and the feature config.
-  Main `kilo.jsonc` restoration was tool-denied; its temporary live-board `ask` values require human
-  cleanup. The feature policy keeps live-board denies plus narrow template-only `ask` exceptions.
+- BOARD-113's generated task configuration allows only shared review evidence outside required-mode
+  source worktrees, preserving later secret/board denies. Normal report writes now succeed; main
+  config was not changed by the agents. Reports are ignored local evidence, so Git does not back
+  them up. Nested separate-app control-root discovery was source-reviewed, not fixture-tested.
 - Live `docs/BOARD.md` prose still describes the old workflow. Row updates remain script-managed;
   root rules and lifecycle CLI are authoritative. No direct live-board prose edit was attempted.
 - Authenticated captures may contain sensitive page content beyond known credentials/session masks.

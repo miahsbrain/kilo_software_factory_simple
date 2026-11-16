@@ -5,7 +5,7 @@
 # Agent worktrees: one per board row, created by .kilo/skills/git-worktree/scripts/worktree.py
 .kilo/worktrees/
 
-# QA evidence. The notes and the summaries are tracked; the captures are not.
+# Local review and QA evidence, including reports, ledgers, notes and summaries. Never commit.
 artifacts/
 artifacts/**/*.png
 artifacts/**/*.log

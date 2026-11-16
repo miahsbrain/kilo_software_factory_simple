@@ -7,8 +7,8 @@ Read this file completely before doing anything. If a narrower `AGENTS.md` exist
 files you are working on, it governs that scope and this file still governs everything else.
 
 **Where things live:** this `AGENTS.md` stays at the repository root (Kilo reads it automatically).
-All other documents live in `docs/` — except `DOMAIN.md`, `ROADMAP.md`, and `CHANGELOG.md`, which
-are root-level by design. Do not scatter documents elsewhere.
+Durable documents live in `docs/` — except `DOMAIN.md`, `ROADMAP.md`, and `CHANGELOG.md`, which
+are root-level by design. Review artifacts are ignored under `artifacts/reviews/` (§B4.2).
 
 ---
 
@@ -484,7 +484,7 @@ Three rules. They apply to the architect and to every builder.
 
 The same three rules govern the **QA↔fix loop** for a row: the loop is capped at 3 rounds, a
 repeat finding escalates the existing row to `Blocked` instead of opening another, and the ledger
-in `docs/reviews/<task-id>-ledger.md` is the only state carried between rounds.
+in `artifacts/reviews/<task-id>-ledger.md` in the control main checkout is the only state carried between rounds.
 
 ### Task chunking rule
 
@@ -752,7 +752,7 @@ each file genuinely needs its own short reference. Do not turn them into impleme
 | `docs/ARCHITECTURE.md` | Domain, system shape, layers, decisions, cross-cutting concerns, roadmap |
 | `docs/BUSINESS-LOGIC.md` | Every business rule as question → answer (see B2) |
 | `docs/UI-UX.md` | Visual language: references, anti-slop rules, component factory gate, Playwright QA spec |
-| `docs/reviews/*.md` | QA and UI/UX review reports — one per task, produced by the reviewer agents |
+| `artifacts/reviews/*.md` | Ignored review reports, findings and round ledgers shared by worktrees; never stage or commit |
 | `docs/BOARD.md` | Work tracking board (see B3) |
 | `docs/STACK.md` | Stack, package managers, dev/verification commands, ports, database, auth |
 | `docs/PROJECT_STATE.md` | Current phase, progress, active task, next step |
@@ -1077,7 +1077,7 @@ met**, proven by evidence. The lanes repeat until then.
 
 ### The ledger
 
-The state of a row's rounds lives in one short file, `docs/reviews/<task-id>-ledger.md`: the
+The state of a row's rounds lives in one short file, `artifacts/reviews/<task-id>-ledger.md`: the
 round number, the findings filed, the Fix row IDs, the Fix rows merged since, and the stop reason.
 The ledger is the **only** thing carried between rounds — a reviewer that watched the last edits
 grades intent, not pixels, so **each round's review is done by a fresh reviewer** that reads the
@@ -1092,19 +1092,19 @@ python3 .kilo/skills/qa-review/scripts/ledger.py merged --task-id BOARD-005 --fi
 python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id BOARD-005
 ```
 
-`next-round` refuses past the cap and tells you the row is done.
+`next-round` refuses past the cap; it does not decide whether the row passed or has blockers.
 
 ### B4.4 The bounded loop: rounds, ledger, fingerprints
 
 A QA finding can come back, get fixed, and come back again. The loop is bounded by a **round cap**
 and a **ledger**, and duplicate findings are recognised by a **fingerprint**.
 
-**The round cap.** A row may go through **at most 3** QA↔fix rounds. Round 3 is the last. When the
-cap is reached and the row still fails, the row moves to `Blocked` with a summary of what was
-tried and the question the human needs to answer. A fourth round is never opened.
+**The round cap.** A row may go through **at most 3** QA↔fix rounds. Round 3 is the last.
+If round 3 ends with unresolved blocking findings, stop automatically. Highlight the remaining problems, severity, user impact, evidence and attempted fixes. Record the stop reason and request Blocked status from the orchestrator. Ask the user how to proceed, directly in an interactive review or through the orchestrator for delegated reviews. Offer a revised approach, defer/drop, or explicitly scoped follow-up. Do not silently start round 4, reset the ledger or claim completion.
+A successful round 3 follows the normal merge gate; the cap alone is not a blocker.
 
 **The ledger.** Each round's state lives in one short file per row:
-`docs/reviews/<task-id>-ledger.md`. It holds the round number, the findings filed in that round,
+`artifacts/reviews/<task-id>-ledger.md`. It holds the round number, the findings filed in that round,
 the Fix row IDs created, the Fix rows merged since, and the stop reason when it stops.
 
 The ledger is the **only** thing carried between rounds. A reviewer that watched the last edits
@@ -1155,7 +1155,7 @@ python3 .kilo/skills/board/scripts/board.py note BOARD-010 --value "<the new evi
 
 | Stop condition | What happens |
 |---|---|
-| **The round cap is reached** (3 rounds done, row still failing) | The row moves to `Blocked` with a summary of what was tried and the question the human must answer. No fourth round is opened. |
+| **Round 3 ends with unresolved blockers** | Stop, record the reason and request `Blocked`; highlight severity, user impact, evidence and attempted fixes, then ask the human for a revised approach, defer/drop or explicitly scoped follow-up. No round 4 or reset. |
 | **A critical path is red** (money, data loss, auth, security) | The row is `Blocked` immediately. It is never retried silently. |
 | **The same fingerprint is filed twice** | The existing row is escalated to `Blocked` rather than a new one opening. |
 | **The human says stop** | The row is `Blocked` with the human's reason recorded in the ledger's stop reason. |
@@ -1336,9 +1336,10 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   `factory`), `--task-id` (default `adhoc`) and `--date` (default today) name the folders;
   `--artifact-dir` is an optional override. The artifacts folder belongs to the **main checkout**,
   so a capture taken from a worktree still lands in one place.
-  **Review reports and the ledger are documents, not artifacts.** They stay where documents live:
-  `docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
-  `docs/reviews/<task-id>-ledger.md`.
+  Review reports, findings and round ledgers live in the control repository’s ignored `artifacts/reviews/` directory, using `<task-id>-qa.md`, `<task-id>-ui.md`, `<task-id>-review.md` and `<task-id>-ledger.md`. Worktrees share that location. Never stage or commit these artifacts.
+  `ledger.py status --task-id <task-id>` prints the resolved shared ledger path. Its default
+  reuses the control-root resolver; `--ledger-dir <directory>` before the subcommand explicitly
+  overrides the directory (relative paths are relative to the caller). Never fall back to `docs/reviews/`.
 - **The script is the only way to capture UI evidence.** The QA reviewer and the UI critic capture
   screenshots **only** through `browser-review.mjs`. Ad-hoc `chromium`, `npx playwright
   screenshot`, `curl`-and-guess, or any other browser command run from bash is **not acceptable
@@ -1359,8 +1360,8 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
     nor the env var, nor the browser Playwright downloaded, nor the system chromium — the script
     exits 2 with the list of places it searched and what to do about it.
 - **Store artifacts** under `artifacts/<scope>/qa/<date>/<task-id>/` with `notes.md`
-  recording what was checked and expected vs actual. Commit `notes.md` and small component shots;
-  leave full-page captures out of git.
+  recording what was checked and expected vs actual. Never stage or commit artifacts, including
+  notes, summaries and component shots. The dated capture hierarchy is unchanged.
 - **Authenticated review:** use the same script with `--storage-state <ignored-local.json>`
   and/or `--navigation <ignored-local.json>`. Navigation JSON is `{ "approved": true,
   "login": [{ "action": "goto", "path": "/login" }, { "action": "fill", "selector":
@@ -1385,7 +1386,7 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
 - **Review:** a UI/UX critique pass runs alongside QA. Findings are stated as
   expected-vs-actual with the screenshot or `file:line` that proves them.
 - **Verdict:** a frontend row cannot leave `In Review` until both QA and the UI/UX critique are
-  green. Any finding returns the row to `In Progress` with the finding restated.
+  green. Findings return the row to `In Progress` unless a stop condition in §B4.4 requires `Blocked`.
 - The spec is in `docs/UI-UX.md` §5. Keep it lean: one spec file per feature lane, no extra test
   framework.
 
@@ -1396,8 +1397,8 @@ independent of the builder's claims:
 
 | Agent | Role | Output |
 |---|---|---|
-| `qa-reviewer` | Verifies behavior against the acceptance criteria; drives Playwright | `docs/reviews/<task-id>-qa.md` + artifacts under `artifacts/<scope>/qa/<date>/<task-id>/` |
-| `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | `docs/reviews/<task-id>-ui.md` |
+| `qa-reviewer` | Verifies behavior against the acceptance criteria; drives Playwright | Shared `artifacts/reviews/<task-id>-qa.md` + captures under `artifacts/<scope>/qa/<date>/<task-id>/` |
+| `ui-critic` | Judges the screen against the 15 anti-slop rules and the approved gallery | Shared `artifacts/reviews/<task-id>-ui.md` |
 
 Both are read-only against application code. They report; they do not fix.
 
@@ -1430,7 +1431,7 @@ A review finding is a **bug-fix unit of work**, so it becomes a board row.
    - A fingerprint that is already open is **refused**. The refusal names the existing row and
      prints the command that updates it: `board.py note <ID> --value "<the new evidence>"`.
 3. The reviewed row's status depends on the verdict:
-   - **FAIL** → the reviewed row returns to `In Progress` with the failing findings restated.
+   - **FAIL** → request `In Progress` with findings restated, or `Blocked` at a §B4.4 stop condition.
    - **PASS** → the reviewed row may proceed to `Pending Merge`.
 4. Fix rows follow `/decide` → original shared workspace → build → QA → review → `Pending Merge`.
 
