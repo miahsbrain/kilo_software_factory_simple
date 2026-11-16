@@ -109,8 +109,8 @@
       "*.pem": "deny",
       "*.key": "deny",
       "*.p12": "deny",
-      "**/id_rsa*": "deny",
       "id_rsa*": "deny",
+      "**/id_rsa*": "deny",
       ".env.example": "allow",
       "**/.env.example": "allow"
     },

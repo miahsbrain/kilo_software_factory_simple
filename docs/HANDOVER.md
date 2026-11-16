@@ -3,23 +3,24 @@
 > **Session Notes** (keep at the very top, updated every session)
 > - **BOARD-113 policy correction:** Approved review-only relative/absolute write exceptions precede
 >   protected-path denials. Task config regenerated; main config untouched. Active reviewer sessions
->   still deny evidence writes after the user confirmed loading the task config. The one authorized
->   retry failed with project `edit` pattern `*`, action `deny`; no alternate write was attempted.
+>   now permit normal reviewer report writes after the user's latest reload. The report and final
+>   delta evidence were saved with `apply_patch`; no alternate write method was used.
 >   Resolved nested SSH-key gap with approved `**/id_rsa*` denial beside existing `id_rsa*`.
->   Independent permission regression passed: 1 test, both modes, 0.070s, exit 0; maps in sync.
+>   Final independent permission regression passed: 1 test, both modes, 0.053s, exit 0; maps in sync.
 >   Ledger/source review passed 6 tests in 0.107s, exit 0, with no blocking source findings.
 > - **2026-11-16, BOARD-113:** Implemented approved shared ignored review storage in
 >   `.kilo/worktrees/store-reviews-as-ignored-artifacts`, branch `chore/store-reviews-as-ignored-artifacts`.
 >   Ledger defaults reuse control-root discovery; explicit directory overrides remain. Rules,
 >   reviewer prompts and templates require contextual human escalation for round-three blockers,
->   not automatic blocking on success. BOARD-113 is Blocked only on actual report-write permission.
+>   not automatic blocking on success. BOARD-113 has no unresolved review or runtime-write blocker.
 > - **Migration:** Four BOARD-102/103 reports/ledgers copied byte-for-byte from main to shared
 >   `artifacts/reviews/`; main and feature originals were identical. Only feature originals removed.
 >   Historical links inside evidence remain unchanged; resolve old `docs/reviews/<name>` references
 >   to `artifacts/reviews/<name>`. BOARD-103's three rounds and stop reason remain intact.
-> - **Next action:** the human must activate the approved review-folder exception in the configuration
->   actually used by the file tool. Preserve the verified checkpoint; do not claim merge readiness
->   until a normal reviewer report write succeeds. Focused verification is recorded in §10 below.
+> - **Next action:** review and merge the clean BOARD-113 branch through the human lifecycle CLI.
+>   The report is shared ignored `artifacts/reviews/BOARD-113-review.md`. The user's reason text
+>   and SSH-denial order are preserved; review allows were normalized with explicit approval.
+>   Focused verification is recorded in §10 below. No agent merge or cleanup was performed.
 >   The shared Git exclude `.kilo/` hides the new test from normal status; the orchestrator must
 >   explicitly include only `test_ledger.py` when staging, never ignored artifacts. Excludes unchanged.
 > - **Previous work:** the human resolved conflicts and committed lifecycle/authenticated review
@@ -254,15 +255,16 @@ read failures and byte-preserving migrated capped history. No real ledger was mu
 Migration used existing `cp -n -p` and `cmp`: main/feature versions of the four BOARD-102/103
 files were identical and shared copies matched byte-for-byte before feature originals were removed.
 No browser, full lifecycle/auth suite or production build was run for BOARD-113. A separate
-permission regression passed independently with **1 test in 0.070s, exit 0**:
+permission regression passed independently on the final delta with **1 test in 0.053s, exit 0**:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -k review_artifact -v
 ```
 
 It checks relative/absolute review access, ordered secret/live-board denials, source restrictions
-in both modes and generated-map consistency. Real reviewer file-tool writes remain blocked after
-the confirmed configuration reload; the test proves the generated map, not the active runtime map.
+in both modes and generated-map consistency. Normal reviewer file-tool writes succeeded after the
+latest reload, including the final delta report update. Earlier failed writes remain in history;
+they were not bypassed. The reviewed policy delta changes reasons and equivalent SSH-denial order.
 
 Lifecycle stdlib regression tests use only disposable repositories in Python's default
 temporary directory:
@@ -312,9 +314,9 @@ ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup fi
 - Lifecycle handoff/merge/discard currently validate linked mapped worktrees; optional current
   checkout edits/commits do not imply those commands accept a nonlinked source checkout.
 - BOARD-113's generated task configuration allows only shared review evidence outside required-mode
-  source worktrees, preserving later secret/board denies. The active file tool still rejects the
-  report with project `edit "*" -> deny` after a confirmed reload. Main config was not changed;
-  the actual loaded permission source must be resolved by the human, without alternate writes.
+  source worktrees, preserving later secret/board denies. Normal report writes now succeed; main
+  config was not changed by the agents. Reports are ignored local evidence, so Git does not back
+  them up. Nested separate-app control-root discovery was source-reviewed, not fixture-tested.
 - Live `docs/BOARD.md` prose still describes the old workflow. Row updates remain script-managed;
   root rules and lifecycle CLI are authoritative. No direct live-board prose edit was attempted.
 - Authenticated captures may contain sensitive page content beyond known credentials/session masks.

@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-16] Resolve review-artifact permission hold
+**Type:** Fix
+**Board:** BOARD-113 | **Branch:** chore/store-reviews-as-ignored-artifacts
+**Changed:** Approved user policy wording/order, regenerated task config, handover and project state.
+**Why:** The latest reload enabled normal shared report writes. User explicitly approved moving only the two review allowances back to tested placement while preserving their values/reasons and SSH denial edits.
+**Impact:** No weakened source, board or secret protection. No ledger reset, new worktree, artifact staging, agent merge or main-config edit. Earlier hold remains historical, not current status.
+**Verification:** Builder focused permission test: 1 passed in 0.065s, exit 0. Independent final delta: 1 passed in 0.053s, exit 0; maps in sync, no blocking findings. Normal `apply_patch` report creation and update both succeeded at shared ignored `artifacts/reviews/BOARD-113-review.md`. Earlier independent 6-test ledger and byte-preserving migration evidence is unchanged.
+
 ## [2026-11-16] Permit shared review evidence writes
 **Type:** Fix
 **Board:** BOARD-113 | **Branch:** chore/store-reviews-as-ignored-artifacts

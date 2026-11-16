@@ -15,17 +15,18 @@
   `.kilo/worktrees/store-reviews-as-ignored-artifacts`, branch `chore/store-reviews-as-ignored-artifacts`.
   Implementation and evidence migration complete; focused verification recorded in the engineering
   log. Independent reviews passed 6 ledger tests and 1 permission test with no blocking source
-  findings. Blocked: shared report file-tool write still denied after the user-confirmed task
-  configuration reload. The verified checkpoint is not a merge-ready handoff.
+  findings. Normal shared report creation and final delta update succeeded after the latest
+  reload. Final independent permission regression passed in 0.053s; no unresolved blocker.
+  Final documentation and approved user policy delta are included in the clean merge handoff.
 - **Previous task:** the human merged configurable shared-workspace lifecycle/authenticated
   review at main `d5ace2f`, including feature commit `44ca90b`. BOARD-103 through BOARD-112 are
   Merged. The old worktree remains for human cleanup; its capped ledger and authorized follow-up
   evidence are preserved in ignored artifacts. Lifecycle/auth source is unchanged by BOARD-113.
 - **Previous work:** BOARD-101 (no-production-build rule) and BOARD-102 (accordion board viewer)
   are recorded as Merged on the live factory board. They are not active tasks.
-- **Next action:** human activates the narrow `artifacts/reviews/**` permission in the config
-  actually loaded by the file tool. One normal report write must succeed before BOARD-113 can
-  leave Blocked. Do not bypass the denial, reset review rounds or merge on the agent's initiative.
+- **Next action:** human reviews and merges BOARD-113 using the lifecycle CLI. The shared report
+  lives in ignored `artifacts/reviews/BOARD-113-review.md`; no review rounds were reset and no
+  agent merge, push or worktree cleanup was performed.
 
 ## Open questions
 

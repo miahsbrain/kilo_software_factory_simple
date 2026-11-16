@@ -317,12 +317,12 @@
     {
       "pattern": "artifacts/reviews/**",
       "action": "allow",
-      "reason": "Review evidence is written to the shared ignored review directory; later protected-path rules still apply."
+      "reason": "Allow shared ignored review evidence; later protected-path rules still apply."
     },
     {
       "pattern": "**/artifacts/reviews/**",
       "action": "allow",
-      "reason": "Absolute control paths may write shared ignored review evidence; later protected-path rules still apply."
+      "reason": "Allow absolute paths to shared ignored review evidence; later protected-path rules still apply."
     },
     {
       "pattern": "AGENTS.md",
@@ -460,15 +460,15 @@
       "reason": "A certificate with a private key is never written by an agent."
     },
     {
-      "pattern": "**/id_rsa*",
-      "action": "deny",
-      "reason": "SSH private keys remain protected at nested paths, including shared review evidence."
-    },
-    {
       "pattern": "id_rsa*",
       "action": "deny",
       "reason": "A private key is never written by an agent."
     },
+    {
+  "pattern": "**/id_rsa*",
+  "action": "deny",
+  "reason": "Protect SSH private keys at nested paths, including review evidence."
+},
     {
       "pattern": ".env.example",
       "action": "allow",
