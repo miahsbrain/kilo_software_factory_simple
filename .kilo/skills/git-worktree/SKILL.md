@@ -61,6 +61,12 @@ for new workspaces, when the branch or directory already exists, or
 when the row's type is unknown. It never deletes anything. It writes the board row in the **main
 checkout**, so the live board always points at the running worktree.
 
+During new worktree creation, the script copies ignored, untracked regular `.env*` files from the
+target repository's primary checkout to matching paths, except `.env.example`. File permissions
+are preserved; missing sources and existing destinations are skipped. For the control repository,
+it also copies ignored `.kilo/local/qa-navigation.json` without overwriting. These local files stay
+untracked, and `.env*` remains unreadable to agents. Reused workspaces are not recopied.
+
 Before creating, check for an in-flight worktree on the same task:
 
 ```bash

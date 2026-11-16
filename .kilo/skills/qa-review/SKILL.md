@@ -113,6 +113,10 @@ login/state do not require a marker. Page-changing steps must declare the final 
 `waitForURL` (as above for `--route /app`); `waitForSelector` alone does not declare a URL.
 Masking covers known credential/session values, not arbitrary sensitive page content; inspect
 screenshots/logs before sharing. Authentication does not waive viewport, count or accessibility rules.
+The lifecycle copies ignored `.kilo/local/qa-navigation.json` into new control-repository
+worktrees without overwriting. Keep it to selectors, same-origin paths and environment-variable
+names; credentials stay in the process environment. Screenshot masking uses known environment and
+session values during the capture operation and must not alter the reviewed page outside capture.
 
 ### Artifact layout
 

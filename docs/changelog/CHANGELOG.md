@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-16] Provision local QA inputs into new worktrees
+**Type:** Fix
+**Board:** BOARD-114 | **Branch:** feat/provision-local-env-and-secure-qa
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, lifecycle tests, browser-review tests, focused skills and factory handover.
+**Why:** New worktrees need approved local environment and navigation inputs while keeping secret values out of agent-readable policy, command output and captured evidence.
+**Impact:** New worktrees copy ignored/untracked regular `.env*` files except `.env.example`, preserve permissions, skip existing targets, and copy ignored control `.kilo/local/qa-navigation.json` without overwriting. The existing browser runner continues env-only login and masks known credentials during screenshot capture. No dependencies or policy changes.
+
 ## [2026-11-16] Resolve review-artifact permission hold
 **Type:** Fix
 **Board:** BOARD-113 | **Branch:** chore/store-reviews-as-ignored-artifacts

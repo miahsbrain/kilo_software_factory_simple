@@ -41,7 +41,9 @@ class LifecycleTests(unittest.TestCase):
             shutil.copyfile(SOURCE / relative, destination)
         (self.root / "docs").mkdir()
         (self.root / ".kilo/repos.json").write_text('{"control": "."}\n')
-        (self.root / ".gitignore").write_text(".kilo/worktrees/\n__pycache__/\napps/\n")
+        (self.root / ".gitignore").write_text(
+            ".kilo/worktrees/\n.kilo/local/qa-navigation.json\n.env*\n!.env.example\n"
+            "__pycache__/\napps/\n")
         self.board = module("test_board", self.root / ".kilo/skills/board/scripts/board.py")
         self.rows = []
         self.add_row("BOARD-001", "Shared lifecycle")
@@ -212,6 +214,45 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual((self.root / "kilo.jsonc").read_bytes(), main_config)
         self.assertEqual(self.git(self.root, "show", "main:kilo.jsonc").stdout, base)
 
+    def test_create_copies_local_environment_and_navigation_without_exposing_values(self):
+        secret_value = "do-not-print-this-secret"
+        (self.root / ".env.local").write_text(secret_value)
+        (self.root / ".env.example").write_text("example")
+        (self.root / "nested").mkdir()
+        (self.root / "nested/.env.production").write_text("nested-secret")
+        os.chmod(self.root / "nested/.env.production", 0o640)
+        (self.root / ".kilo/local").mkdir(parents=True)
+        navigation = self.root / ".kilo/local/qa-navigation.json"
+        navigation.write_text('{"approved":true,"steps":[]}')
+        result = self.cli("create", "--board", "BOARD-001")
+        path = self.root / ".kilo/worktrees/shared-lifecycle"
+        self.assertTrue((path / ".env.local").read_text() == secret_value)
+        self.assertTrue((path / "nested/.env.production").read_text() == "nested-secret")
+        self.assertEqual((path / "nested/.env.production").stat().st_mode & 0o777, 0o640)
+        self.assertFalse((path / ".env.example").exists())
+        self.assertEqual((path / ".kilo/local/qa-navigation.json").read_bytes(), navigation.read_bytes())
+        self.assertNotIn(secret_value, result.stdout + result.stderr)
+
+    def test_local_file_provisioning_skips_tracked_unignored_symlink_and_existing_destination(self):
+        (self.root / ".env.tracked").write_text("tracked")
+        self.git(self.root, "add", "-f", ".env.tracked")
+        self.git(self.root, "commit", "-m", "track env fixture")
+        with (self.root / ".gitignore").open("a") as ignore_file:
+            ignore_file.write("!public/.env.open\n")
+        (self.root / "public").mkdir()
+        (self.root / "public/.env.open").write_text("not ignored")
+        source = self.root / ".env.local"
+        source.write_text("source")
+        target = Path(self.temporary.name) / "copy"
+        target.mkdir()
+        (target / ".env.local").write_text("keep")
+        (self.root / ".env.link").symlink_to(source)
+        WORKTREE.provision_local_files(self.root, target)
+        self.assertEqual((target / ".env.local").read_text(), "keep")
+        self.assertFalse((target / ".env.tracked").exists())
+        self.assertEqual((target / "public/.env.open").read_text(), "not ignored")
+        self.assertFalse((target / ".env.link").exists())
+
     def test_create_refreshes_optional_base_map_in_required_mode(self):
         self.cli("mode", "optional")
         self.commit(self.root)
@@ -228,6 +269,9 @@ class LifecycleTests(unittest.TestCase):
 
     def test_create_app_preserves_inheritance_and_scope_pointer_without_harness_copy(self):
         api = self.add_repo("api")
+        (api / ".kilo/local").mkdir(parents=True)
+        navigation = api / ".kilo/local/qa-navigation.json"
+        navigation.write_text('{"approved":true,"steps":[]}')
         scopes = self.root / ".kilo/scopes"
         scopes.mkdir()
         (scopes / "api.md").write_text("# Fixture scope\n")
@@ -237,7 +281,8 @@ class LifecycleTests(unittest.TestCase):
         path = self.create(repo="api", change=False)
         self.assertFalse((path / "kilo.jsonc").exists())
         self.assertFalse((api / "kilo.jsonc").exists())
-        self.assertFalse((path / ".kilo").exists())
+        self.assertEqual((path / ".kilo/local/qa-navigation.json").read_bytes(), navigation.read_bytes())
+        self.assertEqual({entry.name for entry in (path / ".kilo").iterdir()}, {"local"})
         self.assertIn(".kilo/scopes/api.md", (path / "AGENTS.md").read_text())
         self.git(path, "check-ignore", "AGENTS.md")
         self.assertEqual((self.root / "kilo.jsonc").read_bytes(), main_config)
