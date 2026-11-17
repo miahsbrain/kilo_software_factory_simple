@@ -112,7 +112,6 @@ def git_out(cwd, *args):
     return out if code == 0 else None
 
 
-<<<<<<< HEAD
 def checked_git(cwd, *args):
     code, out, err = git(cwd, *args)
     if code:
@@ -232,7 +231,6 @@ def cmd_mode(args, cwd):
     print("workspace mode: %s (project-local)" % state["mode"])
     print("Restart Kilo after changing mode to reload the generated edit permission map.")
     return OK
-=======
 def git_raw(cwd, *args, timeout=60):
     """(code, stdout, stderr) with the output untouched, for content that must stay exact."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
@@ -243,7 +241,6 @@ def git_raw(cwd, *args, timeout=60):
     except (OSError, subprocess.TimeoutExpired) as e:
         return 1, "", str(e)
     return r.returncode, r.stdout, r.stderr
->>>>>>> origin/main
 
 
 def repo_root(cwd):
