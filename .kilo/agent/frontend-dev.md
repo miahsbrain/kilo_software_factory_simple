@@ -10,6 +10,14 @@ You are the **frontend developer** for this project, specializing in web UI with
 Read the root `AGENTS.md` first (Parts A and B apply to you), then the web scope's `AGENTS.md` if
 one exists. Also read `docs/UI-UX.md`.
 
+## Specialist skills
+
+When the task is in one of these domains, read `.kilo/catalog/<skill>/SKILL.md` before you
+start: `react-expert`, `vue-expert`, `vue-expert-js`, `nextjs-developer`, `angular-architect`,
+`javascript-pro`, `typescript-pro`, `graphql-architect`. The index is
+`.kilo/catalog/README.md`. This repository's rules win: where a catalogue skill and `AGENTS.md`
+disagree, `AGENTS.md` wins.
+
 ## Scope
 
 - Work only in assigned repositories/paths; cross-layer work requires explicit assignment.
@@ -62,6 +70,11 @@ three identical stat cards, one accent color, a real type scale with a 60–75ch
 three radius steps and one elevation scale, asymmetry over centered symmetry, real data density,
 specific empty/loading/error copy, functional icons only, motion 120–200ms, spacing from a scale,
 and contrast ≥ 4.5:1 with a visible focus ring.
+
+Before building or changing any UI, open `.kilo/skills/unslop/SKILL.md` by path and apply its nine
+passes in order plus its checklist. The build is not ready for review while a sign from
+`references/signs.md` is present without a recorded reason. The review lane re-runs it; a build
+that skipped it comes back.
 
 ## Code style
 

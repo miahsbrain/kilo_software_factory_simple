@@ -159,8 +159,13 @@ If a value cannot be confidently determined, leave it `TBD` and ask the user.
 ### New project
 
 If the core project files do not exist, do Day 1 setup before any implementation delegation:
-create the folders and all governance files listed in A1 (with `TBD` where unknown), then run the
-discovery interview (A4) before writing code, scaffolding, or a final implementation plan.
+create the folders and all governance files listed in A1 (with `TBD` where unknown), then run
+the discovery interview (A4) before writing code, scaffolding, or a final implementation plan.
+
+The `plan` skill at `.kilo/skills/plan/` carries the planning procedure and its detail: the
+question banks, the specification template, the EARS syntax, the ADR template and the NFR
+checklist. It states its own precedence over this file in its `SKILL.md`; that rule decides when
+the two disagree.
 
 ---
 
@@ -215,6 +220,11 @@ write code or delegate while a decision is open.
 
 After approval, update the governance files (§A10). Preserve stack neutrality until the user
 approves stack choices.
+
+**The detail lives in the plan skill.** `.kilo/skills/plan/` carries the question banks
+(`references/interview-questions.md`), the specification template, the EARS syntax, the ADR
+template and the NFR checklist, and it names the document each phase writes into. This section
+remains the contract: a batched interview, a decision sheet, nothing assumed.
 
 ---
 
@@ -311,6 +321,9 @@ may choose, and you note the choice in the changelog.
 - **Allow a fast answer.** Offer "go with your recommendations" as an explicit option.
 - **Record.** Every approved decision goes into `docs/DECISIONS.md`; every unapproved guess is
   marked `ASSUMPTION` and listed in the handover's Open Questions.
+
+The `plan` skill at `.kilo/skills/plan/` assembles this sheet during its planning phase. This
+section owns the rule; the skill owns the mechanics of filling it in.
 
 ---
 
@@ -600,6 +613,21 @@ Use the dedicated agents rather than ad-hoc prompts where one fits:
 
 Each agent file carries the scope, style, production, verification, git, and reporting rules that
 apply to it, so a delegated prompt can stay short and specific.
+
+### Specialist skills
+
+The specialist skills live at `.kilo/catalog/<skill>/`, with an index at
+`.kilo/catalog/README.md`. They are **not** loaded as skills: the loader only scans directories
+named `skill`/`skills`, so the catalogue is invisible to it and its 67 skills never enter the
+system prompt. An agent reaches one by **reading** `.kilo/catalog/<skill>/SKILL.md` when the task
+is in that skill's domain.
+
+- Read `.kilo/catalog/README.md` first, then the one matching `SKILL.md`. Do not read the whole
+  catalogue.
+- **This repository's rules win.** Where a catalogue skill and `AGENTS.md` disagree, `AGENTS.md`
+  wins. The catalogue is specialist background, never policy, never a substitute for the
+  project's own stack decisions and boundaries.
+- Each builder agent file names its own specialists.
 
 ### Frontend UI gate (component factory before screens)
 
@@ -907,6 +935,13 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Bra
       python3 .kilo/skills/board/scripts/board.py set-status BOARD-00X "In Progress"
       python3 .kilo/skills/board/scripts/board.py set-field BOARD-00X --field notes --value "..."
 
+- **A teardown command owns the lane for the row it tears down.**
+  `worktree.py cleanup --board <ID> --apply` puts the row in `Merged` and clears its
+  `Branch/Worktree` cell; `worktree.py discard --board <ID> --apply` puts the row back in
+  `Ready` and clears it. The human runs these in the main checkout, so the script is the
+  board's writer for that change and the orchestrator does not repeat it by hand. A refused
+  teardown changes nothing on the board.
+
 - **Never silently drop a row.** A task that cannot proceed moves to `Blocked` with a one-line
   reason and what is needed to unblock it.
 - **`Merged` means the user merged it.** Never means "the agent finished".
@@ -933,6 +968,9 @@ worktree.
 | Required mode uses linked worktrees; optional mode also permits the assigned current checkout | Unassigned work is outside scope |
 | The worktree is named after the feature | Unfindable; the board row cannot point at it |
 | Work only in the assigned workspace set | Other checkouts are outside scope |
+| Work only inside the worktree | Edits in the main checkout are invisible to the merge |
+| Env files are provisioned into every new worktree and are never committed | The application cannot start in a worktree, and a local env file can leak into a commit |
+| A live worktree for a board row is resumed or discarded, never duplicated | Two worktrees for one row, and in-flight work nobody finds |
 | **Never commit to `main`/`master`/`base`** | The human loses control of the base branch |
 | Reuse the assigned branch/workspace; never create a second checkout of that branch | Concurrent checkouts corrupt each other |
 | **Never merge, push, or open a PR** | The human's approval step is skipped |
@@ -1006,6 +1044,27 @@ worktree.
     linked worktrees and their feature branches, never main/protected checkouts or paths outside
     mapped `.kilo/worktrees/`. Fully discarded linked rows become `Dropped`; partial outcomes
     remain recorded. Agents never discard unasked.
+10. **After the merge**, the orchestrator marks the row `Merged` in the main checkout, and the
+    worktree is cleaned up by the human (or by the agent once the branch is confirmed merged).
+11. **Env files are provisioned into every new worktree, and are never committed.**
+    `worktree.py create` copies `.env` and `.env.local` from the repository's main checkout into
+    the new worktree, with mode `0600` and listed in the repository's `.git/info/exclude`. The
+    agent still may not read them: the app reads the file, the agent runs the app. `cleanup` and
+    `discard` remove the copies.
+12. **A live worktree for a board row is resumed or discarded, never duplicated.**
+    `worktree.py create` refuses when the row already has a live worktree and prints the three
+    options: `resume`, `discard`, or a new `--slug`. When the slug directory is taken by
+    *another* row's worktree, the refusal names that owning row and offers only the ways that
+    work: a new `--slug`, or `discard` for that owning row. `worktree.py resume --board <ID>`
+    reuses the worktree and puts the row back in `In Progress`.
+    The teardown command owns the lane for the row it tears down: `cleanup --board <ID> --apply`
+    puts the row in `Merged` and clears the `Branch/Worktree` cell, `discard --board <ID>
+    --apply` puts the row back in `Ready` and clears it. The script is the board's writer in
+    the main checkout when the human runs it, so the orchestrator does not set the lane by hand
+    afterwards. A refusal changes nothing on the board.
+    A human may destroy work that `discard` refuses, in two steps: `--force` alone prints the
+    destruction plan and never acts, and `--force --yes` acts after writing a recovery patch and
+    a recovery TSV under the repository's `cleanup-wt/` folder.
 
 ### Board lanes
 
@@ -1387,6 +1446,14 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   expected-vs-actual with the screenshot or `file:line` that proves them.
 - **Verdict:** a frontend row cannot leave `In Review` until both QA and the UI/UX critique are
   green. Findings return the row to `In Progress` unless a stop condition in §B4.4 requires `Blocked`.
+- **The unslop pass is mandatory on every UI change, alongside QA.** The reviewer opens
+  `.kilo/skills/unslop/SKILL.md` by path, writes the five-line direction, audits every sign in
+  `references/signs.md`, walks the nine passes and the checklist against the same capture the QA
+  lane uses, and records the result. A UI row with no unslop audit is `In Review`, never
+  `Pending Merge`.
+- **Verdict:** a frontend row cannot leave `In Review` until the QA lane and the UI/UX critique
+  are green **and the unslop audit is recorded**. Any finding returns the row to `In Progress`
+  with the finding restated.
 - The spec is in `docs/UI-UX.md` §5. Keep it lean: one spec file per feature lane, no extra test
   framework.
 
@@ -1459,6 +1526,14 @@ the UI/UX critique pass. Full list with examples in `docs/UI-UX.md` §2.
 14. Spacing from a scale: 4/8/12/16/24/32/48/64.
 15. Contrast ≥ 4.5:1, visible focus ring, targets ≥ 24×24 CSS px.
 
+**Extended checklist.** A screen is also judged against the unslop signs list in
+`.kilo/skills/unslop/references/signs.md`, reported sign by sign with where it lives.
+**Mandatory, not advisory.** The unslop pass runs on every UI change alongside the QA lane
+(§B4.2). The precedence rule below governs only a conflict between its guidance and these rules;
+it never allows the pass to be skipped.
+**Precedence.** Where the unslop skill and this file disagree, this file wins: the skill is
+guidance, these rules are the standard.
+
 ## B5. Session handover protocol
 
 At the end of every session, or when asked to hand over:
@@ -1472,6 +1547,11 @@ At the end of every session, or when asked to hand over:
 5. Update the **Session Notes** at the top of `docs/HANDOVER.md`.
 6. Make sure the next agent could start with **only** `AGENTS.md` + `DOMAIN.md` + `docs/` and
    no other context.
+7. **End the report with the hand-off block.** For work in a worktree, print the block from
+   `python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <ID>` — the diff
+   command first, then the merge command. The human gets both every session, without anyone
+   having to remember them. The block ends with the command that removes the worktree and
+   deletes the branch.
 
 ## B6. Reuse before creation (hard rule)
 

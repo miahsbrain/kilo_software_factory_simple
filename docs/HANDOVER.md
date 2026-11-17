@@ -34,6 +34,33 @@
 >   Merged; their old worktree remains pending human cleanup. BOARD-101/102 are also Merged.
 >   The historical capped review and subsequent authorized follow-up remain preserved in artifacts
 >   and the engineering log. This change does not reopen those rounds or modify lifecycle/auth code.
+> - **Last session:** 2026-11-10 — the 67 upstream specialist skills were ported as a
+>   read-on-demand catalogue at `.kilo/catalog/`, with an index at `.kilo/catalog/README.md`.
+>   The catalogue sits outside the auto-discovered skills folder, so the loader never sees it.
+>   BOARD-107, branch `feat/port-the-specialist-skill-catalog`.
+> - **In flight:** that branch waits for the user to merge it. The plan skill branch
+>   (2026-11-10, BOARD-106) also still waits for a merge, and so does the live board viewer
+>   change (2026-11-04, BOARD-102).
+> - **Next action:** the user reviews and merges `feat/port-the-specialist-skill-catalog`.
+> - **Before:** 2026-11-10 — the upstream `feature-forge` and `architecture-designer` skills
+>   were merged into one plan skill at `.kilo/skills/plan/`, with their references carried over
+>   intact and every phase mapped onto a document this repository already has. BOARD-106, branch
+>   `feat/port-a-merged-plan-skill`.
+> - **In flight:** that branch waits for the user to merge it. The live board viewer change
+>   (2026-11-04, BOARD-102) also still waits for a merge.
+> - **Next action:** the user reviews and merges `feat/port-a-merged-plan-skill`.
+> - **Before:** 2026-11-04 — the live board viewer became a vertical accordion: collapsible
+>   lanes, compact cards that expand to their detail, the last 10 merged rows with a "Show all"
+>   control, and folds kept in the browser. BOARD-102, branch
+>   `feat/compact-accordion-redesign-of-the-live`.
+> - **In flight:** that branch waits for the user to merge it. The board file and the JSON
+>   endpoints are unchanged; the viewer still writes nothing.
+> - **Next action:** the user reviews and merges the branch. The earlier factory/project split
+>   (2026-11-02) also still waits for a merge.
+> - **Before:** 2026-11-02 — split the factory from the project. The factory repository now
+>   holds only the harness; the Inhouz Cloud AI platform moved to its own git repository at
+>   `project/`, with its own board, documentation set and 75 microservice repositories under
+>   `project/apps/`. ADR-053, ADR-054 and ADR-055 record the split.
 
 ## 1. Overview
 
@@ -62,6 +89,12 @@
 | `.kilo/scopes/` | Canonical specialization rules; generated ignored pointers expose them to assigned work surfaces. |
 | `.kilo/skills/` | The three skills with their scripts: `board`, `git-worktree`, `qa-review`. |
 | `.kilo/worktrees/` | Original repo-specific workspace set reused by all lanes and finding rows. Git-ignored. Optional mode also permits assigned nonprotected current checkouts. |
+| `.kilo/scopes/` | The canonical scope rules, one file per scope. `guard.py sync` writes them into a project's app repositories as their `AGENTS.md`. |
+| `.kilo/skills/` | The five skills with their scripts: `board`, `git-worktree`, `qa-review`, `unslop`, `plan`. |
+| `.kilo/skills/plan/` | The merged plan skill (MIT, © 2025 Jeffallan — upstream `feature-forge` and `architecture-designer`). `SKILL.md` plus `references/`: the interview bank, the specification template, EARS syntax, acceptance criteria, pre-discovery subagents, system design, architecture patterns, database selection, ADR template, NFR checklist, and the two superpowers research documents. |
+| `.kilo/catalog/` | The specialist skill catalogue: 67 upstream skills (MIT, © 2025 Jeffallan, from https://github.com/Jeffallan/claude-skills), each a `SKILL.md` plus `references/`, byte-for-byte upstream apart from a three-line header that maps the Claude Code tool names onto this harness. It lives outside `.kilo/skills/` on purpose — the loader only scans directories named `skill`/`skills`, so the catalogue is read as a file when the task needs it and never enters the system prompt. |
+| `.kilo/catalog/README.md` | The catalogue index: one row per skill — what it covers and when to read it — plus the path pattern and the MIT attribution. The agent reads this first, then one `SKILL.md`. |
+| `.kilo/worktrees/` | Agent worktrees, one per task. Git-ignored. |
 | `.devcontainer/` | Container definition: `Dockerfile`, `devcontainer.json`, the redaction script. |
 | `docs/` | The factory's own governance set. Product documentation lives in the project repository. |
 | `artifacts/reviews/` | Ignored reports, findings and round ledgers in the control main checkout, shared by worktrees. Never stage or commit. |
@@ -78,20 +111,29 @@
 | `.kilo/skills/board/scripts/board.py` | The board's only writer. `show`, `add`, `set-status`, `set-field`, `note`, `remove`, `lanes`, `add-column`. |
 | `.kilo/skills/board/scripts/board_serve.py` | The read-only board viewer on port 15180. Vertical accordion of collapsible lanes, compact cards that expand to their detail, folds remembered in the browser. |
 | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates/reuses workspaces; `mode required\|optional\|status`, `handoff`, `merge`, `discard`, `list`, `verify`, `cleanup`. Merge/discard/cleanup preview by default; applying them is a human CLI operation. |
+| `.kilo/skills/board/scripts/board_serve.py` | The read-only factory board console on port 15180. Server-rendered, offline, standard library at runtime: a three-column dashboard shell (lane/filter sidebar, KPI strip, segmented flow meter, dense lane panel, sticky worktrees rail), search and status/type/priority filters with URL state, parsed Notes checklists, branch copy, and `j`/`k`/`/`/`Enter`/`Esc` keyboard control. Serves `/static/board.css` and the two self-hosted Geist fonts. `/api/board` and `/api/worktrees` are unchanged JSON. |
+| `.kilo/skills/board/ui/` | The Tailwind v4 source for the console (`package.json`, `src/app.css`); `npm --prefix .kilo/skills/board/ui run build` writes the committed `static/board.css`. |
+| `.kilo/skills/board/static/` | The committed stylesheet and the Geist Sans/Mono variable fonts with their SIL OFL licence. |
+| `.kilo/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, `discard` (`--force`, `--yes`), `handoff`, `list`, `verify`, `cleanup` (by slug or by `--board`). The teardown commands set the row's lane: `cleanup --board` sets `Merged`, `discard --board` sets `Ready`. |
+| `.kilo/skills/git-worktree/scripts/env.py` | Provisions the local env files of a worktree. `sync`, `status`, `clean`. |
 | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.kilo/skills/git-worktree/scripts/scope.py` | The generated pointer a work surface carries, and the local exclude rule that keeps it out of every commit. |
 | `.kilo/skills/qa-review/scripts/browser-review.mjs` | The only UI capture path. Supports ignored local storage state/approved navigation; destructive actions require explicit approval. |
 | `.kilo/agent/merge-conflict-resolver.md:1` | Specialist for existing conflicted merges; assigned edits/checks only, no commit/merge/abort/reset/rebase/push/discard. |
 | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a QA finding and prints its fingerprint. |
 | `.kilo/skills/qa-review/scripts/ledger.py` | Reports/updates QA↔fix rounds; defaults to shared control-root `artifacts/reviews/`; `--ledger-dir` before subcommand overrides it. |
+| `.kilo/skills/qa-review/scripts/ledger.py` | Opens, closes and reports the QA↔fix rounds of a row. |
+| `.kilo/skills/unslop/scripts/snapshot.mjs` | Saves a page as a standalone HTML file with its assets inlined, plus a screenshot. The one capture path the QA script does not cover: a live URL, or a page with no local source. |
 
 ## 4. Modules and functions
 
 | Symbol | File | Responsibility | Kind |
 |---|---|---|---|
 | `board.py` | `.kilo/skills/board/scripts/board.py` | Deterministic manipulation of the markdown board. Never writes prose. | effectful (file I/O) |
-| `board_serve.py` | `.kilo/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a collapsible accordion dashboard with compact cards and persisted folds. | effectful (network, file I/O) |
-| `worktree.py` | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. | effectful (git, filesystem) |
+| `board_serve.py` | `.kilo/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
+| `worktree.py` | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, `discard` removes one, `discard --force --yes` destroys one after writing a recovery copy, `handoff` prints the hand-off block, `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, `discard` sets `Ready`. | effectful (git, filesystem) |
+| `env.py` | `.kilo/skills/git-worktree/scripts/env.py` | Copies the two local env files from a repository's main checkout into a worktree, excludes them from git, and removes them again. Never prints a value. | effectful (filesystem, git exclude) |
+| `test_env.py` | `.kilo/skills/git-worktree/scripts/test_env.py` | Self-test for the env provisioning and the worktree reuse rules, in a throwaway repository under a temp directory. | effectful (filesystem, git) |
 | `guard.py` | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails and the sync that carries them into an app repository. | effectful (git, filesystem) |
 | `check-finding.py` | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a finding and derives its fingerprint. | pure |
 | `default_ledger_dir(cwd)` | `.kilo/skills/qa-review/scripts/ledger.py:37` | Imports and reuses `worktree.control_root(cwd)`; validates board/map presence, returns shared ignored directory, refuses unknown roots. | effectful (Git, filesystem) |
@@ -100,6 +142,7 @@
 | `cmd_next_round(args)` | `.kilo/skills/qa-review/scripts/ledger.py:135` | Opens rounds 1–3; refuses round 4 without writes and explains conditional escalation. | effectful (file I/O, output) |
 | `main(argv)` | `.kilo/skills/qa-review/scripts/ledger.py:213` | Resolves default directory only without override; dispatches existing commands, reports root/I/O failures clearly. | effectful (Git, filesystem, output) |
 | `browser-review.mjs` | `.kilo/skills/qa-review/scripts/browser-review.mjs` | Captures screenshots, console, page errors and network for a route. | effectful (browser, filesystem) |
+| `snapshot.mjs` | `.kilo/skills/unslop/scripts/snapshot.mjs` | Saves a live page or a local file as one standalone HTML file with its assets inlined, and saves a screenshot next to it. Resolves Playwright and chromium the same way the QA script does. | effectful (browser, filesystem) |
 
 ### Lifecycle tooling inventory (2026-11-16)
 
@@ -234,7 +277,16 @@ and `Dropped`. Unresolved findings block handoff; verified shared parent/Fix row
 ## 7. Public interfaces
 
 The factory exposes no network API. Its public surface is the file layout above and the CLI of
-the three scripts.
+the scripts. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
+`verify`, `cleanup`) and `env.py` (`sync`, `status`, `clean`). `discard` takes `--apply`, `--force`
+and `--yes`: `--force` alone prints the destruction plan, and `--force --yes` acts after writing a
+recovery copy under the repository's `cleanup-wt/` folder. `handoff --board <ID>` prints the
+hand-off block — the diff command, then the merge command, then the teardown command — and
+changes nothing. `cleanup` takes the worktree either as a slug or as `--board <ID>`, which
+resolves the row's `Branch/Worktree` cell and clears it when the worktree is gone; giving both or
+neither is a usage error. The lane each command sets: `create` and `resume` put the row in
+`In Progress`, `cleanup --board` puts it in `Merged`, `discard --board` puts it back in `Ready`,
+and the slug form of `cleanup` touches nothing on the board.
 
 ## 8. Configuration and environment
 
@@ -247,6 +299,9 @@ See `docs/ENVIRONMENT.md`. Names only, never values.
 | Python 3.9+ standard library | Every script. No third-party package. |
 | Playwright (global install in the dev container) | The QA capture path. |
 | Chromium (`/usr/bin/chromium`) | The QA capture path. |
+| The unslop skill | CC BY 4.0 — Damir Sokolovsky ([@heydamir](https://x.com/heydamir)). The credit line must survive in every copied file of `.kilo/skills/unslop/`. |
+| The plan skill | MIT — © 2025 Jeffallan (https://github.com/Jeffallan), upstream skills `feature-forge` and `architecture-designer`. The credit line must survive in every copied file of `.kilo/skills/plan/`. |
+| The superpowers research documents | MIT — © Jesse Vincent (obra/superpowers), copied into `.kilo/skills/plan/references/`. The credit line must survive in both files. |
 | Git | Worktrees, branches, the guard rails. |
 
 ## 10. Testing
@@ -313,6 +368,10 @@ The verification of other changes is the smallest relevant script run, recorded 
 its result and a `file:line` proof (AGENTS.md §B4 "Verification cost rule"). The dev container
 ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup file.
 
+`python3 .kilo/skills/git-worktree/scripts/test_env.py` is the one script-level test: it builds
+a throwaway git repository under a temp directory and proves the env provisioning, the
+worktree reuse rules, the hand-off block and the teardown named by a board row.
+
 ## 11. Known issues and risks
 
 - The factory has no remote, so the harness cannot be shared yet. The user decides where it goes.
@@ -342,6 +401,7 @@ ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup fi
 
 - `AGENTS.md` — the rules.
 - `docs/PROJECT_STRUCTURE.md` — the layout.
+- `docs/UI-UX.md` — the visual language, the anti-slop rules and the QA evidence spec.
 - `docs/BOARD.md` — the factory's live board.
 - `docs/DECISIONS.md` — the factory's decisions.
 - `docs/STACK.md` — the tools and commands.

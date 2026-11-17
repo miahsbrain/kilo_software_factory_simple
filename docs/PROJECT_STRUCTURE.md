@@ -17,18 +17,23 @@ and is never tracked here (ADR-053).
     ├── .devcontainer/                # container: Dockerfile, devcontainer.json, redaction script
     ├── .kilo/
     │   ├── agent/                    # agent definitions (frontend-dev, backend-dev, docs-writer…)
+    │   ├── catalog/                  # 67 specialist skills, read as files on demand
+    │   │   ├── README.md             # the catalogue index: one row per skill
+    │   │   └── <skill>/SKILL.md      # one folder per upstream skill, references/ inside
     │   ├── command/                  # slash commands, derived from AGENTS.md
     │   ├── policies/git-policy.json  # canonical guard-rail policy
     │   ├── repos.json                # repo map of this repository: control only
     │   ├── scopes/<id>.md            # canonical scope rules, one per scope
     │   ├── skills/                   # board, git-worktree, qa-review + their scripts
     │   └── worktrees/                # shared repo-specific change workspaces (git-ignored)
+
     ├── docs/
     │   ├── README.md                 # index of the factory documentation set
     │   ├── PROJECT_STRUCTURE.md      # this file
     │   ├── HANDOVER.md               # living description of the factory as it is now
     │   ├── BOARD.md                  # factory work only; project work lives in the project repo
     │   ├── DECISIONS.md              # append-only factory decisions (ADR-001…)
+    │   ├── UI-UX.md                  # visual language, anti-slop rules, QA evidence spec
     │   ├── PROJECT_STATE.md          # current phase, progress, next step
     │   ├── STACK.md                  # the tools the factory needs, and the commands they run
     │   └── changelog/                # engineering log: CHANGELOG.md + one file per change
@@ -53,7 +58,10 @@ and is never tracked here (ADR-053).
 | `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
 | `.kilo/agent/` | Seven definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`, `merge-conflict-resolver`. The last resolves preexisting conflicts without completing merges. |
 | `.kilo/command/` | Eight slash commands that package the workflow. Derived from `AGENTS.md`, never a source of rules. |
-| `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
+| `.kilo/skills/` | Five skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`, `unslop`, `plan`. |
+| `.kilo/skills/unslop/` | The unslop skill (CC BY 4.0, Damir Sokolovsky) with its references, its snapshot script and its examples. Its signs list is the extended checklist of the QA lane. |
+| `.kilo/skills/plan/` | The merged plan skill (MIT, © 2025 Jeffallan — upstream `feature-forge` and `architecture-designer`). `SKILL.md` and `references/`: the interview bank, the specification template, EARS syntax, acceptance criteria, pre-discovery subagents, system design, architecture patterns, database selection, ADR template, NFR checklist, and two superpowers research documents (MIT, © Jesse Vincent). |
+| `.kilo/catalog/` | The specialist skill catalogue: 67 upstream skills (MIT, © 2025 Jeffallan — https://github.com/Jeffallan/claude-skills), each a `SKILL.md` plus `references/`. Outside the auto-discovered skills folder on purpose — the loader only scans directories named `skill`/`skills`, so these are read as files when the task needs them. `guard.py sync` carries them into a project with the rest of the harness. |
 | `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
 | `.kilo/repos.json` | The repo map of this repository. The only way into a repository. |
 | `.kilo/scopes/` | Canonical specialization rules. Work surfaces receive an ignored generated `AGENTS.md` pointer; task assignments define repository/path boundaries. |

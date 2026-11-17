@@ -123,6 +123,117 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Why:** Extend the existing lifecycle, guard generator and board parser instead of adding another workspace tool. The new test module isolates regression fixtures in Python's default temporary directory; no existing test module covered lifecycle mechanics.
 **Impact:** Required mode remains the default; optional mode changes the edit fallback and outside-worktree commit check without relaxing secret/protected-file rules or protected-branch commits. Shared rows reuse workspaces. Human CLI merge/discard is preview-first, confined, fail-closed and records partial progress. Board-only control dirt is allowed; unrelated tracked/untracked dirt is refused. Kilo restart required after generated permission changes. No live board edits, real merges/discards, commits, installs, untracking, or rules/agent markdown changes in this chunk.
 **Verification:** Permission-map regeneration completed. The initial combined unittest attempt could not create fixtures under `/tmp/kilo`. After explicit approval to use Python's default temporary directory, the same command (`PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -v`) passed all 17 tests in 5.475s, exit 0. No permission changes or additional retry were needed. The lifecycle module docstring now describes explicit discard and the local progress journal rather than obsolete never-delete/TSV claims.
+## [2026-11-11] The /plan and /unslop commands
+**Type:** Chore
+**Board:** BOARD-113 | **Branch:** chore/add-plan-and-unslop-commands
+**Changed:** `.kilo/command/plan.md`, `.kilo/command/unslop.md`, `docs/UI-UX.md` §2.1, `docs/changelog/CHANGELOG.md`
+**Why:** The plan and unslop skills sit in `.kilo/skills/`, but the skill loader does not expose them, so neither was discoverable as a command. Both procedures were already the rules; they were only reachable by asking.
+**Impact:** `/plan` packages the plan skill's five phases into a product-planning shortcut that points at the decision gate; `/unslop` packages the unslop procedure — direction, sign audit, nine passes, checklist — and writes the audit to `docs/reviews/<task-id>-unslop.md`. Neither command adds a rule: both name the by-path read and defer to `AGENTS.md`. The command directory is part of the harness slice, so a project copy carries both.
+
+## [2026-11-11] The board screen becomes a dense dashboard
+**Type:** Feature
+**Board:** BOARD-112 | **Branch:** feat/rebuild-factory-pages-as-a-split
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `.kilo/skills/board/ui/src/app.css`, `.kilo/skills/board/static/board.css`, `docs/UI-UX.md` §6.2, `docs/reviews/BOARD-112-*.md`, `docs/changelog/CHANGELOG.md`
+**Why:** The board was still the single-column console while `/gallery` already carried the approved dashboard shell. The user asked for an elegant, dense, useful dashboard, so the real board moved onto the same components.
+**Impact:** `GET /` now renders a 240px lane/filter sidebar, a main column with a KPI strip, flow meter and lane panel, and a 320px sticky worktrees rail. All filters, search, keyboard, URL state, folds, pause/refresh, parsed Notes and branch copy are preserved. The old inline CSS and its renderers are removed; the Tailwind stylesheet is the only style system. Footer pluralisation and the copy-button tap target were fixed from the review.
+
+## [2026-11-11] The factory page language moves to Tailwind
+**Type:** Feature
+**Board:** BOARD-112 | **Branch:** feat/rebuild-factory-pages-as-a-split
+**Changed:** `.kilo/skills/board/ui/package.json`, `.kilo/skills/board/ui/package-lock.json`, `.kilo/skills/board/ui/src/app.css`, `.kilo/skills/board/static/board.css`, `.kilo/skills/board/static/fonts/*`, `.kilo/skills/board/scripts/board_serve.py`, `.kilo/skills/board/SKILL.md`, `docs/DECISIONS.md` (ADR-072), `docs/STACK.md`, `docs/UI-UX.md` §6.2, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-11-factory-tailwind.md`
+**Why:** The board screen read as a generic Bootstrap-style stack, and the single-file hand-written CSS made a consistent component language slow to evolve. The user chose Tailwind v4 with a self-hosted Geist pair and a Swiss-industrial direction.
+**Impact:** The board UI is now built from Tailwind v4 at author time into one committed stylesheet; the runtime stays Python-standard-library and offline. `GET /gallery` is rebuilt in the new language; the board screen moves onto the same components in the next chunk. Self-hosted Geist Sans/Mono (SIL OFL) replace system fonts, so the page is noticeably more distinctive and the repo grows by about 140 KB of woff2. A class change now requires `npm --prefix .kilo/skills/board/ui run build`.
+
+## [2026-11-11] The factory page language and component gallery
+**Type:** Feature
+**Board:** BOARD-112 | **Branch:** feat/rebuild-factory-pages-as-a-split
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/UI-UX.md` §6.2, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-11-factory-workbench.md`
+**Why:** The split-workbench direction needed a settled token set and a reusable component factory before the board screen could be rebuilt. The gallery is the human approval artefact for that language.
+**Impact:** Light and dark colour tokens move to paper/graphite with one signal-orange accent, and a `wb-` component set is shared by `/gallery` and, in the next chunk, the board. `GET /` keeps its structure, filters, keyboard and URL state, and gains one quiet footer link to `/gallery`. Routing, dependencies and the read-only, server-rendered, offline behaviour are unchanged.
+
+## [2026-11-11] The unslop pass is mandatory on every UI change
+**Type:** Docs
+**Board:** BOARD-111 | **Branch:** docs/make-the-unslop-pass-mandatory
+**Changed:** `AGENTS.md` (§B4.2, §B4.3), `docs/UI-UX.md` (§2.1), `.kilo/agent/ui-critic.md`, `.kilo/agent/frontend-dev.md`, `.kilo/skills/qa-review/SKILL.md`, `docs/changelog/CHANGELOG.md`
+**Why:** The BOARD-109 review read the unslop signs list but never ran the unslop procedure, and the loader does not expose the `unslop` skill, so nothing forced an agent to open it. A real audit of the merged console then found uppercase tracked labels, negative tracking on small text, redundant 650/700 weights and five equal stat cards — signs the QA and UI pass had let through.
+**Impact:** Every UI change now runs the full unslop procedure — five-line direction, full `references/signs.md` audit, nine passes, checklist — in the same review round as the QA capture, recorded in the UI report. A UI row with no recorded unslop audit cannot leave `In Review`. The skill is opened by path because the loader does not expose it. Precedence is unchanged: where the skill and `AGENTS.md` disagree, `AGENTS.md` wins, and the conflict is reported.
+
+## [2026-11-11] The board console passes the unslop audit
+**Type:** Fix
+**Board:** BOARD-110 | **Branch:** fix/fix-the-unslop-signs-in-the-board-console
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `docs/UI-UX.md` §6.1, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-11-unslop-board-console.md`
+**Why:** The merged console (BOARD-109) tripped four sign groups in `.kilo/skills/unslop/references/signs.md`: five equal stat cards for the lane counts, uppercase tracked labels, negative tracking on small text, and weights of 650 and 700. The palette, type scale, layout and controls were already right, so this is a polish pass only.
+**Impact:** The five lane counts are one framed flow instrument of five hairline-separated stops; only the stop with the highest non-zero count carries the accent, and on mobile the instrument scrolls rather than stacking. Lane names and table headers are sentence case with normal tracking, small-text tracking is zero, and every weight is 400, 500 or 600. Counts, click-to-filter, aria-pressed sync and the all-clear headline are unchanged; the viewer stays read-only, server-rendered and offline.
+
+## [2026-11-10] The live board becomes a factory console
+**Type:** Feature
+**Board:** BOARD-109 | **Branch:** feat/elevate-the-live-board-ui-into-a-factory-console
+**Changed:** `.kilo/skills/board/scripts/board_serve.py`, `.kilo/skills/board/SKILL.md`, `docs/UI-UX.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-factory-board-console.md`
+**Why:** The viewer was a vertical accordion that showed cards but not the shape of the flow, and its lane and notes content was slow to scan. The board is the orchestrator's main surface, so it needs a dense, keyboard-first console with filters, parsed acceptance criteria and the worktree state in the same view.
+**Impact:** `GET /` now renders again after a `TypeError` in `render_pipeline()` that broke the whole page while `/health` and the JSON endpoints stayed up. The page keeps its read-only, server-rendered, offline behaviour, and `/api/board` and `/api/worktrees` are unchanged. The visual language is recorded in `docs/UI-UX.md` §6.1.
+
+## [2026-11-10] The teardown command sets the board lane
+**Type:** Fix
+**Board:** BOARD-108 | **Branch:** fix/cleanup-and-discard-set-the-board
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-cleanup-and-discard-set-the-lane.md`
+**Why:** `worktree.py cleanup --board BOARD-107 --apply` removed the worktree, deleted the branch and cleared the row's `Branch/Worktree` cell, but left the row in `Pending Merge`. The lane is the source of truth for what is in flight, so a row whose branch is merged and whose worktree is gone must read `Merged`. A discard left the same confusion in `In Progress`.
+**Impact:** The teardown command owns the lane for the row it tears down (ADR-071). `cleanup --board <ID> --apply` puts the row in `Merged` and clears the cell; `discard --board <ID> --apply` puts the row back in `Ready` and clears it; the slug form of `cleanup` cannot know the row and touches nothing on the board. `clear_row_worktree` takes the lane as an argument and writes the lane cell and the worktree cell in the same atomic write, so they never drift. A refused cleanup or discard changes nothing on the board. The board write stays in the control repo's main checkout. `AGENTS.md` §B4 rule 12 and §B3 say the script is the board's writer for a teardown the human runs, so the orchestrator does not set the lane by hand afterwards.
+
+## [2026-11-10] The specialist skills, ported as a read-on-demand catalogue
+**Type:** Feature
+**Board:** BOARD-107 | **Branch:** feat/port-the-specialist-skill-catalog
+**Changed:** `.kilo/catalog/` (67 skill folders + `README.md`, 438 upstream markdown files), `AGENTS.md`, `.kilo/agent/frontend-dev.md`, `.kilo/agent/backend-dev.md`, `.kilo/agent/mobile-dev.md`, `.kilo/agent/qa-reviewer.md`, `.kilo/agent/docs-writer.md`, `.kilo/skills/git-worktree/scripts/guard.py`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STRUCTURE.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-specialist-skill-catalog.md`
+**Why:** The builders need specialist depth — a React, a FastAPI, a Postgres, a Playwright expert — without 67 skills crowding the system prompt. The upstream catalogue (MIT, © 2025 Jeffallan, https://github.com/Jeffallan/claude-skills) is kept as files the agent reads when the task is in that domain.
+**Impact:** The catalogue lives at `.kilo/catalog/<skill>/`, outside the auto-discovered skills folder: the loader only scans directories named `skill`/`skills`, so `.kilo/catalog/` is invisible to it and none of the 67 skills enters the system prompt. `kilo debug skill` still lists exactly the six repository skills — `board`, `git-worktree`, `qa-review`, `plan`, `unslop`, `kilo-config`. Every upstream file is carried over byte for byte with its MIT frontmatter; each `SKILL.md` gains a three-line header that maps the Claude Code tool names onto this harness, and 20 `AskUserQuestion` mentions plus 13 subagent mentions in the body become `question tool` and `Task tool agent`. The index at `.kilo/catalog/README.md` is read first, then the one matching `SKILL.md`. `AGENTS.md` §A7 gains a Specialist skills section that states the precedence rule once — this repository's rules win — and each builder agent file names its own specialists. `guard.py sync` now carries `catalog` in its slice, so a project receives the catalogue with the rest of the harness.
+
+## [2026-11-10] The plan skill, merged from two upstream skills
+**Type:** Feature
+**Board:** BOARD-106 | **Branch:** feat/port-a-merged-plan-skill
+**Changed:** `.kilo/skills/plan/` (SKILL.md, references/ ×12), `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STRUCTURE.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-plan-skill.md`
+**Why:** A new project or a large feature needs a planning procedure that writes into the documents this repository already has. The upstream `feature-forge` and `architecture-designer` skills carry the question banks, the specification template, the EARS syntax, the ADR template and the NFR checklist, and nothing of their own was kept.
+**Impact:** One merged skill at `.kilo/skills/plan/`, with all twelve upstream references carried over intact under their MIT credit lines. Each of the five phases names the document it writes into: `DOMAIN.md`, `docs/BUSINESS-LOGIC.md`, `docs/DECISIONS.md`, `docs/RISKS.md`, `docs/STACK.md`, `ROADMAP.md` and `docs/BOARD.md`. The upstream `AskUserQuestions` tool becomes the `question` tool, the upstream `Task` subagents become this harness's `Task` tool, and the upstream "write a spec document" step becomes "write into the mapped document". The precedence rule is stated once, in the skill, and referenced from `AGENTS.md` §A2, §A4 and §A6. Attribution: MIT, © 2025 Jeffallan for the two upstream skills; MIT, © Jesse Vincent for the two superpowers research documents.
+
+## [2026-11-10] The unslop skill, adopted and merged into the QA lane
+**Type:** Feature
+**Board:** BOARD-105 | **Branch:** feat/add-the-unslop-skill-and-merge
+**Changed:** `.kilo/skills/unslop/` (SKILL.md, references/, scripts/snapshot.mjs, examples/), `.kilo/skills/qa-review/SKILL.md`, `.kilo/agent/ui-critic.md`, `AGENTS.md`, `docs/UI-UX.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STRUCTURE.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-unslop-skill-and-qa-checker.md`
+**Why:** The 15 anti-slop rules catch the loud tells but not the quiet ones — a stray `mt-[13px]`, a mixed number format, an icon nudged off its column. The upstream skill carries a full sign-by-sign checklist, and it belongs in the lanes that judge a screen.
+**Impact:** The unslop skill (Damir Sokolovsky, CC BY 4.0) is adopted as a standalone skill at `.kilo/skills/unslop/`, and its signs list is merged into the QA lane: `AGENTS.md` §B4.3 states the precedence rule once, the qa-review skill and the ui-critic agent each add the unslop pass, and `docs/UI-UX.md` §2.1 points at the list. The story video and every image-generation instruction are removed, so a visual is built in code; `scripts/snapshot.mjs` resolves Playwright and chromium the way the QA script does and exits 2 when no browser is found. The credit line survives in every copied file.
+
+## [2026-11-10] The teardown is named by the board row
+**Type:** Feature
+**Board:** BOARD-104 | **Branch:** feat/hand-off-names-the-teardown
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-provision-env-files-and-reuse-worktrees.md`
+**Why:** The hand-off block named the cleanup by slug and listed the worktree removal and the branch deletion as loose lines, so the human had to read the path back out of the block to run the teardown.
+**Impact:** `worktree.py cleanup` takes `--board <ID>` as an alternative to the slug: it resolves the row's `Branch/Worktree` cell, runs the same cleanup, and clears that cell when the worktree is gone. Giving a slug and `--board` together, or neither, is a usage error. The hand-off block now ends with a teardown section that names `cleanup --board <ID> --apply` and, below it, the manual `git worktree remove` and `git branch -d` pair; the old cleanup lines are gone from the block. `AGENTS.md` §B5 says the block ends with that command. The slug form of `cleanup` and every other command keep their behaviour.
+
+## [2026-11-10] The hand-off block, printed by the script
+**Type:** Feature
+**Board:** BOARD-103 | **Branch:** feat/provision-env-files-into-worktrees
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-provision-env-files-and-reuse-worktrees.md`
+**Why:** Every work session had to hand the human the merge command, and usually forgot the diff command, so the human could not review the work before merging it.
+**Impact:** `worktree.py handoff --board <ID>` prints the hand-off block for a row's worktree: the path, the branch, the base, the diff command, the log command, the merge command and the cleanup command. It prints commands and paths only and never changes anything. A branch already merged into the base gets a `git show --stat` line instead of a merge command that would fail. `AGENTS.md` §B5 now requires every session report for work in a worktree to end with that block, diff command first.
+
+## [2026-11-10] Forced discard, confirmed in two steps
+**Type:** Feature
+**Board:** BOARD-103 | **Branch:** feat/provision-env-files-into-worktrees
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-provision-env-files-and-reuse-worktrees.md`
+**Why:** `discard` refused a dirty worktree or a branch with unmerged commits, so the only way to destroy that work was by hand, and a hand `git worktree remove --force` left nothing behind to recover from.
+**Impact:** `discard --force` alone prints the destruction plan — the path, the branch, the unmerged and dirty counts and exactly what is lost — and refuses without writing a file or deleting anything. `discard --force --yes` acts, and before it destroys anything it writes the uncommitted changes as a patch and the lost commit shas into the recovery files under the repository's `cleanup-wt/` folder, printing both paths. `--force` only relaxes the refusal: `--apply` still governs acting on the normal path, and `--yes` without `--force` is a usage error. The policy, the permission map and the board are unchanged.
+
+## [2026-11-10] Corrective round: distinct create refusals, section order, symlink-safe env copy
+**Type:** Fix
+**Board:** BOARD-103 | **Branch:** feat/provision-env-files-into-worktrees
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/env.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-provision-env-files-and-reuse-worktrees.md`
+**Why:** The review found that `create` used one refusal message for two situations, so a row whose slug directory was taken by another row was told to `resume` or `discard` a worktree it did not have — a circle. The two new SKILL.md sections were also numbered 2b and 2c but placed before the existing 2a, and the env copy followed a symlink planted at the destination.
+**Impact:** `create` now prints a separate message when the slug directory belongs to another row: it names the owning row when the board records one and offers only a new `--slug` or `discard` for that owning row. The SKILL.md sections now read 2a Env files, 2b Reuse a worktree, 2c Repos. The env copy is written with `O_NOFOLLOW`, so a symlink at the destination is replaced by the copy instead of being written through. No change to the policy, the permission map or the board.
+
+## [2026-11-10] Provision env files into worktrees and reuse an existing worktree
+**Type:** Feature
+**Board:** BOARD-103 | **Branch:** feat/provision-env-files-into-worktrees
+**Changed:** `.kilo/skills/git-worktree/scripts/env.py`, `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`
+**Why:** A new worktree had no local env files, so the application could not start there, and the agent could not read or copy them because the policy denies reading them. Separately, `worktree.py create` did not notice a worktree that already existed for the same board row, so agents piled up duplicates.
+**Impact:** `create` copies `.env` and `.env.local` from the repository's main checkout into the new worktree with mode `0600` and lists them in the repository's `.git/info/exclude`; the contents are never printed and the read policy is unchanged. `create` now refuses when the row already has a live worktree and prints the resume / discard / new-slug options. New `resume` and `discard` commands reuse or remove that worktree, `cleanup` removes the env copies, and `list` gained a `state` column. No behaviour change to the existing commands beyond the new refusal and the env provisioning.
 
 ## [2026-11-04] Board heading gets the page gutter
 **Type:** Fix

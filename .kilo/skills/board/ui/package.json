@@ -1,0 +1,15 @@
+{
+  "name": "factory-board-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tailwind build for the factory board console",
+  "scripts": {
+    "build": "tailwindcss -i ./src/app.css -o ../static/board.css",
+    "watch": "tailwindcss -i ./src/app.css -o ../static/board.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.5",
+    "geist": "1.9.2",
+    "tailwindcss": "4.3.5"
+  }
+}

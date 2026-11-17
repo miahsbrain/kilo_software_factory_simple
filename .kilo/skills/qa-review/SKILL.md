@@ -236,6 +236,10 @@ Then look at the screenshots and answer:
   spacing, states?
 - Does it read as designed by a person, or generated? Check the 15 anti-slop rules in
   `docs/UI-UX.md` §2.
+- **Unslop pass (mandatory).** Open `.kilo/skills/unslop/SKILL.md` and run its procedure — the
+  five-line direction, the full audit against `references/signs.md`, the nine passes and the
+  checklist — on the same capture. Report every sign present with where it lives, one line each.
+  A UI review without this is incomplete and cannot pass.
 - Do the empty, loading, and error states say something specific and name the next action?
 - Is the primary action obvious? Does the hierarchy read at 320px?
 
