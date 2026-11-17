@@ -78,8 +78,6 @@
     },
     "edit": {
       "*": "deny",
-      "artifacts/reviews/**": "allow",
-      "**/artifacts/reviews/**": "allow",
       ".kilo/worktrees/**": "allow",
       "**/.kilo/worktrees/**": "allow",
       "artifacts/reviews/**": "allow",

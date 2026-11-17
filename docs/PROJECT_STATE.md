@@ -11,23 +11,19 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **Active task:** BOARD-114, provisioning local QA inputs in
+- **Active task:** BOARD-114, provisioning/auth and permission-order cleanup in
   `.kilo/worktrees/provision-local-env-and-secure-qa`, branch
-  `feat/provision-local-env-and-secure-qa`, commit `9ddd430`. Focused provisioning tests passed
-  3/3 and the Node QA suite passed 20/20. The full lifecycle suite still fails two unchanged
-  permission-order assertions at `.kilo/skills/git-worktree/scripts/test_lifecycle.py:732`
-  (`AssertionError: 1 not greater than 4`). The worktree also has an unrelated unstaged user
-  change to `kilo.jsonc` removing `artifacts/reviews/**` and `**/artifacts/reviews/**` permissions;
-  it remains untouched. These failures and dirty config mean the merge gate is not clear.
+  `feat/provision-local-env-and-secure-qa`. The policy and generated permission map are in sync;
+  lifecycle suite passed 36 tests. Documentation and the approved policy cleanup are committed
+  on this branch, pending human merge. The separate dirty root-main `kilo.jsonc` was not touched.
 - **Previous task:** the human merged configurable shared-workspace lifecycle/authenticated
   review at main `d5ace2f`, including feature commit `44ca90b`. BOARD-103 through BOARD-112 are
   Merged. The old worktree remains for human cleanup; its capped ledger and authorized follow-up
   evidence are preserved in ignored artifacts. Lifecycle/auth source is unchanged by BOARD-113.
 - **Previous work:** BOARD-101 (no-production-build rule) and BOARD-102 (accordion board viewer)
   are recorded as Merged on the live factory board. They are not active tasks.
-- **Next action:** human review/decision on the existing dirty config and pre-existing test
-  failures. Do not start additional feature work until those are resolved. BOARD-114 remains
-  In Review; no merge, push, or worktree cleanup was performed.
+- **Next action:** human review and merge of BOARD-114. No merge, push, or worktree cleanup was
+  performed.
 
 ## Open questions
 

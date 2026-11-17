@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-17] Close BOARD-114 provisioning and permission cleanup
+**Type:** Fix
+**Board:** BOARD-114 | **Branch:** feat/provision-local-env-and-secure-qa
+**Changed:** `.kilo/policies/git-policy.json`, generated `kilo.jsonc`, factory handover and project state.
+**Why:** Complete the approved local QA provisioning/auth work and remove the earlier duplicate review-artifact allow-rule pair while retaining the effective pair after worktree rules.
+**Impact:** Review evidence remains writable and later secret and live-board denials remain effective. Policy and generated map are in sync. Lifecycle suite passed 36 tests; pending human merge.
+
 ## [2026-11-16] Provision local QA inputs into new worktrees
 **Type:** Fix
 **Board:** BOARD-114 | **Branch:** feat/provision-local-env-and-secure-qa

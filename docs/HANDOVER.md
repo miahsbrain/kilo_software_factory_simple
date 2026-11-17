@@ -1,17 +1,12 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
-> - **2026-11-16, BOARD-114 handover:** Provisioning work is on branch
->   `feat/provision-local-env-and-secure-qa` (commit `9ddd430`) in
->   `.kilo/worktrees/provision-local-env-and-secure-qa`. Focused provisioning tests passed 3/3
->   and the Node QA suite passed 20/20. The full lifecycle suite still fails two unchanged
->   permission-order assertions at `.kilo/skills/git-worktree/scripts/test_lifecycle.py:732`
->   (`AssertionError: 1 not greater than 4`). The worktree also contains an unrelated unstaged
->   user edit in `kilo.jsonc` removing `artifacts/reviews/**` and
->   `**/artifacts/reviews/**` permissions; it is preserved and is not included in this work.
->   These unresolved failures and dirty config mean the merge gate is not clear.
->   **Next action:** human review/decision on the existing dirty config and pre-existing failures;
->   no additional feature work.
+> - **2026-11-17, BOARD-114:** Provisioning/auth and permission-order cleanup are documented on
+>   branch `feat/provision-local-env-and-secure-qa` in
+>   `.kilo/worktrees/provision-local-env-and-secure-qa`. Policy and generated permission map are
+>   in sync; lifecycle suite passed 36 tests. Documentation and approved policy cleanup are
+>   committed on this branch; pending human merge. The separate dirty root-main `kilo.jsonc` was
+>   not touched.
 > - **BOARD-113 policy correction:** Approved review-only relative/absolute write exceptions precede
 >   protected-path denials. Task config regenerated; main config untouched. Active reviewer sessions
 >   now permit normal reviewer report writes after the user's latest reload. The report and final
