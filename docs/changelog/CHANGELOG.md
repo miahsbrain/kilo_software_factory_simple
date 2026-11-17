@@ -3,6 +3,21 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-17] Close BOARD-114 provisioning and permission cleanup
+**Type:** Fix
+**Board:** BOARD-114 | **Branch:** feat/provision-local-env-and-secure-qa
+**Changed:** `.kilo/policies/git-policy.json`, generated `kilo.jsonc`, factory handover and project state.
+**Why:** Complete the approved local QA provisioning/auth work and remove the earlier duplicate review-artifact allow-rule pair while retaining the effective pair after worktree rules.
+**Impact:** Review evidence remains writable and later secret and live-board denials remain effective. Policy and generated map are in sync. Lifecycle suite passed 36 tests; pending human merge.
+
+## [2026-11-16] Provision local QA inputs into new worktrees
+**Type:** Fix
+**Board:** BOARD-114 | **Branch:** feat/provision-local-env-and-secure-qa
+**Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, lifecycle tests, browser-review tests, focused skills, factory handover and project state.
+**Why:** New worktrees need approved local environment and navigation inputs while keeping secret values out of agent-readable policy, command output and captured evidence.
+**Impact:** New worktrees copy ignored/untracked regular `.env*` files except `.env.example`, preserve permissions, skip existing targets, and copy ignored control `.kilo/local/qa-navigation.json` without overwriting. The existing browser runner continues env-only login and masks known credentials during screenshot capture. No dependencies or policy changes.
+**Handoff:** Focused provisioning tests passed 3/3 and Node QA passed 20/20. Full lifecycle suite retains two unchanged permission-order assertion failures at `.kilo/skills/git-worktree/scripts/test_lifecycle.py:732`. An unrelated unstaged user `kilo.jsonc` change is preserved; the merge gate is not clear pending human review/decision.
+
 ## [2026-11-16] Resolve review-artifact permission hold
 **Type:** Fix
 **Board:** BOARD-113 | **Branch:** chore/store-reviews-as-ignored-artifacts

@@ -1,6 +1,12 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
+> - **2026-11-17, BOARD-114:** Provisioning/auth and permission-order cleanup are documented on
+>   branch `feat/provision-local-env-and-secure-qa` in
+>   `.kilo/worktrees/provision-local-env-and-secure-qa`. Policy and generated permission map are
+>   in sync; lifecycle suite passed 36 tests. Documentation and approved policy cleanup are
+>   committed on this branch; pending human merge. The separate dirty root-main `kilo.jsonc` was
+>   not touched.
 > - **BOARD-113 policy correction:** Approved review-only relative/absolute write exceptions precede
 >   protected-path denials. Task config regenerated; main config untouched. Active reviewer sessions
 >   now permit normal reviewer report writes after the user's latest reload. The report and final
@@ -123,6 +129,10 @@ Inherited maps must already match; base/canonical configs remain unchanged. App 
 without a local config retain inheritance and generated scope pointers, not a copied harness.
 Invalid initialization preserves the created branch/worktree, records the error locally,
 reports incomplete creation, and leaves the board unchanged for human recovery.
+`provision_local_files()` in `.kilo/skills/git-worktree/scripts/worktree.py` copies only ignored,
+untracked regular `.env*` files (except `.env.example`) from the mapped repository's primary
+checkout and, for control worktrees, `.kilo/local/qa-navigation.json`; it preserves permissions,
+skips preexisting destinations, and never reads or prints file values (effectful).
 The authorized follow-up resolves the former inherited-map order blocker by calling
 `permission_maps_match(current, expected)` at `.kilo/skills/git-worktree/scripts/worktree.py:642`.
 Independent proof: 33 tests passed, including six reordered-rule cases and two ordered success
@@ -181,7 +191,8 @@ local rules/shared governance reads explicitly. All lanes use the original paths
 sessions do not create new worktrees. Optional mode changes workspace requirements, not scope.
 
 The effectful `browser-review.mjs` entrypoint accepts `--storage-state <ignored-local.json>` and
-`--navigation <ignored-local.json>`. Navigation requires `approved:true`, uses `login`,
+`--navigation <ignored-local.json>`. New control worktrees receive the ignored local navigation
+file through lifecycle provisioning. Navigation requires `approved:true`, uses `login`,
 `authenticatedPath`, `authenticatedSelector`, `steps`, and accepts goto/fill-from-env/click-with-intent/waitForURL/
 waitForSelector. Login or storage state requires a visible application-specific authenticated marker;
 page-changing navigation declares its final URL with waitForURL. See the QA skill for the exact schema.

@@ -11,22 +11,19 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **Active task:** BOARD-113, approved shared ignored review storage in
-  `.kilo/worktrees/store-reviews-as-ignored-artifacts`, branch `chore/store-reviews-as-ignored-artifacts`.
-  Implementation and evidence migration complete; focused verification recorded in the engineering
-  log. Independent reviews passed 6 ledger tests and 1 permission test with no blocking source
-  findings. Normal shared report creation and final delta update succeeded after the latest
-  reload. Final independent permission regression passed in 0.053s; no unresolved blocker.
-  Final documentation and approved user policy delta are included in the clean merge handoff.
+- **Active task:** BOARD-114, provisioning/auth and permission-order cleanup in
+  `.kilo/worktrees/provision-local-env-and-secure-qa`, branch
+  `feat/provision-local-env-and-secure-qa`. The policy and generated permission map are in sync;
+  lifecycle suite passed 36 tests. Documentation and the approved policy cleanup are committed
+  on this branch, pending human merge. The separate dirty root-main `kilo.jsonc` was not touched.
 - **Previous task:** the human merged configurable shared-workspace lifecycle/authenticated
   review at main `d5ace2f`, including feature commit `44ca90b`. BOARD-103 through BOARD-112 are
   Merged. The old worktree remains for human cleanup; its capped ledger and authorized follow-up
   evidence are preserved in ignored artifacts. Lifecycle/auth source is unchanged by BOARD-113.
 - **Previous work:** BOARD-101 (no-production-build rule) and BOARD-102 (accordion board viewer)
   are recorded as Merged on the live factory board. They are not active tasks.
-- **Next action:** human reviews and merges BOARD-113 using the lifecycle CLI. The shared report
-  lives in ignored `artifacts/reviews/BOARD-113-review.md`; no review rounds were reset and no
-  agent merge, push or worktree cleanup was performed.
+- **Next action:** human review and merge of BOARD-114. No merge, push, or worktree cleanup was
+  performed.
 
 ## Open questions
 

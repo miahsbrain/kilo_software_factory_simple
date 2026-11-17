@@ -180,6 +180,17 @@ test('artifact collectors withhold raw console/errors/payloads and screenshots m
   assert.equal(page.calls.at(-1)[0], 'close');
 });
 
+test('screenshot masking includes process-environment credentials without mutating the page', async () => {
+  const page = fakePage();
+  const session = new PlaywrightPage({}, page, ['environment-secret-placeholder']);
+  const before = page.calls.length;
+  await session.screenshotFull();
+  assert.equal(page.calls.length, before + 1);
+  assert.equal(page.calls.at(-1)[0], 'screenshot');
+  assert.equal(page.calls.at(-1)[1].mask.length, 2);
+  assert.equal(page.calls.at(-1)[1].mask[1].value, 'environment-secret-placeholder');
+});
+
 test('401/403 target navigation does not count as successful access', async () => {
   for (const status of [401, 403]) {
     const page = fakePage();

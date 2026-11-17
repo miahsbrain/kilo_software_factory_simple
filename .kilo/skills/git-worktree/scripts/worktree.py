@@ -40,6 +40,8 @@ import json
 import os
 import re
 import shlex
+import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -318,6 +320,60 @@ def repo_of_path(path):
         return None
     common = os.path.abspath(common)
     return os.path.dirname(common) if os.path.basename(common) == ".git" else common
+
+
+def provision_local_files(primary, destination, include_navigation=False):
+    """Copy untracked local config without replacing worktree files."""
+    primary, destination = Path(primary), Path(destination)
+    candidates = []
+    for directory, dirnames, filenames in os.walk(primary, followlinks=False):
+        relative_directory = Path(directory).relative_to(primary).as_posix()
+        dirnames[:] = [name for name in dirnames if name != ".git" and
+                       not (relative_directory == ".kilo" and name == "worktrees") and
+                       not (Path(directory) / name).is_symlink()]
+        for name in filenames:
+            source = Path(directory) / name
+            relative = source.relative_to(primary)
+            is_env = name.startswith(".env") and name != ".env.example"
+            is_navigation = (include_navigation and
+                             relative.as_posix() == ".kilo/local/qa-navigation.json")
+            if is_env or is_navigation:
+                candidates.append((source, relative))
+
+    for source, relative in candidates:
+        if source.is_symlink() or not source.is_file():
+            continue
+        rel = relative.as_posix()
+        if git_out(str(primary), "ls-files", "--", rel):
+            continue
+        destination_file = destination / relative
+        if destination_file.exists() or destination_file.is_symlink():
+            continue
+        if any(part.is_symlink() for part in destination_file.parents
+               if part != destination and os.path.commonpath([str(part), str(destination)]) == str(destination)):
+            continue
+        destination_file.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            source_fd = os.open(str(source), os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) |
+                                getattr(os, "O_NONBLOCK", 0))
+        except FileNotFoundError:
+            continue
+        try:
+            with os.fdopen(source_fd, "rb") as source_stream:
+                source_stat = os.fstat(source_stream.fileno())
+                if not stat.S_ISREG(source_stat.st_mode):
+                    continue
+                try:
+                    destination_fd = os.open(
+                        str(destination_file), os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                        stat.S_IMODE(source_stat.st_mode))
+                except FileExistsError:
+                    continue
+                with os.fdopen(destination_fd, "wb") as destination_stream:
+                    shutil.copyfileobj(source_stream, destination_stream)
+                os.chmod(destination_file, stat.S_IMODE(source_stat.st_mode), follow_symlinks=False)
+        except OSError:
+            raise
 
 
 def default_base(target):
@@ -669,6 +725,15 @@ def cmd_create(args, cwd):
             if repo_state != "kept":
                 print("scope pointer at the repository root: %s" % repo_state)
         scope.ensure_ignored(target)
+    if not shared:
+        try:
+            provision_local_files(main_checkout_root(target), path, include_navigation=True)
+        except OSError:
+            state["workspaces"][path]["error"] = "local file provisioning failed"
+            local_state(root, state)
+            print("worktree %s and branch %s preserved; local file provisioning failed; "
+                  "board unchanged, creation incomplete" % (path, branch), file=sys.stderr)
+            return REFUSED
     try:
         lines = list(table["lines"])
         rel_path = os.path.relpath(path, root).replace(os.sep, "/")

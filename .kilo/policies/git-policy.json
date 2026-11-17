@@ -299,16 +299,6 @@
   ],
   "edit": [
     {
-  "pattern": "artifacts/reviews/**",
-  "action": "allow",
-  "reason": "Allow shared ignored review evidence; later protected-path rules still apply."
-},
-{
-  "pattern": "**/artifacts/reviews/**",
-  "action": "allow",
-  "reason": "Allow absolute paths to shared ignored review evidence; later protected-path rules still apply."
-},
-    {
       "pattern": "*",
       "workspace_default": true,
       "action": "deny",
