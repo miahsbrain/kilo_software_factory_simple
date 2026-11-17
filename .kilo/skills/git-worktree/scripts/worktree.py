@@ -8,22 +8,17 @@
     worktree.py list
     worktree.py verify <slug> [--base main]
     worktree.py cleanup <slug> [--apply]
-<<<<<<< HEAD
     worktree.py mode required|optional|status
     worktree.py handoff --board BOARD-00X
     worktree.py merge --board BOARD-00X [--target <branch>] [--apply]
     worktree.py discard --board BOARD-00X [--repo <id>] [--apply --discard]
-=======
     worktree.py cleanup --board BOARD-00X [--apply]
->>>>>>> origin/main
 
 create reads the board row named by --board from docs/BOARD.md, derives the
 branch type from its Type column and the slug from its task title, then makes
 .kilo/worktrees/<slug> on branch <type>/<slug> and records the worktree on the
-<<<<<<< HEAD
 row. Existing workspaces can be shared with --reuse; Fix rows reuse their parent.
 Otherwise an existing branch or directory is a refusal.
-=======
 row. It never overwrites: an existing branch or directory is a refusal. When
 the row already has a live worktree, create refuses and names the three ways
 forward: resume, discard, or a new slug.
@@ -44,7 +39,6 @@ in the recovery TSV, both under <git-common-dir>/cleanup-wt/.
 
 handoff prints the hand-off block for a row: the diff command first, then the
 merge command. It prints commands and paths only; it never changes anything.
->>>>>>> origin/main
 
 --repo picks the repository the worktree is created in. The id comes from
 .kilo/repos.json in the control repo; the default is "control", the control
@@ -730,12 +724,10 @@ def cmd_create(args, cwd):
     if args.slug and args.slug != derived:
         print("derived slug: %s" % derived)
         print("used slug:    %s" % slug)
-<<<<<<< HEAD
     branch = shared["branch"] if shared else "%s/%s" % (branch_type, slug)
     if not shared and git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + branch):
         print("branch %s already exists in %s; pick another slug or type"
               % (branch, target), file=sys.stderr)
-=======
     branch = "%s/%s" % (branch_type, slug)
     cell_text = cells[branch_index] if len(cells) > branch_index else ""
     live_path, live_branch = live_row_worktree(cell_text, root, target)
@@ -776,7 +768,6 @@ def cmd_create(args, cwd):
               (branch, target), file=sys.stderr)
         print("if the row already has a worktree for it, resume it with "
               "'worktree.py resume --board %s'" % args.board, file=sys.stderr)
->>>>>>> origin/main
         return REFUSED
     path = confined(worktree_path(target, slug), os.path.join(target, WORKTREES_DIR))
     if not shared and os.path.exists(path):
@@ -1660,11 +1651,9 @@ def cmd_verify(args, cwd):
     return OK
 
 
-<<<<<<< HEAD
 def cmd_cleanup(args, cwd):
     args.target = args.base
     return cmd_lifecycle(args, cwd)
-=======
 def recovery_tsv(common, rows):
     stamp = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
     path = os.path.join(common, "cleanup-wt", stamp + ".tsv")
@@ -1837,7 +1826,6 @@ def cmd_cleanup(args, cwd):
             print("warning: row %s was not updated (%s)" % (args.board, message), file=sys.stderr)
     print("recovery TSV: %s" % tsv)
     return OK
->>>>>>> origin/main
 
 
 def main(argv):
