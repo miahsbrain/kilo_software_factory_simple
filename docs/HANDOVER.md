@@ -2,20 +2,19 @@
 
 > **Session Notes** (keep at the very top, updated every session)
 
-BOARD-119 adds directory-only Playwright output ignores to the existing factory `.gitignore`,
-`.kilo/.gitignore` and `templates/project/.gitignore`. Scope is factory/template only; no existing
-project, app, tracked-file removal or permanent rule changes. Work is on
-`chore/ignore-generated-playwright-output-in-factory` in
-`.kilo/worktrees/ignore-generated-playwright-output-in-factory`; the user authorized committing
-and preparing the change for human merge.
-`git check-ignore --no-index --verbose --non-matching` proved all five generated names ignored
-directly and nested at factory root and template, with configuration/test probes not ignored.
-The `.kilo` probes are masked by existing `.git/info/exclude:52` (`.kilo/`), including source probes;
-the source ignore behavior there is unverified. `git diff --check` passed (exit 0).
-Verification limited to file review and static Git probes because this was a low-risk config change.
-Diff review passed; the `.kilo` limitation is accepted for this low-risk static change, not a runtime pass.
-Next action: human review and merge after the committed workspace is marked Pending Merge.
-The five frontend design-rule clarifications are approved for a separate change after BOARD-119 merges.
+BOARD-120 applies the five explicitly approved frontend rule clarifications in
+`.kilo/worktrees/clarify-frontend-design-direction-and-composition`, branch
+`docs/clarify-frontend-design-direction-and-composition`: builder role, substantive approved
+design direction, gallery primitives versus task-specific composition, redesign scope, and
+chrome versus content colors. Factory rules, web builder/scope, and corresponding template
+rules are aligned in place; ADR-079 records approval. No existing project copies change.
+Approval, gallery-before-screens, reuse, accessibility, auth/API preservation, no-production-build,
+and mandatory QA/critique/unslop gates remain. No new files, tools, application code or UI evidence.
+Verification limited to file review because this was a low-risk visual/static change.
+`git diff --check` passed (exit 0); orchestrator scoped diff review found no blocking inconsistency.
+Rules do not prove visual results. The user authorized committing the reviewed change and
+preparing BOARD-120 for human merge. After commit and clean-tree verification, the live row
+can move to Pending Merge. Next action: human review and merge; no agent merge or push.
 > - **2026-11-18, BOARD-118 shared correction:** in the original BOARD-117 workspace, changed
 >   two stale `test_lifecycle.py` wildcard expectations from `deny` to `ask` for required-mode
 >   regeneration and the copied base config. `guard.generated_permission()` retains the policy

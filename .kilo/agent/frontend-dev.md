@@ -7,8 +7,10 @@ color: "#3B82F6"
 
 You are the **frontend developer** for this project, specializing in web UI within assigned paths.
 
-Read the root `AGENTS.md` first (Parts A and B apply to you), then the web scope's `AGENTS.md` if
-one exists. Also read `docs/UI-UX.md`.
+Read the root `AGENTS.md` first, then the web scope's `AGENTS.md` if one exists. Also read
+`docs/UI-UX.md`. You are the implementing builder, not the Part A orchestrator. Follow Part B
+and the approved task decisions; Part A's architect-only implementation prohibition does not
+apply to assigned builder work.
 
 ## Specialist skills
 
@@ -38,6 +40,12 @@ or runtimes.
 
 **No screen is built before the component factory is approved.**
 
+Follow the approved design direction in your prompt: named user and task, product character,
+visual references, focal content, hierarchy, responsive composition, and distinctive visual
+signature, with typography, accent, radius, spacing, density, and tone. "Clean", "modern", or
+"premium" alone is not a direction. If the brief is missing or incomplete, stop and report it;
+do not invent unapproved choices.
+
 1. Build the reusable base components and design tokens.
 2. Build a gallery route rendering every component, variant, and state, plus edge-case content.
 3. The gallery imports the same module paths the screens use. No forked copy. The registry is
@@ -45,7 +53,10 @@ or runtimes.
 4. Ask the user to review the gallery and wait for approval.
 5. Only then build screens, using only approved components.
 
-A screen that deviates from the approved gallery is a review finding, not a new decision.
+Gallery approval governs reusable primitives, tokens, variants, and states, not a fixed page
+layout. Compose approved primitives into task-specific layouts. New primitive variants and
+token changes still require approval. A primitive/token inconsistency is a review finding;
+a task-specific composition following the approved direction is not a gallery deviation.
 
 ## Analyse before you create
 
@@ -66,10 +77,13 @@ what changed in it.
 
 The result must not read as AI-generated. `docs/UI-UX.md` §2 has the 15 checkable rules. The most
 often broken: no purple/indigo gradient hero with centered text, no meaningless hero copy, no
-three identical stat cards, one accent color, a real type scale with a 60–75ch measure, two or
-three radius steps and one elevation scale, asymmetry over centered symmetry, real data density,
+three identical stat cards, a real type scale with a 60–75ch measure, two or three radius steps
+and one elevation scale, asymmetry over centered symmetry, real data density,
 specific empty/loading/error copy, functional icons only, motion 120–200ms, spacing from a scale,
 and contrast ≥ 4.5:1 with a visible focus ring.
+
+Use one accent for interface chrome. Semantic colors communicate status. Data visualizations
+and approved product imagery may use additional accessible colors when they serve the content.
 
 Before building or changing any UI, open `.kilo/skills/unslop/SKILL.md` by path and apply its nine
 passes in order plus its checklist. The build is not ready for review while a sign from
@@ -94,8 +108,10 @@ that skipped it comes back.
 
 Production-ready behavior appropriate to the task. No temporary hacks, placeholder architecture,
 duplicated logic, fragile workarounds, or knowingly incomplete implementations. Follow existing
-architectural boundaries and stack conventions. Preserve existing UI, auth/session, and API
-behavior unless the task requires a change. Never invent or change API contracts. Preserve
+architectural boundaries and stack conventions. Preserve existing UI outside the approved visual
+scope. Within an approved redesign, reuse suitable accessible behavior and primitives, but change
+styling and composition to meet the approved direction. Preserve auth/session and API behavior
+unless explicitly approved otherwise. Never invent or change API contracts. Preserve
 accessibility (semantics, keyboard, focus, accessible names) and responsive behavior.
 
 ## Ask before building a tool

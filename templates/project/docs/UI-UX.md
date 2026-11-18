@@ -79,8 +79,8 @@ Every rule here is checkable in review. A screen that trips several of them read
    plan", not "Welcome to our platform".
 3. **No three identical stat cards.** One primary metric in context; a real table or list with
    row density; numbers carry units, timeframes, and a comparison basis.
-4. **One accent color, used sparingly.** Accent for primary action and focus; semantic colors
-   only for status.
+4. Use one accent for interface chrome. Semantic colors communicate status. Data visualizations
+   and approved product imagery may use additional accessible colors when they serve the content.
 5. **A real type scale.** A documented ratio (1.2–1.333), fixed steps, a line-height per step, and
    a measure of 60–75ch. No ad-hoc `text-2xl` / `text-sm` / `text-xs`.
 6. **Two or three radius steps and one elevation scale.** Border beats shadow at low elevation.
@@ -180,6 +180,12 @@ reused everywhere.
 
 ### The gate
 
+Before component work, approve the named user and task, product character, visual references,
+focal content, hierarchy, responsive composition, and a distinctive visual signature. "Clean",
+"modern", or "premium" alone is not a direction. Include the approved direction in the builder
+prompt, with typography, accent, radius, spacing, density, and tone. A builder follows this brief
+and reports missing direction instead of inventing unapproved choices.
+
 1. Build the base components in a `components/ui` area owned by the app scope.
 2. Build a **gallery route** that renders every component, every variant, and every state.
 3. Serve it locally (or on a preview URL) and **ask the user to look at it**.
@@ -218,8 +224,11 @@ apps/<scope>/src/<app>/__gallery__/     # route: /__gallery__ (dev and preview o
 ### What approval means
 
 Approval records the decisions: radius, border, type scale, accent color, spacing scale, and the
-approved states. Those go into the design tokens and into this document. A screen that deviates
-from the approved gallery is a **review finding**, not a new decision.
+approved states. Those go into the design tokens and into this document.
+Gallery approval governs reusable primitives, tokens, variants, and states, not a fixed page
+layout. Compose approved primitives into task-specific layouts. New primitive variants and
+token changes still require approval. A primitive/token inconsistency is a **review finding**,
+not a new decision; task-specific composition following the approved direction is not a deviation.
 
 ### When Storybook is justified
 
@@ -338,7 +347,8 @@ completion. A successful round 3 follows the normal merge gate.
 - **Console errors** — none during the flow.
 - **Network errors** — no unexpected 4xx/5xx.
 - **Responsive** — no horizontal overflow at 320px; layout collapses correctly.
-- **Visual language** — the screen matches the approved gallery: tokens, states, density.
+- **Visual language** — primitives, tokens, variants, and states match the approved gallery;
+  hierarchy, density, and responsive composition follow the approved task-specific direction.
 
 ### Playwright entry points
 

@@ -583,8 +583,10 @@ Work inside the explicitly assigned repositories and paths; other layers require
 Read local rules and explicitly permitted shared governance/contracts. Use the web stack from
 `docs/STACK.md`. Keep pages, components, services, hooks, stores/context, lib, styles, assets, and
 tests in their proper responsibilities. Avoid unnecessary abstractions, wrapper components, state
-layers, and dependencies not justified by the task. Preserve existing UI, auth/session, and API
-behavior unless the task requires changing it. Never invent or change API contracts without
+layers, and dependencies not justified by the task. Preserve existing UI outside the approved
+visual scope. Within an approved redesign, reuse suitable accessible behavior and primitives,
+but change styling and composition to meet the approved direction. Preserve auth/session and
+API behavior unless explicitly approved otherwise. Never invent or change API contracts without
 approval. Preserve accessibility and responsive behavior. Report if a reference image is missing
 or inaccessible in the assigned workspace.
 
@@ -633,13 +635,21 @@ is in that skill's domain.
 
 For any frontend work, the visual language is settled **before** screens are built:
 
-1. **Decide the visual language** in the decision sheet (§A6.1): typography, accent, radius,
-   spacing, density, tone. Reference `docs/UI-UX.md`.
+1. Before component work, approve the named user and task, product character, visual references,
+   focal content, hierarchy, responsive composition, and a distinctive visual signature.
+   "Clean", "modern", or "premium" alone is not a direction. Include the approved direction in
+   the builder prompt. Record typography, accent, radius, spacing, density, and tone in the
+   decision sheet (§A6.1). Reference `docs/UI-UX.md`.
 2. **Build the component factory** — reusable base components plus design tokens — and a
    **gallery route** that renders every component, variant, and state.
 3. **Ask the user to look at the gallery** and wait for approval. Adjust if asked.
 4. **Only then build screens**, using only the approved components.
-5. **A screen that deviates from the approved gallery is a review finding**, not a new decision.
+5. **A primitive/token inconsistency with the approved gallery is a review finding**, not a
+   new decision. Task-specific compositions following the approved direction are not deviations.
+
+Gallery approval governs reusable primitives, tokens, variants, and states, not a fixed page
+layout. Compose approved primitives into task-specific layouts. New primitive variants and
+token changes still require approval.
 
 No screen is built before the gallery is approved. The gallery imports the same component
 modules the screens use — never a forked copy. See `docs/UI-UX.md` §4.
@@ -1443,7 +1453,8 @@ The QA lane for frontend work uses **Playwright** and produces evidence, not ass
   and write evidence. All viewport, error-count and accessibility requirements still apply.
 - **Check:** keyboard focus and focus trapping, contrast, accessible names, tap target size
   (≥24×24 CSS px), console errors, unexpected network failures, horizontal overflow at 320px,
-  and whether the screen matches the approved gallery (tokens, states, density).
+  gallery conformance for primitives, tokens, variants, and states, and whether hierarchy,
+  density, and responsive composition follow the approved task-specific direction.
 - **Review:** a UI/UX critique pass runs alongside QA. Findings are stated as
   expected-vs-actual with the screenshot or `file:line` that proves them.
 - **Verdict:** a frontend row cannot leave `In Review` until both QA and the UI/UX critique are
@@ -1515,7 +1526,8 @@ the UI/UX critique pass. Full list with examples in `docs/UI-UX.md` §2.
 1. No purple/indigo gradient hero with centered text.
 2. No meaningless hero copy — name the actual job.
 3. No three identical stat cards; one primary metric in real context.
-4. One accent color, used sparingly; semantic colors only for status.
+4. Use one accent for interface chrome. Semantic colors communicate status. Data visualizations
+   and approved product imagery may use additional accessible colors when they serve the content.
 5. A real type scale with fixed steps and a 60–75ch measure.
 6. Two or three radius steps and one elevation scale.
 7. Asymmetry over centered symmetry.
