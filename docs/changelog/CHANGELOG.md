@@ -3,6 +3,55 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Keep board state truthful after partial discard
+**Type:** Fix
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** `worktree.py` and lifecycle regression tests.
+**Why:** Clear removed worktree entries even when branch deletion fails.
+**Impact:** Partial discards report the leftover branch while marking affected rows `Dropped`.
+
+## [2026-11-18] Keep cleanup previews side-effect free
+**Type:** Fix
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** `worktree.py`, lifecycle regression tests, `README.md`, `docs/HANDOVER.md`, and tracked review reports.
+**Why:** Delay recovery TSV creation until an apply operation passes preflight, document generated app-scope pointers, and remove obsolete tracked review reports.
+**Impact:** Cleanup dry-runs and refusals no longer write recovery files; discard remains human-only and without backups.
+
+## [2026-11-18] Complete documentation audit correction
+**Type:** Docs
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** `README.md`, `docs/PROJECT_STRUCTURE.md`, `docs/HANDOVER.md`, `docs/UI-UX.md`, historical lifecycle changelog, and this log.
+**Why:** Remove stale inventory counts and duplicate sections, make ignored review artifacts authoritative, and label superseded historical discard and teardown claims.
+**Impact:** Documentation only; the approved lifecycle contract and application code are unchanged.
+
+## [2026-11-18] Correct active lifecycle documentation paths
+**Type:** Docs
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** Review-path guidance, lifecycle decisions, handover test inventory, and this changelog.
+**Why:** Remove stale active references to `docs/reviews/`, clarify superseded ADR claims, and identify the current script-level test modules.
+**Impact:** Documentation only; lifecycle behavior is unchanged.
+
+## [2026-11-18] Align env status with recursive provisioning
+**Type:** Fix
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** `worktree.py`, `env.py`, lifecycle tests, handover and architecture docs
+**Why:** Status previously reported only two top-level names while provisioning accepted recursive eligible `.env*` files.
+**Impact:** Status now reports the same eligible source set without exposing values or changing provisioning exclusions.
+
+## [2026-11-18] Correct lifecycle documentation contradictions
+**Type:** Fix
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** Lifecycle ADRs, handover inventory, skill guidance, historical supersession note, lifecycle self-test cleanup, and factory architecture/risk docs.
+**Why:** Align the written lifecycle contract with recursive local-file provisioning, human-only no-backup discard, CLI-owned teardown, and `Merged`/`Dropped` lane transitions.
+**Impact:** Current guidance no longer offers raw Git teardown or stale recovery behavior; historical rationale remains preserved and explicitly marked superseded.
+
+## [2026-11-18] Align worktree lifecycle with human discard policy
+**Type:** Chore
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** Lifecycle and env scripts/tests, generated policy/config, and lifecycle guidance.
+**Why:** Keep provisioning non-overwriting and recursive, and make permanent discard an explicit human-only action with no recovery copies.
+**Impact:** New worktrees receive safe local-file copies; resume and cleanup preserve unprovenanced files. Discard drops the final board row and is denied through Kilo agent permissions.
+
 ## [2026-11-17] Close BOARD-114 provisioning and permission cleanup
 **Type:** Fix
 **Board:** BOARD-114 | **Branch:** feat/provision-local-env-and-secure-qa
@@ -128,7 +177,8 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Board:** BOARD-113 | **Branch:** chore/add-plan-and-unslop-commands
 **Changed:** `.kilo/command/plan.md`, `.kilo/command/unslop.md`, `docs/UI-UX.md` §2.1, `docs/changelog/CHANGELOG.md`
 **Why:** The plan and unslop skills sit in `.kilo/skills/`, but the skill loader does not expose them, so neither was discoverable as a command. Both procedures were already the rules; they were only reachable by asking.
-**Impact:** `/plan` packages the plan skill's five phases into a product-planning shortcut that points at the decision gate; `/unslop` packages the unslop procedure — direction, sign audit, nine passes, checklist — and writes the audit to `docs/reviews/<task-id>-unslop.md`. Neither command adds a rule: both name the by-path read and defer to `AGENTS.md`. The command directory is part of the harness slice, so a project copy carries both.
+**Impact:** `/plan` packages the plan skill's phases into a product-planning shortcut that points at the decision gate; `/unslop` packages the unslop procedure — direction, sign audit, nine passes, checklist — and writes the audit to `artifacts/reviews/<task-id>-unslop.md`. Neither command adds a rule: both name the by-path read and defer to `AGENTS.md`. The command directory is part of the harness slice, so a project copy carries both.
+**Historical note:** The former `docs/reviews/` output path is superseded by ignored `artifacts/reviews/`.
 
 ## [2026-11-11] The board screen becomes a dense dashboard
 **Type:** Feature
@@ -205,7 +255,7 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Board:** BOARD-104 | **Branch:** feat/hand-off-names-the-teardown
 **Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-provision-env-files-and-reuse-worktrees.md`
 **Why:** The hand-off block named the cleanup by slug and listed the worktree removal and the branch deletion as loose lines, so the human had to read the path back out of the block to run the teardown.
-**Impact:** `worktree.py cleanup` takes `--board <ID>` as an alternative to the slug: it resolves the row's `Branch/Worktree` cell, runs the same cleanup, and clears that cell when the worktree is gone. Giving a slug and `--board` together, or neither, is a usage error. The hand-off block now ends with a teardown section that names `cleanup --board <ID> --apply` and, below it, the manual `git worktree remove` and `git branch -d` pair; the old cleanup lines are gone from the block. `AGENTS.md` §B5 says the block ends with that command. The slug form of `cleanup` and every other command keep their behaviour.
+**Impact:** **Superseded historical entry.** The former manual Git teardown pair is obsolete. Current discard is human-only, requires `--apply --discard`, creates no backup, and marks the final linked row `Dropped`.
 
 ## [2026-11-10] The hand-off block, printed by the script
 **Type:** Feature
@@ -219,7 +269,7 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Board:** BOARD-103 | **Branch:** feat/provision-env-files-into-worktrees
 **Changed:** `.kilo/skills/git-worktree/scripts/worktree.py`, `.kilo/skills/git-worktree/scripts/test_env.py`, `.kilo/skills/git-worktree/SKILL.md`, `AGENTS.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/changelog/CHANGELOG.md`, `docs/changelog/2026-11-10-provision-env-files-and-reuse-worktrees.md`
 **Why:** `discard` refused a dirty worktree or a branch with unmerged commits, so the only way to destroy that work was by hand, and a hand `git worktree remove --force` left nothing behind to recover from.
-**Impact:** `discard --force` alone prints the destruction plan — the path, the branch, the unmerged and dirty counts and exactly what is lost — and refuses without writing a file or deleting anything. `discard --force --yes` acts, and before it destroys anything it writes the uncommitted changes as a patch and the lost commit shas into the recovery files under the repository's `cleanup-wt/` folder, printing both paths. `--force` only relaxes the refusal: `--apply` still governs acting on the normal path, and `--yes` without `--force` is a usage error. The policy, the permission map and the board are unchanged.
+**Impact:** **Superseded historical entry.** The former force/recovery flow is obsolete. Current discard is human-only, requires `--apply --discard`, creates no backup, and marks the final linked row `Dropped`.
 
 ## [2026-11-10] Corrective round: distinct create refusals, section order, symlink-safe env copy
 **Type:** Fix
@@ -338,7 +388,7 @@ Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 **Board:** BOARD-010 | **Branch:** chore/one-artifacts-folder-and-ask-before
 **Changed:** `.kilo/skills/qa-review/scripts/browser-review.mjs`, `.gitignore`, `AGENTS.md`, `docs/{UI-UX,HANDOVER,DECISIONS,PROJECT_STRUCTURE}.md`, `docs/changelog/CHANGELOG.md`, `.kilo/skills/qa-review/SKILL.md`, `.kilo/command/{ui,run}.md`, `.kilo/agent/{frontend-dev,backend-dev,mobile-dev,qa-reviewer,ui-critic}.md`, `apps/{web,mobile}/AGENTS.md`
 **Why:** UI evidence was scattered across app folders, `docs/`, and `/tmp`, and an agent built a browser driver instead of asking, while Playwright was already installed globally.
-**Impact:** All UI evidence lands under `artifacts/<scope>/qa/<date>/<task-id>/` in the main checkout; the capture script computes the path itself and writes `notes.md`. Review reports and ledgers stay in `docs/reviews/` — documents, not artifacts. A new rule makes an agent check for existing tooling and ask before building any.
+**Impact:** All UI evidence lands under `artifacts/<scope>/qa/<date>/<task-id>/` in the main checkout; the capture script computes the path itself and writes ignored local artifacts. Review reports and ledgers use ignored `artifacts/reviews/`; the former `docs/reviews/` path is superseded. A new rule makes an agent check for existing tooling and ask before building any.
 
 ## [2026-10-29] Live board viewer, bounded UI loop, gated UI tooling
 **Type:** Feature

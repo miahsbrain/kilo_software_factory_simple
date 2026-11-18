@@ -17,9 +17,9 @@ belongs to the project, not to the factory.
 | Path | What it holds |
 |---|---|
 | `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
-| `.kilo/agent/` | Six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
-| `.kilo/command/` | Eight slash commands that package the workflow. |
-| `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
+| `.kilo/agent/` | Agent definitions for builders, reviewers, documentation, and conflict resolution. |
+| `.kilo/command/` | Slash commands that package the workflow. |
+| `.kilo/skills/` | Skills and their scripts that enforce the workflow. |
 | `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
 | `.kilo/repos.json`, `.kilo/scopes/` | The repo map and the canonical scope rules for a multi-repo setup. |
 | `docs/` | The factory's own documentation set: board, handover, structure, decisions, changelog. |
@@ -71,8 +71,8 @@ A project is a control repo plus one repository per application.
 - **Control repo** — the project repository. It holds `AGENTS.md`, `docs/`, the board, the domain
   rules, the API contracts and the guard-rail policy.
 - **App repos** — a git repository at `apps/<name>/`, nested inside the control repo. Each holds one
-  application and its own copy of the `.kilo/` slice, so the guard rails are the same wherever the
-  work happens.
+  application and receives only an ignored generated `AGENTS.md` pointer to the canonical scope
+  rules; it does not receive a copied `.kilo/` harness slice.
 
 `.kilo/repos.json` maps a repo id to a path:
 
@@ -197,13 +197,13 @@ around with a new tool.
 - **Commits** — `<emoji> [<type>] <scope>: <subject>`, with one bullet on what changed and why.
 - **Branches** — `feat|fix|chore|docs/<slug>`, derived from the board row's type and title.
 - **Artifacts** — `artifacts/<scope>/qa/<date>/<task-id>/`; the capture script computes the path.
-- **Review reports and ledgers** are documents, not artifacts: `docs/reviews/<task-id>-{qa,ui,ledger}.md`.
+- **Review reports and ledgers** are ignored review artifacts: `artifacts/reviews/<task-id>-{qa,ui,ledger}.md`.
 
 ## Status
 
 The factory board is empty and the harness is complete. `docs/changelog/CHANGELOG.md` is the
-engineering log of the factory itself. The Inhouz Cloud AI platform — 75 microservices, each its
-own git repository — is the project in `project/`.
+engineering log of the factory itself. The Inhouz Cloud AI platform is the project in `project/`,
+with each application repository kept separately.
 
 ## Licence
 

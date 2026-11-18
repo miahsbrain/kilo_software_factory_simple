@@ -6,29 +6,22 @@
     env.py status --board BOARD-00X [--repo <id>]
     env.py clean --board BOARD-00X [--repo <id>] [--apply]
 
-sync copies .env and .env.local from the repository's main checkout into a
-worktree under .kilo/worktrees/. Nothing else travels. The contents are never
-printed: the script reports the file name and the byte count, never a value.
-
-The copies are listed in the repository's .git/info/exclude, so they can never
-be committed. The agent's own read policy on env files stays denied: the app
-reads the file, the agent runs the app.
+sync delegates to worktree.py's canonical recursive copier for ignored or
+untracked regular .env* files and the QA navigation file. Existing destinations
+are preserved; file values are never printed. Copied env paths are listed in
+the repository's .git/info/exclude.
 
 A destination that does not resolve under <repo>/.kilo/worktrees/ is refused.
-clean removes the copies from the worktree and nothing else, and is a dry run
-without --apply.
+clean preserves local files when their provisioning provenance is unknown.
 
 Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 """
 import argparse
-import errno
 import importlib.util
 import os
 import sys
 
-ENV_NAMES = (".env", ".env.local")
 WORKTREES_DIR = os.path.join(".kilo", "worktrees")
-EXCLUDE_MARKER = "# env files provisioned into worktrees by the factory; never committed"
 
 OK = 0
 REFUSED = 1
@@ -55,14 +48,6 @@ def inside_worktrees(path, repo_root):
     base = os.path.realpath(os.path.join(repo_root, WORKTREES_DIR))
     real = os.path.realpath(path)
     return real.startswith(base + os.sep)
-
-
-def read_text(path):
-    try:
-        with open(path, encoding="utf-8") as fh:
-            return fh.read()
-    except OSError:
-        return None
 
 
 def resolve_target(board_id, repo_id, cwd):
@@ -112,97 +97,25 @@ def source_root(repo_root):
     return worktree_module().main_checkout_root(repo_root)
 
 
-def exclude_path(repo_root):
-    """The repository's local exclude file, the one shared by every worktree."""
-    common = worktree_module().common_dir(repo_root)
-    if not common:
-        return None
-    return os.path.join(common, "info", "exclude")
-
-
-def ensure_excluded(repo_root):
-    """(path, error). The env files are listed under a marker comment."""
-    path = exclude_path(repo_root)
-    if not path:
-        return None, "cannot find the repository's common git directory"
-    existing = read_text(path)
-    if existing is None:
-        existing = ""
-    lines = [line.strip() for line in existing.splitlines()]
-    missing = [name for name in ENV_NAMES if name not in lines]
-    if not missing:
-        return path, None
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "a", encoding="utf-8") as fh:
-            if existing and not existing.endswith("\n"):
-                fh.write("\n")
-            if EXCLUDE_MARKER not in existing:
-                fh.write("\n%s\n" % EXCLUDE_MARKER)
-            for name in missing:
-                fh.write("%s\n" % name)
-    except OSError as e:
-        return None, "cannot update %s: %s" % (path, e.strerror)
-    return path, None
-
-
-def write_file(dst, data):
-    """Write the bytes to a regular file at dst, never through a symlink.
-
-    A symlink planted at the destination is replaced by the copy, so the link
-    target is never written to.
-    """
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    nofollow = getattr(os, "O_NOFOLLOW", 0)
-    if nofollow:
-        flags |= nofollow
-    elif os.path.islink(dst):
-        os.unlink(dst)
-    try:
-        fd = os.open(dst, flags, 0o600)
-    except OSError as e:
-        if e.errno != errno.ELOOP or not os.path.islink(dst):
-            raise
-        os.unlink(dst)
-        fd = os.open(dst, flags, 0o600)
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(data)
-    os.chmod(dst, 0o600)
-
-
 def sync_into(worktree_path, repo_root):
-    """(lines, error). Copies the env files into the worktree and excludes them."""
+    """(lines, error). Use the worktree script's safe, non-overwriting copier."""
     wt = worktree_module()
     if not inside_worktrees(worktree_path, repo_root):
         return None, ("refused: %s is not under %s" %
                       (worktree_path, os.path.join(repo_root, WORKTREES_DIR)))
-    source = source_root(repo_root)
-    lines = []
-    for name in ENV_NAMES:
-        src = os.path.join(source, name)
-        dst = os.path.join(worktree_path, name)
-        if not os.path.isfile(src):
-            lines.append("%s: no file in the main checkout" % name)
-            continue
-        try:
-            with open(src, "rb") as fh:
-                data = fh.read()
-            write_file(dst, data)
-        except OSError as e:
-            return None, "cannot copy %s: %s" % (name, e.strerror)
-        lines.append("%s: copied (%d bytes)" % (name, os.path.getsize(dst)))
-    path, err = ensure_excluded(repo_root)
-    if err:
-        return None, err
-    lines.append("excluded in %s" % path)
-    return lines, None
+    try:
+        wt.provision_local_files(source_root(repo_root), worktree_path, include_navigation=True)
+    except OSError as error:
+        return None, "cannot provision local files: %s" % error.strerror
+    return ["safe provisioning complete; existing destinations were preserved"], None
 
 
 def status_into(worktree_path, repo_root):
     """(lines, error). Per file: whether the source and the copy exist."""
     source = source_root(repo_root)
     lines = []
-    for name in ENV_NAMES:
+    for _, relative in worktree_module().eligible_env_files(source):
+        name = relative.as_posix()
         src = os.path.join(source, name)
         dst = os.path.join(worktree_path, name)
         lines.append("%s | main checkout: %s | worktree: %s" %
@@ -213,25 +126,11 @@ def status_into(worktree_path, repo_root):
 
 
 def clean_into(worktree_path, repo_root, apply):
-    """(lines, error). Removes the copies from the worktree and nothing else."""
+    """(lines, error). Never remove local files without recorded provenance."""
     if not inside_worktrees(worktree_path, repo_root):
         return None, ("refused: %s is not under %s" %
                       (worktree_path, os.path.join(repo_root, WORKTREES_DIR)))
-    lines = []
-    for name in ENV_NAMES:
-        dst = os.path.join(worktree_path, name)
-        if not os.path.exists(dst):
-            lines.append("%s: nothing to remove" % name)
-            continue
-        if not apply:
-            lines.append("%s: would remove" % name)
-            continue
-        try:
-            os.unlink(dst)
-        except OSError as e:
-            return None, "cannot remove %s: %s" % (dst, e.strerror)
-        lines.append("%s: removed" % name)
-    return lines, None
+    return ["local files preserved; no provenance manifest is available"], None
 
 
 def cmd_sync(args, cwd):

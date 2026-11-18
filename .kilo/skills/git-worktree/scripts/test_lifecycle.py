@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,7 @@ def module(name, path):
 
 
 WORKTREE = module("lifecycle_test_worktree", SCRIPTS / "worktree.py")
+ENV = module("lifecycle_test_env", SCRIPTS / "env.py")
 GUARD = module("lifecycle_test_guard", SCRIPTS / "guard.py")
 
 
@@ -32,6 +34,7 @@ class LifecycleTests(unittest.TestCase):
         self.root = Path(self.temporary.name) / "control"
         self.root.mkdir()
         for relative in (".kilo/skills/git-worktree/scripts/worktree.py",
+                         ".kilo/skills/git-worktree/scripts/env.py",
                          ".kilo/skills/git-worktree/scripts/guard.py",
                          ".kilo/skills/git-worktree/scripts/scope.py",
                          ".kilo/skills/board/scripts/board.py",
@@ -233,6 +236,31 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual((path / ".kilo/local/qa-navigation.json").read_bytes(), navigation.read_bytes())
         self.assertNotIn(secret_value, result.stdout + result.stderr)
 
+    def test_env_status_reports_the_same_eligible_recursive_sources(self):
+        (self.root / ".env").write_text("root-secret")
+        (self.root / ".env.tracked").write_text("tracked")
+        self.git(self.root, "add", "-f", ".env.tracked")
+        self.git(self.root, "commit", "-m", "track env fixture")
+        (self.root / ".env.local").write_text("local-secret")
+        (self.root / "nested").mkdir()
+        (self.root / "nested/.env.production").write_text("nested-secret")
+        (self.root / ".env.example").write_text("example")
+        (self.root / ".env.link").symlink_to(self.root / ".env.local")
+        self.cli("create", "--board", "BOARD-001")
+        path = self.root / ".kilo/worktrees/shared-lifecycle"
+
+        lines, error = ENV.status_into(str(path), str(self.root))
+        self.assertIsNone(error)
+        output = "\n".join(lines)
+        self.assertIn(".env | main checkout: present | worktree: present", output)
+        self.assertIn(".env.local | main checkout: present | worktree: present", output)
+        self.assertIn("nested/.env.production | main checkout: present | worktree: present", output)
+        self.assertNotIn(".env.example", output)
+        self.assertNotIn(".env.tracked", output)
+        self.assertNotIn(".env.link", output)
+        self.assertNotIn("root-secret", output)
+        self.assertNotIn("nested-secret", output)
+
     def test_local_file_provisioning_skips_tracked_unignored_symlink_and_existing_destination(self):
         (self.root / ".env.tracked").write_text("tracked")
         self.git(self.root, "add", "-f", ".env.tracked")
@@ -378,7 +406,7 @@ class LifecycleTests(unittest.TestCase):
     def test_fix_reuses_parent_and_discard_updates_all_shared_rows(self):
         self.add_row("BOARD-002", "Fix shared lifecycle", "Fix", "BOARD-001")
         path = self.create()
-        self.cli("create", "--board", "BOARD-002")
+        self.cli("create", "--board", "BOARD-002", "--reuse", "BOARD-001")
         self.assertEqual(len(WORKTREE.list_worktrees(str(self.root))), 2)
         (path / "dirty.txt").write_text("uncommitted")
         self.cli("discard", "--board", "BOARD-002")
@@ -633,6 +661,20 @@ class LifecycleTests(unittest.TestCase):
         self.cli("merge", "--board", "BOARD-001", "--apply")
         self.assertEqual(self.status(), "Merged")
 
+    def test_cleanup_preview_and_refusal_do_not_create_recovery_tsv(self):
+        path = self.create(change=False)
+        cleanup_dir = Path(WORKTREE.common_dir(str(self.root))) / "cleanup-wt"
+
+        self.cli("cleanup", "shared-lifecycle")
+        self.assertFalse(list(cleanup_dir.glob("*.tsv")))
+        self.assertTrue(path.exists())
+
+        (path / "data.txt").write_text("unmerged\n")
+        self.commit(path)
+        self.cli("cleanup", "shared-lifecycle", success=False)
+        self.assertFalse(list(cleanup_dir.glob("*.tsv")))
+        self.assertTrue(path.exists())
+
     def test_custom_base_is_persisted_and_origin_default_is_protected(self):
         self.git(self.root, "checkout", "-b", "integration")
         self.cli("create", "--board", "BOARD-001", "--base", "integration")
@@ -677,7 +719,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertIn(str(two), result.stdout)
         self.assertIn("--stat", result.stdout)
         self.assertIn("merge --board BOARD-001 --apply", result.stdout)
-        self.assertIn("discard --board BOARD-001 --apply --discard", result.stdout)
+        self.assertNotIn("discard", result.stdout)
 
     def test_confinement_protected_and_symlink_rejection(self):
         path = self.create()
@@ -697,28 +739,56 @@ class LifecycleTests(unittest.TestCase):
 
     def test_git_errors_fail_closed_before_removal(self):
         path = self.create()
-        args = type("Args", (), {"command": "discard", "board": ["BOARD-001"], "repo": None,
-                                  "apply": True, "discard": True, "target": None})()
+        args = type("Args", (), {"board": "BOARD-001", "repo": None,
+                                  "apply": True, "discard": True})()
         actual = WORKTREE.git
 
         def broken(cwd, *parts, **kwargs):
-            if parts and parts[0] == "status":
-                return 128, "", "injected status failure"
+            if parts[:2] == ("worktree", "remove"):
+                return 128, "", "injected removal failure"
             return actual(cwd, *parts, **kwargs)
 
         with mock.patch.object(WORKTREE, "git", side_effect=broken):
-            with self.assertRaisesRegex(ValueError, "injected status failure"):
-                WORKTREE.cmd_lifecycle(args, str(self.root))
+            self.assertNotEqual(WORKTREE.cmd_discard(args, str(self.root)), 0)
         self.assertTrue(path.exists())
         with mock.patch.object(WORKTREE, "git", return_value=(128, "", "injected list failure")):
             with self.assertRaisesRegex(ValueError, "injected list failure"):
                 WORKTREE.list_worktrees(str(self.root))
+
+    def test_discard_clears_board_when_branch_deletion_fails(self):
+        path = self.create()
+        args = type("Args", (), {"board": "BOARD-001", "repo": None,
+                                  "apply": True, "discard": True})()
+        actual = WORKTREE.git
+
+        def broken(cwd, *parts, **kwargs):
+            if parts[:2] == ("branch", "-D"):
+                return 128, "", "injected branch deletion failure"
+            return actual(cwd, *parts, **kwargs)
+
+        stderr = io.StringIO()
+        with mock.patch.object(WORKTREE, "git", side_effect=broken):
+            with mock.patch("sys.stderr", stderr):
+                result = WORKTREE.cmd_discard(args, str(self.root))
+
+        self.assertEqual(result, WORKTREE.REFUSED)
+        self.assertFalse(path.exists())
+        self.assertEqual(self.git(self.root, "rev-parse", "--verify",
+                                   "refs/heads/feat/shared-lifecycle", check=False).returncode, 0)
+        table, error = self.board.read_table(self.root / "docs/BOARD.md")
+        self.assertIsNone(error)
+        index = self.board.row_by_id(table, "BOARD-001")
+        cells = self.board.cell_texts(table["lines"], index)
+        self.assertEqual(cells[3], "Dropped")
+        self.assertEqual(cells[8], "-")
+        self.assertIn("leftover branch feat/shared-lifecycle remains", stderr.getvalue())
 
     def test_generated_map_matches_policy_and_apply_requires_approval(self):
         policy = json.loads((SOURCE / ".kilo/policies/git-policy.json").read_text())
         config = json.loads((SOURCE / "kilo.jsonc").read_text())
         self.assertEqual(config["permission"], GUARD.generated_permission(policy))
         self.assertEqual(GUARD.bash_verdict(policy, "python3 worktree.py merge --board BOARD-001 --apply")[0], "ask")
+        self.assertEqual(GUARD.bash_verdict(policy, "python3 worktree.py discard --board BOARD-001 --apply --discard")[0], "deny")
         self.assertEqual(GUARD.bash_verdict(policy, "git status")[0], "allow")
 
     def test_review_artifact_permissions_preserve_protections_in_both_modes(self):

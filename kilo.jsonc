@@ -74,7 +74,8 @@
       "git gc*": "deny",
       "git update-ref -d*": "deny",
       "rm -rf *": "ask",
-      "*worktree.py*--apply*": "ask"
+      "*worktree.py*--apply*": "ask",
+      "*worktree.py*discard*": "deny"
     },
     "edit": {
       "*": "deny",
