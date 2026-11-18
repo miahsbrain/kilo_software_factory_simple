@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -753,6 +754,34 @@ class LifecycleTests(unittest.TestCase):
         with mock.patch.object(WORKTREE, "git", return_value=(128, "", "injected list failure")):
             with self.assertRaisesRegex(ValueError, "injected list failure"):
                 WORKTREE.list_worktrees(str(self.root))
+
+    def test_discard_clears_board_when_branch_deletion_fails(self):
+        path = self.create()
+        args = type("Args", (), {"board": "BOARD-001", "repo": None,
+                                  "apply": True, "discard": True})()
+        actual = WORKTREE.git
+
+        def broken(cwd, *parts, **kwargs):
+            if parts[:2] == ("branch", "-D"):
+                return 128, "", "injected branch deletion failure"
+            return actual(cwd, *parts, **kwargs)
+
+        stderr = io.StringIO()
+        with mock.patch.object(WORKTREE, "git", side_effect=broken):
+            with mock.patch("sys.stderr", stderr):
+                result = WORKTREE.cmd_discard(args, str(self.root))
+
+        self.assertEqual(result, WORKTREE.REFUSED)
+        self.assertFalse(path.exists())
+        self.assertEqual(self.git(self.root, "rev-parse", "--verify",
+                                   "refs/heads/feat/shared-lifecycle", check=False).returncode, 0)
+        table, error = self.board.read_table(self.root / "docs/BOARD.md")
+        self.assertIsNone(error)
+        index = self.board.row_by_id(table, "BOARD-001")
+        cells = self.board.cell_texts(table["lines"], index)
+        self.assertEqual(cells[3], "Dropped")
+        self.assertEqual(cells[8], "-")
+        self.assertIn("leftover branch feat/shared-lifecycle remains", stderr.getvalue())
 
     def test_generated_map_matches_policy_and_apply_requires_approval(self):
         policy = json.loads((SOURCE / ".kilo/policies/git-policy.json").read_text())

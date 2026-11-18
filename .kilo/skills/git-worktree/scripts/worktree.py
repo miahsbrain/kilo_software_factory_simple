@@ -1053,10 +1053,15 @@ def cmd_discard(args, cwd):
     if code:
         print("branch deletion failed after worktree removal: %s" %
               (error.splitlines() or ["?"])[-1], file=sys.stderr)
-        return REFUSED
+        branch_error = error.splitlines()[-1] if error.splitlines() else "?"
+    else:
+        branch_error = None
     ok, message = clear_shared_worktree(board, board_file, table, root, path)
     if not ok:
-        print("warning: row %s was not updated (%s)" % (args.board, message), file=sys.stderr)
+        print("warning: board rows were not updated (%s)" % message, file=sys.stderr)
+        return REFUSED
+    if branch_error:
+        print("warning: leftover branch %s remains (%s)" % (branch, branch_error), file=sys.stderr)
         return REFUSED
     print("discarded worktree and branch; updated board rows that shared this worktree")
     return OK

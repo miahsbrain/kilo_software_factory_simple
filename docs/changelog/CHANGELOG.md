@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Keep board state truthful after partial discard
+**Type:** Fix
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** `worktree.py` and lifecycle regression tests.
+**Why:** Clear removed worktree entries even when branch deletion fails.
+**Impact:** Partial discards report the leftover branch while marking affected rows `Dropped`.
+
 ## [2026-11-18] Keep cleanup previews side-effect free
 **Type:** Fix
 **Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
