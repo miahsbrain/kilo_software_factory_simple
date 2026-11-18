@@ -29,7 +29,7 @@ rules with LAST MATCH WINS, exactly like Kilo's own permission evaluation.
 check-policy proves that the permission map in kilo.jsonc still matches the
 policy file. --write regenerates it; policy prints it for a human to paste.
 
-sync copies the .kilo slice, the scope rules and the permission map from the
+sync copies the supported .kilo slice and the permission map from the
 control repo into another repo named in .kilo/repos.json. It is a dry run
 unless --apply is given. check-repos proves that the map and the apps/ layout
 agree.
@@ -53,8 +53,7 @@ TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
 GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 ADD_VALUE_OPTS = {"-b", "-B", "--reason"}
 LINKED_MARKER = os.sep + ".kilo" + os.sep + "worktrees" + os.sep
-SYNC_SLICE = ["agent", "command", "skills", "policies", "scopes", "catalog"]
-DEFAULT_SCOPE = "service"
+SYNC_SLICE = ["agent", "command", "skills", "policies"]
 SCHEMA_URL = "https://app.kilo.ai/config.json"
 
 OK = 0
@@ -827,7 +826,7 @@ def load_scope_module():
 
 
 def shell_tree(ctx):
-    """The tree the shell is in: the source of the .kilo slice and the scope rules."""
+    """The tree the shell is in: the source of the supported .kilo slice."""
     if ctx:
         top = ctx.get("top")
         if top:
@@ -880,46 +879,6 @@ def is_control_repo(path):
     """True when this repository owns a harness: a repo map and a board."""
     return (os.path.exists(os.path.join(path, REPOS_REL))
             and os.path.exists(os.path.join(path, "docs", "BOARD.md")))
-
-
-def scope_files(rules_root, target, repo_id):
-    """The scope pointer this target carries.
-
-    A work surface does not hold a second copy of the project's rules. It
-    holds one generated pointer, AGENTS.md, that names the project and the
-    canonical scope rules inside it. The pointer is listed in the target's
-    local exclude file, so it is never committed.
-    """
-    scope = load_scope_module()
-    if scope is None:
-        return []
-    if repo_id == "control":
-        pairs = []
-        scopes_dir = os.path.join(rules_root, ".kilo", "scopes")
-        for name in sorted(os.listdir(scopes_dir)) if os.path.isdir(scopes_dir) else []:
-            if not name.endswith(".md"):
-                continue
-            scope_id = name[:-3]
-            if scope_id == scope.DEFAULT_SCOPE:
-                continue
-            destination_dir = os.path.join(rules_root, "apps", scope_id)
-            if not os.path.isdir(destination_dir):
-                continue
-            destination = os.path.join(destination_dir, "AGENTS.md")
-            existing = scope.read_existing(destination)
-            if existing is not None and not scope.is_generated(existing):
-                continue
-            content = scope.pointer_content(rules_root, scope_id, destination_dir,
-                                            excluded=False)
-            if content:
-                pairs.append((content, destination))
-        return pairs
-    destination = os.path.join(target, "AGENTS.md")
-    existing = scope.read_existing(destination)
-    if existing is not None and not scope.is_generated(existing):
-        return []
-    content = scope.pointer_content(rules_root, repo_id, target)
-    return [(content, destination)] if content else []
 
 
 def file_state(source, destination):
@@ -986,9 +945,7 @@ def cmd_sync(repo_id, apply, cwd, ctx):
               file=sys.stderr)
         return DENIED
     plan = []
-    # The rules live in the control repo. A work surface receives a pointer
-    # to them and nothing else; the harness itself stays in the project.
-    rules_root = control
+    # Project controls own their harness copies; apps inherit the local config.
     target_is_control = is_control_repo(target)
     if target_is_control:
         for folder in SYNC_SLICE:
@@ -1007,7 +964,6 @@ def cmd_sync(repo_id, apply, cwd, ctx):
         slice_ignore = os.path.join(source_tree, ".kilo", ".gitignore")
         if os.path.exists(slice_ignore):
             plan.append((slice_ignore, os.path.join(target, ".kilo", ".gitignore")))
-    plan.extend(scope_files(rules_root, target, repo_id))
     config_path = os.path.join(target, "kilo.jsonc")
 
     print("control repo: %s" % control)
@@ -1024,8 +980,6 @@ def cmd_sync(repo_id, apply, cwd, ctx):
         print("  %-9s %s" % (state, os.path.relpath(destination, target)))
     if target_is_control:
         print("  %-9s %s" % ("regen", os.path.relpath(config_path, target)))
-    else:
-        print("  %-9s %s" % ("pointer", "AGENTS.md"))
     if not is_repo:
         print("note: the target is not a git repository; --apply would be refused.")
 
@@ -1034,21 +988,10 @@ def cmd_sync(repo_id, apply, cwd, ctx):
         return OK
 
     for source, destination in plan:
-        if isinstance(source, str) and os.path.exists(source):
-            if os.path.realpath(source) == os.path.realpath(destination):
-                continue
-            os.makedirs(os.path.dirname(destination), exist_ok=True)
-            shutil.copyfile(source, destination)
-        else:
-            scope = load_scope_module()
-            if scope is not None and os.path.basename(destination) == scope.IGNORED_NAME:
-                state, note = scope.write_pointer(os.path.dirname(destination), source)
-                if state == "kept":
-                    print("kept: %s" % note)
-                continue
-            os.makedirs(os.path.dirname(destination), exist_ok=True)
-            with open(destination, "w", encoding="utf-8") as fh:
-                fh.write(source)
+        if os.path.realpath(source) == os.path.realpath(destination):
+            continue
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        shutil.copyfile(source, destination)
     if target_is_control:
         policy = load_policy(os.path.join(source_tree, POLICY_REL))
         written_config, message = write_permission_map(config_path, policy, create_missing=True)
@@ -1057,7 +1000,7 @@ def cmd_sync(repo_id, apply, cwd, ctx):
     scope = load_scope_module()
     if scope is not None and is_repo and not target_is_control:
         ok, note = scope.ensure_ignored(target)
-        print("generated files excluded: %s" % note)
+        print("inherited harness files excluded: %s" % note)
     return OK
 
 

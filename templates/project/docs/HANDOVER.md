@@ -1,69 +1,23 @@
-# HANDOVER — <Project name>
+# Handover
 
-> **Session Notes** (keep at the very top, updated every session)
-> - **Last session:** —
-> - **In flight:** none.
-> - **Next action:** run the discovery interview (`/decide`) and fill `DOMAIN.md`.
+## Session Notes
 
-## 1. Overview
+- Last session: not started.
+- In flight: no application implementation.
+- Next action: establish the user's task and product scope, then build the frontend flow for approval where applicable.
 
-- **What it is:** TBD
-- **Who uses it:** TBD
-- **Tech stack:** see `docs/STACK.md`.
-- **How to run it:** see `docs/STACK.md`.
+## Current Reality
 
-## 2. Directory map
+Product/users: TBD. Stack and run commands: see `STACK.md`. Application directories: none yet; update `PROJECT_STRUCTURE.md` as real repositories are added.
 
-| Path | Contents |
-|---|---|
+## Behavior And Interfaces
 
-## 3. Entry points
+Record the useful current flows, entry points, data ownership, and integration boundaries as implemented. Link relevant source when helpful; do not maintain an exhaustive per-symbol inventory.
 
-| Entry point | What it does |
-|---|---|
+## Checks And Limitations
 
-## 4. Modules, classes and functions
+Record actual checks/results, known risks, and unresolved material decisions. Do not imply untested behavior is verified.
 
-| Symbol | File | Responsibility | Pure or effectful |
-|---|---|---|---|
+## Documents
 
-## 5. Data
-
-| Model or table | Where | Fields and validation |
-|---|---|
-
-## 6. States and state transitions
-
-| State | Valid next states | Trigger | Guard |
-|---|---|---|---|
-
-## 7. Public API and interfaces
-
-| Route or event | Method | Request | Response | Auth |
-|---|---|---|---|---|
-
-## 8. Configuration and environment
-
-| Variable | Where used | Required | Default |
-|---|---|---|---|
-
-## 9. Dependencies
-
-| Dependency | Why it is used |
-|---|---|
-
-## 10. Testing
-
-- **How to run the tests:** see `docs/STACK.md`.
-- **What is covered:**
-- **What is not covered:**
-
-## 11. Known issues and risks
-
-## 12. Open questions
-
-## 13. Document map
-
-- [DOMAIN.md](../DOMAIN.md) — product scope and terminology.
-- [ROADMAP.md](../ROADMAP.md) — planned work not in progress.
-- [AGENTS.md](../AGENTS.md) — the rules.
+See `../DOMAIN.md` for scope, `../ROADMAP.md` for planned work, `DECISIONS.md` for approved choices, and `../AGENTS.md` for the working agreement. Add per-application handovers only where useful.

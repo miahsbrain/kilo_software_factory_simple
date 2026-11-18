@@ -7,7 +7,7 @@
 | [handover/](handover/) | What is the whole application? One memory map per application plus the global index. |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How is it built and why? Domain, layers, decisions, roadmap. |
 | [BUSINESS-LOGIC.md](BUSINESS-LOGIC.md) | How does it behave? Question → answer with rules and `file:line`. |
-| [UI-UX.md](UI-UX.md) | What should it look like? References, anti-slop rules, component factory gate, Playwright QA spec. |
+| [UI-UX.md](UI-UX.md) | How do frontend-flow approval, product-specific design, and focused parallel reviews work? |
 | [BOARD.md](BOARD.md) | What is in flight? One row per unit of work, with lanes and acceptance criteria. |
 | [STACK.md](STACK.md) | What stack and commands do we use? |
 | [PROJECT_STATE.md](PROJECT_STATE.md) | Where does the work stand? Phase, progress, active task, next step. |

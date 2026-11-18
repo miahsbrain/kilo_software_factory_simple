@@ -865,21 +865,6 @@ def cmd_create(args, cwd):
             return REFUSED
     scope = load_scope_module(script_root())
     if scope is not None:
-        content = scope.pointer_content(root, repo_id, path)
-        if content:
-            state, note = scope.write_pointer(path, content)
-            if state == "kept":
-                print("warning: %s has a hand-written AGENTS.md; left alone" % path,
-                      file=sys.stderr)
-            else:
-                print("scope pointer: %s" % note)
-        # The repository itself carries the pointer too, so a shell that sits in
-        # the repository rather than in a worktree still finds the project.
-        repo_content = scope.pointer_content(root, repo_id, target)
-        if repo_content:
-            repo_state, _ = scope.write_pointer(target, repo_content)
-            if repo_state != "kept":
-                print("scope pointer at the repository root: %s" % repo_state)
         scope.ensure_ignored(target)
     if not shared:
         try:

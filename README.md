@@ -1,222 +1,53 @@
 # Kilo Software Factory
 
-An agentic delivery harness for [Kilo Code](https://kilo.ai). It gives an AI team the parts a
-small product team needs: a written rule set, a live work board, specialised builder and reviewer
-agents, and a loop that carries every task from decision to merged branch.
+A small delivery harness for [Kilo Code](https://kilo.ai): a working agreement, specialist agents, a live board, and scripts for workspaces and review evidence. This repository maintains the harness, not a product. The existing `project/` is an independent ignored repository and is not migrated by factory changes.
 
-There is no application runtime here. The factory is rules, agents, commands, and scripts. Point
-it at a project and it builds that project.
+## Contents
 
-**The factory is not the project.** This repository holds the harness and nothing else. Every
-project lives in its own git repository, copies the harness in, and is never tracked here
-(ADR-053). Product documentation — the board, the domain rules, the handover, the changelog —
-belongs to the project, not to the factory.
-
-## What is in the box
-
-| Path | What it holds |
+| Path | Purpose |
 |---|---|
-| `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
-| `.kilo/agent/` | Agent definitions for builders, reviewers, documentation, and conflict resolution. |
-| `.kilo/command/` | Slash commands that package the workflow. |
-| `.kilo/skills/` | Skills and their scripts that enforce the workflow. |
-| `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
-| `.kilo/repos.json`, `.kilo/scopes/` | The repo map and the canonical scope rules for a multi-repo setup. |
-| `docs/` | The factory's own documentation set: board, handover, structure, decisions, changelog. |
-| `templates/project/` | The blank project skeleton a new project starts from. |
-| `kilo.jsonc` | Kilo settings, including the Playwright MCP server and the generated permission map. |
-| `.devcontainer/` | The container this was built in: Node, Python, Rust, chromium, Kilo Code. |
-| `project/` | A project repository in this workspace. Its own git repository. Never tracked here. |
+| `AGENTS.md` | Compact working agreement |
+| `.kilo/agent/`, `.kilo/command/` | Seven specialist roles and short workflow shortcuts |
+| `.kilo/skills/` | Focused procedures and existing lifecycle/capture scripts |
+| `.kilo/policies/`, `kilo.jsonc` | Canonical guard policy and generated permissions/configuration |
+| `.kilo/repos.json` | Actual repository IDs and paths |
+| `docs/` | Factory documentation; local live board and engineering history |
+| `templates/project/` | Blank product documents and control-only repo map; no placeholder apps |
+| `.devcontainer/` | Development environment |
 
-## The loop
+## Start A New Project
 
-Every unit of work is a row on the board, and every row moves through the same lanes:
-
-```
-decision sheet  ->  build  ->  QA  ->  critique  ->  review  ->  merge
-(user approves)   (worktree)  (evidence)  (UI/UX)   (diff)   (you do it)
-```
-
-A row is not finished when the builder is finished. It is finished when its acceptance criteria
-pass with recorded proof. The QA↔fix loop runs at most three rounds; a finding that repeats
-blocks the row instead of opening another one.
-
-## Plug it into a project
-
-A project is its own git repository. It copies the harness in and owns the copy from then on
-(ADR-054).
-
-**New project** — from the factory root, copy the skeleton and complete harness before the
-first commit, then start the discovery interview. Use a new, empty project directory:
+Choose a new empty destination and copy the skeleton plus the full supported harness before initializing Git. From the factory root:
 
 ```bash
 cp -r templates/project/. /path/to/project/
-cp -r .kilo/{agent,command,skills,policies,scopes,catalog} /path/to/project/.kilo/
+cp -r .kilo/{agent,command,skills,policies} /path/to/project/.kilo/
 cp .kilo/.gitignore /path/to/project/.kilo/.gitignore
 cp kilo.jsonc /path/to/project/kilo.jsonc
 printf '\n/docs/BOARD.md\n' >> /path/to/project/.gitignore
-cd /path/to/project
-git init
-git add .
-git commit -m "chore: start the project"
+git -C /path/to/project init
 ```
 
-The explicit slice matches `guard.py`'s `SYNC_SLICE`; do not copy the whole factory `.kilo/`
-over the skeleton. Keep the template's project `AGENTS.md` and `.kilo/repos.json`. `kilo.jsonc`
-is the factory's generated configuration. The live `docs/BOARD.md`, all `artifacts/`, local QA
-navigation and scratch files stay ignored; the blank template board remains tracked here.
+Keep the template's `AGENTS.md` and `.kilo/repos.json`; do not overwrite them with the factory map. The template skeleton alone is not the complete harness. The copied project owns its harness independently. Git initialization follows the full copy immediately; staging and the initial commit require explicit user authorization. Worktree creation needs an existing commit, so request that authorization when needed rather than creating one silently.
 
-Then open it in Kilo Code and run `/decide` to fill `DOMAIN.md`, `/board` to open the first row.
+`apps/` starts empty with no fixed API/web/mobile slots and may not exist in a fresh Git checkout, since Git does not store empty directories. Create an app directory only when the approved project needs it. When creating a genuinely new app directory, initialize its repository immediately with `git -C /path/to/project/apps/<name> init`, then register its real ID/path in the project's `.kilo/repos.json` before work. Initial commits still require explicit authorization. Do not reinitialize an existing app repository. The template ignores `apps/*/` so nested repositories are not tracked by the control repo. No app-level `AGENTS.md` or duplicate harness is required.
 
-**Existing project** — copy `AGENTS.md` and `.kilo/` into the project root, then add the
-documentation set the project needs (`DOMAIN.md`, `docs/BOARD.md`, `docs/STACK.md`) and run
-`guard.py sync` for each app repository. Drop the parts that do not apply.
+For an existing project, agree on the migration scope first and preserve its actual layout and repo map. This change does not migrate the existing `project/`. There is no new provisioning CLI.
 
-**In this workspace** — `project/` is a project repository that already exists. The factory
-never tracks it: it is listed in `.gitignore`, and it is a separate git repository with its own
-board and its own documentation.
+## Work
 
-## Multi-repo
+Read the working agreement and relevant task context. Use `/plan` for substantial planning and `/decide` for material unknowns, not routine details. For an app with an existing style, ask whether to keep it or do a complete redesign unless the user already specified the direction. Build reusable components first with Tailwind CSS or a supported, stack-compatible UI library such as shadcn/ui, styled to the chosen theme; the library need not already be installed. Compose the frontend flow for user approval using clearly labeled fixtures, then implement backend/APIs and integration. Backend-only maintenance skips unrelated UI work.
 
-A project is a control repo plus one repository per application.
+The coordinator maintains the main checkout's live board through `board.py`. `/run` uses the assigned workspace and focused checks. `/ui` shares capture evidence with parallel independent UI critique and a general read-only unslop task; findings are consolidated once. `/handover` updates concise current documentation, not exhaustive inventories. A confirmed harmless development-only favicon failure is nonblocking, but raw evidence remains and auth/script/API failures are still reviewed.
 
-- **Control repo** — the project repository. It holds `AGENTS.md`, `docs/`, the board, the domain
-  rules, the API contracts and the guard-rail policy.
-- **App repos** — a git repository at `apps/<name>/`, nested inside the control repo. Each holds one
-  application and receives only an ignored generated `AGENTS.md` pointer to the canonical scope
-  rules; it does not receive a copied `.kilo/` harness slice.
+Use existing lifecycle tools in `.kilo/skills/git-worktree/SKILL.md`. Commits, destructive operations, merge, and push require applicable authorization. `worktree.py handoff --board <ID>` prints review and human lifecycle commands; it does not merge. The board viewer runs with `python3 .kilo/skills/board/scripts/board_serve.py --port 15180`.
 
-`.kilo/repos.json` maps a repo id to a path:
+## Requirements And State
 
-    { "control": ".", "api": "apps/api" }
+Existing tools use Git 2.30+, Python 3.9+, and Node.js 18+ with available Playwright/Chromium for UI capture. The board's existing stylesheet authoring requires Node 22; serving it is Python-only and offline. Do not install missing dependencies without authorization.
 
-To turn an application into its own repository:
-
-    cd apps/api
-    git init
-    git commit --allow-empty -m "chore: start the api repository"
-    cd ../..
-    # the control repo must not track the nested repository
-    printf 'apps/api/\n' >> .gitignore
-    python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
-
-After that, `worktree.py create --board BOARD-00X --repo api` puts the worktree in that
-repository, and the board still lives in the control repo. A row names the repos it touches in its
-`Repos` cell.
-
-### Where the work happens
-
-Every change lands in a worktree **inside the repository it touches**, and the row that tracks it
-lives on the control repo's board:
-
-    board row  →  docs/BOARD.md of the control repo          (one writer: the orchestrator)
-    worktree   →  apps/<name>/.kilo/worktrees/<slug>/         (one per row, per repository)
-
-The base branch is the target repository's own: `main` when it exists, otherwise the branch it
-names as `origin/HEAD`. Name one with `--base` to override. A row's `Repos` cell lists every
-repository it touches, and its `Branch/Worktree` cell records the exact path and branch.
-
-### Carrying the harness across
-
-The harness reaches a repository by copy, and the copy is a command:
-
-    # one repository
-    python3 .kilo/skills/git-worktree/scripts/guard.py sync --repo api --apply
-
-    # every repository in the map, except the control repo
-    python3 .kilo/skills/git-worktree/scripts/guard.py sync --all --apply
-
-A **control repo** — one that holds a repo map and a board — receives the `.kilo/` slice and a
-generated permission map. A **work surface** receives one generated file: `AGENTS.md`, a pointer
-that names the project, the canonical scope rules and the unit's documentation. The pointer is
-never committed: it is listed in the repository's `.git/info/exclude`, which belongs to the clone,
-is shared by every worktree of that repository, and never enters a commit. A work surface's
-committed content is its application code alone.
-
-The factory and the project are two repositories, so a change in the factory's `.kilo/` reaches
-the project the same way — sync it into the project, then sync from the project into the work
-surfaces. The project is registered in the factory's `.kilo/repos.json` for exactly that.
-
-The harness finds the control repo by walking up, so the board, the repo map and the guard rails
-work from inside a work surface as well as from the control repo.
-
-## Quick start
-
-1. Open the repo in Kilo Code, or open the devcontainer: `code .`
-2. `/board` — read the live board. A fresh clone has an empty board, so add the first row:
-   ```bash
-   python3 .kilo/skills/board/scripts/board.py add --id BOARD-001 --task "What to build" \
-     --type Feature --status Ready --priority P1 --risk "🟡 medium — why" --blocked-by "None." \
-     --note "- [ ] the criterion someone can check"
-   ```
-3. `/handover` — read the whole codebase and write the application memory map: one handover per
-   application plus the global index in `docs/handover/`.
-4. `/decide` — the discovery interview. It fills `DOMAIN.md` and produces the first decisions.
-5. `/run BOARD-001` — build the row in a worktree.
-6. `/ui` — the QA and UI/UX lane, with Playwright evidence.
-7. Inspect the branch and merge it yourself. The agent never merges, never pushes, and never
-   opens a pull request.
-
-## Requirements
-
-| Tool | Version | Needed for |
-|---|---|---|
-| Kilo Code CLI | current | the agents and commands |
-| git | 2.30+ | worktrees, branches, commits |
-| Node.js | 18+ | the Playwright capture script |
-| Python | 3.9+ | the board, worktree, and finding scripts |
-| chromium | any | the QA capture lane only |
-
-The devcontainer image carries all of them, including chromium at `/usr/bin/chromium`.
-
-## The board
-
-`docs/BOARD.md` is the only state of the factory itself. A project has its own board, in its own
-repository, and the orchestrator of that project is the only writer of it. One row per unit of work, and a row needs acceptance
-criteria, a risk line, and a `Blocked by` before it leaves `Backlog`. It is edited by `board.py`
-in the main checkout — never by hand, and never from a worktree.
-
-The read-only dashboard shows the lanes, the cards, and the running worktrees:
-
-```bash
-python3 .kilo/skills/board/scripts/board_serve.py --port 15180
-```
-
-## Rules that are enforced, not only written
-
-| Rule | Enforced by |
-|---|---|
-| Every change happens in a worktree named after the board row | `.kilo/skills/git-worktree/scripts/worktree.py` |
-| Deletes stay inside the worktree | `.kilo/skills/git-worktree/scripts/guard.py` |
-| Every board row is edited through the script | `.kilo/skills/board/scripts/board.py` |
-| UI evidence comes from one capture script | `.kilo/skills/qa-review/scripts/browser-review.mjs` |
-| A finding becomes a row only if it names expected, actual, and evidence | `.kilo/skills/qa-review/scripts/check-finding.py` |
-| The QA↔fix loop stops after three rounds | `.kilo/skills/qa-review/scripts/ledger.py` |
-| Git commands that change history or the remote are classified before they run | `.kilo/skills/git-worktree/scripts/guard.py check-git` |
-| The permission map and the policy file cannot drift apart | `.kilo/skills/git-worktree/scripts/guard.py check-policy` |
-
-The permission map in `kilo.jsonc` is the coarse net: it denies the irreversible git commands and
-asks before the rest. `guard.py check-git` is the precise layer — it knows the current branch and
-whether the shell sits in a worktree, so it refuses a commit on `main` and a branch switch inside a
-worktree.
-
-Two rules have no script behind them, so they need your attention: no screen is built before the
-component gallery is approved, and a failed command is reported to you instead of being routed
-around with a new tool.
-
-## Conventions
-
-- **Commits** — `<emoji> [<type>] <scope>: <subject>`, with one bullet on what changed and why.
-- **Branches** — `feat|fix|chore|docs/<slug>`, derived from the board row's type and title.
-- **Artifacts** — `artifacts/<scope>/qa/<date>/<task-id>/`; the capture script computes the path.
-- **Review reports and ledgers** are ignored review artifacts: `artifacts/reviews/<task-id>-{qa,ui,ledger}.md`.
-
-## Status
-
-The factory board is empty and the harness is complete. `docs/changelog/CHANGELOG.md` is the
-engineering log of the factory itself. The Inhouz Cloud AI platform is the project in `project/`,
-with each application repository kept separately.
+Harness sync copies only `agent`, `command`, `skills`, and `policies`, plus the harness ignore file and generated permissions, into mapped project control repositories. App sync and worktree creation do not generate instruction files or copy scope/catalog layers; existing handwritten app instructions are left alone. Apps inherit the project's local configuration. See `docs/PROJECT_STATE.md`, `docs/DECISIONS.md`, and `docs/changelog/CHANGELOG.md` for verification and current status. Review artifacts remain ignored under `artifacts/`; the live board is ignored, while the blank template board stays tracked.
 
 ## Licence
 
-Not licensed yet. Add the licence you want before you share this repo.
+No repository-wide licence is selected. Retained third-party skills keep their own attribution and licences.

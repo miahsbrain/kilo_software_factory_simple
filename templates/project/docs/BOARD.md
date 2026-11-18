@@ -39,9 +39,9 @@ Lanes: `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merg
   The human previews `worktree.py merge --board <ID>` and explicitly applies it with `--apply`.
   The CLI preflights clean workspaces, updates the board and removes merged source worktrees.
   Multi-repository merges are not atomic: stop on conflict and preserve partial outcomes.
-- **Frontend rows** must clear the UI gate first (component factory + user-approved gallery) and
-  the QA + UI/UX critique lane (`/ui`, Playwright evidence) before they can reach
-  `Pending Merge`.
+- **Frontend rows:** approve the actual frontend flow before backend/API implementation;
+  galleries are optional. Run focused QA plus independent UI critique and read-only unslop
+  in parallel against shared evidence.
 - `Merged` means the human lifecycle command completed all required repositories. Partial
   outcomes stay recorded; never mark the parent merged while a required surface is unfinished.
 - Destructive abandonment is human-only: preview `worktree.py discard --board <ID> --repo <ID>`,

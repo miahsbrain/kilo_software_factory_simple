@@ -296,7 +296,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual((self.root / "kilo.jsonc").read_bytes(), main_config)
         self.assertEqual(self.git(self.root, "show", "main:kilo.jsonc").stdout, base)
 
-    def test_create_app_preserves_inheritance_and_scope_pointer_without_harness_copy(self):
+    def test_create_app_preserves_inheritance_without_app_instructions_or_harness_copy(self):
         api = self.add_repo("api")
         (api / ".kilo/local").mkdir(parents=True)
         navigation = api / ".kilo/local/qa-navigation.json"
@@ -304,6 +304,8 @@ class LifecycleTests(unittest.TestCase):
         scopes = self.root / ".kilo/scopes"
         scopes.mkdir()
         (scopes / "api.md").write_text("# Fixture scope\n")
+        self.cli("sync", "--repo", "api", "--apply", guard=True)
+        self.assertFalse((api / "AGENTS.md").exists())
         self.cli("mode", "optional")
         main_config = (self.root / "kilo.jsonc").read_bytes()
         base = self.git(api, "rev-parse", "HEAD").stdout
@@ -312,10 +314,91 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse((api / "kilo.jsonc").exists())
         self.assertEqual((path / ".kilo/local/qa-navigation.json").read_bytes(), navigation.read_bytes())
         self.assertEqual({entry.name for entry in (path / ".kilo").iterdir()}, {"local"})
-        self.assertIn(".kilo/scopes/api.md", (path / "AGENTS.md").read_text())
-        self.git(path, "check-ignore", "AGENTS.md")
+        self.assertFalse((path / "AGENTS.md").exists())
+        self.assertFalse((api / "AGENTS.md").exists())
+        self.assertNotEqual(self.git(api, "check-ignore", "AGENTS.md", check=False).returncode, 0)
+        for name in (".kilo/local/qa-navigation.json", "kilo.jsonc"):
+            self.git(path, "check-ignore", name)
         self.assertEqual((self.root / "kilo.jsonc").read_bytes(), main_config)
         self.assertEqual(self.git(api, "rev-parse", "HEAD").stdout, base)
+
+    def test_sync_and_create_preserve_handwritten_app_instructions(self):
+        app = self.add_repo("inventory")
+        instructions = app / "AGENTS.md"
+        instructions.write_text("# Existing application instructions\n")
+        self.commit(app)
+        inherited = (self.root / "kilo.jsonc").read_bytes()
+        preview = self.cli("sync", "--repo", "inventory", guard=True)
+        self.assertNotIn("AGENTS.md", preview.stdout)
+        self.cli("sync", "--repo", "inventory", "--apply", guard=True)
+        path = self.create(repo="inventory", change=False)
+        for checkout in (app, path):
+            self.assertEqual((checkout / "AGENTS.md").read_text(),
+                             "# Existing application instructions\n")
+            self.assertFalse((checkout / "kilo.jsonc").exists())
+        self.assertEqual((self.root / "kilo.jsonc").read_bytes(), inherited)
+
+    def test_control_only_template_map_and_empty_apps_validate_without_scopes(self):
+        shutil.copyfile(SOURCE / "templates/project/.kilo/repos.json",
+                        self.root / ".kilo/repos.json")
+        self.assertEqual(WORKTREE.load_repos(str(self.root)), ({"control": "."}, None))
+        self.assertFalse((self.root / "apps").exists())
+        self.cli("check-repos", guard=True)
+        (self.root / "apps").mkdir()
+        self.cli("check-repos", guard=True)
+        self.cli("sync", "--repo", "control", "--apply", guard=True)
+        self.assertEqual(list((self.root / "apps").iterdir()), [])
+        self.assertFalse((self.root / ".kilo/scopes").exists())
+        self.assertFalse((self.root / ".kilo/catalog").exists())
+        self.assertEqual(json.loads((self.root / ".kilo/repos.json").read_text()), {"control": "."})
+        self.cli("check-policy", guard=True)
+        self.add_repo("inventory")
+        self.cli("check-repos", guard=True)
+        unregistered = self.root / "apps/unregistered"
+        unregistered.mkdir()
+        self.git(unregistered, "init")
+        result = self.cli("check-repos", guard=True, success=False)
+        self.assertIn("apps/unregistered is a git repository but is not registered", result.stderr)
+
+    def test_sync_bootstraps_project_harness_without_scope_or_catalog_propagation(self):
+        self.assertEqual(GUARD.SYNC_SLICE, ["agent", "command", "skills", "policies"])
+        for folder in ("agent", "command", "scopes", "catalog"):
+            source = self.root / ".kilo" / folder
+            source.mkdir(exist_ok=True)
+            (source / "fixture.md").write_text(folder + " fixture\n")
+        shutil.copyfile(SOURCE / ".kilo/.gitignore", self.root / ".kilo/.gitignore")
+        project = self.root / "new-project"
+        (project / ".kilo").mkdir(parents=True)
+        (project / "docs").mkdir()
+        for relative in (".kilo/repos.json", ".gitignore", "AGENTS.md"):
+            shutil.copyfile(SOURCE / "templates/project" / relative, project / relative)
+        (project / "docs/BOARD.md").write_bytes((self.root / "docs/BOARD.md").read_bytes())
+        (project / "apps").mkdir()
+        self.git(project, "init")
+        (self.root / ".kilo/repos.json").write_text('{"control":".","new-project":"new-project"}')
+        instructions = (project / "AGENTS.md").read_bytes()
+        before = {path.relative_to(project): path.read_bytes()
+                  for path in project.rglob("*") if path.is_file()}
+        preview = self.cli("sync", "--repo", "new-project", guard=True)
+        self.assertNotIn("AGENTS.md", preview.stdout)
+        self.assertEqual(before, {path.relative_to(project): path.read_bytes()
+                                  for path in project.rglob("*") if path.is_file()})
+        self.cli("sync", "--repo", "new-project", "--apply", guard=True)
+        for folder in GUARD.SYNC_SLICE:
+            for source in (self.root / ".kilo" / folder).rglob("*"):
+                if source.is_file():
+                    destination = project / source.relative_to(self.root)
+                    self.assertEqual(source.read_bytes(), destination.read_bytes())
+        self.assertEqual((project / ".kilo/.gitignore").read_bytes(),
+                         (self.root / ".kilo/.gitignore").read_bytes())
+        self.assertEqual((project / "AGENTS.md").read_bytes(), instructions)
+        self.assertEqual(json.loads((project / ".kilo/repos.json").read_text()), {"control": "."})
+        self.assertFalse((project / ".kilo/scopes").exists())
+        self.assertFalse((project / ".kilo/catalog").exists())
+        self.assertEqual(list((project / "apps").iterdir()), [])
+        self.assertEqual(self.git(project, "rev-list", "--all").stdout, "")
+        self.cli("check-policy", cwd=project, guard=True)
+        self.cli("check-repos", cwd=project, guard=True)
 
     def test_create_app_rejects_reordered_inherited_rules_and_preserves_partial_state(self):
         config_path = self.root / "kilo.jsonc"
