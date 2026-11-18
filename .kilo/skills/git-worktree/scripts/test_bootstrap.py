@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import bootstrap
 
@@ -92,6 +93,73 @@ class BootstrapTests(unittest.TestCase):
         self.assertNotIn("safe.directory", config["postCreateCommand"])
         self.assertTrue((root / ".devcontainer/Dockerfile").is_file())
         self.assertEqual(json.loads((root / "services.json").read_text()), {"services": []})
+
+    def test_outside_destinations_refused_before_any_mutation(self):
+        before = {p: p.read_bytes() for p in self.factory.rglob("*") if p.is_file()}
+        parent_entries = set(self.base.iterdir())
+        for destination in ("../sibling", str(self.base / "absolute"),
+                            str(self.base / "missing-parent/project")):
+            with self.subTest(destination=destination):
+                result = self.cli(self.factory, "project", "--destination", destination, ok=False)
+                self.assertIn("outside destination:", result.stderr)
+                self.assertIn("explicit user approval", result.stderr)
+                self.assertIn("--allow-outside", result.stderr)
+                self.assertIn("Current working directory: " + str(self.factory), result.stderr)
+                self.assertIn("Factory source: " + str(self.factory), result.stderr)
+                self.assertIn("Resolved destination:", result.stderr)
+                self.assertEqual(set(self.base.iterdir()), parent_entries)
+                self.assertEqual({p: p.read_bytes() for p in self.factory.rglob("*") if p.is_file()}, before)
+
+    def test_direct_project_helper_enforces_boundary_and_source_cwd(self):
+        with patch.object(Path, "cwd", return_value=self.factory):
+            with self.assertRaisesRegex(ValueError, "outside destination:"):
+                bootstrap.project(self.factory, self.base / "direct")
+        with patch.object(Path, "cwd", return_value=self.base):
+            with self.assertRaisesRegex(ValueError, "factory checkout root"):
+                bootstrap.project(self.factory, self.base / "direct", allow_outside=True)
+        self.assertFalse((self.base / "direct").exists())
+
+    def test_custom_internal_destination_and_explicit_external_destination(self):
+        (self.factory / "products").mkdir()
+        internal = self.cli(self.factory, "project", "--destination", "products/custom")
+        root = self.factory / "products/custom"
+        self.assertTrue(internal.stdout.rstrip().endswith("at " + str(root)))
+        self.assertEqual(self.git(root, "rev-list", "--count", "HEAD").stdout.strip(), "1")
+        external = self.base / "approved-project"
+        self.cli(self.factory, "project", "--destination", str(external), "--allow-outside")
+        self.assertEqual(self.git(external, "rev-list", "--count", "HEAD").stdout.strip(), "1")
+
+    def test_allow_outside_is_project_only(self):
+        root = self.create()
+        clone = self.clone(root)
+        for cwd, args in ((root, ["app", "billing-worker", "--git", "project"]),
+                          (self.factory, ["restore", "--destination", str(clone)])):
+            before = self.state(cwd) if cwd == root else self.state(clone)
+            result = subprocess.run([sys.executable,
+                str(self.factory / ".kilo/skills/git-worktree/scripts/bootstrap.py"),
+                *args, "--allow-outside"], cwd=cwd, env=self.env, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("unrecognized arguments: --allow-outside", result.stderr)
+            self.assertEqual(self.state(root if cwd == root else clone), before)
+        self.assertFalse((root / "apps/billing-worker").exists())
+        self.assertFalse((clone / ".kilo").exists())
+        self.cli(self.factory, "restore", "--destination", str(clone))
+
+    def test_project_cwd_and_path_preflights_with_override(self):
+        self.cli(self.base, "project", "--destination", str(self.base / "wrong-cwd"),
+                 "--allow-outside", ok=False)
+        alias = self.factory / "alias"
+        alias.symlink_to(self.base, target_is_directory=True)
+        for destination, diagnostic in ((alias / "escaped", "symlinks are not supported"),
+                (self.factory / "child/../escaped", "traversal is not supported"),
+                (self.base / "missing-parent/project", "destination parent must"),
+                (self.factory, "destination already exists")):
+            result = self.cli(self.factory, "project", "--destination", str(destination),
+                              "--allow-outside", ok=False)
+            self.assertIn(diagnostic, result.stderr)
+        self.assertFalse((self.base / "escaped").exists())
+        self.assertFalse((self.factory / "escaped").exists())
+        self.assertFalse((self.base / "wrong-cwd").exists())
 
     def test_ignored_local_files_and_trackable_product_files(self):
         root = self.create()
@@ -280,12 +348,12 @@ class BootstrapTests(unittest.TestCase):
         self.git(self.factory, "config", "--global", "user.email", "fixture@example.invalid")
         self.git(self.factory, "config", "--global", "core.hooksPath", str(hooks))
         root = self.base / "hook-rejected"
-        result = self.cli(self.factory, "project", "--destination", str(root), ok=False)
+        result = self.cli(self.factory, "project", "--destination", str(root), "--allow-outside", ok=False)
         self.assertIn("partial state retained", result.stderr)
         self.assertTrue((root / ".git").is_dir())
         self.assertNotEqual(self.git(root, "rev-parse", "--verify", "HEAD", ok=False).returncode, 0)
         self.assertIn("services.json", self.git(root, "ls-files").stdout)
-        self.cli(self.factory, "project", "--destination", str(root), ok=False)
+        self.cli(self.factory, "project", "--destination", str(root), "--allow-outside", ok=False)
 
     def test_all_initial_policy_commands_and_unknown_context_denials(self):
         path = self.factory / ".kilo/policies/git-policy.json"
@@ -295,12 +363,14 @@ class BootstrapTests(unittest.TestCase):
             policy["bash"].append({"pattern": command, "action": "deny"})
             path.write_text(json.dumps(policy))
             destination = self.base / ("denied-" + str(index))
-            self.cli(self.factory, "project", "--destination", str(destination), ok=False)
+            result = self.cli(self.factory, "project", "--destination", str(destination), "--allow-outside", ok=False)
+            self.assertIn("guard refused", result.stderr)
             self.assertFalse(destination.exists())
         original["context"].append({"applies_to": ["git commit*"], "check": "always", "action": "deny"})
         path.write_text(json.dumps(original))
         destination = self.base / "denied-context"
-        self.cli(self.factory, "project", "--destination", str(destination), ok=False)
+        result = self.cli(self.factory, "project", "--destination", str(destination), "--allow-outside", ok=False)
+        self.assertIn("guard refused", result.stderr)
         self.assertFalse(destination.exists())
 
     def test_restore_nonregular_exclude_refuses_before_local_writes(self):
@@ -402,7 +472,7 @@ class BootstrapTests(unittest.TestCase):
 
     def test_project_prerequisites_existing_parent_and_traversal(self):
         for destination in (self.base / "missing-parent/project", self.base / "child/../escape"):
-            self.cli(self.factory, "project", "--destination", str(destination), ok=False)
+            self.cli(self.factory, "project", "--destination", str(destination), "--allow-outside", ok=False)
         self.assertFalse((self.base / "escape").exists())
         (self.factory / "kilo.jsonc").unlink()
         self.cli(self.factory, "project", ok=False)
@@ -420,7 +490,8 @@ class BootstrapTests(unittest.TestCase):
         self.cli(root, "app", "billing-worker", "--git", "project")
         self.assertEqual(self.state(root)[:2], before)
         destination = self.base / "denied"
-        self.cli(self.factory, "project", "--destination", str(destination), ok=False)
+        result = self.cli(self.factory, "project", "--destination", str(destination), "--allow-outside", ok=False)
+        self.assertIn("guard refused", result.stderr)
         self.assertFalse(destination.exists())
 
     def test_invalid_names_collisions_existing_paths_and_required_git_choice(self):

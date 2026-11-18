@@ -210,14 +210,23 @@ def initial_commit(destination, files):
         raise ValueError("unexpected initial history; inspect retained state")
 
 
-def project(source, destination):
+def project(source, destination, allow_outside=False):
+    root = real_path(Path.cwd())
+    source = real_path(source)
+    if root != source:
+        raise ValueError("run project mode from the factory checkout root")
+    resolved = destination.resolve()
+    print("Current working directory: {}\nFactory source: {}\nResolved destination: {}".format(
+        root, source, resolved), file=sys.stderr)
+    if root not in resolved.parents and resolved != root and not allow_outside:
+        raise ValueError("outside destination: {}; ASK for explicit user approval first, then use "
+                         "--allow-outside; never infer a path from a product or service name; "
+                         "nothing created".format(resolved))
     destination = real_path(destination)
     if os.path.lexists(destination):
         raise ValueError("destination already exists; never overwrite or reinitialize")
     if not destination.parent.is_dir():
         raise ValueError("destination parent must be an existing real directory")
-    if destination == source or source in destination.parents and destination != source / "project":
-        raise ValueError("inside the factory only its project/ destination is allowed")
     template = factory_template(source)
     plan = {}
     collect(template, Path("."), plan)
@@ -367,6 +376,8 @@ def main(argv=None):
     modes = parser.add_subparsers(dest="mode", required=True)
     project_parser = modes.add_parser("project", help="create a new project and one initial source commit")
     project_parser.add_argument("--destination", type=Path)
+    project_parser.add_argument("--allow-outside", action="store_true",
+                                help="permit an external destination only after explicit user approval")
     application = modes.add_parser("app", help="create apps/<meaningful-service-name>")
     application.add_argument("name")
     application.add_argument("--git", choices=("separate", "project"), required=True)
@@ -384,7 +395,7 @@ def main(argv=None):
         if args.mode == "project":
             if root != source:
                 raise ValueError("run project mode from the factory checkout root")
-            result = project(source, args.destination or root / "project")
+            result = project(source, args.destination or root / "project", args.allow_outside)
         elif args.mode == "app":
             result = app(source, root, args.name, args.git)
         else:

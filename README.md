@@ -21,11 +21,15 @@ Use `/bootstrap` or the deterministic CLI from the factory checkout root. Never 
 
 ```bash
 python3 .kilo/skills/git-worktree/scripts/bootstrap.py project
-# Optional isolated destination; its parent must already exist:
-python3 .kilo/skills/git-worktree/scripts/bootstrap.py project --destination /path/to/new-project
+# Optional factory-local destination; its parent must already exist:
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py project --destination custom-project
+# ONLY after the user explicitly approves this external destination:
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py project --destination /path/to/approved-project --allow-outside
 ```
 
 The default destination is the caller factory root's `project/`. Existing paths, even empty directories or dangling symlinks, are refused. Source is the executing checkout, including assigned worktrees. It copies blank product documents, the four-directory `.kilo` harness, config, generated root agreement, blank local board and complete supported devcontainer, creates empty `apps/`, then initializes Git and creates exactly one initial source commit. Source, product docs, `.gitignore` and the small `services.json` manifest are tracked. `.kilo/`, `.devcontainer/`, `kilo.jsonc`, generated root `AGENTS.md`, live board, secrets and outputs are ignored; the factory itself continues tracking its harness and blank template board. Local runtime inputs and factory live state are not copied.
+
+The invoking CWD must equal the source factory root; there is no silent script-root fallback. Relative destinations use CWD. Project creation prints CWD, factory source and resolved destination to stderr before creation, preserving the final success line on stdout. Canonically external destinations are refused before writes/init/staging/commits unless project-only `--allow-outside` is explicitly supplied; ASK for actual user approval first, since the flag is capability, not consent. Custom internal subdirectories are supported with existing real parents; traversal and symlinks remain refused even with the flag. Never derive a destination from a product display/service name. Keep the user-chosen workspace as the boundary, verify resolved control/target roots before app/worktree writes, and stop on mismatch rather than entering siblings or reusing unrelated boards/worktrees. This is not a blanket CWD rule for lifecycle helpers. Restore intentionally supports explicit external clones without this project flag; app/restore reject the flag.
 
 From the initialized **project control root**, create any number of services when needed, not fixed frontend/backend slots:
 
