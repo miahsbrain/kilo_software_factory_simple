@@ -273,7 +273,8 @@ class LifecycleTests(unittest.TestCase):
         source = self.root / ".env.local"
         source.write_text("source")
         target = Path(self.temporary.name) / "copy"
-        target.mkdir()
+        self.git(self.root, "worktree", "add", str(target), "-b", "feat/copy", "main")
+        (target / ".env.tracked").unlink()
         (target / ".env.local").write_text("keep")
         (self.root / ".env.link").symlink_to(source)
         WORKTREE.provision_local_files(self.root, target)
@@ -339,8 +340,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual((self.root / "kilo.jsonc").read_bytes(), inherited)
 
     def test_control_only_template_map_and_empty_apps_validate_without_scopes(self):
-        shutil.copyfile(SOURCE / "templates/project/.kilo/repos.json",
-                        self.root / ".kilo/repos.json")
+        (self.root / ".kilo/repos.json").write_text('{"control": "."}\n')
         self.assertEqual(WORKTREE.load_repos(str(self.root)), ({"control": "."}, None))
         self.assertFalse((self.root / "apps").exists())
         self.cli("check-repos", guard=True)
@@ -370,7 +370,8 @@ class LifecycleTests(unittest.TestCase):
         project = self.root / "new-project"
         (project / ".kilo").mkdir(parents=True)
         (project / "docs").mkdir()
-        for relative in (".kilo/repos.json", ".gitignore", "AGENTS.md"):
+        (project / ".kilo/repos.json").write_text('{"control": "."}\n')
+        for relative in (".gitignore", "AGENTS.md"):
             shutil.copyfile(SOURCE / "templates/project" / relative, project / relative)
         (project / "docs/BOARD.md").write_bytes((self.root / "docs/BOARD.md").read_bytes())
         (project / "apps").mkdir()
@@ -386,7 +387,7 @@ class LifecycleTests(unittest.TestCase):
         self.cli("sync", "--repo", "new-project", "--apply", guard=True)
         for folder in GUARD.SYNC_SLICE:
             for source in (self.root / ".kilo" / folder).rglob("*"):
-                if source.is_file():
+                if source.is_file() and "__pycache__" not in source.parts:
                     destination = project / source.relative_to(self.root)
                     self.assertEqual(source.read_bytes(), destination.read_bytes())
         self.assertEqual((project / ".kilo/.gitignore").read_bytes(),
@@ -632,7 +633,7 @@ class LifecycleTests(unittest.TestCase):
                 self.assertEqual(WORKTREE.local_state(str(self.root))["mode"], mode)
                 for checkout in (self.root, control_tree, api, app_tree):
                     permissions = json.loads((checkout / "kilo.jsonc").read_text())["permission"]["edit"]
-                    self.assertEqual(permissions["*"], "allow" if mode == "optional" else "deny")
+                    self.assertEqual(permissions["*"], "allow" if mode == "optional" else "ask")
                     self.assertEqual(permissions[".env"], "deny")
                     self.assertEqual(permissions["AGENTS.md"], "ask")
                 self.cli("check-policy", cwd=control_tree, guard=True)
@@ -647,8 +648,9 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual((path / "kilo.jsonc").read_text(), "{malformed")
         self.assertEqual(WORKTREE.local_state(str(self.root))["mode"], "required")
         (path / "kilo.jsonc").unlink()
+        (self.root / "kilo.jsonc").unlink()
         self.cli("mode", "optional", success=False)
-        self.assertEqual((self.root / "kilo.jsonc").read_bytes(), original)
+        self.assertFalse((self.root / "kilo.jsonc").exists())
 
     def test_mode_write_error_restores_maps_and_does_not_persist_mode(self):
         path = self.create(change=False)
@@ -710,7 +712,7 @@ class LifecycleTests(unittest.TestCase):
     def test_batch_merge_by_board_id(self):
         self.add_row("BOARD-002", "Second workspace")
         one = self.create(change=False)
-        self.cli("create", "--board", "BOARD-002")
+        self.cli("create", "--board", "BOARD-002", "--new")
         two = self.root / ".kilo/worktrees/second-workspace"
         for index, path in enumerate((one, two)):
             (path / ("file-%s.txt" % index)).write_text("feature")
@@ -907,6 +909,225 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(cells[8], "-")
         self.assertIn("leftover branch feat/shared-lifecycle remains", stderr.getvalue())
 
+    def partial(self):
+        args = WORKTREE.argparse.Namespace(board="BOARD-001", repo="control", base=None,
+                                           slug=None, reuse=None, new=False)
+        with mock.patch.object(WORKTREE, "initialize_permissions", side_effect=ValueError("injected initialization")):
+            self.assertEqual(WORKTREE.cmd_create(args, str(self.root)), WORKTREE.REFUSED)
+        return self.root / ".kilo/worktrees/shared-lifecycle"
+
+    def test_partial_resume_preserves_files_base_and_association_and_blocks_slug_retry(self):
+        path = self.partial()
+        (path / "data.txt").write_text("keep dirty source")
+        (path / ".env.local").write_text("keep ignored")
+        (self.root / ".env.local").write_text("do not replace")
+        config = path / "kilo.jsonc"
+        value = json.loads(config.read_text())
+        value["model"] = "manual-selection"
+        config.write_text(json.dumps(value))
+        manual = config.read_bytes()
+        board_before = (self.root / "docs/BOARD.md").read_bytes()
+        branches = self.git(self.root, "branch", "--list").stdout
+        for flags in (("--slug", "retry"), ("--slug", "retry", "--new")):
+            result = self.cli("create", "--board", "BOARD-001", *flags, success=False)
+            self.assertIn("resume", result.stderr)
+        self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), board_before)
+        record = WORKTREE.local_state(str(self.root))["workspaces"][str(path)].copy()
+        self.cli("resume", "--board", "BOARD-001")
+        self.cli("resume", "--board", "BOARD-001")
+        self.assertEqual(self.status(), "In Progress")
+        self.assertEqual(self.git(self.root, "branch", "--list").stdout, branches)
+        self.assertEqual((path / "data.txt").read_text(), "keep dirty source")
+        self.assertEqual((path / ".env.local").read_text(), "keep ignored")
+        self.assertEqual(config.read_bytes(), manual)
+        record.pop("error")
+        self.assertEqual(WORKTREE.local_state(str(self.root))["workspaces"][str(path)], record)
+
+    def test_recovery_provisioning_and_board_errors_remain_retryable(self):
+        path = self.partial()
+        board_before = (self.root / "docs/BOARD.md").read_bytes()
+        for stage in ("provision", "board"):
+            args = WORKTREE.argparse.Namespace(board="BOARD-001", repo="control", worktree=None)
+            if stage == "provision":
+                patcher = mock.patch.object(WORKTREE, "provision_local_files", side_effect=OSError("injected"))
+            else:
+                board = WORKTREE.load_board_module(str(self.root))
+                patcher = mock.patch.object(board, "write_atomic", side_effect=OSError("injected"))
+            with patcher, mock.patch.object(WORKTREE, "load_board_module", return_value=board if stage == "board" else self.board):
+                self.assertEqual(WORKTREE.cmd_resume(args, str(self.root)), WORKTREE.REFUSED)
+            self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), board_before)
+            self.assertIn("failed", WORKTREE.local_state(str(self.root))["workspaces"][str(path)]["error"])
+        self.cli("resume", "--board", "BOARD-001")
+        self.assertNotIn("error", WORKTREE.local_state(str(self.root))["workspaces"][str(path)])
+
+    def test_resume_repairs_exclusion_failure_after_env_copy_without_overwriting(self):
+        api = self.add_repo("api")
+        fixture = b"FIXTURE_ONLY=value\n"
+        (api / ".env.retry").write_bytes(fixture)
+        path = api / ".kilo/worktrees/shared-lifecycle"
+        exclude = Path(WORKTREE.common_dir(str(api))) / "info/exclude"
+        before = (self.root / "docs/BOARD.md").read_bytes()
+        real_open = open
+
+        def fail_exclusion(file, mode="r", *args, **kwargs):
+            if Path(file) == exclude and mode == "a":
+                raise PermissionError("injected exclusion failure after copy")
+            return real_open(file, mode, *args, **kwargs)
+
+        create = WORKTREE.argparse.Namespace(board="BOARD-001", repo="api", base=None,
+                                             slug=None, reuse=None, new=False)
+        resume = WORKTREE.argparse.Namespace(board="BOARD-001", repo="api", worktree=None)
+        with mock.patch.object(WORKTREE, "open", side_effect=fail_exclusion, create=True):
+            self.assertEqual(WORKTREE.cmd_create(create, str(self.root)), WORKTREE.REFUSED)
+            self.assertEqual((path / ".env.retry").read_bytes(), fixture)
+            self.assertNotEqual(self.git(path, "check-ignore", ".env.retry", check=False).returncode, 0)
+            self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), before)
+            self.assertIn("provisioning failed", WORKTREE.local_state(str(self.root))["workspaces"][str(path)]["error"])
+            self.assertEqual(WORKTREE.cmd_resume(resume, str(self.root)), WORKTREE.REFUSED)
+            self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), before)
+            self.assertIn("provisioning failed", WORKTREE.local_state(str(self.root))["workspaces"][str(path)]["error"])
+
+        # A retry must not read env values, even when primary and destination differ.
+        (api / ".env.retry").write_bytes(b"FIXTURE_ONLY=changed-primary\n")
+        (path / ".env.unrelated").write_bytes(b"FIXTURE_ONLY=unrelated\n")
+        real_os_open = os.open
+
+        def no_env_open(file, *args, **kwargs):
+            if Path(file).name.startswith(".env"):
+                raise AssertionError("retry opened an existing env file")
+            return real_os_open(file, *args, **kwargs)
+
+        with mock.patch.object(WORKTREE.os, "open", side_effect=no_env_open):
+            self.assertEqual(WORKTREE.cmd_resume(resume, str(self.root)), WORKTREE.OK)
+            self.assertEqual(WORKTREE.cmd_resume(resume, str(self.root)), WORKTREE.OK)
+        self.assertEqual((path / ".env.retry").read_bytes(), fixture)
+        self.git(path, "check-ignore", ".env.retry")
+        self.assertNotEqual(self.git(path, "check-ignore", ".env.unrelated", check=False).returncode, 0)
+        self.assertNotIn("error", WORKTREE.local_state(str(self.root))["workspaces"][str(path)])
+        self.assertEqual(self.status(), "In Progress")
+
+    def test_existing_env_exclusion_must_be_effective_before_resume_succeeds(self):
+        api = self.add_repo("api")
+        # Create a partial before env provisioning, then supply an existing destination.
+        create = WORKTREE.argparse.Namespace(board="BOARD-001", repo="api", base=None,
+                                             slug=None, reuse=None, new=False)
+        with mock.patch.object(WORKTREE, "initialize_permissions", side_effect=ValueError("fixture")):
+            self.assertEqual(WORKTREE.cmd_create(create, str(self.root)), WORKTREE.REFUSED)
+        path = api / ".kilo/worktrees/shared-lifecycle"
+        (api / ".env.retry").write_text("FIXTURE_ONLY=source\n")
+        (path / ".env.retry").write_text("FIXTURE_ONLY=destination\n")
+        ignore = path / ".gitignore"
+        original = ignore.read_bytes()
+        ignore.write_bytes(original + b"!.env.retry\n")
+        before = (self.root / "docs/BOARD.md").read_bytes()
+        self.cli("resume", "--board", "BOARD-001", "--repo", "api", success=False)
+        self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), before)
+        self.assertIn("provisioning failed", WORKTREE.local_state(str(self.root))["workspaces"][str(path)]["error"])
+        self.assertNotEqual(self.git(path, "check-ignore", ".env.retry", check=False).returncode, 0)
+        ignore.write_bytes(original)
+        self.cli("resume", "--board", "BOARD-001", "--repo", "api")
+        self.git(path, "check-ignore", ".env.retry")
+        self.assertEqual((path / ".env.retry").read_text(), "FIXTURE_ONLY=destination\n")
+        self.assertNotIn("error", WORKTREE.local_state(str(self.root))["workspaces"][str(path)])
+
+    def test_multiple_partials_require_selection_then_prefer_linked_assignment(self):
+        one = self.partial()
+        two = self.root / ".kilo/worktrees/older-retry"
+        self.git(self.root, "worktree", "add", str(two), "-b", "feat/older-retry", "main")
+        state = WORKTREE.local_state(str(self.root))
+        state["workspaces"][str(two)] = dict(state["workspaces"][str(one)], branch="feat/older-retry")
+        WORKTREE.local_state(str(self.root), state)
+        before = (self.root / "docs/BOARD.md").read_bytes()
+        result = self.cli("resume", "--board", "BOARD-001", success=False)
+        for path in (one, two):
+            self.assertIn("--worktree " + str(path), result.stderr)
+        self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), before)
+        self.cli("resume", "--board", "BOARD-001", "--worktree", str(one))
+        linked = (self.root / "docs/BOARD.md").read_bytes()
+        self.cli("resume", "--board", "BOARD-001")
+        self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), linked)
+        self.assertIn("error", WORKTREE.local_state(str(self.root))["workspaces"][str(two)])
+        self.cli("resume", "--board", "BOARD-001", "--worktree", str(two))
+        self.assertTrue(one.exists())
+        self.assertTrue(two.exists())
+        table, _ = self.board.read_table(self.root / "docs/BOARD.md")
+        cell = self.board.cell_texts(table["lines"], self.board.row_by_id(table, "BOARD-001"))[8]
+        self.assertNotIn("shared-lifecycle", cell)
+        self.assertIn("older-retry", cell)
+
+    def test_new_task_requires_reuse_or_explicit_new_but_never_for_same_task(self):
+        self.add_row("BOARD-002", "Other task")
+        self.add_row("BOARD-003", "Independent task")
+        path = self.create(change=False)
+        before = self.git(self.root, "worktree", "list", "--porcelain").stdout
+        self.assertIn("--reuse", self.cli("create", "--board", "BOARD-002", success=False).stderr)
+        self.assertEqual(self.git(self.root, "worktree", "list", "--porcelain").stdout, before)
+        self.cli("create", "--board", "BOARD-002", "--reuse", "BOARD-001")
+        self.cli("create", "--board", "BOARD-003", "--new")
+        self.cli("create", "--board", "BOARD-001", "--slug", "no-bypass", "--new", success=False)
+        self.assertEqual(WORKTREE.local_state(str(self.root))["workspaces"][str(path)]["boards"],
+                         ["BOARD-001", "BOARD-002"])
+
+    def test_selection_refuses_other_task_repo_outside_and_unassociated_paths(self):
+        self.add_row("BOARD-002", "Other task")
+        self.add_repo("api")
+        path = self.partial()
+        before = (self.root / "docs/BOARD.md").read_bytes()
+        state = WORKTREE.local_state(str(self.root))
+        for board_id, repo, selection in (("BOARD-002", "control", path),
+                                           ("BOARD-001", "api", path),
+                                           ("BOARD-001", "unknown", path),
+                                           ("BOARD-001", "control", self.root),
+                                           ("BOARD-001", "control", self.root / ".kilo/worktrees/unknown")):
+            with self.subTest(board=board_id, repo=repo, selection=selection):
+                self.cli("resume", "--board", board_id, "--repo", repo, "--worktree", str(selection), success=False)
+        self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), before)
+        self.assertEqual(WORKTREE.local_state(str(self.root)), state)
+
+    def test_selection_refuses_locked_detached_branch_base_and_identity_mismatches(self):
+        path = self.partial()
+        before = (self.root / "docs/BOARD.md").read_bytes()
+        state = WORKTREE.local_state(str(self.root))
+        self.git(self.root, "worktree", "lock", str(path))
+        self.cli("resume", "--board", "BOARD-001", "--worktree", str(path), success=False)
+        self.git(self.root, "worktree", "unlock", str(path))
+        self.git(path, "checkout", "--detach")
+        self.cli("resume", "--board", "BOARD-001", success=False)
+        self.git(path, "checkout", "feat/shared-lifecycle")
+        for field, value in (("branch", "feat/wrong"), ("base", "gone-base"),
+                             ("control", str(self.root.parent)), ("repo", str(self.root.parent)),
+                             ("repo_id", "wrong"), ("boards", ["BOARD-002"])):
+            with self.subTest(field=field):
+                changed = json.loads(json.dumps(state))
+                changed["workspaces"][str(path)][field] = value
+                WORKTREE.local_state(str(self.root), changed)
+                self.cli("resume", "--board", "BOARD-001", "--worktree", str(path), success=False)
+        WORKTREE.local_state(str(self.root), state)
+        self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), before)
+
+    def test_wrong_common_dir_and_prunable_selection_refuse_without_mutation(self):
+        path = self.partial()
+        args = WORKTREE.argparse.Namespace(board="BOARD-001", repo="control", worktree=str(path))
+        board_before = (self.root / "docs/BOARD.md").read_bytes()
+        actual = WORKTREE.common_dir
+        with mock.patch.object(WORKTREE, "common_dir", side_effect=lambda p: "/wrong" if p == str(path) else actual(p)):
+            with self.assertRaisesRegex(ValueError, "common-dir mismatch"):
+                WORKTREE.cmd_resume(args, str(self.root))
+        missing = path.with_name("retained-fixture")
+        path.rename(missing)
+        self.cli("resume", "--board", "BOARD-001", "--worktree", str(path), success=False)
+        self.assertTrue(missing.exists())
+        self.assertEqual((self.root / "docs/BOARD.md").read_bytes(), board_before)
+
+    def test_missing_registration_with_leftovers_refuses_new_and_preserves_directory(self):
+        path = self.partial()
+        # Only disposable fixture registration is removed; source directory is retained.
+        entries = WORKTREE.list_worktrees(str(self.root))
+        with mock.patch.object(WORKTREE, "list_worktrees", return_value=entries[:1]):
+            with self.assertRaisesRegex(ValueError, "leftover directory or branch"):
+                WORKTREE.task_workspaces(str(self.root), str(self.root), "control", "BOARD-001", "-")
+        self.assertTrue(path.exists())
+
     def test_generated_map_matches_policy_and_apply_requires_approval(self):
         policy = json.loads((SOURCE / ".kilo/policies/git-policy.json").read_text())
         config = json.loads((SOURCE / "kilo.jsonc").read_text())
@@ -936,7 +1157,7 @@ class LifecycleTests(unittest.TestCase):
                     cases[prefix + "artifacts/reviews/docs/BOARD.md"] = "deny"
                     cases[prefix + "docs/BOARD.md"] = "deny"
                     for name in ("apps/web/src/main.ts", "artifacts/other/report.md"):
-                        cases[prefix + name] = "allow" if mode == "optional" else "deny"
+                        cases[prefix + name] = "allow" if mode == "optional" else "ask"
                     cases[prefix + ".kilo/worktrees/assigned/apps/web/src/main.ts"] = "allow"
                 for path, action in cases.items():
                     with self.subTest(path=path):

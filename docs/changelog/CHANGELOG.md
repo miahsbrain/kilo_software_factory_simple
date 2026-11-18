@@ -3,6 +3,35 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Commit lifecycle recovery and prepare combined handoff
+**Type:** Fix
+**Board:** BOARD130, BOARD131 | **Branch:** chore/recover-partial-worktrees-and-inherit-control
+**Authorization:** User requested a local implementation commit and human merge preparation. Current state and handover distinguish that authorization from live external deployment/recovery, which remains outside this change.
+**Verification:** Reviewed implementation and tests; final coordinator `python3 -B -m unittest test_lifecycle test_bootstrap` passed 79 tests in 29.644s (exit 0). Expected injected-failure messages exercise preservation/recovery. Independent recheck resolved the exclusion-retry P2 with no further actionable findings. Commit ID and clean lifecycle readiness are recorded on the live board after verification.
+**Limits:** No real leftovers changed or deleted, copied-factory deployment, saved policy/config changes, agent merge or push.
+
+## [2026-11-18] Complete lifecycle recovery safety recheck
+**Type:** Review
+**Board:** BOARD130, BOARD131 | **Branch:** chore/recover-partial-worktrees-and-inherit-control (unstaged/uncommitted)
+**Result:** Independent recheck confirmed the env-exclusion retry P2 is resolved with no further actionable findings. Reviewer inspected the retry regressions and independently passed `git diff --check`; the 79-test suite was not rerun by the reviewer.
+**Limits:** No live deployment, recovery, deletion or real env access. Both reported external candidates remain preserved. Implementation remains uncommitted pending authorization.
+
+## [2026-11-18] Repair post-copy env exclusion retries
+**Type:** Fix
+**Board:** BOARD131, linked reuse to BOARD130 | **Branch:** chore/recover-partial-worktrees-and-inherit-control (same assigned workspace, unstaged/uncommitted)
+**Review:** Independent P2 found env copy could succeed before exclusion append failed; retry skipped the existing destination and falsely cleared lifecycle error. No other configuration/identity/reuse findings reported.
+**Changed:** Existing `provision_local_files` separates exclusion eligibility from missing-file copy: eligible primary env sources with regular untracked nonsymlink destination counterparts require exclusions even when already present. No env-value reads/overwrites during retry, no unrelated preexisting destination adoption, no new provenance store/tool. Destination `git check-ignore` must confirm every required exclusion before success. Source eligibility and tracked/symlink rules preserved. Added post-copy/repeated-failure regression and ineffective-exclusion verification regression; updated existing copier fixture to a disposable linked Git destination. State/handover record proof and pending independent recheck.
+**Verification:** New regression reproduced old bug: 1 test failed in 0.281s (`0 != 1` on retry). After fix: 1 test passed in 0.571s; focused 3 tests passed in 1.104s; `python3 -B -m unittest test_lifecycle test_bootstrap` passed 79 tests in 29.859s (exit 0). `git diff --check` passed. Repeated exclusion failure keeps error/unlinked board; restoring access repairs ignore protection with identical fixture bytes before clearing error; idempotent resume and unrelated-file preservation proved. Higher-precedence unignore blocks success until corrected.
+**Limits:** Fixture-only data/Git operations. No real env access/edits, external recovery/deployment, primary/project edits, staging/commit/merge/push/install or policy/config changes. Independent recheck remains pending.
+
+## [2026-11-18] Recover partial worktrees and inherit control configuration
+**Final verification:** Post-documentation `python3 -B -m unittest test_lifecycle test_bootstrap` passed 77 tests in 28.461s (exit 0); `git diff --check` passed. Injected-failure messages are expected fixture output.
+**Type:** Fix
+**Board:** BOARD130 | **Branch:** chore/recover-partial-worktrees-and-inherit-control (assigned worktree, unstaged/uncommitted)
+**Changed:** Shared effective configuration discovery confines inherited config to actual control root, supports ignored control configs in create/recovery/mode and preserves ordered permissions/saved-mode/scoped overrides without silently regenerating shared config. Exact task metadata plus Git registration/path/common-dir/branch/base/repo/control checks enable same-path partial resume, retry initialization/nonoverwriting local provisioning and update board before clearing error. Same-task candidates block retry slugs/--new; ambiguity requires explicit --worktree, otherwise linked current wins. New tasks with existing managed workspaces require explicit --reuse or user approval before --new. Root/template agreement, /run, skill/README, state/handover and appended ADR-089 explain missing versus incomplete and capability versus consent.
+**Verification:** `python3 -B -m unittest test_lifecycle test_bootstrap` passed 77 tests in 28.382s from assigned scripts directory. Real bootstrap ignored-config fixtures plus selection/identity/registration failures, retryable initialization/provision/board errors, preservation and idempotency. Earlier runs: 66 tests (8 failures/2 errors), 77 tests (5 errors); stale expectations/fixture setup corrected. No blanket --new helper override.
+**Limits:** No actual external/primary/project edits, live deployment/recovery/deletion, mode/policy/config changes, installs, factory staging/commit/merge/push. Fixture Git operations only. Both reported live partials preserved; newer-script deployment and user candidate selection remain prerequisites. Merge/cleanup and secret-read policy unchanged. No full builds/browser or hostile concurrent-filesystem guarantee.
+
 ## [2026-11-18] Commit destination guardrail and prepare human handoff
 **Type:** Chore
 **Board:** BOARD-129 | **Branch:** chore/constrain-bootstrap-to-approved-working-directories

@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 import bootstrap
+import worktree
 
 
 SOURCE = Path(__file__).resolve().parents[4]
@@ -93,6 +94,106 @@ class BootstrapTests(unittest.TestCase):
         self.assertNotIn("safe.directory", config["postCreateCommand"])
         self.assertTrue((root / ".devcontainer/Dockerfile").is_file())
         self.assertEqual(json.loads((root / "services.json").read_text()), {"services": []})
+
+    def lifecycle_fixture(self):
+        root = self.create()
+        board = worktree.load_board_module(str(root))
+        text = "| " + " | ".join(board.COLUMNS) + " |\n"
+        text += "| " + " | ".join(["---"] * len(board.COLUMNS)) + " |\n"
+        text += "| BOARD-001 | Inherited control | Feature | Ready | P2 | low | None. | control | - | fixture |\n"
+        (root / "docs/BOARD.md").write_text(text)
+        return root
+
+    def lifecycle(self, root, *args, ok=True, override=None):
+        env = dict(self.env)
+        env.pop("KILO_CONFIG", None)
+        if override:
+            env["KILO_CONFIG"] = str(override)
+        # The script is ignored in the primary. A new worktree has no local copy.
+        script = root / ".kilo/skills/git-worktree/scripts/worktree.py"
+        result = subprocess.run([sys.executable, str(script), *args], cwd=root,
+                                env=env, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0 if ok else 1, result.stdout + result.stderr)
+        return result
+
+    def test_bootstrapped_ignored_control_inherits_unchanged_config_and_mode(self):
+        root = self.lifecycle_fixture()
+        config = root / "kilo.jsonc"
+        original = config.read_bytes()
+        self.assertNotIn("kilo.jsonc", self.git(root, "ls-files").stdout)
+        self.assertNotIn(".kilo/repos.json", self.git(root, "ls-files").stdout)
+        self.lifecycle(root, "create", "--board", "BOARD-001", override=config)
+        path = root / ".kilo/worktrees/inherited-control"
+        self.assertFalse((path / "kilo.jsonc").exists())
+        self.assertFalse((path / ".kilo/skills/git-worktree/scripts/worktree.py").exists())
+        self.assertEqual(config.read_bytes(), original)
+        self.assertIn(".kilo/worktrees/inherited-control", (root / "docs/BOARD.md").read_text())
+        self.assertIn("required", self.lifecycle(root, "mode", "status").stdout)
+        for mode in ("optional", "required"):
+            self.lifecycle(root, "mode", mode)
+            self.assertEqual(worktree.local_state(str(root))["mode"], mode)
+            self.assertFalse((path / "kilo.jsonc").exists())
+        self.assertEqual(config.read_bytes(), original)
+        self.lifecycle(root, "resume", "--board", "BOARD-001")
+
+    def test_bootstrapped_partial_ordered_config_failure_recovers_same_path(self):
+        root = self.lifecycle_fixture()
+        path = root / ".kilo/worktrees/inherited-control"
+        config = root / "kilo.jsonc"
+        ordered = config.read_bytes()
+        before = (root / "docs/BOARD.md").read_bytes()
+        for index, kind in enumerate(("edit", "bash", "read")):
+            data = json.loads(ordered)
+            mapping = data["permission"][kind]
+            first = next(iter(mapping))
+            mapping[first] = mapping.pop(first)
+            config.write_text(json.dumps(data))
+            bad = config.read_bytes()
+            command = "create" if index == 0 else "resume"
+            result = self.lifecycle(root, command, "--board", "BOARD-001", ok=False)
+            self.assertIn("inherited permission map disagrees", result.stderr)
+            self.assertEqual(config.read_bytes(), bad)
+            self.assertEqual((root / "docs/BOARD.md").read_bytes(), before)
+        self.assertFalse((path / "kilo.jsonc").exists())
+        (path / "source.txt").write_text("preserve source")
+        (path / ".env.local").write_text("preserve ignored")
+        (root / ".env.local").write_text("primary value")
+        self.lifecycle(root, "create", "--board", "BOARD-001", "--slug", "retry", "--new", ok=False)
+        branches = self.git(root, "branch", "--list").stdout
+        config.write_bytes(ordered)
+        self.lifecycle(root, "resume", "--board", "BOARD-001")
+        self.lifecycle(root, "resume", "--board", "BOARD-001")
+        self.assertEqual(self.git(root, "branch", "--list").stdout, branches)
+        self.assertEqual((path / "source.txt").read_text(), "preserve source")
+        self.assertEqual((path / ".env.local").read_text(), "preserve ignored")
+        self.assertEqual(config.read_bytes(), ordered)
+        state = worktree.local_state(str(root))["workspaces"][str(path)]
+        self.assertNotIn("error", state)
+        self.assertEqual(state["boards"], ["BOARD-001"])
+
+    def test_bootstrapped_recovery_config_scope_and_saved_mode_fail_closed(self):
+        root = self.lifecycle_fixture()
+        path = root / ".kilo/worktrees/inherited-control"
+        config = root / "kilo.jsonc"
+        ordered = config.read_bytes()
+        before = (root / "docs/BOARD.md").read_bytes()
+        result = self.lifecycle(root, "create", "--board", "BOARD-001", ok=False,
+                                override=self.factory / "kilo.jsonc")
+        self.assertIn("KILO_CONFIG is outside", result.stderr)
+        # A source-factory ancestor is never an effective project configuration.
+        config.unlink()
+        result = self.lifecycle(root, "resume", "--board", "BOARD-001", ok=False)
+        self.assertIn("no effective project configuration", result.stderr)
+        self.assertFalse(config.exists())
+        config.write_bytes(ordered)
+        state = worktree.local_state(str(root))
+        state["mode"] = "optional"
+        worktree.local_state(str(root), state)
+        result = self.lifecycle(root, "resume", "--board", "BOARD-001", ok=False)
+        self.assertIn("inherited permission map disagrees with saved mode", result.stderr)
+        self.assertEqual(config.read_bytes(), ordered)
+        self.assertEqual((root / "docs/BOARD.md").read_bytes(), before)
+        self.assertIn("error", worktree.local_state(str(root))["workspaces"][str(path)])
 
     def test_outside_destinations_refused_before_any_mutation(self):
         before = {p: p.read_bytes() for p in self.factory.rglob("*") if p.is_file()}
