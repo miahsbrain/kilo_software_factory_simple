@@ -11,7 +11,8 @@ define product or application architecture.
   handoff, list, verify and cleanup.
 - `env.py` delegates local-input provisioning to the same safe copier used by lifecycle creation.
   It handles ignored or untracked regular `.env*` files except `.env.example`, plus the ignored
-  QA navigation input, without exposing values to agents.
+  QA navigation input, without exposing values to agents. `env.py status` enumerates that same
+  recursive eligible source set without printing file contents.
 - The control repository's main checkout owns board writes. A worktree branch holds application
   changes and scope documentation, but never edits the live board.
 - `.kilo/policies/git-policy.json` is the source of truth for command permissions; generated

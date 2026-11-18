@@ -352,9 +352,9 @@ def repo_of_path(path):
     return os.path.dirname(common) if os.path.basename(common) == ".git" else common
 
 
-def provision_local_files(primary, destination, include_navigation=False):
-    """Copy untracked local config without replacing worktree files."""
-    primary, destination = Path(primary), Path(destination)
+def eligible_env_files(primary, destination=None):
+    """Return eligible untracked regular .env* files and relative paths."""
+    primary = Path(primary)
     candidates = []
     for directory, dirnames, filenames in os.walk(primary, followlinks=False):
         relative_directory = Path(directory).relative_to(primary).as_posix()
@@ -365,18 +365,38 @@ def provision_local_files(primary, destination, include_navigation=False):
             source = Path(directory) / name
             relative = source.relative_to(primary)
             is_env = name.startswith(".env") and name != ".env.example"
-            is_navigation = (include_navigation and
-                             relative.as_posix() == ".kilo/local/qa-navigation.json")
-            if is_env or is_navigation:
+            if is_env:
                 candidates.append((source, relative))
 
-    copied_env = []
     for source, relative in candidates:
         if source.is_symlink() or not source.is_file():
             continue
         rel = relative.as_posix()
         if git_out(str(primary), "ls-files", "--", rel):
             continue
+        if destination is not None:
+            destination_file = Path(destination) / relative
+            if destination_file.exists() or destination_file.is_symlink():
+                continue
+            if any(part.is_symlink() for part in destination_file.parents
+                   if part != destination and os.path.commonpath([str(part), str(destination)]) == str(destination)):
+                continue
+        yield source, relative
+
+
+def provision_local_files(primary, destination, include_navigation=False):
+    """Copy untracked local config without replacing worktree files."""
+    primary, destination = Path(primary), Path(destination)
+    candidates = list(eligible_env_files(primary, destination))
+    if include_navigation:
+        navigation = primary / ".kilo/local/qa-navigation.json"
+        if navigation.is_file() and not navigation.is_symlink() and not git_out(
+                str(primary), "ls-files", "--", ".kilo/local/qa-navigation.json"):
+            candidates.append((navigation, Path(".kilo/local/qa-navigation.json")))
+
+    copied_env = []
+    for source, relative in candidates:
+        rel = relative.as_posix()
         destination_file = destination / relative
         if destination_file.exists() or destination_file.is_symlink():
             continue

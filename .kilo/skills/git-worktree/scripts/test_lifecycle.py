@@ -22,6 +22,7 @@ def module(name, path):
 
 
 WORKTREE = module("lifecycle_test_worktree", SCRIPTS / "worktree.py")
+ENV = module("lifecycle_test_env", SCRIPTS / "env.py")
 GUARD = module("lifecycle_test_guard", SCRIPTS / "guard.py")
 
 
@@ -32,6 +33,7 @@ class LifecycleTests(unittest.TestCase):
         self.root = Path(self.temporary.name) / "control"
         self.root.mkdir()
         for relative in (".kilo/skills/git-worktree/scripts/worktree.py",
+                         ".kilo/skills/git-worktree/scripts/env.py",
                          ".kilo/skills/git-worktree/scripts/guard.py",
                          ".kilo/skills/git-worktree/scripts/scope.py",
                          ".kilo/skills/board/scripts/board.py",
@@ -232,6 +234,31 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse((path / ".env.example").exists())
         self.assertEqual((path / ".kilo/local/qa-navigation.json").read_bytes(), navigation.read_bytes())
         self.assertNotIn(secret_value, result.stdout + result.stderr)
+
+    def test_env_status_reports_the_same_eligible_recursive_sources(self):
+        (self.root / ".env").write_text("root-secret")
+        (self.root / ".env.tracked").write_text("tracked")
+        self.git(self.root, "add", "-f", ".env.tracked")
+        self.git(self.root, "commit", "-m", "track env fixture")
+        (self.root / ".env.local").write_text("local-secret")
+        (self.root / "nested").mkdir()
+        (self.root / "nested/.env.production").write_text("nested-secret")
+        (self.root / ".env.example").write_text("example")
+        (self.root / ".env.link").symlink_to(self.root / ".env.local")
+        self.cli("create", "--board", "BOARD-001")
+        path = self.root / ".kilo/worktrees/shared-lifecycle"
+
+        lines, error = ENV.status_into(str(path), str(self.root))
+        self.assertIsNone(error)
+        output = "\n".join(lines)
+        self.assertIn(".env | main checkout: present | worktree: present", output)
+        self.assertIn(".env.local | main checkout: present | worktree: present", output)
+        self.assertIn("nested/.env.production | main checkout: present | worktree: present", output)
+        self.assertNotIn(".env.example", output)
+        self.assertNotIn(".env.tracked", output)
+        self.assertNotIn(".env.link", output)
+        self.assertNotIn("root-secret", output)
+        self.assertNotIn("nested-secret", output)
 
     def test_local_file_provisioning_skips_tracked_unignored_symlink_and_existing_destination(self):
         (self.root / ".env.tracked").write_text("tracked")

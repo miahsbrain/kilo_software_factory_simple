@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Align env status with recursive provisioning
+**Type:** Fix
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** `worktree.py`, `env.py`, lifecycle tests, handover and architecture docs
+**Why:** Status previously reported only two top-level names while provisioning accepted recursive eligible `.env*` files.
+**Impact:** Status now reports the same eligible source set without exposing values or changing provisioning exclusions.
+
 ## [2026-11-18] Correct lifecycle documentation contradictions
 **Type:** Fix
 **Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy

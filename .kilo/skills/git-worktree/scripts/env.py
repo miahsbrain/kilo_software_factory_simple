@@ -114,7 +114,8 @@ def status_into(worktree_path, repo_root):
     """(lines, error). Per file: whether the source and the copy exist."""
     source = source_root(repo_root)
     lines = []
-    for name in (".env", ".env.local"):
+    for _, relative in worktree_module().eligible_env_files(source):
+        name = relative.as_posix()
         src = os.path.join(source, name)
         dst = os.path.join(worktree_path, name)
         lines.append("%s | main checkout: %s | worktree: %s" %

@@ -1,6 +1,10 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
+> - **2026-11-18, BOARD-116:** Extended `env.py status` to enumerate the same recursive eligible
+>   regular ignored/untracked `.env*` sources as provisioning, including nested paths while
+>   preserving tracked, example, symlink and nonregular exclusions. Added focused lifecycle test
+>   coverage; policy, generated config, board and unrelated files were not changed.
 > - **2026-11-18, BOARD-116:** Reconciled this handover and project state with the approved
 >   human-only discard policy on branch `chore/synchronize-factory-worktree-lifecycle-and-policy`
 >   in `.kilo/worktrees/synchronize-factory-worktree-lifecycle-and-policy`. Discard requires
@@ -141,7 +145,7 @@
 | `board.py` | `.kilo/skills/board/scripts/board.py` | Deterministic manipulation of the markdown board. Never writes prose. | effectful (file I/O) |
 | `board_serve.py` | `.kilo/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
 | `worktree.py` | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, human-only `discard --apply --discard` permanently removes one without a backup, `handoff` prints the hand-off block, and `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, and discard sets `Dropped` when no linked worktrees remain. | effectful (git, filesystem) |
-| `env.py` | `.kilo/skills/git-worktree/scripts/env.py` | Provisions ignored or untracked regular `.env*` files except `.env.example`, plus `.kilo/local/qa-navigation.json`, into a worktree without overwriting existing destinations; preserves source modes, updates git excludes, and never prints values. | effectful (filesystem, git exclude) |
+| `env.py` | `.kilo/skills/git-worktree/scripts/env.py` | Provisions and reports ignored or untracked regular `.env*` files except `.env.example`, including nested paths, plus `.kilo/local/qa-navigation.json`, without overwriting existing destinations or printing values. | effectful (filesystem, git exclude) |
 | `test_env.py` | `.kilo/skills/git-worktree/scripts/test_env.py` | Self-test for the env provisioning and the worktree reuse rules, in a throwaway repository under a temp directory. | effectful (filesystem, git) |
 | `guard.py` | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails and the sync that carries them into an app repository. | effectful (git, filesystem) |
 | `check-finding.py` | `.kilo/skills/qa-review/scripts/check-finding.py` | Validates a finding and derives its fingerprint. | pure |
