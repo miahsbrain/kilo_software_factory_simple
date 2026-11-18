@@ -1,6 +1,6 @@
 # Project Structure
 
-This repository is the factory. BOARD124 changes only its assigned linked worktree; existing `project/` and apps are not migrated.
+This repository is the factory. BOARD128 changes only its assigned linked worktree; existing `project/` and apps are not migrated.
 
 | Path | Purpose |
 |---|---|

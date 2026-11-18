@@ -3,6 +3,31 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Commit removal and prepare human merge handoff
+**Type:** Chore
+**Board:** BOARD-128 | **Branch:** chore/remove-unslop-from-factory-ui-workflows
+**Changed:** Current state and handover reflect explicit user authorization to commit the reviewed removal and prepare lifecycle commands.
+**Verification:** Independent review found no correctness issues or active references. All 19 bootstrap tests passed in 4.501s; whitespace checks passed. Clean post-commit readiness and commit ID are recorded on the live board before Pending Merge. Existing project/app copies remain untouched; no agent merge or push.
+
+## [2026-11-18] Verify removal and independent review
+**Type:** Docs
+**Board:** BOARD128 | **Branch:** chore/remove-unslop-from-factory-ui-workflows (unstaged/uncommitted)
+**Verification:** Independent final review found no correctness issues. Hidden/ignored-inclusive searches found no active invocations, links or deleted-resource references across root guidance, agents, commands, skills and templates. Final coordinator `git diff --check` passed, exit 0; builder bootstrap suite passed 19 tests in 4.501s. Existing project/app copies were not migrated, and future UI behavior was not demonstrated. No staging, commit, merge or push.
+
+## [2026-11-18] Resolve removal's blank-template-board hold
+**Type:** Docs
+**Board:** BOARD128 | **Branch:** chore/remove-unslop-from-factory-ui-workflows (unstaged/uncommitted)
+**Changed:** Removed the final two active references from the blank template board with explicit user approval. Updated current state, handover and the removal decision to reflect the resolved hold.
+**Preserved:** Initial gallery, focused QA, independent UI critique, fixes/rechecks and frontend-flow approval. No permission configuration or live-board changes by this correction; existing projects are not migrated.
+
+## [2026-11-18] Remove unslop from factory UI workflows (template-board blocker)
+**Type:** Chore
+**Board:** BOARD128 | **Branch:** chore/remove-unslop-from-factory-ui-workflows (assigned worktree, unstaged/uncommitted)
+**Changed:** Deleted the entire skill's 15 files (skill, script, two HTML examples, five reference Markdown files, six WebP assets) and `/unslop` command: 16 deletions total. Removed active invocations from root/template agreements, components/UI/run commands, frontend/critic roles, QA/planning skills, UI-UX pair and README. Updated current state/handover/structure and appended ADR-087; historical entries remain unchanged. No replacement skill/checklist or relocated rules.
+**Preserved:** User style choices, themed component-first Tailwind/supported libraries, initial gallery without recurring gates, responsive/accessibility QA, shared-evidence critique, meaningful fixes/rechecks and frontend-flow approval before backend/APIs. Generic bootstrap/guard/sync mechanics unchanged; new copies omit deleted source files, existing project copies are not cleaned or migrated.
+**Verification:** `git diff --check` passed, exit 0. Existing `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_bootstrap` from `.kilo/skills/git-worktree/scripts` passed 19 tests in 4.501s, exit 0; validates generic harness copy/restore, not skill-specific removal. Hidden/ignored-inclusive active-reference search found only two references in `templates/project/docs/BOARD.md:42,44`; zero in the other active root/template rules, agents, commands and skills. Historical references intentionally remain.
+**Blocker:** Session edit policy denied `templates/project/docs/BOARD.md` (`**/docs/BOARD.md` deny). The blank template board is unchanged despite explicit task authorization; its targeted removal remains for authorized policy resolution. No alternate tool bypass, permission changes or live-board edits. Existing project/apps untouched; no staging/commit/merge/push/install, runtime changes, full build or new scripts.
+
 ## [2026-11-18] Commit service bootstrap and prepare shared human handoff
 **Type:** Chore
 **Board:** BOARD124, BOARD125, BOARD126, BOARD127 | **Branch:** chore/restore-local-harness-and-bootstrap-service

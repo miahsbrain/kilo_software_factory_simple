@@ -26,7 +26,7 @@ Plan new products or substantial features around the user's actual task. Read re
 2. For new apps and user-facing features, plan a frontend flow with clearly labeled fixtures for user approval before backend/API implementation. Backend-only maintenance skips unrelated frontend work.
 3. Record material approved architecture, security, data, cost, and integration choices in `docs/DECISIONS.md`; keep unresolved decisions explicit. Define contracts when backend work is ready, informed by the approved flow.
 4. Put a concise sequence in `ROADMAP.md` and checkable work units on the board through its script. Reuse assigned workspaces and suitable existing code; use short specialist assignments when useful.
-5. Include focused verification, shared UI capture with parallel critique/read-only unslop, and essential documentation updates. Do not require a component gallery or exhaustive audit before building screens.
+5. Include the initial reusable-component gallery, focused QA and UI critique against shared evidence, meaningful fixes and rechecks before screen composition, and essential documentation updates. Do not require a new gallery for every screen.
 
 Keep product requirements in the project's `DOMAIN.md` and relevant docs, never in the factory. Use reference material only when it helps the task, not as a compulsory template or separate policy. The root working agreement governs.
 

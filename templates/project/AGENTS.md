@@ -12,7 +12,7 @@ For new applications and user-facing features, build the frontend flow for user 
 
 Design around the user's actual task, content, and product character. If an app has an existing style, ask whether to keep it or do a complete redesign unless the user has already specified the direction. Develop reusable components before screens using Tailwind CSS or a supported UI library such as shadcn/ui, compatible with the app's stack and styled to the chosen visual language and theme. Library choices are not limited to those already installed. Reuse suitable components without preserving unwanted styling. Avoid generic dashboard templates; preserve accessibility and responsive behavior.
 
-Present the initial reusable-component gallery and ask whether the user wants an unslop pass. Run focused QA regardless, fix meaningful issues and recheck before composing screens. Use short specialist assignments; run UI critique and any requested read-only unslop pass in parallel against shared evidence, then consolidate findings once. A proven development-only missing favicon is nonblocking.
+Present the initial reusable-component gallery. Run focused QA, fix meaningful issues and recheck before composing screens. Use short specialist assignments; run UI critique against shared evidence, then consolidate findings once. A proven development-only missing favicon is nonblocking.
 
 Verify proportionately with focused checks. Report what changed, what passed, and what remains unverified. Never fabricate evidence.
 
