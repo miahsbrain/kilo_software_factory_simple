@@ -1,0 +1,9 @@
+---
+description: Initialize a project or an app with explicit Git ownership
+---
+
+Use the deterministic CLI, never manual copying. From the factory root run `python3 .kilo/skills/git-worktree/scripts/bootstrap.py project` (default `project/`), or provide `--destination <new-path>` for an isolated destination. Project Git is mandatory. Before creating an app, ASK the user whether to use separate app Git or track source in project Git unless already specified. Then, from the initialized project control root run `python3 .kilo/skills/git-worktree/scripts/bootstrap.py app <name> --git separate|project`. Omission fails before mutation; there is no default.
+
+Both modes write app-local safe ignores: snapshot the current project `.gitignore`, omitting only its control-only `apps/*/` rule. Existing apps are not updated by later project ignore edits. `separate` then initializes/maps the app repository. `project` creates no nested Git or map entry; a targeted `!/apps/<name>/` unignore keeps source trackable by control Git without overriding secret/runtime rules. A missing/nonregular/symlink ignore source fails before creation in both modes.
+
+Read `README.md` for constraints. Invoke only for an authorized bootstrap, including scoped `git init` consent where initialization occurs; no other Git action is authorized. Hard init guard denials/errors stop project bootstrap and separate mode; project-tracked app mode performs no init check. Existing paths are refused, including empty directories and symlinks. No automatic staging, initial commit, dependency installation, app scaffolding, or app-level instructions. Bootstrap needs no prior commit/worktree; feature implementation waits for an authorized initial commit and assigned linked worktree. On failure inspect reported retained partial state; never silently fall back to copying or deleting it.

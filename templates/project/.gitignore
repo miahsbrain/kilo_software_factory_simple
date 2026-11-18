@@ -1,12 +1,16 @@
-# Nested application repositories are created only when needed and mapped in .kilo/repos.json.
+# Separate app repositories are ignored/mapped; bootstrap unignores each project-tracked app.
 apps/*/
 
-# Agent worktrees: one per board row, created by .kilo/skills/git-worktree/scripts/worktree.py
+# Assigned linked worktrees; explicitly assigned features may share a worktree/branch.
 .kilo/worktrees/
 .kilo/local/qa-navigation.json
+.kilo/agent-manager.json
 
 # Local review and QA evidence, including reports, ledgers, notes and summaries. Never commit.
 artifacts/
+artifacts/**/*.png
+artifacts/**/*.log
+artifacts/**/network.json
 
 # Generated Playwright output, at any depth.
 .playwright-mcp/
@@ -33,3 +37,7 @@ id_rsa*
 
 .DS_Store
 .vscode/
+
+# The copied project's live board is local; the factory template remains tracked.
+/docs/BOARD.md
+**/docs/BOARD.md
