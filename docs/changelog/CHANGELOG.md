@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Ignore generated Playwright output in factory and template
+**Type:** Chore
+**Board:** BOARD-119 | **Branch:** chore/ignore-generated-playwright-output-in-factory
+**Changed:** `.gitignore`, `.kilo/.gitignore`, `templates/project/.gitignore`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/DECISIONS.md`, `docs/changelog/CHANGELOG.md`.
+**Why:** Reuse the three maintained ignore files to exclude five generated Playwright directory names at any depth.
+**Impact:** Factory/template only; existing rules remain and no files are untracked. No new files or tools. User authorized commit and human-merge preparation; diff review passed with the static `.kilo` verification limitation recorded.
+**Verification:** One command invocation: `git check-ignore --no-index --verbose --non-matching` with 42 synthetic probes, then `git diff --check` and scoped diff review (exit 0). Factory-root/template generated-directory and source probes passed at direct/nested levels. Existing `.git/info/exclude:52` (`.kilo/`) masks all `.kilo` probes, including source/config; that context is unverified, not a pass. No local-exclude change or workaround.
+
 ## [2026-11-18] Prepare reviewed bootstrap and handoff changes for merge
 **Type:** Chore
 **Board:** BOARD-117, BOARD-118 | **Branch:** chore/fix-project-bootstrap-and-template-drift

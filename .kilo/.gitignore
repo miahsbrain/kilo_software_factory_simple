@@ -6,3 +6,10 @@ bun.lock
 yarn.lock
 agent-manager.json
 worktrees
+
+# Generated Playwright output, at any depth.
+.playwright-mcp/
+.playwright/
+playwright-report/
+test-results/
+blob-report/

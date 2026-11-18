@@ -11,7 +11,16 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **Active task:** BOARD-117, project bootstrap and template drift correction in
+- **Active task:** BOARD-119, generated Playwright output ignores in the assigned
+  `.kilo/worktrees/ignore-generated-playwright-output-in-factory`, branch
+  `chore/ignore-generated-playwright-output-in-factory`. Only the three existing factory/template
+  ignore files and control documentation change. Factory-root/template direct and nested ignore
+  and source probes passed; `git diff --check` passed. Existing `.git/info/exclude:52` (`.kilo/`)
+  masks `.kilo` probes, so that context remains unverified and was assessed by file review only.
+  Diff review passed; user authorized committing and preparing human merge. No existing project/app
+  edits or agent merges. Next: human merge of BOARD-119, then a separate change for the five approved
+  frontend design-rule clarifications; existing project-owned harness copies remain unchanged.
+- **Prior task (separate workspace):** BOARD-117, project bootstrap and template drift correction in
   `.kilo/worktrees/fix-project-bootstrap-and-template-drift`. Initial setup now copies the complete
   approved harness slice and generated config before the first commit, preserving template rules
   and repo map. Template ignores and live-board tracking wording are aligned. Generated handoff

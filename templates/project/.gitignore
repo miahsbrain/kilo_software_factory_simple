@@ -13,6 +13,13 @@ apps/*/
 # Local review and QA evidence, including reports, ledgers, notes and summaries. Never commit.
 artifacts/
 
+# Generated Playwright output, at any depth.
+.playwright-mcp/
+.playwright/
+playwright-report/
+test-results/
+blob-report/
+
 # Local scratch
 .kilo/qa-local/
 .tmp/
