@@ -32,3 +32,4 @@ id_rsa*
 .vscode/
 docs/BOARD.md
 **/docs/BOARD.md
+!/templates/project/docs/BOARD.md

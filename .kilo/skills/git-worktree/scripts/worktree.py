@@ -1259,7 +1259,8 @@ def cmd_lifecycle(args, cwd):
         if record.get("outcome") in ("merged", "discarded"):
             if os.path.lexists(item["path"]):
                 raise ValueError("completed workspace path has been recreated; refusing stale state")
-            print("%s: already %s" % (item["path"], record["outcome"]))
+            print("%s: already %s" % (os.path.relpath(item["path"], root) if command == "handoff"
+                                    else item["path"], record["outcome"]))
             continue
         resuming = record.get("outcome") in ("merged-pending-cleanup", "discarded-pending-cleanup")
         pending_merge = command == "merge" and record.get("outcome") == "pending" and record.get("operation") == "merge"
@@ -1281,9 +1282,10 @@ def cmd_lifecycle(args, cwd):
                                            or item["sha"] != record.get("sha")):
             raise ValueError("saved operation source or target identity changed")
         if command == "handoff":
-            print(shlex.join(["git", "-C", item["repo"], "diff", base + "..." + item["branch"]]))
-            print(shlex.join(["git", "-C", item["repo"], "diff", "--stat", base + "..." + item["branch"]]))
-            print("workspace: %s" % item["path"])
+            repo = os.path.relpath(item["repo"], root)
+            print(shlex.join(["git", "-C", repo, "diff", base + "..." + item["branch"]]))
+            print(shlex.join(["git", "-C", repo, "diff", "--stat", base + "..." + item["branch"]]))
+            print("workspace: %s" % os.path.relpath(item["path"], root))
             continue
         if not item["removed"]:
             require_clean(item["path"], root)
@@ -1321,7 +1323,7 @@ def cmd_lifecycle(args, cwd):
               item["repo_id"], item["branch"], base))
     if command == "handoff":
         for verb in ("merge",):
-            invocation = ["python3", script, verb]
+            invocation = ["python3", os.path.relpath(script, root), verb]
             for board_id in args.board:
                 invocation.extend(["--board", board_id])
             for repo_id in args.repo or []:

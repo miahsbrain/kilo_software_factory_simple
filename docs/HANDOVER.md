@@ -1,6 +1,36 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
+> - **2026-11-18, BOARD-118 shared correction:** in the original BOARD-117 workspace, changed
+>   two stale `test_lifecycle.py` wildcard expectations from `deny` to `ask` for required-mode
+>   regeneration and the copied base config. `guard.generated_permission()` retains the policy
+>   action in required mode and overrides only the optional fallback to `allow`; protected-file
+>   and secret assertions are unchanged. One invocation naming both affected tests and handoff
+>   passed: 3 tests, 1.715s, exit 0. No production changes, commits or real merges.
+> - **2026-11-18, BOARD-117:** Bootstrap copies the complete harness and generated config before
+>   the first commit, preserving template rules/map. Live boards and artifacts stay ignored;
+>   the factory blank board stays tracked. ADR-077 supersedes ADR-075: handoff review/lifecycle
+>   commands and workspace paths are control-root-relative, without machine paths or `cd`.
+>   The human runs them from the control root. Executing script selection, discovery and
+>   board/repo/target arguments remain intact. The policy fallback stays `ask`; config is unchanged.
+> - **Handoff proof:** replacement regression covers a root with spaces/apostrophes, both repos,
+>   primary/worktree script selection, exact root-relative diff/stat/preview/apply output,
+>   execution from the root and byte-for-byte preview immutability. One explicit-name invocation
+>   including both BOARD-118 policy tests passed: 3 tests, 2.007s, exit 0. No apply was executed.
+>   Earlier failures/results remain historical in the engineering log.
+> - **Verification (BOARD-117):** corrected bootstrap appends `/docs/BOARD.md` only in the
+>   destination ignore file. One approved invocation passed, exit 0, in
+>   `.tmp/board-117.jsHiWB`: `diff -qr` passed for all six slices; `cmp` passed for copied
+>   ignore/config and retained project rules/map. Eight `git check-ignore --no-index -q` project
+>   checks passed. `git ls-files --error-unmatch` confirmed template board and board.py tracked;
+>   template-board `check-ignore` returned 1 (not ignored), factory live-board check returned 0.
+>   Both index listings were empty and `git diff --check` passed. Earlier permission and child
+>   ignore failures are resolved by the approved scratch location and destination-only rule.
+> - **Next action (BOARD-117/118):** the user authorized committing the reviewed shared changes
+>   on `chore/fix-project-bootstrap-and-template-drift` and preparing both rows for human merge.
+>   After the commit and clean-tree check, review and merge both rows together using handoff.
+>   The agent does not merge, push or clean up the workspace.
+>   Earlier task notes below are historical context.
 > - **2026-11-18, BOARD-116:** Extended `env.py status` to enumerate the same recursive eligible
 >   regular ignored/untracked `.env*` sources as provisioning, including nested paths while
 >   preserving tracked, example, symlink and nonregular exclusions. Added focused lifecycle test
@@ -197,7 +227,9 @@ The lifecycle test suite is run with `PYTHONDONTWRITEBYTECODE=1 python3 -m unitt
 checks registered linked workspaces, branches, confinement and locks; `require_clean()` allows
 only `docs/BOARD.md` dirt in the control checkout. `related_rows()` and
 `update_lifecycle_board()` use the existing board parser/writer, never manual table replacement.
-`cmd_lifecycle()` sequences preflight, merge/discard, cleanup and journal updates.
+`cmd_lifecycle()` sequences preflight, merge/discard, cleanup and journal updates. Its handoff
+output prints safely quoted review and merge preview/apply commands relative to the resolved
+control root, retaining selected board/repo/target arguments. Run them from that root.
 `require_committed_merge()` checks named-target ancestry, cleanliness and absence of
 `MERGE_HEAD` before cleanup. These functions are effectful. Board association uses branch
 and recorded board identities, and terminal historical rows do not adopt reused-path outcomes.
