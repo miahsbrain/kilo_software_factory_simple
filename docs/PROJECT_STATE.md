@@ -11,21 +11,43 @@
   repository that copies the harness in and owns it (ADR-054). The factory board
   (`docs/BOARD.md`) carries factory work only; project work is tracked on the project's own
   board (ADR-055).
-- **Active task:** BOARD-116, documentation reconciliation for the approved human-only discard
-  policy in `.kilo/worktrees/synchronize-factory-worktree-lifecycle-and-policy`, branch
-  `chore/synchronize-factory-worktree-lifecycle-and-policy`. Discard requires `--apply --discard`,
-  permanently removes the selected linked worktree and branch without a recovery backup, and
-  marks the final linked row `Dropped`; normal cleanup remains separate. Application logic, tests,
-  policy and `docs/BOARD.md` were not changed. The focused documentation correction is pending
-  human review and merge.
+- **Active task:** BOARD-117, project bootstrap and template drift correction in
+  `.kilo/worktrees/fix-project-bootstrap-and-template-drift`. Initial setup now copies the complete
+  approved harness slice and generated config before the first commit, preserving template rules
+  and repo map. Template ignores and live-board tracking wording are aligned. Generated handoff
+  review/lifecycle commands and workspace paths are now relative to the resolved control root,
+  without machine-specific paths or `cd` prefixes (ADR-077 supersedes ADR-075). The human runs
+  from that root; executing script selection and board discovery are unchanged. The user has
+  authorized committing the reviewed shared changes and preparing both rows for human merge.
+  The approved follow-up changes only the policy's first
+  workspace-default edit fallback from `deny` to `ask` and its reason; board, index, existing
+  project, main checkout and generated config are untouched.
+- **Shared review correction:** BOARD-118 uses the same assigned BOARD-117 workspace. Two
+  stale wildcard assertions now expect approved required-mode `ask`, not `deny`; protected-file
+  and secret assertions remain intact. No production behavior changed.
 - **Previous task:** the human merged configurable shared-workspace lifecycle/authenticated
   review at main `d5ace2f`, including feature commit `44ca90b`. BOARD-103 through BOARD-112 are
   Merged. The old worktree remains for human cleanup; its capped ledger and authorized follow-up
   evidence are preserved in ignored artifacts. Lifecycle/auth source is unchanged by BOARD-113.
 - **Previous work:** BOARD-101 (no-production-build rule) and BOARD-102 (accordion board viewer)
   are recorded as Merged on the live factory board. They are not active tasks.
-- **Next action:** human review and merge of BOARD-116. No merge, push, or worktree cleanup was
-  performed.
+- **Verification:** approved isolated bootstrap invocation passed, exit 0, in
+  `.tmp/board-117.jsHiWB`. `diff -qr`/`cmp` confirmed all six slices, copied ignore/config and
+  retained rules/map; eight project ignore checks passed. Template board and board.py are tracked,
+  the factory template board is not ignored, and factory/project live boards are ignored.
+  Index listings were empty and `git diff --check` passed. Bootstrap adds the live-board rule
+  only to the destination, resolving the earlier child-ignore failure.
+- **Handoff verification:** replacement root-relative regression passed in the single approved
+  invocation. It covers both repos, spaces/apostrophes in the root, primary/worktree script
+  selection, batch arguments, exact review/lifecycle output, execution from root and preview
+  immutability. Prior policy alignment and fixture correction are preserved; no real merge.
+- **BOARD-118 verification:** one explicit-name unittest invocation covering required-mode
+  regeneration, optional-mode creation from the required base map, and handoff passed:
+  3 tests, 2.007s, exit 0, after the root-relative revision. No full suite, production build or
+  real merge was run.
+- **Next action:** human review and merge of BOARD-117/118 together from
+  `chore/fix-project-bootstrap-and-template-drift` after the authorized commit and clean-tree
+  check. No real merge, push, or worktree cleanup was performed by the agent.
 - **Historical in-flight notes:** `fix/cleanup-and-discard-set-the-board` (BOARD-108) and the
   other branches listed below are historical records. Their earlier `discard` → `Ready` behavior
   is superseded by the current BOARD-116 human-only discard policy. The specialist skill catalogue branch

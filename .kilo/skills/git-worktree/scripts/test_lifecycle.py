@@ -3,6 +3,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -150,7 +151,7 @@ class LifecycleTests(unittest.TestCase):
         self.git(self.root, "checkout", "main")
         self.cli("check-git", "--", "git commit -m test", guard=True, success=False)
         self.cli("mode", "required")
-        self.assertEqual(json.loads((self.root / "kilo.jsonc").read_text())["permission"]["edit"]["*"], "deny")
+        self.assertEqual(json.loads((self.root / "kilo.jsonc").read_text())["permission"]["edit"]["*"], "ask")
         other = Path(self.temporary.name) / "other"
         other.mkdir()
         self.initialize(other)
@@ -206,7 +207,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_create_refreshes_required_base_map_in_optional_mode(self):
         base = self.git(self.root, "show", "main:kilo.jsonc").stdout
-        self.assertEqual(json.loads(base)["permission"]["edit"]["*"], "deny")
+        self.assertEqual(json.loads(base)["permission"]["edit"]["*"], "ask")
         self.cli("mode", "optional")
         main_config = (self.root / "kilo.jsonc").read_bytes()
         path = self.create(change=False)
@@ -711,15 +712,55 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.status(), "Dropped")
 
     def test_handoff_lists_all_repo_diffs_and_batch_commands(self):
+        renamed = self.root.with_name("control root's workspace")
+        self.root.rename(renamed)
+        self.root = renamed
+        self.script = self.root / ".kilo/skills/git-worktree/scripts/worktree.py"
+        self.guard = self.root / ".kilo/skills/git-worktree/scripts/guard.py"
         self.add_repo("api")
+        self.add_row("BOARD-002", "Shared lifecycle fix", kind="Fix", blocked="BOARD-001")
         one = self.create()
         two = self.create(repo="api")
-        result = self.cli("handoff", "--board", "BOARD-001")
-        self.assertIn(str(one), result.stdout)
-        self.assertIn(str(two), result.stdout)
-        self.assertIn("--stat", result.stdout)
-        self.assertIn("merge --board BOARD-001 --apply", result.stdout)
-        self.assertNotIn("discard", result.stdout)
+        for repo in ("control", "api"):
+            self.cli("create", "--board", "BOARD-002", "--reuse", "BOARD-001", "--repo", repo)
+        for board_id in ("BOARD-001", "BOARD-002"):
+            self.set_status(board_id, "Pending Merge")
+        before = {path.relative_to(self.root): path.read_bytes()
+                  for path in self.root.rglob("*") if path.is_file()}
+        arguments = ["--board", "BOARD-001", "--board", "BOARD-002",
+                     "--repo", "control", "--repo", "api", "--target", "main"]
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", GIT_CONFIG_GLOBAL="/dev/null",
+                   GIT_CONFIG_NOSYSTEM="1")
+        env.pop("KILO_CONFIG", None)
+        for script in (self.script, one / ".kilo/skills/git-worktree/scripts/worktree.py"):
+            with self.subTest(script=script):
+                self.script = script
+                result = self.cli("handoff", *arguments)
+                self.assertNotIn(str(self.root), result.stdout)
+                self.assertNotIn("cd ", result.stdout)
+                self.assertNotIn("discard", result.stdout)
+                lines = result.stdout.splitlines()
+                for index, (repo, path) in enumerate(((self.root, one), (self.root / "apps/api", two))):
+                    branch = self.git(path, "branch", "--show-current").stdout.strip()
+                    diff = ["git", "-C", os.path.relpath(repo, self.root), "diff"]
+                    self.assertEqual(lines[index * 3], shlex.join(diff + ["main..." + branch]))
+                    self.assertEqual(lines[index * 3 + 1],
+                                     shlex.join(diff + ["--stat", "main..." + branch]))
+                    self.assertEqual(lines[index * 3 + 2],
+                                     "workspace: " + os.path.relpath(path, self.root))
+                preview, apply = lines[-2:]
+                expected = shlex.join(["python3", os.path.relpath(script, self.root), "merge", *arguments])
+                self.assertEqual(preview, expected)
+                self.assertEqual(apply, expected + " --apply")
+                for command in [line for line in lines if line.startswith("git ")] + [preview]:
+                    result = subprocess.run(["sh", "-c", command], cwd=self.root, env=env,
+                                            text=True, capture_output=True, timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("preview: merge control", result.stdout)
+                self.assertIn("preview: merge api", result.stdout)
+                self.assertIn("dry run; human CLI only: add --apply", result.stdout)
+        self.assertEqual(before, {path.relative_to(self.root): path.read_bytes()
+                                  for path in self.root.rglob("*") if path.is_file()})
 
     def test_confinement_protected_and_symlink_rejection(self):
         path = self.create()

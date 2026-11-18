@@ -14,7 +14,7 @@ request or the next approved task after the previous change merged.
 
 `python3 .kilo/skills/git-worktree/scripts/worktree.py mode required|optional|status` selects or
 reports project-local mode (choose one value). Mode changes regenerate permissions; restart Kilo.
-`board.py` and `docs/BOARD.md` remain tracked pending user clarification.
+board.py remains tracked. The live docs/BOARD.md is local and ignored; the blank template board remains tracked for project initialization.
 
 This is **CLI only**: plain `git`, no extension, no `gh`, no browser, no pull requests.
 
@@ -375,58 +375,25 @@ The agent **never** merges.
 
 ```bash
 python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <ID>
-# human: preview, then apply; repeat --board for a batch
-python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board <ID>
-python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board <ID> --apply
-3. The agent prints the hand-off block for the human.
+```
+
+The block prints each repository's diff/stat commands and workspace path, followed by merge
+preview/apply commands. All paths are relative to the resolved control repository root, with
+shell quoting for command arguments. The human runs the commands from that root. No absolute
+machine paths or `cd` prefixes are emitted; each clone remains independent. Board discovery is
+unchanged. The script path selects the executing harness copy, including a worktree copy before
+merge, rather than substituting the primary checkout's script.
+
+When handoff runs with the primary checkout's script, the lifecycle lines look like this:
 
 ```bash
-python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <BOARD-ID>
+python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board BOARD-00X
+python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board BOARD-00X --apply
 ```
 
-That prints the block: the worktree path, the branch, the base, the diff command, the log
-command, the merge command and the teardown command — commands and paths only. It never runs a
-git command that changes anything. Every session that worked in a worktree ends with it, so the
-diff command and the merge command always reach the human together.
-
-The block looks like this:
-
-```text
-board:    BOARD-00X
-worktree: <path>/.kilo/worktrees/<slug>
-branch:   <type>/<slug>
-base:     main
-
-diff:
-  git -C <path>/.kilo/worktrees/<slug> diff main
-log:
-  git -C <path>/.kilo/worktrees/<slug> log --oneline main..HEAD
-merge (run by the human, in the main checkout):
-  git merge --no-ff <type>/<slug> -m "merge: <slug>"
-after the merge, remove the worktree and delete the branch:
-  python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
-```
-
-The teardown is the last section: it names the row, so the human uses the lifecycle CLI to remove
-the worktree and delete the branch. Do not replace it with raw Git teardown commands.
-
-When the branch is already merged into the base, the block prints a `git show --stat` line
-instead of the merge command, so nobody is handed a merge that would fail.
-
-The same commands by hand, if the human prefers them:
-
-```bash
-# review
-python3 .kilo/skills/git-worktree/scripts/worktree.py list
-git -C .kilo/worktrees/<slug> diff main
-git -C .kilo/worktrees/<slug> log --oneline main..HEAD
-
-# merge — run by the human, in the main checkout
-git merge --no-ff <type>/<slug> -m "merge: <slug>"
-
-# cleanup — run by the human, after the merge
-python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
-```
+Repeat `--board` for a batch. The generated commands retain every selected `--board`, `--repo`
+and `--target` argument. Handoff only prints commands; the human previews before applying.
+Applied lifecycle merge performs cleanup automatically; do not substitute raw Git teardown.
 
 The human may select `--repo <ID>` and `--target <branch>`; the saved base is default. ALL clean
 sources/targets (except live control-board metadata), readiness and commits are preflighted before

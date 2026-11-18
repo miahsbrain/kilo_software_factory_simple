@@ -8,13 +8,13 @@ apps/*/
 
 # Agent worktrees: one per board row, created by .kilo/skills/git-worktree/scripts/worktree.py
 .kilo/worktrees/
+.kilo/local/qa-navigation.json
 
-# QA evidence. The notes and the summaries are tracked; the captures are not.
-artifacts/**/*.png
-artifacts/**/*.log
-artifacts/**/network.json
+# Local review and QA evidence, including reports, ledgers, notes and summaries. Never commit.
+artifacts/
 
 # Local scratch
+.kilo/qa-local/
 .tmp/
 **/__pycache__/
 *.pyc
@@ -30,3 +30,4 @@ node_modules/
 id_rsa*
 
 .DS_Store
+.vscode/

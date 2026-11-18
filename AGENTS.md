@@ -898,7 +898,7 @@ going on, including work that has not been merged yet.
   worktrees can never conflict on the board file.
 - **After the human CLI merges every required surface**, the lifecycle script marks linked rows
   `Merged` and cleans up the merged worktrees. Partial completion stays recorded, not `Merged`.
-- `board.py` and `docs/BOARD.md` remain tracked. Do not untrack either without a new user decision.
+- board.py remains tracked. The live docs/BOARD.md is local and ignored; the blank template board remains tracked for project initialization.
 - **If a worktree needs to record its own lane transition**, it does so in the changelog entry
   and in its report — not in the board file.
 

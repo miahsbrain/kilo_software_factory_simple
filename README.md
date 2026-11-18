@@ -46,13 +46,25 @@ blocks the row instead of opening another one.
 A project is its own git repository. It copies the harness in and owns the copy from then on
 (ADR-054).
 
-**New project** — copy the skeleton, make it a repository, start the discovery interview:
+**New project** — from the factory root, copy the skeleton and complete harness before the
+first commit, then start the discovery interview. Use a new, empty project directory:
 
 ```bash
 cp -r templates/project/. /path/to/project/
+cp -r .kilo/{agent,command,skills,policies,scopes,catalog} /path/to/project/.kilo/
+cp .kilo/.gitignore /path/to/project/.kilo/.gitignore
+cp kilo.jsonc /path/to/project/kilo.jsonc
+printf '\n/docs/BOARD.md\n' >> /path/to/project/.gitignore
 cd /path/to/project
-git init && git commit -m "chore: start the project"
+git init
+git add .
+git commit -m "chore: start the project"
 ```
+
+The explicit slice matches `guard.py`'s `SYNC_SLICE`; do not copy the whole factory `.kilo/`
+over the skeleton. Keep the template's project `AGENTS.md` and `.kilo/repos.json`. `kilo.jsonc`
+is the factory's generated configuration. The live `docs/BOARD.md`, all `artifacts/`, local QA
+navigation and scratch files stay ignored; the blank template board remains tracked here.
 
 Then open it in Kilo Code and run `/decide` to fill `DOMAIN.md`, `/board` to open the first row.
 

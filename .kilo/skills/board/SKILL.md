@@ -13,8 +13,9 @@ checkout**, and the orchestrator is its **only writer**.
 - The script is the only sanctioned way to change it. Hand-editing the table loses the column
   alignment and risks corrupting a row.
 - One orchestrator at a time. Never two agents writing the board.
-- `board.py` and `docs/BOARD.md` remain tracked. Human lifecycle commands also write outcomes
-  through the board parser; agents never untrack either file or hand-edit lifecycle cells.
+- board.py remains tracked. The live docs/BOARD.md is local and ignored; the blank template board remains tracked for project initialization.
+  Human lifecycle commands also write outcomes through the board parser; agents never hand-edit
+  lifecycle cells.
 
 ---
 

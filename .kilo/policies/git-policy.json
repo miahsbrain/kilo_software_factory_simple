@@ -306,8 +306,8 @@
     {
       "pattern": "*",
       "workspace_default": true,
-      "action": "deny",
-      "reason": "Required mode confines edits to linked worktrees. Optional mode changes only this fallback; protected-file and secret rules still apply."
+      "action": "ask",
+      "reason": "Required mode asks for approval outside linked worktrees. Optional mode allows the fallback; protected-file and secret rules still apply."
     },
     {
       "pattern": ".kilo/worktrees/**",

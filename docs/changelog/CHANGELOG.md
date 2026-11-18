@@ -3,6 +3,61 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Prepare reviewed bootstrap and handoff changes for merge
+**Type:** Chore
+**Board:** BOARD-117, BOARD-118 | **Branch:** chore/fix-project-bootstrap-and-template-drift
+**Changed:** Handover and project state record explicit commit authorization and human merge handoff.
+**Why:** Both shared rows passed focused verification and review; the user requested a commit and merge preparation.
+**Impact:** Commit the intended change set, verify a clean worktree, and set both live rows Pending Merge. The agent does not merge or push. Earlier uncommitted notes below describe intermediate task history.
+
+## [2026-11-18] Replace absolute handoff output with control-root-relative commands
+**Type:** Fix
+**Board:** BOARD-117 (shared BOARD-118 workspace) | **Branch:** chore/fix-project-bootstrap-and-template-drift (uncommitted)
+**Changed:** Existing `cmd_lifecycle()` handoff formatting and handoff regression, worktree skill examples, handover, state, decisions and this log.
+**Why:** Approved ADR-077 supersedes ADR-075: humans run commands from the control root; each clone remains independent of machine paths.
+**Impact:** Review/lifecycle commands and workspace displays use `os.path.relpath` from the resolved control root, with shell quoting for command arguments and no `cd` prefix. Preserve actual executing script selection, discovery, all board/repo/target arguments, bootstrap architecture, policy and BOARD-118 assertion fixes. Reused existing function/test; no new helper or tool.
+**Verification:** From `.kilo/skills/git-worktree/scripts`, ran `TMPDIR=/projects/kilo_inhouz_ai/.kilo/worktrees/fix-project-bootstrap-and-template-drift/.tmp PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_lifecycle.LifecycleTests.test_mode_is_local_persistent_and_regenerates_permissions test_lifecycle.LifecycleTests.test_create_refreshes_required_base_map_in_optional_mode test_lifecycle.LifecycleTests.test_handoff_lists_all_repo_diffs_and_batch_commands`. All 3 tests passed in 2.007s, exit 0. Handoff checks exact relative output for both repos and primary/worktree scripts, root with spaces/apostrophes, batch selections, execution of review/preview commands from root, and byte-for-byte immutability; apply text only. No full suite, production build, real merge, commit, board edit or main/existing-project edit.
+
+## [2026-11-18] Align stale required-mode assertions with approved ask policy
+**Type:** Fix
+**Board:** BOARD-118 (shared BOARD-117 workspace) | **Branch:** chore/fix-project-bootstrap-and-template-drift (uncommitted)
+**Changed:** Two existing assertions in `test_lifecycle.py`, handover, state and this log.
+**Why:** Required-mode regeneration and the copied base config now use the approved workspace-default `ask` action, not `deny`.
+**Impact:** Test expectations only; protected-file/secret assertions, production lifecycle behavior and approved policy remain unchanged. Reused existing tests; no new helper, workspace, commit, board edit or real merge.
+**Verification:** From `.kilo/skills/git-worktree/scripts`, ran `TMPDIR=/projects/kilo_inhouz_ai/.kilo/worktrees/fix-project-bootstrap-and-template-drift/.tmp PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_lifecycle.LifecycleTests.test_mode_is_local_persistent_and_regenerates_permissions test_lifecycle.LifecycleTests.test_create_refreshes_required_base_map_in_optional_mode test_lifecycle.LifecycleTests.test_handoff_lists_all_repo_diffs_and_batch_commands`. All 3 tests passed in 1.715s, exit 0. Full suite and production builds were not run.
+
+## [2026-11-18] Correct handoff regression fixture ordering
+**Type:** Fix
+**Board:** BOARD-117 | **Branch:** chore/fix-project-bootstrap-and-template-drift (uncommitted)
+**Changed:** Added handoff setup in `test_lifecycle.py`, handover, state and this log.
+**Why:** `add_row()` rewrites the fixture board from `self.rows`, erasing workspace entries previously added by CLI calls. Existing reuse coverage adds the fix row before creating workspaces.
+**Impact:** Moved BOARD-002 creation before workspace creation; production lifecycle semantics and approved policy are unchanged. No new helper, commit, board/main-checkout edit or real merge.
+**Verification:** `TMPDIR=/projects/kilo_inhouz_ai/.kilo/worktrees/fix-project-bootstrap-and-template-drift/.tmp PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -k handoff -v` passed: 1 test in 0.871s, exit 0. Covers preview from outside control root, spaces/apostrophes, repeated board/repo and target arguments, exact printed apply structure and byte-for-byte preview immutability. Apply was not executed; full suite was outside the focused scope.
+
+## [2026-11-18] Align the approved workspace-default policy fallback
+**Type:** Fix
+**Board:** BOARD-117 | **Branch:** chore/fix-project-bootstrap-and-template-drift (uncommitted)
+**Changed:** First workspace-default edit rule in `.kilo/policies/git-policy.json`, decisions, handover, state and this log.
+**Why:** Apply the explicitly approved `deny` to `ask` fallback correction already reflected in generated config.
+**Impact:** Required mode asks for approval outside linked worktrees; optional fallback and protected-file/secret rules retain their existing behavior. `kilo.jsonc`, main checkout, board and existing projects remain unchanged.
+**Verification:** One combined command: `TMPDIR=/projects/kilo_inhouz_ai/.kilo/worktrees/fix-project-bootstrap-and-template-drift/.tmp PYTHONDONTWRITEBYTECODE=1 python3 .kilo/skills/git-worktree/scripts/guard.py check-policy && TMPDIR=/projects/kilo_inhouz_ai/.kilo/worktrees/fix-project-bootstrap-and-template-drift/.tmp PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -k handoff -v`. Policy output: `policy in sync`. Test: 1 failure in 0.409s, combined exit 1, fixture reuse at `test_lifecycle.py:725`: `worktree.py error: board BOARD-001 has required repos without workspace entries`. Handoff assertions not reached; stopped without fixture changes, retries, commits or real merges.
+
+## [2026-11-18] Anchor generated handoff commands to the control repository
+**Type:** Fix
+**Board:** BOARD-117 | **Branch:** chore/fix-project-bootstrap-and-template-drift (uncommitted)
+**Changed:** `worktree.py`, existing `test_lifecycle.py` handoff test, worktree skill examples, handover, state, decisions and this log.
+**Why:** Pasting an absolute lifecycle script command from outside the control root sought the wrong board.
+**Impact:** Printed merge preview/apply commands use safely quoted `cd <resolved control root> && python3 <script> ...`; discovery and selection arguments remain unchanged. No new tool, commit, policy/config, board or existing-project edits; no real merge.
+**Verification:** `TMPDIR=/projects/kilo_inhouz_ai/.kilo/worktrees/fix-project-bootstrap-and-template-drift/.tmp PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_lifecycle.py -k handoff -v` failed (1 test, exit 1) during fixture creation: `permission initialization failed: inherited permission map disagrees with saved mode`. Handoff assertions were not reached; no workaround or second command attempted.
+
+## [2026-11-18] Complete project bootstrap and align template ignores
+**Type:** Fix
+**Board:** BOARD-117 | **Branch:** assigned BOARD-117 worktree (uncommitted)
+**Changed:** Factory/template READMEs, `.gitignore` files and tracking rules, board/worktree skill guidance, handover, state, decisions and this log.
+**Why:** Skeleton-only setup omitted the harness and staging; template QA ignores and tracked-live-board wording contradicted approved local state.
+**Impact:** Initial setup copies the existing complete sync slice/config before the first commit while retaining project rules and repo map. Live boards and all evidence stay ignored; the blank template board stays trackable. No tool, policy/config, existing project, index or board changes; no commit.
+**Verification:** After approved correction to append `/docs/BOARD.md` only to the bootstrap destination, one invocation passed, exit 0, in `.tmp/board-117.jsHiWB`: `diff -qr` for six slices; `cmp` for copied ignore/config and retained rules/map; eight project ignore checks; tracked template-board/board.py checks; template-board not ignored; factory live board ignored; empty index listings; `git diff --check`. Earlier permission and child-ignore failures resolved. No handoff edits or commits.
+
 ## [2026-11-18] Keep board state truthful after partial discard
 **Type:** Fix
 **Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
