@@ -660,6 +660,20 @@ class LifecycleTests(unittest.TestCase):
         self.cli("merge", "--board", "BOARD-001", "--apply")
         self.assertEqual(self.status(), "Merged")
 
+    def test_cleanup_preview_and_refusal_do_not_create_recovery_tsv(self):
+        path = self.create(change=False)
+        cleanup_dir = Path(WORKTREE.common_dir(str(self.root))) / "cleanup-wt"
+
+        self.cli("cleanup", "shared-lifecycle")
+        self.assertFalse(list(cleanup_dir.glob("*.tsv")))
+        self.assertTrue(path.exists())
+
+        (path / "data.txt").write_text("unmerged\n")
+        self.commit(path)
+        self.cli("cleanup", "shared-lifecycle", success=False)
+        self.assertFalse(list(cleanup_dir.glob("*.tsv")))
+        self.assertTrue(path.exists())
+
     def test_custom_base_is_persisted_and_origin_default_is_protected(self):
         self.git(self.root, "checkout", "-b", "integration")
         self.cli("create", "--board", "BOARD-001", "--base", "integration")

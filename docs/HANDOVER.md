@@ -189,8 +189,9 @@ checkout and, for control worktrees, `.kilo/local/qa-navigation.json`; it preser
 skips preexisting destinations, and never reads or prints file values (effectful).
 The authorized follow-up resolves the former inherited-map order blocker by calling
 `permission_maps_match(current, expected)` at `.kilo/skills/git-worktree/scripts/worktree.py:642`.
-Independent proof: 33 tests passed, including six reordered-rule cases and two ordered success
-cases at `.kilo/skills/git-worktree/scripts/test_lifecycle.py:246-300`. The template hold is resolved.
+The lifecycle test suite is run with `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s
+ .kilo/skills/git-worktree/scripts -p 'test_*.py' -v`; it covers permission-map ordering,
+ workspace lifecycle, and cleanup/discard safety. The template hold is resolved.
 
 `lifecycle_selection()` resolves board rows and mapped repo IDs; `validate_workspace()`
 checks registered linked workspaces, branches, confinement and locks; `require_clean()` allows

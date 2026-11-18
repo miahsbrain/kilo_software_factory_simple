@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Keep cleanup previews side-effect free
+**Type:** Fix
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** `worktree.py`, lifecycle regression tests, `README.md`, `docs/HANDOVER.md`, and tracked review reports.
+**Why:** Delay recovery TSV creation until an apply operation passes preflight, document generated app-scope pointers, and remove obsolete tracked review reports.
+**Impact:** Cleanup dry-runs and refusals no longer write recovery files; discard remains human-only and without backups.
+
 ## [2026-11-18] Complete documentation audit correction
 **Type:** Docs
 **Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy

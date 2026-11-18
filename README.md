@@ -71,8 +71,8 @@ A project is a control repo plus one repository per application.
 - **Control repo** — the project repository. It holds `AGENTS.md`, `docs/`, the board, the domain
   rules, the API contracts and the guard-rail policy.
 - **App repos** — a git repository at `apps/<name>/`, nested inside the control repo. Each holds one
-  application and its own copy of the `.kilo/` slice, so the guard rails are the same wherever the
-  work happens.
+  application and receives only an ignored generated `AGENTS.md` pointer to the canonical scope
+  rules; it does not receive a copied `.kilo/` harness slice.
 
 `.kilo/repos.json` maps a repo id to a path:
 

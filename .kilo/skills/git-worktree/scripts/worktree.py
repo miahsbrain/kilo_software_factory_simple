@@ -1642,15 +1642,13 @@ def cmd_cleanup(args, cwd):
     if reason is not None:
         rows.append({"when": now, "kind": "worktree", "name": branch or "(detached)", "sha": sha,
                      "path": path, "action": "keep", "reason": reason})
-    tsv = recovery_tsv(common, rows) if common else None
+    tsv = None
 
     print("worktree: %s" % os.path.abspath(path))
     print("branch:   %s" % (branch or "(detached)"))
     if reason is not None:
         print("refused: %s" % reason)
         print("no work was deleted")
-        if tsv:
-            print("recovery TSV: %s" % tsv)
         return REFUSED
 
     print("plan:")
@@ -1659,10 +1657,9 @@ def cmd_cleanup(args, cwd):
 
     if not args.apply:
         print("dry run; re-run with --apply to act")
-        if tsv:
-            print("recovery TSV: %s" % tsv)
         return OK
 
+    tsv = recovery_tsv(common, rows) if common else None
     done = []
     env = load_env_module(script_root())
     if env is not None:
