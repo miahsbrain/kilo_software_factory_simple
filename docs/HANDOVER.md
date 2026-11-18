@@ -1,6 +1,20 @@
 # Factory Handover
 
-## Session Notes
+## BOARD129 Current
+
+Final verification after guidance/documentation updates: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_bootstrap.py -v` passed all 24 tests in 4.858s (exit 0); `git diff --check` passed.
+
+Independent read-only safety review found no actionable findings and independently passed `git diff --check`. The reviewer did not rerun the fixture suite. The user authorized committing this change and preparing a human merge handoff; it is not deployed to existing copied factories.
+
+Implemented the approved factory guardrail in assigned `.kilo/worktrees/constrain-bootstrap-to-approved-working-directories`, branch `chore/constrain-bootstrap-to-approved-working-directories`. Commit the reviewed files, verify clean lifecycle readiness, and record the commit/readiness on BOARD-129 before human handoff. `project()` defaults to rejecting canonical destinations outside invoking factory CWD before writes/init/staging/commits, including direct calls. Project mode still requires CWD == source factory root; no fallback. Default local `project/` and custom internal destinations with existing parents work. Project-only `--allow-outside` supports intentional external creation only after actual user approval; the flag itself cannot prove approval. CWD/source/resolved destination print on stderr before creation without changing final stdout success. Existing path, traversal/symlink, policy, identity/hook checks remain.
+
+Root/template agreement and README, active `/bootstrap` and `/run`, and worktree skill anchor mutation to approved resolved control/target roots. Stop mismatches; never derive sibling destinations from display/service names, enter siblings or reuse unrelated board/worktree paths without approval. No blanket lifecycle-helper CWD rule, source-resolver/worktree/policy/config changes. Restore retains explicit external clone targets without the flag; app/restore reject the flag. BOARD128 removal remains intact.
+
+Initial focused command from this assigned workspace: `python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_bootstrap.py -v`, 24 tests passed in 4.978s, exit 0. Existing authorized fixture Git commits only; external policy/hook fixtures explicitly opt in individually. New tests prove default rejection leaves target parents and factory bytes (including index/HEAD metadata) unchanged, direct helper confinement, internal/approved-external success, project-only flag parsing, unchanged external restore, CWD and unsafe-path preflight.
+
+No live external changes, migration, cleanup or install; no agent merge or push. Coordinator owns main live-board updates. The supplied diagnosis does not prove any historical automatic redirect; exact prior action remains unverified. This correction prevents unapproved external bootstrap by default, not all possible agent misuse. No full lifecycle, browser, build or image verification; concurrent filesystem races remain outside the existing preflight guarantee. ADR-088 records the decision. Earlier session/testing notes below describe BOARD128 history, not this task's authorization.
+
+## Prior Session Notes
 
 BOARD128 removes the unslop skill, command, bundled resources and active factory/template references in assigned `.kilo/worktrees/remove-unslop-from-factory-ui-workflows`, branch `chore/remove-unslop-from-factory-ui-workflows`. The user authorized committing the reviewed removal and preparing its human merge handoff. No agent merge, push, install or runtime changes. Existing `/projects/kilo_inhouz_ai/project` and apps are untouched; existing project copies are not migrated. Coordinator owns live-board updates.
 

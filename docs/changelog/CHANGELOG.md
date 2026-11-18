@@ -3,6 +3,20 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Commit destination guardrail and prepare human handoff
+**Type:** Chore
+**Board:** BOARD-129 | **Branch:** chore/constrain-bootstrap-to-approved-working-directories
+**Changed:** State and handover reflect explicit user authorization to commit the reviewed destination guardrail and prepare lifecycle commands.
+**Verification:** Twenty-four bootstrap tests passed in 4.858s; independent safety review found no actionable findings. Post-commit readiness and commit ID are recorded on the live board. No existing copied factory deployment, external project edits, agent merge or push.
+
+## [2026-11-18] Constrain bootstrap to approved working directories
+**Final verification:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_bootstrap.py -v` passed all 24 tests in 4.858s (exit 0), after guidance/documentation updates; `git diff --check` passed.
+**Type:** Chore
+**Board:** BOARD129 | **Branch:** chore/constrain-bootstrap-to-approved-working-directories (assigned workspace, unstaged/uncommitted)
+**Changed:** Existing `project()` helper checks invoking source factory-root CWD and canonical containment before any writes/init/staging/commits. Project-only `--allow-outside` explicitly enables external targets after actual user approval, not as proof of approval. Default remains local `project/`; custom internal destinations with existing parents work. CWD/source/resolved destination print to stderr, success stdout preserved. Root/template agreements and READMEs, active bootstrap/run commands and worktree skill anchor resolved control/target writes to user-approved roots, stop mismatches and forbid inferred siblings/unrelated board reuse without approval. Current docs and appended ADR-088 record scope and limits.
+**Preserved:** Existing destination/path/symlink/traversal preflight, hard policy denials, identity/hooks and initial-commit semantics. App canonical layout, explicit external restore, source resolver fallback and worktree behavior unchanged; flag rejected in app/restore. BOARD128 removal intact. No live external changes/migration/cleanup, install, factory staging/commit/merge/push. Exact historical action remains unverified; no claim of proven automatic tool redirect.
+**Verification:** Initial `python3 -m unittest discover -s .kilo/skills/git-worktree/scripts -p test_bootstrap.py -v` from the assigned workspace passed 24 tests in 4.978s, exit 0. Five new tests cover no-write relative/absolute external refusal with unchanged parent entries/factory bytes including Git metadata, direct helper/CWD confinement, internal/explicit external success, project-only flag and external restore, retained unsafe-path preflight. Intentional external policy/hook fixtures opt in individually; no blanket harness flag. Disposable authorized fixture commits only. No full lifecycle, build, browser, image or hostile concurrent-filesystem verification.
+
 ## [2026-11-18] Commit removal and prepare human merge handoff
 **Type:** Chore
 **Board:** BOARD-128 | **Branch:** chore/remove-unslop-from-factory-ui-workflows
