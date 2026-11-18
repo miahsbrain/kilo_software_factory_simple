@@ -17,22 +17,28 @@ A small delivery harness for [Kilo Code](https://kilo.ai): a working agreement, 
 
 ## Start A New Project
 
-Choose a new empty destination and copy the skeleton plus the full supported harness before initializing Git. From the factory root:
+Use `/bootstrap` or the deterministic CLI from the factory checkout root. Never manually copy a new project:
 
 ```bash
-cp -r templates/project/. /path/to/project/
-cp -r .kilo/{agent,command,skills,policies} /path/to/project/.kilo/
-cp .kilo/.gitignore /path/to/project/.kilo/.gitignore
-cp kilo.jsonc /path/to/project/kilo.jsonc
-printf '\n/docs/BOARD.md\n' >> /path/to/project/.gitignore
-git -C /path/to/project init
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py project
+# Optional isolated destination; its parent must already exist:
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py project --destination /path/to/new-project
 ```
 
-Keep the template's `AGENTS.md` and `.kilo/repos.json`; do not overwrite them with the factory map. The template skeleton alone is not the complete harness. The copied project owns its harness independently. Git initialization follows the full copy immediately; staging and the initial commit require explicit user authorization. Worktree creation needs an existing commit, so request that authorization when needed rather than creating one silently.
+The default destination is the caller factory root's `project/`. Every existing destination is refused, even an empty directory or dangling symlink. The source is the executing script's checkout, including assigned worktrees, never a stale primary checkout. It copies the blank template (retaining project `AGENTS.md` and the flat `{"control":"."}` map), then `agent`, `command`, `skills`, `policies`, the exact `.kilo/.gitignore`, and `kilo.jsonc`. It creates empty `apps/` and initializes Git only after the complete copy. The project owns its copied harness independently. Local files, env/secrets, generated outputs, artifacts, factory map and live board are not copied; only the blank template board is copied, already ignored by static template rules. `.kilo/local/qa-navigation.json` is optional local runtime input, not a source-config prerequisite; source policies, config and tests remain trackable.
 
-`apps/` starts empty with no fixed API/web/mobile slots and may not exist in a fresh Git checkout, since Git does not store empty directories. Create an app directory only when the approved project needs it. When creating a genuinely new app directory, initialize its repository immediately with `git -C /path/to/project/apps/<name> init`, then register its real ID/path in the project's `.kilo/repos.json` before work. Initial commits still require explicit authorization. Do not reinitialize an existing app repository. The template ignores `apps/*/` so nested repositories are not tracked by the control repo. No app-level `AGENTS.md` or duplicate harness is required.
+From the initialized **project control root**, create each real frontend, backend or other app only when needed:
 
-For an existing project, agree on the migration scope first and preserve its actual layout and repo map. This change does not migrate the existing `project/`. There is no new provisioning CLI.
+```bash
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py app customer-portal --git separate
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py app billing-worker --git project
+```
+
+Project Git is mandatory; individual app Git is optional. `/bootstrap` must ASK whether the user wants separate app Git or source tracked in project Git unless already specified. The CLI requires `--git separate|project` with no default; omission fails before mutation. App names/IDs are lowercase kebab-case starting with a letter (`control` is reserved). Both modes create only `apps/<name>`. `separate` writes an app-local `.gitignore`, initializes Git, then registers `<name>: apps/<name>` in flat `.kilo/repos.json`. Its ignore snapshot removes only the control-only `apps/*/` rule, retaining secret/local-output protections and trackable source/`.env.example`; later project ignore edits do not update that snapshot. `project` creates no nested Git or independent map entry: source belongs to the control repository. It appends only `!/apps/<name>/` to the project ignore file, preserving prior patterns and secret/runtime ignores; other apps remain ignored. A missing/nonregular/symlink project `.gitignore` is refused before creation. No arbitrary destination, scaffolding, app `AGENTS.md`, duplicate harness or installation. Existing paths/symlinks, malformed maps, ID/path collisions, traversal and nonproject roots are refused in both modes. `apps/` may be absent after checkout; app mode creates it.
+
+Both modes receive the app-local ignore snapshot so control-root-relative runtime rules also protect integrated app paths. The snapshot is not automatically refreshed by later project ignore edits.
+
+Requires Python 3.9+ and Git. Authorized bootstrap includes scoped init consent where initialization occurs, satisfying the guard's `ask` result; hard denials/errors still stop project bootstrap and separate mode. Project-tracked app mode performs no init or init guard check. Policy files are unchanged. Unset `GIT_*` overrides. Preconditions are checked before writing where feasible. Failures retain partial state, never destructive rollback or copying fallback. No staging or commits occur. Initial scaffolding/bootstrap needs no worktree; request explicit initial-commit authorization before feature implementation in an assigned linked worktree. Existing projects/repositories, including the ignored `project/` and its apps, are never reinitialized or migrated.
 
 ## Work
 
@@ -41,6 +47,8 @@ Read the working agreement and relevant task context. Use `/plan` for substantia
 The coordinator maintains the main checkout's live board through `board.py`. `/run` uses the assigned workspace and focused checks. `/ui` shares capture evidence with parallel independent UI critique and a general read-only unslop task; findings are consolidated once. `/handover` updates concise current documentation, not exhaustive inventories. A confirmed harmless development-only favicon failure is nonblocking, but raw evidence remains and auth/script/API failures are still reviewed.
 
 Use existing lifecycle tools in `.kilo/skills/git-worktree/SKILL.md`. Commits, destructive operations, merge, and push require applicable authorization. `worktree.py handoff --board <ID>` prints review and human lifecycle commands; it does not merge. The board viewer runs with `python3 .kilo/skills/board/scripts/board_serve.py --port 15180`.
+
+All FEATURE implementation uses an assigned linked worktree, not the primary checkout. Explicitly assigned features may share its worktree/branch with `worktree.py create --board NEW --reuse EXISTING --repo ID`, preserving scope/ownership without auto-switching branches. Project-tracked apps use control's worktree; separate apps use their mapped repo's worktree. Optional policy remains for non-feature maintenance; do not alter saved mode or permissions for feature assignments.
 
 ## Requirements And State
 
