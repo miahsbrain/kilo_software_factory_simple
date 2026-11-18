@@ -1,6 +1,15 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
+> - **2026-11-18, BOARD-116:** Reconciled this handover and project state with the approved
+>   human-only discard policy on branch `chore/synchronize-factory-worktree-lifecycle-and-policy`
+>   in `.kilo/worktrees/synchronize-factory-worktree-lifecycle-and-policy`. Discard requires
+>   `--apply --discard`, permanently removes the selected linked worktree and branch without a
+>   recovery backup, and marks the final linked row `Dropped`; normal cleanup remains separate.
+>   Application logic, tests, policy and `docs/BOARD.md` were not changed. The focused docs commit
+>   is pending human review and merge.
+> - **Next action:** review and merge the BOARD-116 documentation correction. Historical session
+>   notes below are retained as history and do not describe the current discard contract.
 > - **2026-11-17, BOARD-114:** Provisioning/auth and permission-order cleanup are documented on
 >   branch `feat/provision-local-env-and-secure-qa` in
 >   `.kilo/worktrees/provision-local-env-and-secure-qa`. Policy and generated permission map are
@@ -114,7 +123,7 @@
 | `.kilo/skills/board/scripts/board_serve.py` | The read-only factory board console on port 15180. Server-rendered, offline, standard library at runtime: a three-column dashboard shell (lane/filter sidebar, KPI strip, segmented flow meter, dense lane panel, sticky worktrees rail), search and status/type/priority filters with URL state, parsed Notes checklists, branch copy, and `j`/`k`/`/`/`Enter`/`Esc` keyboard control. Serves `/static/board.css` and the two self-hosted Geist fonts. `/api/board` and `/api/worktrees` are unchanged JSON. |
 | `.kilo/skills/board/ui/` | The Tailwind v4 source for the console (`package.json`, `src/app.css`); `npm --prefix .kilo/skills/board/ui run build` writes the committed `static/board.css`. |
 | `.kilo/skills/board/static/` | The committed stylesheet and the Geist Sans/Mono variable fonts with their SIL OFL licence. |
-| `.kilo/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, `discard` (`--force`, `--yes`), `handoff`, `list`, `verify`, `cleanup` (by slug or by `--board`). The teardown commands set the row's lane: `cleanup --board` sets `Merged`, `discard --board` sets `Ready`. |
+| `.kilo/skills/git-worktree/scripts/worktree.py` | Creates, lists, verifies and cleans the worktree of a board row. `create`, `resume`, human-only `discard` (`--apply --discard`), `handoff`, `list`, `verify`, `cleanup` (by slug or by `--board`). Discard permanently removes the selected linked worktree and branch without a backup and marks the final linked row `Dropped`; `cleanup --board` sets `Merged`. |
 | `.kilo/skills/git-worktree/scripts/env.py` | Provisions the local env files of a worktree. `sync`, `status`, `clean`. |
 | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails: `check-git`, `check-policy`, `check-delete`, `check-worktree`, `check-repos`, `sync` (one repo or `--all`). |
 | `.kilo/skills/git-worktree/scripts/scope.py` | The generated pointer a work surface carries, and the local exclude rule that keeps it out of every commit. |
@@ -131,7 +140,7 @@
 |---|---|---|---|
 | `board.py` | `.kilo/skills/board/scripts/board.py` | Deterministic manipulation of the markdown board. Never writes prose. | effectful (file I/O) |
 | `board_serve.py` | `.kilo/skills/board/scripts/board_serve.py` | Serves the board and the live worktree state read-only, as a server-rendered factory console with a segmented flow meter, keyboard-first filtering, parsed Notes checklists, a sticky worktrees rail, and the static Tailwind CSS and font files. | effectful (network, file I/O) |
-| `worktree.py` | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, `discard` removes one, `discard --force --yes` destroys one after writing a recovery copy, `handoff` prints the hand-off block, `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, `discard` sets `Ready`. | effectful (git, filesystem) |
+| `worktree.py` | `.kilo/skills/git-worktree/scripts/worktree.py` | Creates the worktree for a board row, derives its name and branch, records it back on the row. `resume` reuses a live worktree, human-only `discard --apply --discard` permanently removes one without a backup, `handoff` prints the hand-off block, and `cleanup` removes a merged worktree by slug or by the row that owns it. A teardown by row sets that row's lane: `cleanup` sets `Merged`, and discard sets `Dropped` when no linked worktrees remain. | effectful (git, filesystem) |
 | `env.py` | `.kilo/skills/git-worktree/scripts/env.py` | Copies the two local env files from a repository's main checkout into a worktree, excludes them from git, and removes them again. Never prints a value. | effectful (filesystem, git exclude) |
 | `test_env.py` | `.kilo/skills/git-worktree/scripts/test_env.py` | Self-test for the env provisioning and the worktree reuse rules, in a throwaway repository under a temp directory. | effectful (filesystem, git) |
 | `guard.py` | `.kilo/skills/git-worktree/scripts/guard.py` | The guard rails and the sync that carries them into an app repository. | effectful (git, filesystem) |
@@ -278,14 +287,15 @@ and `Dropped`. Unresolved findings block handoff; verified shared parent/Fix row
 
 The factory exposes no network API. Its public surface is the file layout above and the CLI of
 the scripts. The worktree CLI is `worktree.py` (`create`, `resume`, `discard`, `handoff`, `list`,
-`verify`, `cleanup`) and `env.py` (`sync`, `status`, `clean`). `discard` takes `--apply`, `--force`
-and `--yes`: `--force` alone prints the destruction plan, and `--force --yes` acts after writing a
-recovery copy under the repository's `cleanup-wt/` folder. `handoff --board <ID>` prints the
+`verify`, `cleanup`) and `env.py` (`sync`, `status`, `clean`). `discard` is human-only: it previews
+by default and requires both `--apply` and `--discard` to permanently remove the selected linked
+worktree and branch without writing a recovery patch, TSV or other backup. A successful discard
+clears the board entry and marks the row `Dropped` when no linked worktrees remain. `handoff --board <ID>` prints the
 hand-off block — the diff command, then the merge command, then the teardown command — and
 changes nothing. `cleanup` takes the worktree either as a slug or as `--board <ID>`, which
 resolves the row's `Branch/Worktree` cell and clears it when the worktree is gone; giving both or
 neither is a usage error. The lane each command sets: `create` and `resume` put the row in
-`In Progress`, `cleanup --board` puts it in `Merged`, `discard --board` puts it back in `Ready`,
+`In Progress`, `cleanup --board` puts it in `Merged`, discard marks the final linked row `Dropped`,
 and the slug form of `cleanup` touches nothing on the board.
 
 ## 8. Configuration and environment
