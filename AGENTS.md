@@ -937,8 +937,9 @@ Columns: `ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | Bra
 
 - **A teardown command owns the lane for the row it tears down.**
   `worktree.py cleanup --board <ID> --apply` puts the row in `Merged` and clears its
-  `Branch/Worktree` cell; `worktree.py discard --board <ID> --apply` puts the row back in
-  `Ready` and clears it. The human runs these in the main checkout, so the script is the
+  `Branch/Worktree` cell; human-only `worktree.py discard --board <ID> --apply --discard`
+  permanently removes the selected worktree and branch without backups, clearing the entry and
+  putting the row in `Dropped` when no other worktrees remain. The human runs these in the main checkout, so the script is the
   board's writer for that change and the orchestrator does not repeat it by hand. A refused
   teardown changes nothing on the board.
 
@@ -1040,17 +1041,18 @@ worktree.
     verification, then reports staged/unstaged state. It never commits or completes the merge.
     The human completes the preexisting merge after review/checks, then reruns the lifecycle command.
 12. **Explicit discard:** preview with `worktree.py discard --board ID --repo ID`; only the
-    human's explicit request permits `--apply --discard`. This may remove selected dirty/unmerged
-    linked worktrees and their feature branches, never main/protected checkouts or paths outside
-    mapped `.kilo/worktrees/`. Fully discarded linked rows become `Dropped`; partial outcomes
-    remain recorded. Agents never discard unasked.
+    human's explicit request permits `--apply --discard`. This permanently removes selected
+    dirty/unmerged linked worktrees and their feature branches without backup files, never
+    main/protected checkouts or paths outside mapped `.kilo/worktrees/`. Rows become `Dropped`
+    when their last worktree is removed. Agents never discard; Kilo denies the command.
 10. **After the merge**, the orchestrator marks the row `Merged` in the main checkout, and the
     worktree is cleaned up by the human (or by the agent once the branch is confirmed merged).
-11. **Env files are provisioned into every new worktree, and are never committed.**
-    `worktree.py create` copies `.env` and `.env.local` from the repository's main checkout into
-    the new worktree, with mode `0600` and listed in the repository's `.git/info/exclude`. The
-    agent still may not read them: the app reads the file, the agent runs the app. `cleanup` and
-    `discard` remove the copies.
+11. **Local files are provisioned once into new worktrees, and are never committed.**
+    `worktree.py create` recursively copies ignored/untracked regular `.env*` files except
+    `.env.example`, plus `.kilo/local/qa-navigation.json`, from the primary checkout. It skips
+    tracked sources and existing destinations, preserves file modes, and excludes copied env
+    paths in `.git/info/exclude`. Resume never recopies. Cleanup never deletes unprovenanced local
+    files; removing a whole worktree removes its contents as part of Git's operation.
 12. **A live worktree for a board row is resumed or discarded, never duplicated.**
     `worktree.py create` refuses when the row already has a live worktree and prints the three
     options: `resume`, `discard`, or a new `--slug`. When the slug directory is taken by
@@ -1058,13 +1060,13 @@ worktree.
     work: a new `--slug`, or `discard` for that owning row. `worktree.py resume --board <ID>`
     reuses the worktree and puts the row back in `In Progress`.
     The teardown command owns the lane for the row it tears down: `cleanup --board <ID> --apply`
-    puts the row in `Merged` and clears the `Branch/Worktree` cell, `discard --board <ID>
-    --apply` puts the row back in `Ready` and clears it. The script is the board's writer in
+    puts the row in `Merged` and clears the `Branch/Worktree` cell; human-only `discard --board <ID>
+    --apply --discard` permanently removes the selected worktree and branch with no backup and
+    marks the row `Dropped` once none remain. The script is the board's writer in
     the main checkout when the human runs it, so the orchestrator does not set the lane by hand
     afterwards. A refusal changes nothing on the board.
-    A human may destroy work that `discard` refuses, in two steps: `--force` alone prints the
-    destruction plan and never acts, and `--force --yes` acts after writing a recovery patch and
-    a recovery TSV under the repository's `cleanup-wt/` folder.
+    Discard is an explicit permanent loss operation. It has a dry-run and requires both `--apply`
+    and `--discard`; it writes no recovery patch, TSV or backup. Kilo agent execution is denied.
 
 ### Board lanes
 
@@ -1273,7 +1275,7 @@ reason on one line.
 - If several worktrees depend on the same contract, schema, or file layout, settle that shared
   shape on the base branch **before** fanning out.
 - Preserve dirty/unmerged work except an explicitly requested human discard through the CLI.
-- Lifecycle merge cleans up merged worktrees; discard records full/partial outcomes separately.
+- Lifecycle merge cleans up merged worktrees; discard permanently removes selected work without backups and sets `Dropped` after the final linked worktree is gone.
 - Never create, move, or use a worktree outside `.kilo/worktrees/`.
 
 ### Guard rules (enforced by the guard script, not by discipline)
@@ -1770,7 +1772,8 @@ Work lands on a branch. A human reviews it and decides where it goes:
   handoff --board ID`. The human previews `merge --board ID` then runs `merge --board ID --apply`.
   Repeat `--board ID` for batches. Cleanup is automatic; partial failures preserve state (§B4).
 - Discard is a separate human decision: preview `discard --board ID --repo ID`, then only with
-  explicit loss approval run `discard --board ID --repo ID --apply --discard`.
+  explicit loss approval run `discard --board ID --repo ID --apply --discard`. It creates no
+  backups and is denied through Kilo agent permissions.
 
 The agent stops at `Pending Merge`. It does not merge, does not push, and does not open a PR.
 

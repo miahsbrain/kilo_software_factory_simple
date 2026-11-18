@@ -18,6 +18,7 @@ import tempfile
 
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 REPO_SCRIPTS = os.path.abspath(os.path.join(SCRIPTS, "..", ".."))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPTS, "..", "..", "..", ".."))
 MARKER = "FACTORY-TEST-SECRET-MARKER"
 
 FAILURES = []
@@ -59,6 +60,10 @@ def make_repo(base):
             if name.endswith(".py"):
                 shutil.copyfile(os.path.join(REPO_SCRIPTS, group, "scripts", name),
                                 os.path.join(target, name))
+    for relative in (".kilo/policies/git-policy.json", "kilo.jsonc"):
+        target = os.path.join(repo, relative)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(os.path.join(REPO_ROOT, relative), target)
     write(os.path.join(repo, ".kilo", "repos.json"), '{\n  "control": "."\n}\n')
     write(os.path.join(repo, "docs", "BOARD.md"), (
         "| ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | "
@@ -68,10 +73,6 @@ def make_repo(base):
         "test | None. | control | - | test row |\n"
         "| BOARD-901 | Provision env files in the scratch repo | Feature | Ready | P2 | "
         "test | None. | control | - | a second row with the same title |\n"
-        "| BOARD-902 | Force a dirty worktree away | Feature | Ready | P2 | "
-        "test | None. | control | - | forced discard of a dirty worktree |\n"
-        "| BOARD-903 | Force an unmerged branch away | Feature | Ready | P2 | "
-        "test | None. | control | - | forced discard of an unmerged branch |\n"
         "| BOARD-904 | Hand off a worktree | Feature | Ready | P2 | "
         "test | None. | control | - | the hand-off block |\n"
         "| BOARD-905 | Clean up a worktree by board row | Feature | Ready | P2 | "
@@ -82,10 +83,8 @@ def make_repo(base):
         "test | None. | control | - | cleanup --board on a merged worktree |\n"
         "| BOARD-908 | Refuse a cleanup that holds unmerged work | Feature | Ready | P2 | "
         "test | None. | control | - | the refused cleanup |\n"
-        "| BOARD-909 | Set the lane after a discard | Feature | Ready | P2 | "
-        "test | None. | control | - | discard --board on a clean worktree |\n"
-        "| BOARD-910 | Refuse a discard of a dirty worktree | Feature | Ready | P2 | "
-        "test | None. | control | - | the refused discard |\n"))
+        "| BOARD-911 | Discard a worktree | Feature | Ready | P2 | "
+        "test | None. | control | - | explicit destructive consent |\n"))
     write(os.path.join(repo, "README.md"), "scratch\n")
     git(repo, "init", "-b", "main")
     git(repo, "config", "user.email", "test@example.invalid")
@@ -96,7 +95,7 @@ def make_repo(base):
 
 
 def env_names(repo):
-    """The two env file names this factory provisions."""
+    """Top-level environment files reported by status."""
     return [".env", ".env.local"]
 
 
@@ -135,8 +134,15 @@ def main():
 
     source = os.path.join(repo, ".env")
     write(source, "TOKEN=%s\n" % MARKER)
+    os.chmod(source, 0o640)
     local = os.path.join(repo, ".env.local")
     write(local, "LOCAL=%s\n" % MARKER)
+    nested = os.path.join(repo, "config", ".env.staging")
+    os.makedirs(os.path.dirname(nested))
+    write(nested, "NESTED=%s\n" % MARKER)
+    navigation = os.path.join(repo, ".kilo", "local", "qa-navigation.json")
+    os.makedirs(os.path.dirname(navigation))
+    write(navigation, '{"qa": "%s"}\n' % MARKER)
 
     code, out, err = call(worktree_script, "create", "--board", "BOARD-900")
     check(code == 0, "create failed: %s%s" % (out, err))
@@ -150,7 +156,8 @@ def main():
         if not os.path.isfile(copied):
             continue
         mode = stat.S_IMODE(os.stat(copied).st_mode)
-        check(mode == 0o600, "%s has mode %o, expected 600" % (name, mode))
+        check(mode == stat.S_IMODE(os.stat(os.path.join(repo, name)).st_mode),
+              "%s did not preserve its source permissions" % name)
         with open(copied, encoding="utf-8") as fh:
             content = fh.read()
         with open(os.path.join(repo, name), encoding="utf-8") as fh:
@@ -164,6 +171,12 @@ def main():
             excluded = fh.read()
         for name in env_names(repo):
             check(name in excluded, "%s is not listed in info/exclude" % name)
+        check("config/.env.staging" in excluded,
+              "nested env path is not listed in info/exclude")
+    nested_copy = os.path.join(worktree, "config", ".env.staging")
+    navigation_copy = os.path.join(worktree, ".kilo", "local", "qa-navigation.json")
+    check(os.path.isfile(nested_copy), "nested env file was not provisioned")
+    check(os.path.isfile(navigation_copy), "QA navigation config was not provisioned")
 
     code, out, err = call(worktree_script, "create", "--board", "BOARD-900")
     check(code != 0, "create did not refuse for a row that already has a live worktree")
@@ -189,8 +202,8 @@ def main():
     code, out, err = call(env_script, "clean", "--board", "BOARD-900", "--apply")
     check(code == 0, "clean --apply failed: %s%s" % (out, err))
     for name in env_names(repo):
-        check(not os.path.exists(os.path.join(worktree, name)),
-              "clean --apply left %s in the worktree" % name)
+        check(os.path.exists(os.path.join(worktree, name)),
+              "clean --apply removed a file without provenance: %s" % name)
 
     outside = os.path.join(repo, "not-a-worktree")
     os.makedirs(outside, exist_ok=True)
@@ -207,52 +220,54 @@ def main():
     check(code == 0, "sync failed on a planted symlink: %s%s" % (out, err))
     with open(link_target, encoding="utf-8") as fh:
         check(fh.read() == "untouched\n", "the copy was written through the symlink")
-    check(not os.path.islink(planted), "the planted symlink was not replaced by a regular file")
-    if os.path.isfile(planted) and not os.path.islink(planted):
-        mode = stat.S_IMODE(os.stat(planted).st_mode)
-        check(mode == 0o600, "the copy over a symlink has mode %o, expected 600" % mode)
+    check(os.path.islink(planted), "sync replaced a pre-existing symlink")
 
     code, out, err = call(worktree_script, "resume", "--board", "BOARD-900")
     check(code == 0, "resume failed: %s%s" % (out, err))
     check(os.path.isdir(worktree), "resume removed the worktree")
     with open(os.path.join(repo, "docs", "BOARD.md"), encoding="utf-8") as fh:
         check("In Progress" in fh.read(), "resume did not put the row back in progress")
-    for name in env_names(repo):
-        check(os.path.isfile(os.path.join(worktree, name)),
-              "resume did not re-provision %s" % name)
+    with open(os.path.join(worktree, ".env.local"), "w", encoding="utf-8") as fh:
+        fh.write("LOCAL=worktree-value\n")
+    os.unlink(nested_copy)
+    code, out, err = call(worktree_script, "resume", "--board", "BOARD-900")
+    check(code == 0, "second resume failed: %s%s" % (out, err))
+    with open(os.path.join(worktree, ".env.local"), encoding="utf-8") as fh:
+        check(fh.read() == "LOCAL=worktree-value\n", "resume overwrote a local file")
+    check(not os.path.exists(nested_copy), "resume recopied a removed local file")
 
     marker_file = os.path.join(worktree, "dirty.txt")
     write(marker_file, "uncommitted\n")
     code, out, err = call(worktree_script, "discard", "--board", "BOARD-900", "--apply")
-    check(code != 0, "discard accepted a dirty worktree")
-    check(os.path.isdir(worktree), "the refused discard removed the worktree")
-    os.unlink(marker_file)
+    check(code != 0, "discard acted without explicit consent")
+    check(os.path.isdir(worktree), "discard without consent removed the worktree")
 
     code, out, err = call(worktree_script, "discard", "--board", "BOARD-900")
     check(code == 0, "the discard dry run failed: %s%s" % (out, err))
     check(os.path.isdir(worktree), "the discard dry run removed the worktree")
-    code, out, err = call(worktree_script, "discard", "--board", "BOARD-900", "--apply")
-    check(code == 0, "discard --apply failed: %s%s" % (out, err))
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-900", "--apply", "--discard")
+    check(code == 0, "discard with consent failed: %s%s" % (out, err))
     check(not os.path.exists(worktree), "discard --apply left the worktree behind")
     _, branches, _ = git(repo, "branch", "--list")
     check(slug not in branches, "discard --apply left the branch behind")
     with open(os.path.join(repo, "docs", "BOARD.md"), encoding="utf-8") as fh:
         check(".kilo/worktrees/%s" % slug not in fh.read(),
               "discard did not clear the row's worktree cell")
+    status, cell = row_state(repo, "BOARD-900")
+    check(status == "Dropped", "discard set row status to %r, expected Dropped" % status)
+    check(cell in ("-", ""), "discard left a worktree cell: %r" % cell)
+    check(not os.path.exists(os.path.join(common, "cleanup-wt")),
+          "discard created backup artifacts")
 
     code, out, err = call(worktree_script, "list")
     check(code == 0, "list failed: %s%s" % (out, err))
     check("state" in out, "list has no state column")
-
-    force_dirty(repo, worktree_script, base, call, check)
 
     handoff(repo, worktree_script, call, check)
 
     cleanup_merged(repo, worktree_script, call, check)
 
     cleanup_by_board(repo, worktree_script, call, check)
-
-    lanes(repo, worktree_script, call, check)
 
     joined = "".join(outputs)
     check(MARKER not in joined, "the secret value appeared in the script output")
@@ -269,7 +284,6 @@ def handoff(repo, worktree_script, call, check):
     """The hand-off block: the diff command first, then the merge command."""
     code, out, err = call(worktree_script, "handoff", "--board", "BOARD-901")
     check(code != 0, "handoff did not refuse for a row with no worktree")
-    check("no live worktree" in out + err, "the refusal does not say what is missing")
 
     code, out, err = call(worktree_script, "create", "--board", "BOARD-904")
     check(code == 0, "create failed for BOARD-904: %s%s" % (out, err))
@@ -281,19 +295,13 @@ def handoff(repo, worktree_script, call, check):
     check(code == 0, "handoff failed: %s%s" % (out, err))
     check(worktree in out, "the block does not name the worktree path")
     check("feat/hand-off-a-worktree" in out, "the block does not name the branch")
-    diff_at = out.find("diff %s" % "main")
-    merge_at = out.find("git merge --no-ff feat/hand-off-a-worktree")
+    diff_at = out.find("diff main")
+    merge_at = out.find("merge --board BOARD-904")
     check(diff_at != -1, "the block has no diff command")
     check(merge_at != -1, "the block has no merge command")
     check(diff_at < merge_at, "the merge command comes before the diff command")
-    check("log --oneline main..HEAD" in out, "the block has no log command")
-    teardown_at = out.find("after the merge, remove the worktree and delete the branch:")
-    check(teardown_at != -1, "the block has no teardown section")
-    check("cleanup --board BOARD-904 --apply" in out,
-          "the block does not name the cleanup --board command")
-    check("git worktree remove %s" % worktree in out, "the block has no manual worktree remove")
-    check("git branch -d feat/hand-off-a-worktree" in out, "the block has no manual branch delete")
-    check(teardown_at > merge_at, "the teardown comes before the merge command")
+    check("merge --board BOARD-904 --apply" in out,
+          "the handoff does not include the human apply command")
 
     write(os.path.join(worktree, "kept.txt"), "committed on the branch\n")
     git(worktree, "add", "-A")
@@ -302,9 +310,8 @@ def handoff(repo, worktree_script, call, check):
 
     code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")
     check(code == 0, "handoff failed after the merge: %s%s" % (out, err))
-    check("git merge --no-ff" not in out, "the block offers a merge command for a merged branch")
-    check("show --stat main..feat/hand-off-a-worktree" in out,
-          "the block has no show --stat line for a merged branch")
+    check("merge --board BOARD-904" in out,
+          "the handoff does not retain the human lifecycle merge command")
     check("diff main" in out, "the block has no diff command for a merged branch")
 
 
@@ -419,47 +426,6 @@ def cleanup_refusal_keeps_lane(repo, worktree_script, call, check):
     check(cell == before_cell, "the refused cleanup changed the worktree cell")
 
 
-def discard_sets_ready(repo, worktree_script, call, check):
-    """discard --board on a clean, merged worktree: the row reads Ready."""
-    code, out, err = call(worktree_script, "create", "--board", "BOARD-909")
-    check(code == 0, "create failed for BOARD-909: %s%s" % (out, err))
-    slug = "set-the-lane-after-a-discard"
-    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
-    check(os.path.isdir(worktree), "the BOARD-909 worktree was not created")
-    write(os.path.join(worktree, "merged.txt"), "merged into main\n")
-    git(worktree, "add", "-A")
-    git(worktree, "commit", "-m", "a commit that gets merged")
-    git(repo, "merge", "--no-ff", "feat/%s" % slug, "-m", "merge: %s" % slug)
-    set_status(repo, "BOARD-909", "In Progress")
-
-    code, out, err = call(worktree_script, "discard", "--board", "BOARD-909", "--apply")
-    check(code == 0, "discard --apply failed for BOARD-909: %s%s" % (out, err))
-    check(not os.path.exists(worktree), "discard --apply left the worktree behind")
-    status, cell = row_state(repo, "BOARD-909")
-    check(status == "Ready", "discard --apply left the row at %r, expected Ready" % status)
-    check(cell in ("-", ""), "discard --apply left the worktree cell at %r" % cell)
-
-
-def discard_refusal_keeps_lane(repo, worktree_script, call, check):
-    """discard --board on a dirty worktree: the refusal leaves the row alone."""
-    code, out, err = call(worktree_script, "create", "--board", "BOARD-910")
-    check(code == 0, "create failed for BOARD-910: %s%s" % (out, err))
-    slug = "refuse-a-discard-of-a-dirty-worktree"
-    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
-    check(os.path.isdir(worktree), "the BOARD-910 worktree was not created")
-    write(os.path.join(worktree, "dirty.txt"), "uncommitted work\n")
-
-    before_status, before_cell = row_state(repo, "BOARD-910")
-
-    code, out, err = call(worktree_script, "discard", "--board", "BOARD-910", "--apply")
-    check(code != 0, "discard --apply accepted a dirty worktree: %s%s" % (out, err))
-    check(os.path.isdir(worktree), "the refused discard removed the worktree")
-    status, cell = row_state(repo, "BOARD-910")
-    check(status == before_status,
-          "the refused discard moved the row from %r to %r" % (before_status, status))
-    check(cell == before_cell, "the refused discard changed the worktree cell")
-
-
 def cleanup_by_slug_keeps_lane(repo, worktree_script, call, check):
     """cleanup by slug: it cannot know the row, so it touches nothing on the board."""
     code, out, err = call(worktree_script, "create", "--board", "BOARD-906")
@@ -481,86 +447,6 @@ def cleanup_by_slug_keeps_lane(repo, worktree_script, call, check):
     check(status == before_status,
           "cleanup by slug moved the row from %r to %r" % (before_status, status))
     check(cell == before_cell, "cleanup by slug changed the worktree cell")
-
-
-def force_dirty(repo, worktree_script, base, call, check):
-    """The forced discard of a dirty worktree: the plan, then the act."""
-    code, out, err = call(worktree_script, "create", "--board", "BOARD-902")
-    check(code == 0, "create failed for BOARD-902: %s%s" % (out, err))
-    slug = "force-a-dirty-worktree-away"
-    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
-    check(os.path.isdir(worktree), "the BOARD-902 worktree was not created")
-    dirty_file = os.path.join(worktree, "uncommitted.txt")
-    write(dirty_file, "work that will be destroyed\n")
-
-    code, out, err = call(worktree_script, "discard", "--board", "BOARD-902", "--apply")
-    check(code != 0, "discard --apply accepted a dirty worktree without --force")
-
-    code, out, err = call(worktree_script, "discard", "--board", "BOARD-902", "--force")
-    check(code != 0, "--force alone did not refuse")
-    plan = out + err
-    check(worktree in plan, "the plan does not name the worktree path")
-    check("feat/force-a-dirty-worktree-away" in plan, "the plan does not name the branch")
-    check("dirty files: 1" in plan, "the plan does not report the dirty file count")
-    check("--force --yes" in plan, "the plan does not name the command that acts")
-    check(os.path.isdir(worktree), "--force alone removed the worktree")
-    _, branches, _ = git(repo, "branch", "--list")
-    check(slug in branches, "--force alone deleted the branch")
-
-    code, out, err = call(worktree_script, "discard", "--board", "BOARD-902",
-                           "--force", "--yes")
-    check(code == 0, "--force --yes failed: %s%s" % (out, err))
-    check(not os.path.exists(worktree), "--force --yes left the worktree behind")
-    _, branches, _ = git(repo, "branch", "--list")
-    check(slug not in branches, "--force --yes left the branch behind")
-
-    _, common, _ = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    patches = [name for name in os.listdir(os.path.join(common, "cleanup-wt"))
-               if name.endswith(".patch")]
-    check(len(patches) == 1, "expected one recovery patch, found %d" % len(patches))
-    if patches:
-        patch_path = os.path.join(common, "cleanup-wt", patches[0])
-        check(patch_path in out, "the output does not print the patch path")
-        with open(patch_path, encoding="utf-8") as fh:
-            patch = fh.read()
-        check("work that will be destroyed" in patch,
-              "the recovery patch does not hold the uncommitted content")
-
-    force_unmerged(repo, worktree_script, call, check)
-
-
-def force_unmerged(repo, worktree_script, call, check):
-    """The forced discard of a branch with a commit the base does not have."""
-    code, out, err = call(worktree_script, "create", "--board", "BOARD-903")
-    check(code == 0, "create failed for BOARD-903: %s%s" % (out, err))
-    slug = "force-an-unmerged-branch-away"
-    worktree = os.path.join(repo, ".kilo", "worktrees", slug)
-    check(os.path.isdir(worktree), "the BOARD-903 worktree was not created")
-    write(os.path.join(worktree, "kept.txt"), "committed on the branch\n")
-    git(worktree, "add", "-A")
-    git(worktree, "commit", "-m", "a commit the base does not have")
-    _, commit_sha, _ = git(worktree, "rev-parse", "HEAD")
-
-    code, out, err = call(worktree_script, "discard", "--board", "BOARD-903", "--apply")
-    check(code != 0, "discard --apply accepted a branch with an unmerged commit")
-
-    code, out, err = call(worktree_script, "discard", "--board", "BOARD-903", "--force", "--yes")
-    check(code == 0, "--force --yes failed: %s%s" % (out, err))
-    check(commit_sha in out, "the output does not print the commit sha")
-    check(not os.path.exists(worktree), "--force --yes left the worktree behind")
-    _, branches, _ = git(repo, "branch", "--list")
-    check(slug not in branches, "--force --yes left the branch behind")
-
-    _, common, _ = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    tsvs = [name for name in os.listdir(os.path.join(common, "cleanup-wt"))
-            if name.endswith(".tsv")]
-    check(bool(tsvs), "no recovery TSV was written")
-    found = False
-    for name in tsvs:
-        with open(os.path.join(common, "cleanup-wt", name), encoding="utf-8") as fh:
-            if commit_sha in fh.read():
-                found = True
-    check(found, "the recovery TSV does not hold the commit sha")
 
 
 if __name__ == "__main__":

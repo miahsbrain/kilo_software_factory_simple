@@ -74,12 +74,15 @@
       "git gc*": "deny",
       "git update-ref -d*": "deny",
       "rm -rf *": "ask",
-      "*worktree.py*--apply*": "ask"
+      "*worktree.py*--apply*": "ask",
+      "*worktree.py*discard*": "deny"
     },
     "edit": {
       "*": "deny",
       ".kilo/worktrees/**": "allow",
       "**/.kilo/worktrees/**": "allow",
+      "artifacts/reviews/**": "allow",
+      "**/artifacts/reviews/**": "allow",
       "AGENTS.md": "ask",
       "apps/*/AGENTS.md": "ask",
       ".kilo/agent/*.md": "ask",

@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Align worktree lifecycle with human discard policy
+**Type:** Chore
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** Lifecycle and env scripts/tests, generated policy/config, and lifecycle guidance.
+**Why:** Keep provisioning non-overwriting and recursive, and make permanent discard an explicit human-only action with no recovery copies.
+**Impact:** New worktrees receive safe local-file copies; resume and cleanup preserve unprovenanced files. Discard drops the final board row and is denied through Kilo agent permissions.
+
 ## [2026-11-17] Close BOARD-114 provisioning and permission cleanup
 **Type:** Fix
 **Board:** BOARD-114 | **Branch:** feat/provision-local-env-and-secure-qa

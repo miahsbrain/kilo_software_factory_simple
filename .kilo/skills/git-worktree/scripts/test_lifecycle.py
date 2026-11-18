@@ -378,7 +378,7 @@ class LifecycleTests(unittest.TestCase):
     def test_fix_reuses_parent_and_discard_updates_all_shared_rows(self):
         self.add_row("BOARD-002", "Fix shared lifecycle", "Fix", "BOARD-001")
         path = self.create()
-        self.cli("create", "--board", "BOARD-002")
+        self.cli("create", "--board", "BOARD-002", "--reuse", "BOARD-001")
         self.assertEqual(len(WORKTREE.list_worktrees(str(self.root))), 2)
         (path / "dirty.txt").write_text("uncommitted")
         self.cli("discard", "--board", "BOARD-002")
@@ -677,7 +677,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertIn(str(two), result.stdout)
         self.assertIn("--stat", result.stdout)
         self.assertIn("merge --board BOARD-001 --apply", result.stdout)
-        self.assertIn("discard --board BOARD-001 --apply --discard", result.stdout)
+        self.assertNotIn("discard", result.stdout)
 
     def test_confinement_protected_and_symlink_rejection(self):
         path = self.create()
@@ -697,18 +697,17 @@ class LifecycleTests(unittest.TestCase):
 
     def test_git_errors_fail_closed_before_removal(self):
         path = self.create()
-        args = type("Args", (), {"command": "discard", "board": ["BOARD-001"], "repo": None,
-                                  "apply": True, "discard": True, "target": None})()
+        args = type("Args", (), {"board": "BOARD-001", "repo": None,
+                                  "apply": True, "discard": True})()
         actual = WORKTREE.git
 
         def broken(cwd, *parts, **kwargs):
-            if parts and parts[0] == "status":
-                return 128, "", "injected status failure"
+            if parts[:2] == ("worktree", "remove"):
+                return 128, "", "injected removal failure"
             return actual(cwd, *parts, **kwargs)
 
         with mock.patch.object(WORKTREE, "git", side_effect=broken):
-            with self.assertRaisesRegex(ValueError, "injected status failure"):
-                WORKTREE.cmd_lifecycle(args, str(self.root))
+            self.assertNotEqual(WORKTREE.cmd_discard(args, str(self.root)), 0)
         self.assertTrue(path.exists())
         with mock.patch.object(WORKTREE, "git", return_value=(128, "", "injected list failure")):
             with self.assertRaisesRegex(ValueError, "injected list failure"):
@@ -719,6 +718,7 @@ class LifecycleTests(unittest.TestCase):
         config = json.loads((SOURCE / "kilo.jsonc").read_text())
         self.assertEqual(config["permission"], GUARD.generated_permission(policy))
         self.assertEqual(GUARD.bash_verdict(policy, "python3 worktree.py merge --board BOARD-001 --apply")[0], "ask")
+        self.assertEqual(GUARD.bash_verdict(policy, "python3 worktree.py discard --board BOARD-001 --apply --discard")[0], "deny")
         self.assertEqual(GUARD.bash_verdict(policy, "git status")[0], "allow")
 
     def test_review_artifact_permissions_preserve_protections_in_both_modes(self):

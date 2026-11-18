@@ -295,6 +295,11 @@
       "pattern": "*worktree.py*--apply*",
       "action": "ask",
       "reason": "Lifecycle apply operations are explicit human CLI commands. Agents preview only."
+    },
+    {
+      "pattern": "*worktree.py*discard*",
+      "action": "deny",
+      "reason": "Discard permanently destroys a selected worktree and branch; only the human may run it."
     }
   ],
   "edit": [
