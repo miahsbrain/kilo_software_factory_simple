@@ -20,6 +20,8 @@ Verify proportionately with focused checks. Report what changed, what passed, an
 
 Preserve unrelated work and secrets. Use the assigned workspace and existing lifecycle tools. Do not install dependencies, perform destructive operations, commit, merge, or push without the applicable user authorization.
 
+Reuse the same task's assigned worktree. Missing board linkage can mean incomplete initialization: use `resume --board ID --repo ID`, selecting `--worktree PATH` explicitly if ambiguous; preserve other candidates. Never retry another slug. For a new task with managed workspaces, explicitly share with `--reuse ID` or ASK before `--new` (capability, not consent); it cannot bypass same-task recovery. Truly gone assignments with leftover directories/branches require inspection, not deletion or reinitialization.
+
 Keep the board and essential documentation current, concise, and factual.
 
 Use `board.py` for board changes, `worktree.py` for workspace lifecycle, `guard.py` for policy checks, and `browser-review.mjs` for shared UI evidence; procedures live in `.kilo/skills/`.

@@ -14,13 +14,13 @@ branch type from its Type column and the slug from its task title, then makes
 .kilo/worktrees/<slug> on branch <type>/<slug> and records the worktree on the
 row. Existing workspaces can be shared with --reuse; Fix rows reuse their parent.
 Otherwise an existing branch or directory is a refusal. A live row must be
-resumed, and a colliding slug can be changed with --slug.
+resumed, including metadata-backed incomplete creation; --slug cannot bypass recovery.
 
 create recursively provisions ignored/untracked regular .env* files except
 .env.example, and .kilo/local/qa-navigation.json, from the target repository's
 primary checkout. It skips tracked files, symlinks, nonregular files and
 existing destinations; preserves modes; and excludes copied env paths from Git.
-resume does not copy files again.
+resume retries initialization and missing local files without overwriting existing files.
 
 discard is human-only and permanent. It previews by default; `--apply
 --discard` removes only the selected linked worktree and branch, with no
@@ -157,6 +157,44 @@ def load_guard_policy(root):
     return guard, policy
 
 
+def effective_configs(tree, root):
+    """Existing local/ancestor configs, never ancestors outside this control root."""
+    local = confined(os.path.join(tree, "kilo.jsonc"), tree)
+    configs = {local} if os.path.exists(local) else set()
+    if os.path.commonpath([tree, root]) == root:
+        for parent in Path(tree).parents:
+            if os.path.commonpath([str(parent), root]) != root:
+                break
+            config = confined(os.path.join(parent, "kilo.jsonc"), root)
+            if os.path.exists(config):
+                configs.add(config)
+    if not configs:
+        raise ValueError("checkout has no effective project configuration: %s" % tree)
+    return configs
+
+
+def initialize_permissions(path, root, guard, policy, mode):
+    config = os.path.join(path, "kilo.jsonc")
+    candidates = effective_configs(path, root)
+    override = os.environ.get("KILO_CONFIG")
+    if override and os.path.abspath(override) not in candidates:
+        raise ValueError("KILO_CONFIG is outside the new checkout's effective configurations")
+    for candidate in sorted(candidates):
+        expected, message = guard.write_permission_map(candidate, policy, mode=mode, preview=True)
+        if expected is None:
+            raise ValueError(message)
+        if candidate != config:
+            current, _ = guard.load_config(candidate)
+            if not guard.permission_maps_match(current.get("permission"), expected):
+                raise ValueError("inherited permission map disagrees with saved mode: %s" % candidate)
+    if config in candidates:
+        current, _ = guard.load_config(config)
+        if not guard.permission_maps_match(current.get("permission"), expected):
+            expected, message = guard.write_permission_map(config, policy, mode=mode)
+            if expected is None:
+                raise ValueError(message)
+
+
 def cmd_mode(args, cwd):
     root = control_root(cwd)
     state = local_state(root)
@@ -175,21 +213,7 @@ def cmd_mode(args, cwd):
                 if not os.path.isdir(tree) or entry.get("prunable"):
                     raise ValueError("mapped checkout is missing or prunable: %s" % tree)
                 checkouts.add(tree)
-                config = confined(os.path.join(tree, "kilo.jsonc"), tree)
-                if os.path.exists(config) or repo_id == "control":
-                    configs.add(config)
-                if repo_id != "control":
-                    inherited = os.path.exists(config)
-                    if os.path.commonpath([tree, root]) == root:
-                        for parent in Path(tree).parents:
-                            if os.path.commonpath([str(parent), root]) != root:
-                                break
-                            ancestor_config = confined(os.path.join(parent, "kilo.jsonc"), root)
-                            if os.path.exists(ancestor_config):
-                                configs.add(ancestor_config)
-                                inherited = True
-                    if not inherited:
-                        raise ValueError("mapped checkout has no effective project config: %s" % tree)
+                configs.update(effective_configs(tree, root))
         if checked_git(cwd, "rev-parse", "--show-toplevel") not in checkouts:
             raise ValueError("caller is not a mapped project checkout")
         override = os.environ.get("KILO_CONFIG")
@@ -387,21 +411,27 @@ def eligible_env_files(primary, destination=None):
 def provision_local_files(primary, destination, include_navigation=False):
     """Copy untracked local config without replacing worktree files."""
     primary, destination = Path(primary), Path(destination)
-    candidates = list(eligible_env_files(primary, destination))
+    candidates = list(eligible_env_files(primary))
     if include_navigation:
         navigation = primary / ".kilo/local/qa-navigation.json"
         if navigation.is_file() and not navigation.is_symlink() and not git_out(
                 str(primary), "ls-files", "--", ".kilo/local/qa-navigation.json"):
             candidates.append((navigation, Path(".kilo/local/qa-navigation.json")))
 
-    copied_env = []
+    required_exclusions = []
     for source, relative in candidates:
         rel = relative.as_posix()
         destination_file = destination / relative
-        if destination_file.exists() or destination_file.is_symlink():
+        is_env = source.name.startswith(".env") and source.name != ".env.example"
+        if destination_file.is_symlink() or (is_env and git_out(str(destination), "ls-files", "--", rel)):
             continue
         if any(part.is_symlink() for part in destination_file.parents
                if part != destination and os.path.commonpath([str(part), str(destination)]) == str(destination)):
+            continue
+        if destination_file.exists():
+            # A prior copy may have succeeded before its exclusion write failed.
+            if is_env and destination_file.is_file():
+                required_exclusions.append(rel)
             continue
         destination_file.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -423,11 +453,11 @@ def provision_local_files(primary, destination, include_navigation=False):
                 with os.fdopen(destination_fd, "wb") as destination_stream:
                     shutil.copyfileobj(source_stream, destination_stream)
                 os.chmod(destination_file, stat.S_IMODE(source_stat.st_mode), follow_symlinks=False)
-                if source.name.startswith(".env") and source.name != ".env.example":
-                    copied_env.append(rel)
+                if is_env:
+                    required_exclusions.append(rel)
         except OSError:
             raise
-    if copied_env:
+    if required_exclusions:
         common = common_dir(str(primary))
         if not common:
             raise OSError("cannot find repository git directory for local-file exclusions")
@@ -438,13 +468,17 @@ def provision_local_files(primary, destination, include_navigation=False):
         except FileNotFoundError:
             existing = ""
         known = set(existing.splitlines())
-        missing = [rel for rel in copied_env if rel not in known]
+        missing = [rel for rel in required_exclusions if rel not in known]
         if missing:
             with open(exclude, "a", encoding="utf-8") as stream:
                 if existing and not existing.endswith("\n"):
                     stream.write("\n")
                 stream.write("\n# local env files provisioned into worktrees\n")
                 stream.writelines(rel + "\n" for rel in missing)
+        for rel in required_exclusions:
+            code, _, _ = git(str(destination), "check-ignore", "--quiet", "--", rel)
+            if code:
+                raise OSError("local env exclusion verification failed: %s" % rel)
 
 
 def default_base(target):
@@ -690,6 +724,55 @@ def board_row(board, path, board_id):
     return table, index
 
 
+def task_workspaces(root, target, repo_id, board_id, cell, selected=None):
+    """Resolve exact board links and common-Git metadata, not task titles/slugs."""
+    state = local_state(root)
+    paths = {}
+    for path, branch in row_worktrees(cell, root):
+        path = os.path.abspath(path)
+        if os.path.dirname(path) == os.path.join(target, WORKTREES_DIR):
+            paths[path] = branch
+    linked = set(paths)
+    for path, record in state["workspaces"].items():
+        if board_id in record.get("boards", []) and record.get("outcome") == "active":
+            if os.path.dirname(path) == os.path.join(target, WORKTREES_DIR):
+                paths.setdefault(path, record.get("branch"))
+            elif record.get("repo_id") == repo_id:
+                raise ValueError("recorded workspace is outside mapped worktree directory: %s" % path)
+    items = []
+    registered = {os.path.abspath(wt["path"]) for wt in list_worktrees(target)}
+    for path, branch in paths.items():
+        if selected and path != selected:
+            continue
+        if path not in registered:
+            if os.path.lexists(path) or (branch and git_out(target, "rev-parse", "--verify", "refs/heads/" + branch)):
+                raise ValueError("missing registered assignment with leftover directory or branch; preserve and inspect: %s" % path)
+            continue
+        item = {"path": path, "branch": branch, "repo": target, "repo_id": repo_id,
+                "boards": [board_id], "linked": path in linked}
+        validate_workspace(item, root)
+        if common_dir(path) != common_dir(target):
+            raise ValueError("workspace Git common-dir mismatch: %s" % path)
+        if checked_git(path, "symbolic-ref", "--short", "HEAD") != branch:
+            raise ValueError("workspace live branch mismatch: %s" % path)
+        checked_git(target, "rev-parse", "--verify", "refs/heads/" + branch)
+        record = state["workspaces"].get(path)
+        if (not record or board_id not in record.get("boards", []) or
+                record.get("branch") != branch or record.get("outcome") != "active" or
+                record.get("control", root) != root or record.get("repo", target) != target or
+                record.get("repo_id", repo_id) != repo_id or not record.get("base")):
+            raise ValueError("workspace has no matching active task/repository metadata: %s" % path)
+        checked_git(target, "rev-parse", "--verify", "refs/heads/" + record["base"])
+        item["base"] = record["base"]
+        items.append(item)
+    return items
+
+
+def recovery_options(items, board_id, repo_id):
+    return "\n".join(shlex.join(["worktree.py", "resume", "--board", board_id,
+                                  "--repo", repo_id, "--worktree", item["path"]]) for item in items)
+
+
 def cmd_create(args, cwd):
     root = control_root(cwd)
     board = load_board_module(script_root())
@@ -727,6 +810,15 @@ def cmd_create(args, cwd):
               "'board.py add-column --name Repos --after \"Blocked by\"'", file=sys.stderr)
         return REFUSED
     task, row_type = cells[1], cells[2]
+    cell_text = cells[branch_index] if len(cells) > branch_index else ""
+    recovery = getattr(args, "_recovery", None)
+    candidates = task_workspaces(root, target, repo_id, args.board, cell_text,
+                                recovery["path"] if recovery else None)
+    if candidates and not recovery:
+        raise ValueError("task already has a live or incomplete workspace; resume, not a new slug:\n" +
+                         recovery_options(candidates, args.board, repo_id))
+    if recovery and not any(item == recovery for item in candidates):
+        raise ValueError("recovery selection changed; refusing initialization")
     branch_type = TYPE_MAP.get(row_type)
     if branch_type is None:
         print("row %s has Type %r; allowed types are %s" %
@@ -740,7 +832,7 @@ def cmd_create(args, cwd):
               file=sys.stderr)
         return INVALID
     reuse = getattr(args, "reuse", None)
-    if row_type == "Fix" and not reuse:
+    if row_type == "Fix" and not reuse and not recovery:
         dependency = board.field_index(table, "blocked-by")
         parents = re.findall(r"BOARD-\d+", cells[dependency]) if dependency is not None else []
         if len(parents) != 1:
@@ -750,32 +842,35 @@ def cmd_create(args, cwd):
     if reuse:
         shared = lifecycle_selection(root, board, [reuse], [repo_id])[0]
         validate_workspace(shared, root)
-    slug = os.path.basename(shared["path"]) if shared else args.slug or derived
+    if not shared and not recovery and not getattr(args, "new", False):
+        active = [wt for wt in list_worktrees(target)[1:]
+                  if os.path.dirname(os.path.abspath(wt["path"])) == os.path.join(target, WORKTREES_DIR)]
+        if active:
+            raise ValueError("repository already has managed workspace(s); use --reuse <BOARD-ID> for an explicit shared assignment, or --new only after user approval")
+    slug = os.path.basename((recovery or shared)["path"]) if recovery or shared else args.slug or derived
     if not SLUG_RE.match(slug):
         print("invalid slug %r: use kebab-case, e.g. user-login" % slug, file=sys.stderr)
         return INVALID
     if args.slug and args.slug != derived:
         print("derived slug: %s" % derived)
         print("used slug:    %s" % slug)
-    branch = shared["branch"] if shared else "%s/%s" % (branch_type, slug)
+    branch = (recovery or shared)["branch"] if recovery or shared else "%s/%s" % (branch_type, slug)
     cell_text = cells[branch_index] if len(cells) > branch_index else ""
     live_path, live_branch = live_row_worktree(cell_text, root, target)
-    if live_path:
+    if live_path and not recovery:
         print("row %s already has a live worktree: %s (branch %s)" %
               (args.board, live_path, live_branch), file=sys.stderr)
         print("pick one:", file=sys.stderr)
         print("  resume:  worktree.py resume --board %s" % args.board, file=sys.stderr)
         print("  discard: worktree.py discard --board %s --apply --discard" % args.board,
               file=sys.stderr)
-        print("  new slug: worktree.py create --board %s --slug <other-slug>" % args.board,
-              file=sys.stderr)
         return REFUSED
     existing = find_worktree(target, slug)
-    if existing and not shared:
+    if existing and not shared and not recovery:
         base = os.path.realpath(os.path.join(target, WORKTREES_DIR)) + os.sep
         if not os.path.realpath(existing["path"]).startswith(base):
             existing = None
-    if existing and not shared:
+    if existing and not shared and not recovery:
         other_path = existing["path"]
         other_branch = existing["branch"]
         owner_index, _ = row_of_worktree(board, root, table, other_path)
@@ -787,24 +882,23 @@ def cmd_create(args, cwd):
         else:
             print("no board row records that worktree", file=sys.stderr)
         print("pick one:", file=sys.stderr)
-        print("  new slug: worktree.py create --board %s --slug <other-slug>" % args.board,
-              file=sys.stderr)
+        print("  inspect the existing assignment; do not retry with another slug", file=sys.stderr)
         if owner:
             print("  discard that row's worktree: worktree.py discard --board %s --apply --discard" % owner,
                   file=sys.stderr)
         return REFUSED
     branch_exists = git_out(target, "rev-parse", "-q", "--verify", "refs/heads/" + branch)
-    if branch_exists and (not shared or shared["branch"] != branch):
-        print("branch %s already exists in %s; pick another slug or type" %
+    if branch_exists and not recovery and (not shared or shared["branch"] != branch):
+        print("branch %s already exists in %s; inspect the recorded assignment" %
               (branch, target), file=sys.stderr)
         print("if the row already has a worktree for it, resume it with "
               "'worktree.py resume --board %s'" % args.board, file=sys.stderr)
         return REFUSED
     path = confined(worktree_path(target, slug), os.path.join(target, WORKTREES_DIR))
-    if not shared and os.path.exists(path):
+    if not shared and not recovery and os.path.exists(path):
         print("directory %s already exists; refusing to overwrite it" % path, file=sys.stderr)
         return REFUSED
-    base, base_err = resolve_base(target, args.base)
+    base, base_err = resolve_base(target, recovery["base"] if recovery else args.base)
     if base_err:
         print(base_err, file=sys.stderr)
         return REFUSED
@@ -815,13 +909,14 @@ def cmd_create(args, cwd):
         base = saved_base
     guard, policy = load_guard_policy(root)
     state = local_state(root)
-    code, _, err = (0, "", "") if shared else git(target, "worktree", "add", path, "-b", branch, base)
+    code, _, err = (0, "", "") if shared or recovery else git(target, "worktree", "add", path, "-b", branch, base)
     if code != 0:
         print("git worktree add failed: %s" % (err.splitlines() or ["?"])[-1], file=sys.stderr)
         return REFUSED
-    if not shared:
-        state["workspaces"][path] = {"base": base, "branch": branch, "outcome": "active", "boards": [args.board]}
-    else:
+    if not shared and not recovery:
+        state["workspaces"][path] = {"base": base, "branch": branch, "outcome": "active", "boards": [args.board],
+                                     "control": root, "repo": target, "repo_id": repo_id}
+    elif shared:
         associated = state["workspaces"].setdefault(path, {"base": base, "branch": branch, "outcome": "active"})
         boards = associated.setdefault("boards", [reuse])
         if args.board not in boards:
@@ -829,47 +924,20 @@ def cmd_create(args, cwd):
     local_state(root, state)
     if not shared:
         try:
-            config = confined(os.path.join(path, "kilo.jsonc"), path)
-            inherited = set()
-            if os.path.commonpath([path, root]) == root:
-                for parent in Path(path).parents:
-                    if os.path.commonpath([str(parent), root]) != root:
-                        break
-                    ancestor = confined(os.path.join(parent, "kilo.jsonc"), root)
-                    if os.path.exists(ancestor):
-                        inherited.add(ancestor)
-            local = os.path.exists(config)
-            if not local and (repo_id == "control" or not inherited):
-                raise ValueError("new checkout has no effective project configuration")
-            candidates = inherited | ({config} if local else set())
-            override = os.environ.get("KILO_CONFIG")
-            if override and os.path.abspath(override) not in candidates:
-                raise ValueError("KILO_CONFIG is outside the new checkout's effective configurations")
-            for candidate in sorted(candidates):
-                expected, message = guard.write_permission_map(candidate, policy, mode=state["mode"], preview=True)
-                if expected is None:
-                    raise ValueError(message)
-                if candidate != config:
-                    current, _ = guard.load_config(candidate)
-                    if not guard.permission_maps_match(current.get("permission"), expected):
-                        raise ValueError("inherited permission map disagrees with saved mode: %s" % candidate)
-            if local:
-                expected, message = guard.write_permission_map(config, policy, mode=state["mode"])
-                if expected is None:
-                    raise ValueError(message)
+            initialize_permissions(path, root, guard, policy, state["mode"])
         except (ValueError, OSError) as exc:
             state["workspaces"][path]["error"] = "permission initialization failed: %s" % exc
             local_state(root, state)
             print("worktree %s and branch %s preserved; permission initialization failed: %s; "
                   "board unchanged, creation incomplete" % (path, branch, exc), file=sys.stderr)
             return REFUSED
-    scope = load_scope_module(script_root())
-    if scope is not None:
-        scope.ensure_ignored(target)
     if not shared:
         try:
+            scope = load_scope_module(script_root())
+            if scope is not None:
+                scope.ensure_ignored(target)
             provision_local_files(main_checkout_root(target), path, include_navigation=True)
-        except OSError:
+        except (OSError, ValueError):
             state["workspaces"][path]["error"] = "local file provisioning failed"
             local_state(root, state)
             print("worktree %s and branch %s preserved; local file provisioning failed; "
@@ -881,6 +949,9 @@ def cmd_create(args, cwd):
         entry = "%s · branch %s" % (rel_path, branch)
         existing = cells[branch_index] if len(cells) > branch_index else ""
         entries = parse_worktree_entries(existing)
+        if recovery and getattr(args, "worktree", None):
+            entries = [(p, b) for p, b in entries if
+                       os.path.dirname(os.path.abspath(os.path.join(root, p))) != os.path.join(target, WORKTREES_DIR)]
         if not any(p == rel_path for p, _ in entries):
             entries.append((rel_path, branch))
         merged = ", ".join("%s · branch %s" % (p, branch_name(b)) for p, b in entries)
@@ -894,9 +965,13 @@ def cmd_create(args, cwd):
         lines[index] = board.replace_cell(lines[index], STATUS_INDEX, "In Progress")
         board.write_atomic(board_file, lines)
     except Exception as exc:
+        state["workspaces"][path]["error"] = "board linkage failed: %s" % exc
+        local_state(root, state)
         print("warning: worktree %s exists but row %s was not updated (%s)" %
               (path, args.board, exc), file=sys.stderr)
         return REFUSED
+    state["workspaces"][path].pop("error", None)
+    local_state(root, state)
     print("board:    %s" % args.board)
     print("board file: %s" % board_file)
     print("task:     %s" % task)
@@ -970,23 +1045,19 @@ def cmd_resume(args, cwd):
     if err:
         print(err, file=sys.stderr)
         return REFUSED
-    path, branch = live_row_worktree(cell_text, root, target)
-    if not path:
-        print("row %s has no live worktree in %s; nothing to resume" % (args.board, target),
-              file=sys.stderr)
-        return REFUSED
-    print("worktree: %s" % path)
-    print("branch:   %s" % (branch or "(detached)"))
-    print("repo:     %s (%s)" % (repo_id, target))
-    try:
-        lines = list(table["lines"])
-        lines[index] = board.replace_cell(lines[index], STATUS_INDEX, "In Progress")
-        board.write_atomic(board_file, lines)
-    except Exception as exc:
-        print("warning: row %s was not updated (%s)" % (args.board, exc), file=sys.stderr)
-        return REFUSED
-    print("board:    %s is In Progress" % args.board)
-    return OK
+    selector = getattr(args, "worktree", None)
+    selected = os.path.abspath(selector) if selector else None
+    items = task_workspaces(root, target, repo_id, args.board, cell_text, selected)
+    if not selected:
+        linked = [item for item in items if item["linked"]]
+        items = linked or items
+    if len(items) != 1:
+        raise ValueError(("ambiguous incomplete workspaces; select one explicitly:\n" +
+                          recovery_options(items, args.board, repo_id)) if items else
+                         "no matching live task workspace; missing or unassociated selection; nothing to resume")
+    args._recovery = items[0]
+    args.base = args.slug = args.reuse = None
+    return cmd_create(args, cwd)
 
 
 def cmd_discard(args, cwd):
@@ -1704,10 +1775,12 @@ def main(argv):
     p.add_argument("--slug", help="override the slug derived from the task title")
     p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
     p.add_argument("--reuse", help="reuse the workspace of another board row")
+    p.add_argument("--new", action="store_true", help="create an independent workspace only with explicit user approval")
 
     p = sub.add_parser("resume", help="reuse the live worktree of a board row")
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
     p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
+    p.add_argument("--worktree", help="explicit exact metadata-backed recovery path; permits relinking this row")
 
     p = sub.add_parser("discard", help="remove the live worktree of a board row")
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
