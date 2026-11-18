@@ -12,7 +12,7 @@ A small delivery harness for [Kilo Code](https://kilo.ai): a working agreement, 
 | `.kilo/policies/`, `kilo.jsonc` | Canonical guard policy and generated permissions/configuration |
 | `.kilo/repos.json` | Actual repository IDs and paths |
 | `docs/` | Factory documentation; local live board and engineering history |
-| `templates/project/` | Blank product documents and control-only repo map; no placeholder apps |
+| `templates/project/` | Blank product documents, tracked `services.json`, local tooling ignores; no placeholder services |
 | `.devcontainer/` | Development environment |
 
 ## Start A New Project
@@ -25,20 +25,39 @@ python3 .kilo/skills/git-worktree/scripts/bootstrap.py project
 python3 .kilo/skills/git-worktree/scripts/bootstrap.py project --destination /path/to/new-project
 ```
 
-The default destination is the caller factory root's `project/`. Every existing destination is refused, even an empty directory or dangling symlink. The source is the executing script's checkout, including assigned worktrees, never a stale primary checkout. It copies the blank template (retaining project `AGENTS.md` and the flat `{"control":"."}` map), then `agent`, `command`, `skills`, `policies`, the exact `.kilo/.gitignore`, and `kilo.jsonc`. It creates empty `apps/` and initializes Git only after the complete copy. The project owns its copied harness independently. Local files, env/secrets, generated outputs, artifacts, factory map and live board are not copied; only the blank template board is copied, already ignored by static template rules. `.kilo/local/qa-navigation.json` is optional local runtime input, not a source-config prerequisite; source policies, config and tests remain trackable.
+The default destination is the caller factory root's `project/`. Existing paths, even empty directories or dangling symlinks, are refused. Source is the executing checkout, including assigned worktrees. It copies blank product documents, the four-directory `.kilo` harness, config, generated root agreement, blank local board and complete supported devcontainer, creates empty `apps/`, then initializes Git and creates exactly one initial source commit. Source, product docs, `.gitignore` and the small `services.json` manifest are tracked. `.kilo/`, `.devcontainer/`, `kilo.jsonc`, generated root `AGENTS.md`, live board, secrets and outputs are ignored; the factory itself continues tracking its harness and blank template board. Local runtime inputs and factory live state are not copied.
 
-From the initialized **project control root**, create each real frontend, backend or other app only when needed:
+From the initialized **project control root**, create any number of services when needed, not fixed frontend/backend slots:
 
 ```bash
-python3 .kilo/skills/git-worktree/scripts/bootstrap.py app customer-portal --git separate
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py app shop-frontend --git separate
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py app shop-backend --git separate
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py app shop-backend-experimental --git separate
 python3 .kilo/skills/git-worktree/scripts/bootstrap.py app billing-worker --git project
+python3 .kilo/skills/git-worktree/scripts/bootstrap.py app inventory-cron --git project
 ```
 
-Project Git is mandatory; individual app Git is optional. `/bootstrap` must ASK whether the user wants separate app Git or source tracked in project Git unless already specified. The CLI requires `--git separate|project` with no default; omission fails before mutation. App names/IDs are lowercase kebab-case starting with a letter (`control` is reserved). Both modes create only `apps/<name>`. `separate` writes an app-local `.gitignore`, initializes Git, then registers `<name>: apps/<name>` in flat `.kilo/repos.json`. Its ignore snapshot removes only the control-only `apps/*/` rule, retaining secret/local-output protections and trackable source/`.env.example`; later project ignore edits do not update that snapshot. `project` creates no nested Git or independent map entry: source belongs to the control repository. It appends only `!/apps/<name>/` to the project ignore file, preserving prior patterns and secret/runtime ignores; other apps remain ignored. A missing/nonregular/symlink project `.gitignore` is refused before creation. No arbitrary destination, scaffolding, app `AGENTS.md`, duplicate harness or installation. Existing paths/symlinks, malformed maps, ID/path collisions, traversal and nonproject roots are refused in both modes. `apps/` may be absent after checkout; app mode creates it.
+Project Git is mandatory; service Git ownership is explicit (`--git separate|project`, no default). `/bootstrap` asks ownership unless specified and asks for a meaningful product-role name if unclear. Names start with a lowercase letter and use lowercase kebab-case; `control` is reserved. Arbitrary meaningful roles are supported, not a suffix enum. All services occupy `apps/<service-name>`. Separate mode initializes an independent repo with an initial `.gitignore` commit; integrated mode creates no nested Git/staging/commit and adds only a targeted control unignore. Both update the single tracked control manifest and ignored local map; review/commit control registration separately with authorization. No scaffolding or install. Invalid names/paths, symlinks, collisions and inconsistent manifests/maps are refused.
 
-Both modes receive the app-local ignore snapshot so control-root-relative runtime rules also protect integrated app paths. The snapshot is not automatically refreshed by later project ignore edits.
+Both modes snapshot control ignore rules without control-only service directory patterns and explicitly ignore local tooling. Source, product docs and `.env.example` remain trackable. Later ignore edits do not refresh snapshots. `services.json` records only `services: [{"name":"shop-backend","path":"apps/shop-backend","git":"separate"}]`; blank projects use `{"services":[]}`. Generated `.kilo/repos.json` contains `control: .` plus separate services; integrated services use control's worktree. Do not maintain another tracked ownership manifest.
 
-Requires Python 3.9+ and Git. Authorized bootstrap includes scoped init consent where initialization occurs, satisfying the guard's `ask` result; hard denials/errors still stop project bootstrap and separate mode. Project-tracked app mode performs no init or init guard check. Policy files are unchanged. Unset `GIT_*` overrides. Preconditions are checked before writing where feasible. Failures retain partial state, never destructive rollback or copying fallback. No staging or commits occur. Initial scaffolding/bootstrap needs no worktree; request explicit initial-commit authorization before feature implementation in an assigned linked worktree. Existing projects/repositories, including the ignored `project/` and its apps, are never reinitialized or migrated.
+Requires Python 3.9+ and Git; unset `GIT_*` overrides. User approval authorizes one initial commit only in a genuinely new repository created by that invocation, with an unborn HEAD and empty index. Only intended initial source/docs/manifest/ignore files are staged. The narrow new-repo protected-branch/worktree exception leaves saved policy untouched, checks actual init/add/commit commands against hard denials, and honors hooks and existing Git identity without inventing identity or skipping hooks. Identity preflight fails before creation when possible; later commit/init failures retain partial files/index and report failure. Never retry by reinitializing or deleting retained state. Existing control/factory/app repositories are not auto-committed or migrated; feature implementation waits for successful initialization and an assigned linked worktree.
+
+## Restore A Clone
+
+Run the script from a factory checkout containing `templates/project` and the complete harness/devcontainer source, not the clone's missing tooling:
+
+```bash
+python3 /path/to/factory/.kilo/skills/git-worktree/scripts/bootstrap.py restore --destination /path/to/project
+# After you clone a registered separate service into its manifest path:
+python3 /path/to/factory/.kilo/skills/git-worktree/scripts/bootstrap.py restore --destination /path/to/project/apps/shop-frontend --project /path/to/project
+```
+
+Restore control first. It regenerates ignored `.kilo/repos.json` from `services.json`, reports missing service checkouts and restores local tooling, config, root instructions, blank board and devcontainer. No clone/fetch/network or remote URL fabrication. The human supplies actual separate clones in registered paths. App restore requires the control context (`--project`, or safe canonical `apps/<name>` inference); it inherits existing control tooling and adds ignored local instructions/config/harness, not an app-local devcontainer or app map/board. Open the control project's folder in its devcontainer, then work under `apps/<name>` inside that container; an app-only mount cannot see its parent control. Service instructions use portable `../../` context, lifecycle tools discover the ancestor board/map, and control `KILO_CONFIG` uses the mounted workspace path rather than host paths. External standalone app paths are refused; place the clone at its registered path first so lifecycle control-root discovery remains valid. Existing app-local devcontainers are not deleted or modified by restore; review them manually and use the control container for supported inherited tooling.
+
+All outputs are preflighted: missing files are restored, identical files left alone, any differing/custom file or unsafe path causes refusal before writes. No force/overwrite mode. Clone-local `.git/info/exclude` protects restored tooling without changing source `.gitignore`, Git config, index or HEAD; source and product docs are untouched. Factory and linked-worktree destinations, symlinks/traversal, incomplete source and malformed manifests are refused. No init/add/commit/install/build on restore. Generated devcontainer retains supported Dockerfile/features/env/ports but replaces the factory-only post-create step with local shell-guard installation, without global Git configuration. Images are not built by the command.
+
+Restore also refuses any Git-tracked output or ancestor (including deleted files, symlinks and gitlinks) before writing tooling or excludes. Separate-app bootstrap checks both executing-source and target-control policy; neither source nor control hard init/add/commit denials can be overridden by the other's allowance.
 
 ## Work
 
