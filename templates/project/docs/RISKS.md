@@ -2,10 +2,9 @@
 
 Active architectural and project risks. Short bullets only.
 
-- **Documentation drift risk:** doc updates depend on the agent following AGENTS.md §B1 in the
-  same change set as the code. Mitigation: every task ends with the Definition of Done checklist.
-- **Bootstrapping the repo:** the first commit lands on `main` and must exist before any worktree
-  can branch from it. Required mode uses worktrees; optional permits assigned nonprotected checkouts.
+- **Documentation drift:** keep affected essential docs current with changes, without exhaustive inventories.
+- **Bootstrap:** worktrees need an existing commit. Initialize Git after the full harness copy,
+  but obtain explicit authorization before staging or making an initial commit.
 - **Partial lifecycle operations:** multi-repo merge is non-atomic. Preserve progress/conflicts;
   the human completes/retries. Mark Merged only when every required surface completes.
 - **Explicit discard loses work:** preview first; user-approved --apply --discard can remove

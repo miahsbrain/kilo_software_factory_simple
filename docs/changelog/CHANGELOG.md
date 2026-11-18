@@ -3,6 +3,68 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Authorize compact harness commit and handoff
+**Type:** Chore
+**Board:** BOARD-121 | **Branch:** chore/simplify-factory-harness-and-project-bootstrap
+**Changed:** Session handover and state record the user's continuation from staged preparation to local commit and human handoff.
+**Why:** Preserve the reviewed change on its assigned feature branch, then verify clean readiness before Pending Merge.
+**Impact:** Factory/template only; existing projects/apps unchanged. No agent merge or push.
+**Verification:** Eleven focused lifecycle cases passed; independent diff review found no blocker. Staged whitespace and deletion-scope checks passed, with no unstaged or untracked candidates before this final documentation update. Later UI-library/style-choice corrections are text-only. Clean-worktree readiness is checked after the authorized commit and recorded on the live board.
+
+## [2026-11-18] Prepare compact harness change for commit
+**Type:** Chore
+**Board:** BOARD-121 | **Branch:** chore/simplify-factory-harness-and-project-bootstrap (uncommitted)
+**Changed:** Handover and state reflect explicit authorization to prepare and stage the reviewed factory/template change.
+**Why:** Prepare the existing shared workspace for a later authorized commit, without creating a commit or invoking merge.
+**Impact:** Existing projects/apps remain untouched; no new dependencies or permission changes. The large deletion count is the approved catalog/scope removal and template app placeholders.
+**Verification:** Independent mechanics review found no blocker and 11 focused lifecycle tests passed; subsequent corrections are instruction-only. Final pre-commit review checks changed-file scope, deleted-path scope, whitespace and staged/unstaged state. No build, install, live-project sync, commit, merge or push.
+
+## [2026-11-18] Correct UI library choice and style approval
+**Type:** Docs
+**Board:** BOARD-121 | **Branch:** chore/simplify-factory-harness-and-project-bootstrap (uncommitted)
+**Changed:** Root/template agreements, frontend agent, components command, README, UI guidance, ADR-082, handover and state.
+**Why:** Correct the previous interpretation: supported, stack-compatible libraries such as shadcn/ui are allowed even when not already installed. Ask whether to keep an existing app style or do a complete redesign before component work, unless the user already specified the direction.
+**Impact:** Components still precede screens and follow the chosen theme. No dependency installation, application changes or existing-project migration. Changes remain uncommitted.
+**Verification:** File review for instruction consistency; no build or runtime tests for this text-only correction.
+
+## [2026-11-18] Retain component-first frontend delivery
+**Type:** Docs
+**Board:** BOARD-121 | **Branch:** chore/simplify-factory-harness-and-project-bootstrap (uncommitted)
+**Changed:** Root/template agreements, frontend agent, components command, UI guidance, ADR-081, handover and state.
+**Why:** User clarified that reusable components come before screens, with Tailwind CSS or the app's existing component library styled to its visual language and theme. Extend existing components and compose screens from them; do not restore a mandatory gallery gate.
+**Impact:** Factory/template guidance only; existing projects, application source and dependencies unchanged. No staging, commit, merge or push.
+**Verification:** File review for this low-risk instruction change; no build or runtime test required.
+
+## [2026-11-18] Review compact harness and resolve template gate
+**Type:** Docs
+**Board:** BOARD-121 | **Branch:** chore/simplify-factory-harness-and-project-bootstrap (uncommitted)
+**Changed:** Blank template board's frontend paragraph, root/template documentation indexes, README, handover and state.
+**Why:** Apply the explicitly authorized template-only correction and remove stale gallery-gate and permission-hold references. The live board and permission configuration are unchanged by the correction.
+**Impact:** Independent combined-diff review found no blocking issue; 11 focused lifecycle tests passed in chunk 2. No application output or visual-quality improvement is claimed. Work remains uncommitted pending explicit authorization.
+**Verification:** Independent reviewer ran `git diff --check` with exit 0 and inspected mechanics, tests, bootstrap and active instructions. Two nonblocking documentation gaps were corrected after review. No build, install, live-project sync, staging, commit, merge or push.
+
+## [2026-11-18] Remove instruction generation from factory mechanics, chunk 2
+**Type:** Chore
+**Board:** BOARD-121 | **Branch:** chore/simplify-factory-harness-and-project-bootstrap (uncommitted)
+**Changed:** Existing `guard.py` `SYNC_SLICE`/`cmd_sync()`, `worktree.py` `cmd_create()`, `scope.py` exclusion helpers, focused `test_lifecycle.py` cases; README, worktree skill, structure, handover, state and this log. No new tools or files.
+**Why:** Match the approved compact root and empty-app template without recreating removed scope/catalog layers or generating app/repo/worktree `AGENTS.md`. Reused existing sync/create functions and test fixtures; removed pointer-only templates/lookups/writers rather than adding compatibility aliases. Retained `read_existing()`, `exclude_file()` and `ensure_ignored()` because sync/create still need inherited-harness exclusions.
+**Impact:** Factory/template mechanics only, reversible through a reviewed harness change. Existing copied projects, application source, handwritten instructions and prior local excludes are untouched. Four-directory sync and config regeneration remain copy-owned by project controls; apps inherit config. Existing env/nav copying and policy protections are unchanged. The template map remains the runtime-supported flat `{"control":"."}`; no web/mobile/api placeholders, invented schema, provisioning tool or automatic initial commit. README and worktree skill no longer claim mechanics are pending. Template-board permission hold remains for coordinator handling.
+**Verification:** One invocation below passed all 11 tests in 4.530s, exit 0, using existing temporary fixtures. Covers absent/empty apps, arbitrary real IDs and unmapped-app rejection, dry-run immutability, four harness directories plus ignore/config bootstrap, no scope/catalog propagation, instruction absence/preservation, permission ordering in both modes, local config refresh and env/nav provisioning. No full suite, build, install, real-project sync, staging, commit, merge or push. Read documented `docs/STACK.md` and existing unittest examples; `docs/RUNNING.md` is absent.
+
+Run from `.kilo/skills/git-worktree/scripts`:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_lifecycle.LifecycleTests.test_control_only_template_map_and_empty_apps_validate_without_scopes test_lifecycle.LifecycleTests.test_sync_bootstraps_project_harness_without_scope_or_catalog_propagation test_lifecycle.LifecycleTests.test_sync_and_create_preserve_handwritten_app_instructions test_lifecycle.LifecycleTests.test_create_app_preserves_inheritance_without_app_instructions_or_harness_copy test_lifecycle.LifecycleTests.test_create_app_rejects_reordered_inherited_rules_and_preserves_partial_state test_lifecycle.LifecycleTests.test_create_app_accepts_ordered_inherited_rules_in_both_modes test_lifecycle.LifecycleTests.test_create_refreshes_required_base_map_in_optional_mode test_lifecycle.LifecycleTests.test_create_refreshes_optional_base_map_in_required_mode test_lifecycle.LifecycleTests.test_mode_is_local_persistent_and_regenerates_permissions test_lifecycle.LifecycleTests.test_create_copies_local_environment_and_navigation_without_exposing_values test_lifecycle.LifecycleTests.test_local_file_provisioning_skips_tracked_unignored_symlink_and_existing_destination
+```
+
+## [2026-11-18] Simplify factory guidance and project bootstrap, chunk 1
+**Type:** Docs
+**Board:** BOARD-121 | **Branch:** chore/simplify-factory-harness-and-project-bootstrap
+**Changed:** Root/template agreements, seven agent bodies with preserved frontmatter, commands, planning/board/workspace/QA/unslop procedures, UI guidance, READMEs, structure/handover/state/decision records; removed catalogue, scope text, and template app placeholders; template repo map is control-only.
+**Why:** Apply the approved compact agreement instead of moving the same restrictions into another instruction layer. Reuse existing tools; add no scripts or application source.
+**Impact:** Future factory/template use only, reversible through an approved harness change; existing project and real apps unchanged. Frontend-flow approval precedes backend for user-facing work; galleries optional, focused critique and independent read-only unslop parallel. Bootstrap initializes Git after full copy, with initial commits requiring explicit authorization. Chunk 2 must align script mechanics. Template board edit was denied by session policy and reported to the coordinator; stale gallery gate remains pending authorized handling.
+**Verification:** `git diff --check && git diff --stat` passed (exit 0): 486 files changed, 250 insertions, 160226 deletions at check time, before this result was recorded. File review only beyond that single check; no builds, installs, runtime proof, staging, commits, merges, or pushes.
+
 ## [2026-11-18] Clarify frontend design direction and composition
 **Type:** Docs
 **Board:** BOARD-120 | **Branch:** docs/clarify-frontend-design-direction-and-composition
