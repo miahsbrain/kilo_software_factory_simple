@@ -3,6 +3,11 @@
 **Board:** BOARD-103 | **Branch:** feat/provision-env-files-into-worktrees
 **Date:** 2026-11-10
 
+> **Superseded:** This historical entry preserves the original rationale, but its env-file,
+> discard/recovery, and manual teardown behavior is no longer current. See ADR-063, ADR-065,
+> ADR-067 and ADR-071, plus `docs/HANDOVER.md` and the current lifecycle skill. The sections
+> marked below describe the superseded implementation and are retained for history only.
+
 ## The problem
 
 Two separate failures, both about the agent's starting point.
@@ -25,7 +30,7 @@ first one still held work.
 
 ## The decisions
 
-### The script copies the files, not the agent (ADR-063)
+### [Superseded] The script copies the files, not the agent (ADR-063)
 
 A new script, `.kilo/skills/git-worktree/scripts/env.py`, copies the two local env files from a
 repository's main checkout into a worktree. The agent never sees a value: the script reports
@@ -77,7 +82,7 @@ link target is never touched and the copy lands as a regular file with mode `060
 `list` gained a `state` column so a leftover is visible: `active`, `merged`, `stale` (the row
 says `Merged` or `Dropped` but the worktree is still there), or `unknown` (no row records it).
 
-## The forced discard (ADR-065)
+## [Superseded] The forced discard (ADR-065)
 
 `discard` refuses a dirty worktree or a branch with commits the base does not have. That is
 the right default, but it left a human with no way to destroy that work through the tool: the
@@ -129,7 +134,7 @@ merge that would fail.
 `AGENTS.md` §B5 now says what every session report for work in a worktree ends with: this
 block, diff command first, then the merge command.
 
-## The teardown, named by the row (ADR-067)
+## [Superseded] The teardown, named by the row (ADR-067)
 
 The block printed the cleanup command by slug and then listed the worktree removal and the
 branch deletion as loose lines under it. The human was handed a teardown spread over three

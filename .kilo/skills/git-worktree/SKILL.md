@@ -405,13 +405,10 @@ merge (run by the human, in the main checkout):
   git merge --no-ff <type>/<slug> -m "merge: <slug>"
 after the merge, remove the worktree and delete the branch:
   python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
-or, by hand:
-  git worktree remove <path>/.kilo/worktrees/<slug>
-  git branch -d <type>/<slug>
 ```
 
-The teardown is the last section: it names the row, so one command removes the worktree and
-deletes the branch.
+The teardown is the last section: it names the row, so the human uses the lifecycle CLI to remove
+the worktree and delete the branch. Do not replace it with raw Git teardown commands.
 
 When the branch is already merged into the base, the block prints a `git show --stat` line
 instead of the merge command, so nobody is handed a merge that would fail.

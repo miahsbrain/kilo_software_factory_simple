@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Correct lifecycle documentation contradictions
+**Type:** Fix
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** Lifecycle ADRs, handover inventory, skill guidance, historical supersession note, lifecycle self-test cleanup, and factory architecture/risk docs.
+**Why:** Align the written lifecycle contract with recursive local-file provisioning, human-only no-backup discard, CLI-owned teardown, and `Merged`/`Dropped` lane transitions.
+**Impact:** Current guidance no longer offers raw Git teardown or stale recovery behavior; historical rationale remains preserved and explicitly marked superseded.
+
 ## [2026-11-18] Align worktree lifecycle with human discard policy
 **Type:** Chore
 **Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
