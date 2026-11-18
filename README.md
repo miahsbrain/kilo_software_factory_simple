@@ -17,9 +17,9 @@ belongs to the project, not to the factory.
 | Path | What it holds |
 |---|---|
 | `AGENTS.md` | The rules. Part A governs the architect and orchestrator, Part B binds every agent. Read it first. |
-| `.kilo/agent/` | Six agent definitions: `frontend-dev`, `backend-dev`, `mobile-dev`, `qa-reviewer`, `ui-critic`, `docs-writer`. |
-| `.kilo/command/` | Eight slash commands that package the workflow. |
-| `.kilo/skills/` | Three skills, each with the scripts that enforce the rules: `board`, `git-worktree`, `qa-review`. |
+| `.kilo/agent/` | Agent definitions for builders, reviewers, documentation, and conflict resolution. |
+| `.kilo/command/` | Slash commands that package the workflow. |
+| `.kilo/skills/` | Skills and their scripts that enforce the workflow. |
 | `.kilo/policies/` | The canonical guard-rail policy. The `permission` map in `kilo.jsonc` is generated from it. |
 | `.kilo/repos.json`, `.kilo/scopes/` | The repo map and the canonical scope rules for a multi-repo setup. |
 | `docs/` | The factory's own documentation set: board, handover, structure, decisions, changelog. |
@@ -202,8 +202,8 @@ around with a new tool.
 ## Status
 
 The factory board is empty and the harness is complete. `docs/changelog/CHANGELOG.md` is the
-engineering log of the factory itself. The Inhouz Cloud AI platform — 75 microservices, each its
-own git repository — is the project in `project/`.
+engineering log of the factory itself. The Inhouz Cloud AI platform is the project in `project/`,
+with each application repository kept separately.
 
 ## Licence
 

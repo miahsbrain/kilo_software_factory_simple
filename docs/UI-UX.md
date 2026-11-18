@@ -303,8 +303,9 @@ Review reports and the ledger are ignored review artifacts:
 `artifacts/reviews/<task-id>-qa.md`, `artifacts/reviews/<task-id>-ui.md`, and
 `artifacts/reviews/<task-id>-ledger.md`.
 
-Commit `notes.md` and small component shots. Keep full-page captures out of git unless the team
-wants a visual record — they are large and churn.
+Review reports, ledgers, notes and captures are ignored local artifacts under `artifacts/` and are
+never committed. Review reports and the ledger use `artifacts/reviews/<task-id>-qa.md`,
+`artifacts/reviews/<task-id>-ui.md`, and `artifacts/reviews/<task-id>-ledger.md`.
 
 ### Checks
 

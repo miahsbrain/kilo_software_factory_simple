@@ -1,5 +1,9 @@
 # Cleanup and discard set the board lane
 
+> **Superseded:** This historical entry describes the former discard-to-`Ready` behavior and its
+> obsolete recovery-oriented verification. The current contract requires human-only
+> `--apply --discard`, no backups, and `Dropped` for the final discarded row.
+
 **Board:** BOARD-108
 **Branch:** `fix/cleanup-and-discard-set-the-board`
 
@@ -21,7 +25,7 @@ The teardown command owns the lane for the row it tears down (ADR-071).
 | Command | What it does to the row |
 |---|---|
 | `cleanup --board <ID> --apply` | Status becomes `Merged`, the `Branch/Worktree` cell is cleared |
-| `discard --board <ID> --apply` | Status becomes `Ready`, the `Branch/Worktree` cell is cleared |
+| `discard --board <ID> --apply` | **Superseded:** Status became `Ready`, the `Branch/Worktree` cell was cleared |
 | `cleanup <slug> --apply` | Nothing — the slug form cannot know the row |
 
 Cleanup only succeeds when the branch is merged into the base and the worktree is clean, so a
@@ -55,6 +59,6 @@ directory, never this repository's board. Five checks:
   `Merged`, cell empty.
 - `cleanup --board` on a branch with a commit the base does not have: refusal, worktree and
   branch in place, row untouched.
-- `discard --board` on a clean, merged worktree: row reads `Ready`, cell empty.
+- `discard --board` on a clean, merged worktree: **superseded** — this historical check expected `Ready`; current behavior ends the final linked row as `Dropped`.
 - `discard --board` on a dirty worktree: refusal, row untouched.
 - `cleanup <slug>`: the row is untouched.
