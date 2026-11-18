@@ -1,6 +1,12 @@
 # Separate app repositories are ignored/mapped; bootstrap unignores each project-tracked app.
 apps/*/
 
+# Clone-local tooling; source, product docs and services.json remain tracked.
+.kilo/
+.devcontainer/
+kilo.jsonc
+/AGENTS.md
+
 # Assigned linked worktrees; explicitly assigned features may share a worktree/branch.
 .kilo/worktrees/
 .kilo/local/qa-navigation.json

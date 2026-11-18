@@ -1,26 +1,25 @@
 # Project Structure
 
-This is the factory repository. Product work belongs to a separate project repository; the existing ignored `project/` and its apps are not changed by BOARD-122.
+This repository is the factory. BOARD124 changes only its assigned linked worktree; existing `project/` and apps are not migrated.
 
 | Path | Purpose |
 |---|---|
-| `AGENTS.md` | Compact root working agreement |
-| `.kilo/agent/` | Seven short specialist prompts with preserved execution frontmatter |
-| `.kilo/command/` | Short workflow shortcuts |
-| `.kilo/skills/git-worktree/scripts/bootstrap.py` | Deterministic project copy/Git initialization and explicit separate/project Git ownership for `apps/<name>`; `/bootstrap` shortcut |
-| `.kilo/skills/` | Planning, board, lifecycle, QA, and unslop procedures and existing tools |
-| `.kilo/policies/`, `kilo.jsonc` | Guard policy and generated permissions/configuration |
-| `.kilo/repos.json` | Factory map: `control` at `.`, existing `project` at `project` |
-| `.kilo/worktrees/` | Ignored assigned change workspaces |
-| `.devcontainer/` | Development environment and output protections |
-| `docs/` | Factory handover, state, structure, architecture, decisions, run/stack notes, and engineering history |
-| `docs/BOARD.md` | Local ignored live board in the main checkout |
-| `artifacts/` | Ignored shared captures and review reports in the control main checkout |
-| `templates/project/` | Blank product documents, compact agreement, ignore rules, and control-only repo map |
-| `project/` | Existing independent ignored project repository; not migrated |
+| `AGENTS.md` | Factory working agreement, including narrow new-bootstrap commit approval |
+| `.kilo/agent/`, `.kilo/command/`, `.kilo/skills/`, `.kilo/policies/` | Factory-tracked harness source; project/service copies are ignored local tooling |
+| `.kilo/skills/git-worktree/scripts/bootstrap.py` | New project/service bootstrap and factory-sourced clone restore |
+| `.kilo/repos.json` | Local lifecycle map; generated project maps contain control plus separate services |
+| `.kilo/worktrees/` | Ignored assigned workspaces |
+| `.devcontainer/`, `kilo.jsonc` | Factory-tracked environment/config; ignored when copied to projects/services |
+| `templates/project/services.json` | Blank tracked product service manifest, no competing tracked repo map |
+| `templates/project/` | Product docs, local agreement, static ignores, factory-tracked blank board |
+| `docs/BOARD.md`, `artifacts/` | Ignored live board and review evidence |
+| `docs/` | Factory state, decisions, handover, structure and engineering history |
+| `project/` | Existing independent ignored project, untouched |
 
-The specialist catalogue and `.kilo/scopes/` instruction layer are removed. The template has no API/web/mobile boilerplate directories or app-level rules. `bootstrap.py project` from the factory checkout root creates `project/` by default, or a new `--destination` whose parent exists. It copies the blank template and four-directory harness from the executing checkout, plus exact harness ignore/config, creates empty `apps/`, then initializes Git without staging/commits. The template does not duplicate the harness. The blank template board remains tracked; its static ignore rules make the copied board local/ignored.
+New product repositories track source, product docs, `.gitignore` and `services.json`, not `.kilo/`, `.devcontainer/`, `kilo.jsonc`, generated root `AGENTS.md` or live board. Product docs remain independent of the harness. The manifest contains only `services` entries with `name`, `path: apps/<name>` and `git: separate|project`. The ignored map reconstructs `control: .` plus separate services, never integrated ones.
 
-`bootstrap.py app <name> --git separate|project` from an initialized project control root requires explicit app Git ownership; ask the user unless already specified. Project Git remains mandatory. Both modes create only `apps/<name>` with a safe app-local ignore snapshot. `separate` initializes Git and maps its real ID/path; `project` creates no nested repo/map entry and adds a targeted control-repo unignore, preserving secret/runtime rules. Empty `apps/` may be absent after checkout. Existing paths/symlinks, invalid names/maps and collisions are refused. No scaffolding, instructions, installs or arbitrary destination. Partial state is retained. Local QA navigation is optional runtime input, not bootstrapped. All feature implementation uses assigned linked worktrees after an authorized initial commit, with explicitly assigned features allowed to share a branch/worktree via `--reuse`; project-tracked apps use control, separate apps their mapped repo. No permission/mode changes.
+All services live in `project/apps/<service-name>`: `shop-frontend`, `shop-backend`, `shop-backend-experimental`, `billing-worker`, `inventory-cron`, or any meaningful lowercase kebab-case role. There are no fixed slots or suffix enum. Bootstrap asks unclear names and ownership. Separate mode creates one initial ignore-only commit; integrated mode creates no nested repo/staging/control commit. Both register the manifest and update the local map; control registration changes await separate authorized review/commit.
 
-BOARD-121 chunk 2 aligns the existing scripts: `guard.py` syncs the four supported harness directories into project controls, `worktree.py` no longer generates app/repo/worktree instructions, and `scope.py` retains only inherited-harness exclude helpers. No application source is changed.
+New project bootstrap copies blank docs and complete local tooling/devcontainer, creates empty `apps/`, initializes and initial-commits only intended tracked files. New repos only; no reinitialization. Existing identity/hooks and hard policy denials remain active under the narrow new-repo commit exception. All feature implementation still needs an assigned linked worktree.
+
+Factory CLI `restore --destination <clone> [--project <control>]` restores missing ignored tools/config/instructions/devcontainer and project blank board, leaving identical files and refusing conflicts before writes. It regenerates the map from the manifest and reports missing checkouts without network access. Restore control first; separate app clones must occupy registered paths so existing lifecycle root discovery works. Apps inherit control tooling with local ignored files, no app map/board. Source/index/HEAD/Git config are unchanged; local excludes protect restored files. No install/build or implicit Git mutations on restore.

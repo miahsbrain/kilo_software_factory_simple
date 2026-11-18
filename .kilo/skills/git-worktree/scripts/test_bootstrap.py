@@ -1,7 +1,5 @@
-"""Bootstrap tests use temporary factory/project fixtures, never the real project."""
+"""Bootstrap/restore tests operate only on disposable, identity-isolated repositories."""
 
-import contextlib
-import io
 import json
 import os
 from pathlib import Path
@@ -10,7 +8,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 
 import bootstrap
 
@@ -25,21 +22,31 @@ class BootstrapTests(unittest.TestCase):
         self.base = Path(self.temp.name)
         self.factory = self.base / "factory"
         self.factory.mkdir()
+        self.home = self.base / "home"
+        self.home.mkdir()
+        self.env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+        self.env.update(HOME=str(self.home), XDG_CONFIG_HOME=str(self.home / "xdg"),
+                        GIT_CONFIG_NOSYSTEM="1", PYTHONDONTWRITEBYTECODE="1")
         shutil.copytree(SOURCE / "templates", self.factory / "templates")
         for name in bootstrap.HARNESS:
             shutil.copytree(SOURCE / ".kilo" / name, self.factory / ".kilo" / name,
                             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        shutil.copytree(SOURCE / ".devcontainer", self.factory / ".devcontainer")
         for name in (".kilo/.gitignore", "kilo.jsonc"):
             shutil.copy2(SOURCE / name, self.factory / name)
-        self.run_git(self.factory, "init")
+        self.git(self.factory, "init")
+        self.git(self.factory, "config", "--global", "user.name", "Bootstrap Fixture")
+        self.git(self.factory, "config", "--global", "user.email", "fixture@example.invalid")
 
-    def run_git(self, root, *args, check=True):
-        return subprocess.run(["git", *args], cwd=root, text=True, capture_output=True,
-                              check=check)
+    def git(self, root, *args, ok=True):
+        result = subprocess.run(["git", *args], cwd=root, env=self.env, text=True, capture_output=True)
+        if ok:
+            self.assertEqual(result.returncode, 0, result.stderr)
+        return result
 
-    def cli(self, root, *args, script_root=None, ok=True):
-        script = (script_root or root) / ".kilo/skills/git-worktree/scripts/bootstrap.py"
-        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    def cli(self, root, *args, ok=True, script_root=None):
+        env = {k: v for k, v in self.env.items() if not k.startswith("GIT_")}
+        script = (script_root or self.factory) / ".kilo/skills/git-worktree/scripts/bootstrap.py"
         result = subprocess.run([sys.executable, str(script), *args], cwd=root,
                                 env=env, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0 if ok else 1, result.stdout + result.stderr)
@@ -49,287 +56,388 @@ class BootstrapTests(unittest.TestCase):
         self.cli(self.factory, "project")
         return self.factory / "project"
 
-    def assert_empty_git(self, root):
-        self.assertEqual(self.run_git(root, "rev-parse", "--show-toplevel").stdout.strip(), str(root))
-        self.assertNotEqual(self.run_git(root, "rev-parse", "--verify", "HEAD", check=False).returncode, 0)
-        self.assertEqual(self.run_git(root, "ls-files", "--stage").stdout, "")
+    def state(self, root):
+        return tuple(self.git(root, *args).stdout for args in (
+            ("rev-parse", "HEAD"), ("ls-files", "--stage"),
+            ("status", "--porcelain", "--untracked-files=all")))
 
-    def test_default_project_full_harness_and_no_local_copy(self):
-        for relative in ("docs/BOARD.md", ".kilo/repos.json", ".kilo/local/qa-navigation.json",
-                         ".kilo/skills/artifacts/report.txt", ".kilo/skills/.env",
-                         "templates/project/.env", "templates/project/artifacts/report.txt",
-                         "templates/project/.kilo/local/qa-navigation.json"):
+    def clone(self, root, name="clone"):
+        destination = self.base / name
+        self.git(self.base, "clone", "--no-local", str(root), str(destination))
+        return destination
+
+    def test_project_initial_commit_and_tracked_boundary(self):
+        marker = self.factory / ".kilo/command/source-marker.md"
+        marker.write_text("factory checkout fixture\n")
+        for relative in ("templates/project/.env", ".kilo/skills/.env", ".kilo/local/private"):
             path = self.factory / relative
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("fixture-local\n")
-        # A checkout-local change proves we copy this fixture checkout, not the primary factory.
-        marker = self.factory / ".kilo/command/checkout-marker.md"
-        marker.write_text("fixture source\n")
-        project = self.create()
-        self.assert_empty_git(project)
-        self.assertEqual(list((project / "apps").iterdir()), [])
-        self.assertEqual(json.loads((project / ".kilo/repos.json").read_text()), {"control": "."})
-        self.assertEqual((project / "AGENTS.md").read_bytes(),
-                         (self.factory / "templates/project/AGENTS.md").read_bytes())
-        self.assertEqual((project / "docs/BOARD.md").read_bytes(),
-                         (self.factory / "templates/project/docs/BOARD.md").read_bytes())
-        self.assertEqual((project / ".kilo/.gitignore").read_bytes(),
-                         (self.factory / ".kilo/.gitignore").read_bytes())
-        self.assertEqual((project / "kilo.jsonc").read_bytes(), (self.factory / "kilo.jsonc").read_bytes())
+            path.write_text("never copy\n")
+        root = self.create()
+        self.assertEqual(self.git(root, "rev-list", "--count", "HEAD").stdout.strip(), "1")
+        tracked = set(self.git(root, "ls-files").stdout.splitlines())
+        expected = {str(p.relative_to(self.factory / "templates/project"))
+                    for p in (self.factory / "templates/project").rglob("*") if p.is_file()}
+        expected -= {"AGENTS.md", "docs/BOARD.md", ".env"}
+        self.assertEqual(tracked, expected)
+        self.assertIn("services.json", tracked)
+        self.assertEqual(self.git(root, "status", "--porcelain").stdout, "")
+        self.assertTrue((root / ".kilo/command/source-marker.md").is_file())
+        self.assertFalse((root / ".env").exists())
+        self.assertFalse((root / ".kilo/local").exists())
         for name in bootstrap.HARNESS:
-            self.assertTrue((project / ".kilo" / name).is_dir())
-        self.assertTrue((project / ".kilo/command/checkout-marker.md").is_file())
-        for relative in (".env", "artifacts", ".kilo/local", ".kilo/skills/.env",
-                         ".kilo/skills/artifacts"):
-            self.assertFalse((project / relative).exists(), relative)
+            self.assertTrue((root / ".kilo" / name).is_dir())
+        config = json.loads((root / ".devcontainer/devcontainer.json").read_text())
+        self.assertIn("kilo-redact.sh", config["postCreateCommand"])
+        self.assertNotIn("safe.directory", config["postCreateCommand"])
+        self.assertTrue((root / ".devcontainer/Dockerfile").is_file())
+        self.assertEqual(json.loads((root / "services.json").read_text()), {"services": []})
 
-    def test_isolated_destination_and_static_ignore_probes(self):
-        project = self.base / "isolated"
-        self.cli(self.factory, "project", "--destination", str(project))
-        ignored = ["docs/BOARD.md", "nested/docs/BOARD.md", "artifacts/report.txt",
-                   ".env", "nested/.env.local", "secret.key", "cert.pem", "cert.p12",
-                   "id_rsa_test", ".kilo/local/qa-navigation.json", ".kilo/qa-local/note",
-                   ".kilo/worktrees/demo/file", ".tmp/file", "apps/frontend/code.py",
-                   ".kilo/agent-manager.json", "nested/__pycache__/x.pyc"]
-        for pattern in (".playwright-mcp", ".playwright", "playwright-report", "test-results", "blob-report"):
-            ignored.extend([pattern + "/result.txt", "nested/" + pattern + "/result.txt"])
-        for path in ignored:
-            self.assertEqual(self.run_git(project, "check-ignore", "--no-index", path, check=False).returncode, 0, path)
-        for path in (".env.example", "src/main.py", ".kilo/policies/git-policy.json",
-                     "kilo.jsonc", ".kilo/skills/git-worktree/scripts/test_bootstrap.py",
-                     ".kilo/command/bootstrap.md", ".kilo/repos.json"):
-            self.assertEqual(self.run_git(project, "check-ignore", "--no-index", path, check=False).returncode, 1, path)
-        self.assertNotIn("/project/", (project / ".gitignore").read_text().splitlines())
+    def test_ignored_local_files_and_trackable_product_files(self):
+        root = self.create()
+        for path in (".kilo/agent/a.md", ".devcontainer/Dockerfile", "kilo.jsonc", "AGENTS.md",
+                     "docs/BOARD.md", ".env", "nested/.env.local", "secret.key", "cert.pem",
+                     "cert.p12", "id_rsa_test", "artifacts/report", ".tmp/file", "node_modules/a",
+                     ".playwright/a", ".playwright-mcp/a", "playwright-report/a", "test-results/a", "blob-report/a"):
+            self.assertEqual(self.git(root, "check-ignore", "--no-index", path, ok=False).returncode, 0, path)
+        for path in ("services.json", "src/main.py", "docs/spec.md", ".env.example"):
+            self.assertEqual(self.git(root, "check-ignore", "--no-index", path, ok=False).returncode, 1, path)
+        self.assertEqual(self.git(SOURCE, "ls-files", "--", "templates/project/docs/BOARD.md").stdout.strip(),
+                         "templates/project/docs/BOARD.md")
 
-    def test_template_board_remains_tracked(self):
-        tracked = self.run_git(SOURCE, "ls-files", "--", "templates/project/docs/BOARD.md")
-        self.assertEqual(tracked.stdout.strip(), "templates/project/docs/BOARD.md")
+    def test_service_roles_and_both_git_ownerships(self):
+        root = self.create()
+        before = self.state(root)[:2]
+        for name, mode in (("shop-frontend", "separate"), ("shop-backend", "project"),
+                           ("shop-backend-experimental", "separate"), ("billing-worker", "project"),
+                           ("inventory-cron", "project"), ("shop-public-frontdoor", "project")):
+            self.cli(root, "app", name, "--git", mode, script_root=root)
+            app = root / "apps" / name
+            self.assertEqual((app / ".git").is_dir(), mode == "separate")
+            if mode == "separate":
+                self.assertEqual(self.git(app, "rev-list", "--count", "HEAD").stdout.strip(), "1")
+                self.assertEqual(self.git(app, "ls-files").stdout, ".gitignore\n")
+            else:
+                (app / "source.py").write_text("pass\n")
+                self.assertIn("apps/" + name + "/source.py", self.git(root, "ls-files", "--others", "--exclude-standard").stdout)
+            for path in ("AGENTS.md", ".devcontainer/Dockerfile", "kilo.jsonc", ".kilo/local/a", ".env", "secret.key"):
+                self.assertEqual(self.git(app, "check-ignore", "--no-index", path, ok=False).returncode, 0, name + path)
+        self.assertEqual(self.state(root)[:2], before)
+        data = json.loads((root / "services.json").read_text())
+        self.assertEqual(len(data["services"]), 6)
+        self.assertEqual(json.loads((root / ".kilo/repos.json").read_text()), {
+            "control": ".", "shop-frontend": "apps/shop-frontend",
+            "shop-backend-experimental": "apps/shop-backend-experimental"})
 
-    def test_copied_tool_initializes_arbitrary_real_apps_only(self):
-        project = self.create()
-        ignore_path = project / ".gitignore"
-        ignore_path.write_text(ignore_path.read_text() + "\n.project-local-cache/\n")
-        for name in ("customer-portal", "billing-worker", "backend", "frontend"):
-            self.cli(project, "app", name, "--git", "separate")
-            app = project / "apps" / name
-            self.assert_empty_git(app)
-            self.assertEqual(sorted(path.name for path in app.iterdir()), [".git", ".gitignore"])
-            self.assertEqual((app / ".gitignore").read_text(), "".join(
-                line for line in ignore_path.read_text().splitlines(keepends=True)
-                if line.strip() != "apps/*/"))
-            ignored = [".env", ".env.production", "nested/.env.local", "secret.key", "cert.pem",
-                       "cert.p12", "id_rsa_test", ".kilo/worktrees/demo/file",
-                       ".kilo/local/qa-navigation.json", ".kilo/qa-local/note",
-                       "artifacts/report.txt", "node_modules/pkg/index.js", ".tmp/file",
-                       "nested/__pycache__/x.pyc", ".project-local-cache/file"]
-            for pattern in (".playwright-mcp", ".playwright", "playwright-report", "test-results", "blob-report"):
-                ignored.extend([pattern + "/result.txt", "nested/" + pattern + "/result.txt"])
-            for path in ignored:
-                self.assertEqual(self.run_git(app, "check-ignore", "--no-index", path, check=False).returncode, 0, path)
-            for path in (".env.example", "nested/.env.example", "src/main.py", "tests/test_main.py",
-                         "apps/nested/src/main.py", ".gitignore", "kilo.jsonc"):
-                self.assertEqual(self.run_git(app, "check-ignore", "--no-index", path, check=False).returncode, 1, path)
-            self.assertEqual(json.loads((project / ".kilo/repos.json").read_text())[name], "apps/" + name)
-        self.assert_empty_git(project)
-        before = (project / ".kilo/repos.json").read_bytes()
-        self.cli(project, "app", "customer-portal", "--git", "separate", ok=False)
-        self.assertEqual((project / ".kilo/repos.json").read_bytes(), before)
+    def test_project_clone_restore_twice_preserves_source_index_head(self):
+        root = self.create()
+        self.cli(root, "app", "shop-frontend", "--git", "separate")
+        self.cli(root, "app", "billing-worker", "--git", "project")
+        self.git(root, "add", "services.json", ".gitignore", "apps/billing-worker/.gitignore")
+        self.git(root, "commit", "-m", "fixture service registration")
+        clone = self.clone(root)
+        self.assertFalse((clone / ".kilo").exists())
+        (clone / "docs/local-note.txt").write_text("handwritten source\n")
+        self.git(clone, "add", "docs/local-note.txt")
+        before = self.state(clone)
+        tracked = {p: (clone / p).read_bytes() for p in self.git(clone, "ls-files").stdout.splitlines()}
+        first = self.cli(self.factory, "restore", "--destination", str(clone))
+        self.assertIn("Missing service checkout: apps/shop-frontend", first.stdout)
+        self.assertEqual(json.loads((clone / ".kilo/repos.json").read_text()), {
+            "control": ".", "shop-frontend": "apps/shop-frontend"})
+        exclude = (clone / ".git/info/exclude").read_bytes()
+        self.cli(self.factory, "restore", "--destination", str(clone))
+        self.assertEqual((clone / ".git/info/exclude").read_bytes(), exclude)
+        shutil.rmtree(clone / ".kilo")
+        shutil.rmtree(clone / ".devcontainer")
+        (clone / "AGENTS.md").unlink()
+        (clone / "kilo.jsonc").unlink()
+        (clone / "docs/BOARD.md").unlink()
+        self.cli(self.factory, "restore", "--destination", str(clone))
+        self.assertEqual(self.state(clone), before)
+        for p, content in tracked.items():
+            self.assertEqual((clone / p).read_bytes(), content)
 
-    def test_app_choice_required_before_mutation(self):
-        project = self.create()
-        before = {path: (project / path).read_bytes()
-                  for path in (".gitignore", ".kilo/repos.json")}
-        for options in ([], ["--git", "unknown"]):
-            result = subprocess.run(
-                [sys.executable, str(project / ".kilo/skills/git-worktree/scripts/bootstrap.py"),
-                 "app", "demo", *options], cwd=project, capture_output=True, text=True)
-            self.assertEqual(result.returncode, 2)
-            self.assertIn("--git", result.stderr)
-            self.assertEqual(list((project / "apps").iterdir()), [])
-            for path, content in before.items():
-                self.assertEqual((project / path).read_bytes(), content)
-        self.assert_empty_git(project)
+    def test_separate_clone_restore_context_and_lifecycle_root(self):
+        root = self.create()
+        self.cli(root, "app", "shop-frontend", "--git", "separate")
+        self.git(root, "add", "services.json")
+        self.git(root, "commit", "-m", "fixture manifest")
+        clone = self.clone(root)
+        self.cli(self.factory, "restore", "--destination", str(clone))
+        app = clone / "apps/shop-frontend"
+        app.parent.mkdir(exist_ok=True)
+        self.git(clone, "clone", str(root / "apps/shop-frontend"), str(app))
+        before, control_before = self.state(app), self.state(clone)
+        restored = self.cli(self.factory, "restore", "--destination", str(app), "--project", str(clone))
+        self.assertIn("without an app devcontainer", restored.stdout)
+        self.cli(self.factory, "restore", "--destination", str(app))
+        self.assertTrue((app / ".kilo/skills/git-worktree/scripts/worktree.py").is_file())
+        self.assertFalse((app / ".devcontainer").exists())
+        instructions = (app / "AGENTS.md").read_text()
+        self.assertIn("../../", instructions)
+        self.assertNotIn(str(clone), instructions)
+        self.assertFalse((app / ".kilo/local/control-root").exists())
+        self.assertFalse((app / ".kilo/repos.json").exists())
+        self.assertFalse((app / "docs/BOARD.md").exists())
+        self.assertEqual(self.state(app), before)
+        self.assertEqual(self.state(clone), control_before)
+        result = subprocess.run([sys.executable, "-c",
+            "import worktree; print(worktree.control_root('.'))"], cwd=app,
+            env={**self.env, "PYTHONPATH": str(app / ".kilo/skills/git-worktree/scripts")},
+            text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), str(clone))
+        standalone = self.clone(root / "apps/shop-frontend", "standalone")
+        self.assertIn("requires --project", self.cli(self.factory, "restore", "--destination", str(standalone), ok=False).stderr)
+        self.assertIn("must occupy", self.cli(self.factory, "restore", "--destination", str(standalone), "--project", str(clone), ok=False).stderr)
 
-    def test_project_app_tracks_source_without_git_or_mapping(self):
-        project = self.create()
-        ignore = project / ".gitignore"
-        ignore.write_text(ignore.read_text() + "\n.project-local-cache/\n")
-        before = ignore.read_text()
-        map_before = (project / ".kilo/repos.json").read_bytes()
-        # No init is performed here, so even a hard init denial is irrelevant.
-        policy_path = project / ".kilo/policies/git-policy.json"
-        policy = json.loads(policy_path.read_text())
-        for rule in policy["bash"]:
-            if rule["pattern"] == "git init*":
-                rule["action"] = "deny"
-        policy_path.write_text(json.dumps(policy))
-        self.cli(project, "app", "portal", "--git", "project")
-        self.assertEqual([path.name for path in (project / "apps/portal").iterdir()], [".gitignore"])
-        self.assertEqual((project / ".kilo/repos.json").read_bytes(), map_before)
-        self.assertEqual(ignore.read_text(), before + "\n!/apps/portal/\n")
-        source = project / "apps/portal/src/main.py"
-        source.parent.mkdir()
-        source.write_text("# fixture source\n")
-        untracked = self.run_git(project, "ls-files", "--others", "--exclude-standard").stdout.splitlines()
-        self.assertIn("apps/portal/src/main.py", untracked)
-        for path in ("src/main.py", ".env.example", "nested/.env.example"):
-            self.assertEqual(self.run_git(project, "check-ignore", "--no-index",
-                                         "apps/portal/" + path, check=False).returncode, 1, path)
-        for path in (".env", "nested/.env.local", "secret.key", "cert.pem", "cert.p12",
-                     "id_rsa_test", "artifacts/file", "node_modules/pkg/file", ".tmp/file",
-                     ".kilo/local/qa-navigation.json", ".kilo/agent-manager.json", ".kilo/worktrees/demo/file",
-                     ".kilo/qa-local/file", "nested/__pycache__/x.pyc", ".project-local-cache/file",
-                     ".playwright/file", ".playwright-mcp/file", "playwright-report/file",
-                     "test-results/file", "blob-report/file"):
-            self.assertEqual(self.run_git(project, "check-ignore", "--no-index",
-                                         "apps/portal/" + path, check=False).returncode, 0, path)
-        self.assertEqual(self.run_git(project, "check-ignore", "apps/other/src/main.py",
-                                     check=False).returncode, 0)
-        self.cli(project, "app", "independent", "--git", "separate", ok=False)
-        self.assertFalse((project / "apps/independent").exists())
-        for mode in ("separate", "project"):
-            self.cli(project, "app", "portal", "--git", mode, ok=False)
-        self.assert_empty_git(project)
+        # Moving the entire control simulates a different container mount prefix.
+        mounted = self.base / "container-workspace"
+        clone.rename(mounted)
+        app = mounted / "apps/shop-frontend"
+        config = json.loads((mounted / ".devcontainer/devcontainer.json").read_text())
+        effective_config = config["remoteEnv"]["KILO_CONFIG"].replace("${containerWorkspaceFolder}", str(mounted))
+        self.assertEqual(Path(effective_config), mounted / "kilo.jsonc")
+        self.assertTrue(Path(effective_config).is_file())
+        self.assertEqual((app / "../../").resolve(), mounted)
+        result = subprocess.run([sys.executable, "-c",
+            "import guard, worktree; print(worktree.control_root('.')); print(guard.control_root(None))"],
+            cwd=app, env={**self.env, "KILO_CONFIG": effective_config,
+                         "PYTHONPATH": str(app / ".kilo/skills/git-worktree/scripts")},
+            text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [str(mounted), str(mounted)])
+        self.assertEqual((app / "kilo.jsonc").read_bytes(), (mounted / "kilo.jsonc").read_bytes())
 
-    def test_app_ignore_source_preflight_creates_nothing(self):
-        project = self.create()
-        (project / "apps").rmdir()  # Empty fixture only.
-        before = (project / ".kilo/repos.json").read_bytes()
-        ignore_path = project / ".gitignore"
-        saved = project / "saved-ignore"
-        ignore_path.rename(saved)
-        for kind in ("missing", "symlink", "directory"):
-            if kind == "symlink":
-                ignore_path.symlink_to(saved)
-            elif kind == "directory":
-                ignore_path.unlink()  # Fixture symlink, not its target.
-                ignore_path.mkdir()
+    def test_restore_conflict_preflight_writes_nothing(self):
+        root = self.clone(self.create())
+        (root / "AGENTS.md").write_text("handwritten custom instructions\n")
+        before = self.state(root)
+        exclude = (root / ".git/info/exclude").read_bytes()
+        result = self.cli(self.factory, "restore", "--destination", str(root), ok=False)
+        self.assertIn("restore conflict; no files written", result.stderr)
+        self.assertFalse((root / ".kilo").exists())
+        self.assertFalse((root / ".devcontainer").exists())
+        self.assertEqual((root / ".git/info/exclude").read_bytes(), exclude)
+        self.assertEqual(self.state(root), before)
+
+    def test_restore_missing_source_roots_and_source_symlinks(self):
+        root = self.clone(self.create())
+        shutil.rmtree(self.factory / ".devcontainer")
+        self.cli(self.factory, "restore", "--destination", str(root), ok=False)
+        self.assertFalse((root / ".kilo").exists())
+        shutil.copytree(SOURCE / ".devcontainer", self.factory / ".devcontainer")
+        (self.factory / ".kilo/command/linked.md").symlink_to(self.factory / "templates/project/README.md")
+        self.cli(self.factory, "restore", "--destination", str(root), ok=False)
+        self.assertFalse((root / ".kilo").exists())
+
+    def test_restore_rejects_factory_linked_checkout_and_destination_symlinks(self):
+        root = self.create()
+        for destination in (self.factory, self.base / "alias", self.base / "linked"):
+            if destination.name == "alias":
+                destination.symlink_to(root, target_is_directory=True)
+            if destination.name == "linked":
+                self.git(root, "worktree", "add", "-b", "fixture", str(destination))
+            self.cli(self.factory, "restore", "--destination", str(destination), ok=False)
+        clone = self.clone(root)
+        (clone / ".kilo").symlink_to(self.factory / ".kilo", target_is_directory=True)
+        self.cli(self.factory, "restore", "--destination", str(clone), ok=False)
+
+    def test_manifest_validation_before_restore_writes(self):
+        root = self.clone(self.create())
+        good = {"name": "shop-backend", "path": "apps/shop-backend", "git": "project"}
+        for services in ([good, good], [{**good, "path": "../escape"}],
+                         [{**good, "git": "guess"}], [{**good, "name": "Bad_Name"}]):
+            (root / "services.json").write_text(json.dumps({"services": services}))
+            self.cli(self.factory, "restore", "--destination", str(root), ok=False)
+            self.assertFalse((root / ".kilo").exists())
+
+    def test_missing_identity_preflight_and_commit_failure_retained_state(self):
+        self.git(self.factory, "config", "--global", "--unset", "user.name")
+        self.git(self.factory, "config", "--global", "--unset", "user.email")
+        self.git(self.factory, "config", "--global", "user.useConfigOnly", "true")
+        result = self.cli(self.factory, "project", ok=False)
+        self.assertIn("identity unavailable", result.stderr)
+        self.assertFalse((self.factory / "project").exists())
+        # Parent-only identity passes preflight but is not inherited by the new repo.
+        self.git(self.factory, "config", "user.name", "Fixture Parent")
+        self.git(self.factory, "config", "user.email", "parent@example.invalid")
+        result = self.cli(self.factory, "project", ok=False)
+        self.assertIn("Git commit failed", result.stderr)
+        self.assertIn("partial state retained", result.stderr)
+        partial = self.factory / "project"
+        self.assertTrue((partial / ".git").is_dir())
+        self.assertNotEqual(self.git(partial, "rev-parse", "--verify", "HEAD", ok=False).returncode, 0)
+        self.assertIn("services.json", self.git(partial, "ls-files").stdout)
+        # A rejecting installed hook must not be bypassed; fixture-only hook configuration.
+        hooks = self.base / "hooks"
+        hooks.mkdir()
+        hook = hooks / "pre-commit"
+        hook.write_text("#!/bin/sh\nexit 1\n")
+        hook.chmod(0o755)
+        self.git(self.factory, "config", "--global", "user.name", "Fixture")
+        self.git(self.factory, "config", "--global", "user.email", "fixture@example.invalid")
+        self.git(self.factory, "config", "--global", "core.hooksPath", str(hooks))
+        root = self.base / "hook-rejected"
+        result = self.cli(self.factory, "project", "--destination", str(root), ok=False)
+        self.assertIn("partial state retained", result.stderr)
+        self.assertTrue((root / ".git").is_dir())
+        self.assertNotEqual(self.git(root, "rev-parse", "--verify", "HEAD", ok=False).returncode, 0)
+        self.assertIn("services.json", self.git(root, "ls-files").stdout)
+        self.cli(self.factory, "project", "--destination", str(root), ok=False)
+
+    def test_all_initial_policy_commands_and_unknown_context_denials(self):
+        path = self.factory / ".kilo/policies/git-policy.json"
+        original = json.loads(path.read_text())
+        for index, command in enumerate(("git init*", "git add*", "git commit*")):
+            policy = json.loads(json.dumps(original))
+            policy["bash"].append({"pattern": command, "action": "deny"})
+            path.write_text(json.dumps(policy))
+            destination = self.base / ("denied-" + str(index))
+            self.cli(self.factory, "project", "--destination", str(destination), ok=False)
+            self.assertFalse(destination.exists())
+        original["context"].append({"applies_to": ["git commit*"], "check": "always", "action": "deny"})
+        path.write_text(json.dumps(original))
+        destination = self.base / "denied-context"
+        self.cli(self.factory, "project", "--destination", str(destination), ok=False)
+        self.assertFalse(destination.exists())
+
+    def test_restore_nonregular_exclude_refuses_before_local_writes(self):
+        root = self.clone(self.create())
+        exclude = root / ".git/info/exclude"
+        exclude.unlink()
+        exclude.mkdir()
+        self.cli(self.factory, "restore", "--destination", str(root), ok=False)
+        self.assertFalse((root / ".kilo").exists())
+        self.assertFalse((root / ".devcontainer").exists())
+
+    def test_restore_refuses_missing_tracked_tooling_without_source_changes(self):
+        root = self.clone(self.create())
+        instructions = root / "AGENTS.md"
+        instructions.write_text("Handwritten tracked instructions\n")
+        self.git(root, "add", "-f", "AGENTS.md")
+        self.git(root, "commit", "-m", "fixture tracked instructions")
+        instructions.unlink()
+        before = self.state(root)
+        result = self.cli(self.factory, "restore", "--destination", str(root), ok=False)
+        self.assertIn("tracked source", result.stderr)
+        self.assertFalse(instructions.exists())
+        self.assertFalse((root / ".kilo").exists())
+        self.assertEqual(self.state(root), before)
+
+    def test_restore_refuses_deleted_tracked_ancestors_before_any_writes(self):
+        original = self.create()
+        for index, (relative, kind) in enumerate(((".kilo", "file"), (".devcontainer", "symlink"),
+                                                  (".kilo/skills", "gitlink"))):
+            with self.subTest(kind=kind):
+                root = self.clone(original, "ancestor-" + str(index))
+                path = root / relative
+                if kind == "gitlink":
+                    commit = self.git(root, "rev-parse", "HEAD").stdout.strip()
+                    self.git(root, "update-index", "--add", "--cacheinfo", "160000", commit, relative)
+                else:
+                    if kind == "file":
+                        path.write_text("tracked ancestor source\n")
+                    else:
+                        path.symlink_to("README.md")
+                    self.git(root, "add", "-f", "--", relative)
+                self.git(root, "commit", "-m", "fixture tracked ancestor")
+                if kind != "gitlink":
+                    path.unlink()
+                before = self.state(root)
+                exclude = (root / ".git/info/exclude").read_bytes()
+                result = self.cli(self.factory, "restore", "--destination", str(root), ok=False)
+                self.assertIn("tracked source", result.stderr)
+                self.assertFalse(os.path.lexists(path))
+                for output in (".kilo", ".devcontainer", "kilo.jsonc", "AGENTS.md", "docs/BOARD.md"):
+                    self.assertFalse((root / output).exists(), output)
+                self.assertEqual((root / ".git/info/exclude").read_bytes(), exclude)
+                self.assertEqual(self.state(root), before)
+
+    def test_factory_app_cli_honors_target_control_policy_denials(self):
+        root = self.create()
+        policy_path = root / ".kilo/policies/git-policy.json"
+        original = json.loads(policy_path.read_text())
+        for index, command in enumerate(("git init*", "git add*", "git commit*")):
+            with self.subTest(command=command):
+                policy = json.loads(json.dumps(original))
+                policy["bash"].append({"pattern": command, "action": "deny"})
+                policy_path.write_text(json.dumps(policy))
+                before = self.state(root)
+                manifest = (root / "services.json").read_bytes()
+                mapping = (root / ".kilo/repos.json").read_bytes()
+                name = "denied-worker-" + str(index)
+                result = self.cli(root, "app", name, "--git", "separate", ok=False,
+                                  script_root=self.factory)
+                self.assertIn("guard refused", result.stderr)
+                self.assertFalse((root / "apps" / name).exists())
+                self.assertEqual((root / "services.json").read_bytes(), manifest)
+                self.assertEqual((root / ".kilo/repos.json").read_bytes(), mapping)
+                self.assertEqual(self.state(root), before)
+
+    def test_app_unsafe_ignore_or_stale_map_creates_nothing(self):
+        root = self.create()
+        ignore = root / ".gitignore"
+        content = ignore.read_bytes()
+        before = (root / "services.json").read_bytes()
+        for kind in ("missing", "directory", "symlink"):
+            ignore.unlink()
+            if kind == "directory":
+                ignore.mkdir()
+            elif kind == "symlink":
+                ignore.symlink_to(self.factory / "templates/project/.gitignore")
             for mode in ("separate", "project"):
-                self.cli(project, "app", "demo", "--git", mode, ok=False)
-            self.assertFalse((project / "apps").exists())
-            self.assertEqual((project / ".kilo/repos.json").read_bytes(), before)
-            self.assertTrue(saved.is_file())
+                self.cli(root, "app", "billing-worker", "--git", mode, ok=False)
+                self.assertFalse((root / "apps/billing-worker").exists())
+            if ignore.is_dir():
+                ignore.rmdir()
+            elif ignore.is_symlink():
+                ignore.unlink()
+            ignore.write_bytes(content)
+        (root / ".kilo/repos.json").write_text('{"control":".","stale":"apps/stale"}')
+        self.cli(root, "app", "billing-worker", "--git", "project", ok=False)
+        self.assertFalse((root / "apps/billing-worker").exists())
+        self.assertEqual((root / "services.json").read_bytes(), before)
 
-    def test_project_refuses_existing_empty_file_and_symlink_destinations(self):
-        paths = [self.base / "empty", self.base / "file", self.base / "link", self.base / "dangling"]
-        paths[0].mkdir()
-        paths[1].write_text("unchanged")
-        paths[2].symlink_to(paths[0], target_is_directory=True)
-        paths[3].symlink_to(self.base / "missing")
-        for path in paths:
-            self.cli(self.factory, "project", "--destination", str(path), ok=False)
-        self.assertEqual(paths[1].read_text(), "unchanged")
-        self.assertFalse((paths[0] / ".git").exists())
-        project = self.create()
-        before = (project / "kilo.jsonc").read_bytes()
-        self.cli(self.factory, "project", ok=False)
-        self.assertEqual((project / "kilo.jsonc").read_bytes(), before)
-
-    def test_app_rejects_invalid_names_paths_existing_and_symlinks(self):
-        project = self.create()
-        before = (project / ".kilo/repos.json").read_bytes()
-        for name in ("../escape", "a/b", "/absolute", "..", ".", "UPPER", "a_b", "control"):
-            for mode in ("separate", "project"):
-                self.cli(project, "app", name, "--git", mode, ok=False)
-        existing = project / "apps/existing"
-        existing.mkdir()
-        (existing / "keep").write_text("unchanged")
-        (project / "apps/link").symlink_to(self.base / "absent")
-        for name in ("existing", "link"):
-            for mode in ("separate", "project"):
-                self.cli(project, "app", name, "--git", mode, ok=False)
-        self.assertEqual((existing / "keep").read_text(), "unchanged")
-        self.assertEqual((project / ".kilo/repos.json").read_bytes(), before)
+    def test_project_prerequisites_existing_parent_and_traversal(self):
+        for destination in (self.base / "missing-parent/project", self.base / "child/../escape"):
+            self.cli(self.factory, "project", "--destination", str(destination), ok=False)
         self.assertFalse((self.base / "escape").exists())
-
-    def test_malformed_maps_and_collisions_leave_no_app(self):
-        project = self.create()
-        map_path = project / ".kilo/repos.json"
-        for data in ('{', '[]', '{"control":"other"}', '{"control":".","x":4}',
-                     '{"control":".","x":"../x"}', '{"control":".","control":"."}',
-                     '{"control":".","other":"apps/demo"}',
-                     '{"control":".","demo":"apps/other"}',
-                     '{"control":".","a":"apps/x","b":"apps/x"}'):
-            map_path.write_text(data)
-            for mode in ("separate", "project"):
-                self.cli(project, "app", "demo", "--git", mode, ok=False)
-            self.assertEqual(map_path.read_text(), data)
-            self.assertFalse((project / "apps/demo").exists())
-
-    def test_nonproject_missing_git_repo_and_symlink_apps_refused(self):
-        for mode in ("separate", "project"):
-            self.cli(self.factory, "app", "demo", "--git", mode, ok=False)
-        project = self.create()
-        other = self.base / "not-initialized"
-        shutil.copytree(project, other, ignore=shutil.ignore_patterns(".git"))
-        for mode in ("separate", "project"):
-            self.cli(other, "app", "demo", "--git", mode, ok=False)
-        (project / "apps").rmdir()  # Empty fixture only; never a real project.
-        (project / "apps").symlink_to(self.base, target_is_directory=True)
-        for mode in ("separate", "project"):
-            self.cli(project, "app", "demo", "--git", mode, ok=False)
-        self.assertFalse((self.base / "demo").exists())
-        for mode in ("separate", "project"):
-            self.cli(self.factory / "templates/project", "app", "demo", "--git", mode,
-                     script_root=self.factory, ok=False)
-
-    def test_missing_sources_and_source_symlink_preflight(self):
-        config = self.factory / "kilo.jsonc"
-        config.rename(self.factory / "saved-config")
+        (self.factory / "kilo.jsonc").unlink()
         self.cli(self.factory, "project", ok=False)
         self.assertFalse((self.factory / "project").exists())
-        (self.factory / "saved-config").rename(config)
-        (self.factory / ".kilo/command/link.md").symlink_to(config)
-        self.cli(self.factory, "project", ok=False)
-        self.assertFalse((self.factory / "project").exists())
-        self.cli(self.factory, "project", "--destination", str(self.base / "missing/child"), ok=False)
-        self.assertFalse((self.base / "missing").exists())
 
-    def test_guard_hard_denial_and_destination_traversal_create_nothing(self):
+    def test_hard_policy_denials_not_bypassed_and_integrated_no_commit(self):
+        root = self.create()
         policy_path = self.factory / ".kilo/policies/git-policy.json"
         policy = json.loads(policy_path.read_text())
-        for rule in policy["bash"]:
-            if rule["pattern"] == "git init*":
-                rule["action"] = "deny"
+        policy["bash"].append({"pattern": "git commit*", "action": "deny", "reason": "fixture denial"})
         policy_path.write_text(json.dumps(policy))
-        result = self.cli(self.factory, "project", ok=False)
-        self.assertIn("guard refused", result.stderr)
-        self.assertFalse((self.factory / "project").exists())
-        with self.assertRaisesRegex(ValueError, "traversal"):
-            bootstrap.project(self.factory, self.base / "factory/../escape")
-        self.assertFalse((self.base / "escape").exists())
+        self.cli(root, "app", "shop-frontend", "--git", "separate", ok=False)
+        self.assertFalse((root / "apps/shop-frontend").exists())
+        before = self.state(root)[:2]
+        self.cli(root, "app", "billing-worker", "--git", "project")
+        self.assertEqual(self.state(root)[:2], before)
+        destination = self.base / "denied"
+        self.cli(self.factory, "project", "--destination", str(destination), ok=False)
+        self.assertFalse(destination.exists())
 
-    def test_retained_map_temporary_path_refused_before_app_creation(self):
-        project = self.create()
-        temporary = project / ".kilo/repos.json.bootstrap-tmp"
-        temporary.write_text("retained fixture")
-        for mode in ("separate", "project"):
-            self.cli(project, "app", "demo", "--git", mode, ok=False)
-        self.assertEqual(temporary.read_text(), "retained fixture")
-        self.assertFalse((project / "apps/demo").exists())
-
-    def test_missing_git_and_environment_overrides_create_nothing(self):
-        with patch("bootstrap.shutil.which", return_value=None), contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(bootstrap.main(["project", "--destination", str(self.base / "absent")]), 1)
-        with patch.dict(os.environ, {"GIT_DIR": "fixture-override"}), contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(bootstrap.main(["project", "--destination", str(self.base / "absent")]), 1)
-        self.assertFalse((self.base / "absent").exists())
-
-    def test_git_init_failure_retains_partial_state_and_map(self):
-        project = self.base / "partial"
-        with patch("bootstrap.git", side_effect=ValueError("Git init failed")):
-            with self.assertRaisesRegex(ValueError, "partial state retained"):
-                bootstrap.project(self.factory, project)
-        self.assertTrue((project / "kilo.jsonc").is_file())
-        self.assertFalse((project / ".git").exists())
-        control = self.create()
-        before = (control / ".kilo/repos.json").read_bytes()
-        with patch("bootstrap.git", side_effect=[str(control), ValueError("Git init failed")]):
-            with self.assertRaisesRegex(ValueError, "partial state retained"):
-                bootstrap.app(control, control, "failed-app", "separate")
-        self.assertTrue((control / "apps/failed-app").is_dir())
-        self.assertTrue((control / "apps/failed-app/.gitignore").is_file())
-        self.assertEqual((control / ".kilo/repos.json").read_bytes(), before)
+    def test_invalid_names_collisions_existing_paths_and_required_git_choice(self):
+        root = self.create()
+        for name in ("Bad_Name", "../escape", "control", "worker--one"):
+            self.cli(root, "app", name, "--git", "separate", ok=False)
+        result = subprocess.run([sys.executable, str(self.factory / ".kilo/skills/git-worktree/scripts/bootstrap.py"),
+                                 "app", "shop-frontend"], cwd=root, env=self.env, capture_output=True)
+        self.assertEqual(result.returncode, 2)
+        self.cli(root, "app", "shop-frontend", "--git", "separate")
+        before = self.state(root)
+        self.cli(root, "app", "shop-frontend", "--git", "project", ok=False)
+        self.assertEqual(self.state(root), before)
+        self.cli(self.factory, "project", ok=False)
+        alias = self.base / "alias"
+        alias.symlink_to(root, target_is_directory=True)
+        self.cli(self.factory, "project", "--destination", str(alias), ok=False)
 
 
 if __name__ == "__main__":

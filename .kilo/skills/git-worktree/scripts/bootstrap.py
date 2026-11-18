@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""Create a project control repository or an app with an explicit Git ownership choice."""
+"""Bootstrap source repositories or restore their ignored local factory tooling."""
 
 import argparse
 import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 
-from guard import script_project_root
+from guard import bash_verdict, load_policy, pattern_matches, script_project_root
 
 
 NAME = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z")
 HARNESS = ("agent", "command", "skills", "policies")
+LOCAL = ("/.kilo/", "/.devcontainer/", "/kilo.jsonc", "/AGENTS.md", "/docs/BOARD.md")
 OUTPUTS = {".git", "__pycache__", "node_modules", "artifacts", ".tmp",
            ".playwright-mcp", ".playwright", "playwright-report", "test-results",
            "blob-report", ".vscode", ".DS_Store"}
@@ -24,44 +26,65 @@ def git(*args, cwd):
     result = subprocess.run(["git", *args], cwd=cwd, text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode:
-        # Do not echo subprocess output: local Git hooks/config may contain secrets.
+        # Git hooks/config output can contain secrets; never print it.
         raise ValueError("Git {} failed (exit {})".format(args[0], result.returncode))
     return result.stdout.strip()
+
+
+def real_path(path):
+    if ".." in path.parts:
+        raise ValueError("traversal is not supported")
+    path = Path(os.path.abspath(path))
+    if any(p.is_symlink() for p in (path, *path.parents)):
+        raise ValueError("symlinks are not supported: " + str(path))
+    return path
 
 
 def unique_object(pairs):
     result = {}
     for key, value in pairs:
         if key in result:
-            raise ValueError("duplicate repository ID")
+            raise ValueError("duplicate manifest key")
         result[key] = value
     return result
 
 
-def read_map(path):
-    if path.is_symlink() or not path.is_file():
-        raise ValueError("repository map must be a regular file")
+def read_services(root):
+    path = real_path(root / "services.json")
+    if not path.is_file():
+        raise ValueError("missing regular tracked services.json")
     try:
-        repos = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
+        data = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
     except (json.JSONDecodeError, UnicodeError):
-        raise ValueError("malformed repository map") from None
-    if not isinstance(repos, dict) or repos.get("control") != ".":
-        raise ValueError("repository map must contain control: .")
-    paths = set()
-    for name, path in repos.items():
-        if not NAME.fullmatch(name) or not isinstance(path, str):
-            raise ValueError("invalid repository ID/path")
-        if name != "control" and not re.fullmatch(r"apps/[a-z][a-z0-9]*(?:-[a-z0-9]+)*", path):
-            raise ValueError("application map paths must be apps/<name>")
-        if path in paths:
-            raise ValueError("duplicate repository path")
+        raise ValueError("malformed services manifest") from None
+    if not isinstance(data, dict) or set(data) != {"services"} or not isinstance(data["services"], list):
+        raise ValueError("manifest must contain a services array")
+    names, paths = set(), set()
+    for service in data["services"]:
+        if not isinstance(service, dict) or set(service) != {"name", "path", "git"}:
+            raise ValueError("service needs only name, path and git ownership")
+        name, path = service["name"], service["path"]
+        if (not isinstance(name, str) or not NAME.fullmatch(name) or name == "control"
+                or path != "apps/" + name or service["git"] not in ("separate", "project")
+                or name in names or path in paths):
+            raise ValueError("invalid or colliding service name/path/ownership")
+        real_path(root / path)
+        names.add(name)
         paths.add(path)
-    return repos
+    return data
+
+
+def encoded(data):
+    return (json.dumps(data, indent=2) + "\n").encode("utf-8")
+
+
+def repo_map(data):
+    return {"control": ".", **{s["name"]: s["path"] for s in data["services"]
+                             if s["git"] == "separate"}}
 
 
 def excluded(relative):
-    parts = relative.parts
-    name = relative.name
+    parts, name = relative.parts, relative.name
     return (any(part in OUTPUTS for part in parts)
             or any(parts[i] == ".kilo" and parts[i + 1] in
                    {"local", "qa-local", "worktrees"} for i in range(len(parts) - 1))
@@ -72,152 +95,304 @@ def excluded(relative):
             or name.startswith("id_rsa"))
 
 
+def collect(root, target, plan):
+    real_path(root)
+    if not root.is_dir():
+        raise ValueError("missing source root: " + str(root))
+    for directory, dirs, names in os.walk(root, followlinks=False):
+        relative = Path(directory).relative_to(root)
+        for name in list(dirs):
+            output = target / relative / name
+            if excluded(output):
+                dirs.remove(name)
+            else:
+                real_path(Path(directory) / name)
+        for name in names:
+            output = target / relative / name
+            if excluded(output):
+                continue
+            path = real_path(Path(directory) / name)
+            if not path.is_file():
+                raise ValueError("source must contain only regular files")
+            if output in plan:
+                raise ValueError("source output collision: " + str(output))
+            plan[output] = path.read_bytes()
+
+
+def local_plan(source):
+    plan = {}
+    for name in HARNESS:
+        collect(source / ".kilo" / name, Path(".kilo") / name, plan)
+    for relative in (".kilo/.gitignore", "kilo.jsonc"):
+        path = real_path(source / relative)
+        if not path.is_file():
+            raise ValueError("missing regular source: " + relative)
+        plan[Path(relative)] = path.read_bytes()
+    collect(source / ".devcontainer", Path(".devcontainer"), plan)
+    config_path = Path(".devcontainer/devcontainer.json")
+    if any(Path(p) not in plan for p in (".devcontainer/devcontainer.json", ".devcontainer/Dockerfile", ".devcontainer/kilo-redact.sh")):
+        raise ValueError("incomplete devcontainer source")
+    config = json.loads(plan[config_path])
+    # Workspace-relative tools/config, without the factory's global Git mutation or doctor.
+    config["name"] = "Project Development"
+    config["postCreateCommand"] = "install -m 0644 .devcontainer/kilo-redact.sh /home/node/.kilo-redact.sh"
+    config["remoteEnv"]["KILO_CONFIG"] = "${containerWorkspaceFolder}/kilo.jsonc"
+    plan[config_path] = encoded(config)
+    return plan
+
+
+def factory_template(source):
+    template = real_path(source / "templates/project")
+    if not template.is_dir():
+        raise ValueError("restore/project source must be the factory checkout containing templates/project")
+    if read_services(template) != {"services": []}:
+        raise ValueError("template manifest must be blank")
+    return template
+
+
+def preflight(destination, plan):
+    for relative, content in plan.items():
+        output = real_path(destination / relative)
+        if os.path.lexists(output) and (not output.is_file() or output.read_bytes() != content):
+            raise ValueError("restore conflict; no files written: " + str(output))
+        for parent in output.parents:
+            if parent == destination.parent:
+                break
+            if parent.exists() and not parent.is_dir():
+                raise ValueError("non-directory destination parent: " + str(parent))
+
+
+def write_plan(destination, plan):
+    for relative, content in plan.items():
+        output = destination / relative
+        if output.exists():
+            continue
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with output.open("xb") as handle:
+            handle.write(content)
+
+
+def bootstrap_policy(source, files):
+    policy = load_policy(str(real_path(source / ".kilo/policies/git-policy.json")))
+    commands = (["git", "init"], ["git", "add", "--", *sorted(files)],
+                ["git", "commit", "-m", "chore: initialize source repository"])
+    for args in commands:
+        command = shlex.join(args)
+        if bash_verdict(policy, command)[0] not in ("allow", "ask"):
+            raise ValueError("guard refused " + command.split(" --")[0] + "; nothing created")
+        # Only these two context checks have the approved new-repo exception.
+        for rule in policy.get("context", []):
+            if (any(pattern_matches(command, p) for p in rule.get("applies_to", []))
+                    and rule.get("check") not in ("protected_branch", "in_worktree")
+                    and rule.get("action", "deny") == "deny"):
+                raise ValueError("guard refused bootstrap context rule; nothing created")
+
+
+def identity(cwd):
+    try:
+        git("var", "GIT_AUTHOR_IDENT", cwd=cwd)
+        git("var", "GIT_COMMITTER_IDENT", cwd=cwd)
+    except ValueError:
+        raise ValueError("Git identity unavailable; configure your identity, then retry; nothing created") from None
+
+
+def initial_commit(destination, files):
+    # Called only immediately after this invocation creates a previously absent repo.
+    if not (destination / ".git").is_dir() or git("ls-files", cwd=destination):
+        raise ValueError("initial commit requires a fresh empty index")
+    result = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], cwd=destination,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode == 0:
+        raise ValueError("initial commit requires unborn HEAD")
+    git("add", "--", *sorted(files), cwd=destination)
+    git("commit", "-m", "chore: initialize source repository", cwd=destination)
+    if git("rev-list", "--count", "HEAD", cwd=destination) != "1":
+        raise ValueError("unexpected initial history; inspect retained state")
+
+
 def project(source, destination):
-    # lexists also refuses dangling symlinks; resolve only after checking the leaf.
+    destination = real_path(destination)
     if os.path.lexists(destination):
         raise ValueError("destination already exists; never overwrite or reinitialize")
-    if ".." in destination.parts:
-        raise ValueError("destination must not contain traversal")
-    if not destination.parent.is_dir() or any(path.is_symlink() for path in destination.parents):
+    if not destination.parent.is_dir():
         raise ValueError("destination parent must be an existing real directory")
-    destination = destination.parent.resolve() / destination.name
     if destination == source or source in destination.parents and destination != source / "project":
         raise ValueError("inside the factory only its project/ destination is allowed")
-    template = source / "templates/project"
-    if template.is_symlink() or (source / ".kilo").is_symlink():
-        raise ValueError("source roots must not be symlinks")
-    if read_map(template / ".kilo/repos.json") != {"control": "."}:
-        raise ValueError("template map must be control-only")
-    required = [template / "AGENTS.md", template / ".gitignore",
-                template / "docs/BOARD.md", source / ".kilo/.gitignore",
-                source / "kilo.jsonc"]
-    roots = [(template, Path("."))]
-    for name in HARNESS:
-        directory = source / ".kilo" / name
-        if not directory.is_dir() or directory.is_symlink():
-            raise ValueError("missing regular harness directory: " + name)
-        roots.append((directory, Path(".kilo") / name))
-    if any(not path.is_file() or path.is_symlink() for path in required):
-        raise ValueError("missing regular template/config prerequisite")
-    files = []
-    for root, target in roots:
-        for directory, dirs, names in os.walk(root, followlinks=False):
-            relative = Path(directory).relative_to(root)
-            for name in list(dirs):
-                path = Path(directory) / name
-                if excluded(target / relative / name):
-                    dirs.remove(name)
-                elif path.is_symlink():
-                    raise ValueError("source symlinks are not supported")
-            for name in names:
-                path = Path(directory) / name
-                output = target / relative / name
-                if excluded(output):
-                    continue
-                if path.is_symlink() or not path.is_file():
-                    raise ValueError("source must contain only regular files")
-                files.append((path, output))
-    files.extend((path, Path(path.relative_to(source))) for path in required[-2:])
-    # Every source/path check above precedes the first destination write.
+    template = factory_template(source)
+    plan = {}
+    collect(template, Path("."), plan)
+    plan.update(local_plan(source))
+    plan[Path(".kilo/repos.json")] = encoded({"control": "."})
+    files = [str(p) for p in plan if p.parts[0] not in (".kilo", ".devcontainer")
+             and str(p) not in ("AGENTS.md", "kilo.jsonc", "docs/BOARD.md")]
+    bootstrap_policy(source, files)
+    identity(destination.parent)
+    preflight(destination, plan)
     destination.mkdir()
     try:
-        for path, relative in files:
-            output = destination / relative
-            output.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path, output)
+        write_plan(destination, plan)
         (destination / "apps").mkdir()
         git("init", cwd=destination)
-    except (OSError, ValueError):
-        raise ValueError("project bootstrap failed; partial state retained at " + str(destination)) from None
+        initial_commit(destination, files)
+    except (OSError, ValueError) as error:
+        raise ValueError(str(error) + "; partial state retained at " + str(destination)) from None
     return destination
 
 
 def app(source, root, name, git_mode):
-    if git_mode not in ("separate", "project"):
-        raise ValueError("choose app Git ownership: separate or project")
-    if not NAME.fullmatch(name) or name == "control":
-        raise ValueError("app name must be lowercase kebab-case, starting with a letter; not control")
-    if root != source or (root / "templates/project").exists():
-        raise ValueError("run app mode from the project control root, not the factory or an app")
-    if git("rev-parse", "--show-toplevel", cwd=root) != str(root):
-        raise ValueError("project control root must be an initialized Git repository")
-    map_path = root / ".kilo/repos.json"
-    repos = read_map(map_path)
+    root = real_path(root)
+    real_path(root / ".git")
+    if git_mode not in ("separate", "project") or not NAME.fullmatch(name) or name == "control":
+        raise ValueError("choose separate/project Git and a meaningful lowercase kebab-case service name; not control")
+    if (root / "templates/project").exists():
+        raise ValueError("run app mode from the project control root, not the factory")
+    if git("rev-parse", "--show-toplevel", cwd=root) != str(root) or not (root / ".git").is_dir():
+        raise ValueError("app creation requires the primary project control checkout")
+    data = read_services(root)
     relative = "apps/" + name
-    if name in repos or relative in repos.values():
-        raise ValueError("repository ID/path collision")
-    apps = root / "apps"
-    if apps.is_symlink() or (apps.exists() and not apps.is_dir()):
-        raise ValueError("apps must be a real directory")
-    destination = apps / name
+    if any(s["name"] == name or s["path"] == relative for s in data["services"]):
+        raise ValueError("service name/path collision")
+    destination = real_path(root / relative)
     if os.path.lexists(destination):
         raise ValueError("app destination already exists; never overwrite or reinitialize")
-    temporary = map_path.with_name("repos.json.bootstrap-tmp")
-    if os.path.lexists(temporary):
-        raise ValueError("repository map temporary path already exists; inspect retained state")
-    ignore_path = root / ".gitignore"
-    if ignore_path.is_symlink() or not ignore_path.is_file():
+    apps = destination.parent
+    if apps.exists() and not apps.is_dir():
+        raise ValueError("apps must be a real directory")
+    ignore_path = real_path(root / ".gitignore")
+    if not ignore_path.is_file():
         raise ValueError("project .gitignore must be a regular file; nothing created")
-    # Reuse current project protections without hiding app source under apps/.
     project_ignores = ignore_path.read_text(encoding="utf-8")
     ignore_rules = "".join(line for line in project_ignores.splitlines(keepends=True)
-                           if line.strip() != "apps/*/")
+                           if line.strip() != "apps/*/" and not line.startswith("!/apps/"))
+    ignore_rules += "\n" + "\n".join(LOCAL) + "\n"
+    map_path = real_path(root / ".kilo/repos.json")
+    if not map_path.is_file() or json.loads(map_path.read_text()) != repo_map(data):
+        raise ValueError("local repo map differs from manifest; restore project tooling first")
+    if git_mode == "separate":
+        bootstrap_policy(source, [".gitignore"])
+        if root != source:
+            bootstrap_policy(root, [".gitignore"])
+        identity(root)
     apps.mkdir(exist_ok=True)
     destination.mkdir()
     try:
         (destination / ".gitignore").write_text(ignore_rules, encoding="utf-8")
         if git_mode == "separate":
             git("init", cwd=destination)
-            repos[name] = relative
-            # Replace only a fully written map; failed initialization leaves it unchanged.
-            with temporary.open("x", encoding="utf-8") as handle:
-                handle.write(json.dumps(repos, indent=2) + "\n")
-            temporary.replace(map_path)
+            initial_commit(destination, [".gitignore"])
         else:
-            # Unignore only this directory, not its contents' secret/runtime rules.
             ignore_path.write_text(project_ignores + "\n!/" + relative + "/\n", encoding="utf-8")
-    except (OSError, ValueError):
-        raise ValueError("app bootstrap failed; partial state retained at " + str(destination)
-                         + "; inspect repository map before retrying") from None
+        data["services"].append({"name": name, "path": relative, "git": git_mode})
+        (root / "services.json").write_bytes(encoded(data))
+        map_path.write_bytes(encoded(repo_map(data)))
+    except (OSError, ValueError) as error:
+        raise ValueError(str(error) + "; partial state retained at " + str(destination)
+                         + "; inspect services.json and local repo map before retrying") from None
+    return destination
+
+
+def restore(source, destination, control=None):
+    template = factory_template(source)
+    # Validate complete factory sources even when an app inherits its project's harness.
+    factory_local = local_plan(source)
+    destination = real_path(destination)
+    real_path(destination / ".git")
+    if (destination == source or (destination / "templates/project").exists()):
+        raise ValueError("restore destination must not be a factory checkout or its worktrees")
+    if (not destination.is_dir() or not (destination / ".git").is_dir()
+            or git("rev-parse", "--show-toplevel", cwd=destination) != str(destination)):
+        raise ValueError("restore requires an existing primary repository checkout, not a linked worktree")
+    if control is None and (destination / "services.json").is_file():
+        data = read_services(destination)
+        plan = factory_local
+        for relative in ("AGENTS.md", "docs/BOARD.md"):
+            plan[Path(relative)] = real_path(template / relative).read_bytes()
+        plan[Path(".kilo/repos.json")] = encoded(repo_map(data))
+        for service in data["services"]:
+            checkout = destination / service["path"]
+            if not checkout.is_dir() or (service["git"] == "separate" and not (checkout / ".git").is_dir()):
+                print("Missing service checkout: " + service["path"] + " (" + service["git"] + ")")
+    else:
+        if control is None:
+            candidate = destination.parent.parent
+            if destination.parent.name != "apps" or not (candidate / "services.json").is_file():
+                raise ValueError("separate-app restore requires --project <control-path>")
+            control = candidate
+        control = real_path(control)
+        real_path(control / ".git")
+        if (not (control / ".git").is_dir() or (control / "templates/project").exists()
+                or git("rev-parse", "--show-toplevel", cwd=control) != str(control)):
+            raise ValueError("--project must name the primary project control checkout")
+        data = read_services(control)
+        if not any(s["git"] == "separate" and control / s["path"] == destination for s in data["services"]):
+            raise ValueError("app checkout must occupy its separate services.json path under --project; clone it there first")
+        if json.loads(real_path(control / ".kilo/repos.json").read_text()) != repo_map(data):
+            raise ValueError("restore the control project first; local repo map is missing or stale")
+        # Open the control-level container: an app-only mount hides its parent context.
+        plan = {p: content for p, content in local_plan(control).items()
+                if p.parts[0] != ".devcontainer"}
+        plan[Path("AGENTS.md")] = ("# Local Service Tooling\n\n"
+            "Inherit the working agreement, board and lifecycle tools from `../../` "
+            "relative to this service root. Open the control project's `../../.devcontainer/` "
+            "in the editor, then work in `apps/" + destination.name + "` inside that container. "
+            "The control container sets KILO_CONFIG to its mounted workspace config; "
+            "lifecycle tools discover control by walking ancestors to its board and repo map. "
+            "No app-only devcontainer or host-absolute control pointer is generated. "
+            "This generated local file is ignored; service source and product docs remain tracked.\n").encode()
+    tracked = set(git("ls-files", "-z", cwd=destination).split("\0"))
+    if any(str(path) in tracked for relative in plan for path in (relative, *relative.parents)):
+        raise ValueError("restore outputs are tracked source; migrate explicitly first; no files written")
+    # Excludes are clone-local. Never rewrite source .gitignore, index, HEAD or config.
+    exclude = real_path(destination / ".git/info/exclude")
+    if exclude.exists() and not exclude.is_file():
+        raise ValueError("local exclude must be a regular file; no files written")
+    existing = exclude.read_bytes() if exclude.is_file() else b""
+    patterns = existing.decode("utf-8").splitlines()
+    missing = [p for p in LOCAL if p not in patterns]
+    updated = existing + (b"\n# Local factory tooling\n" + ("\n".join(missing) + "\n").encode() if missing else b"")
+    preflight(destination, plan)
+    write_plan(destination, plan)
+    if updated != existing:
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        exclude.write_bytes(updated)
+    if control is not None:
+        print("Service tooling restored without an app devcontainer; open the control project's "
+              "../../.devcontainer/ and work in apps/" + destination.name +
+              " inside its container (paths relative to the service root).")
     return destination
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_subparsers(dest="mode", required=True)
-    control = modes.add_parser("project", help="copy the factory template and complete harness")
-    control.add_argument("--destination", type=Path, help="new path; default: caller root/project")
-    application = modes.add_parser("app", help="create apps/<name> with explicit Git ownership")
+    project_parser = modes.add_parser("project", help="create a new project and one initial source commit")
+    project_parser.add_argument("--destination", type=Path)
+    application = modes.add_parser("app", help="create apps/<meaningful-service-name>")
     application.add_argument("name")
-    application.add_argument("--git", choices=("separate", "project"), required=True,
-                             help="separate app repository or source tracked by project Git")
+    application.add_argument("--git", choices=("separate", "project"), required=True)
+    restoration = modes.add_parser("restore", help="rehydrate ignored tooling from this factory checkout")
+    restoration.add_argument("--destination", type=Path, required=True)
+    restoration.add_argument("--project", type=Path, help="control checkout for a separate service")
     args = parser.parse_args(argv)
     try:
         if not shutil.which("git"):
             raise ValueError("Git is required; nothing created")
-        # Git environment overrides could initialize or inspect a different repository.
         if any(key.startswith("GIT_") for key in os.environ):
             raise ValueError("unset GIT_* environment overrides before bootstrap")
-        source = Path(script_project_root()).resolve()
-        root = Path.cwd().resolve()
-        if args.mode == "project" or args.git == "separate":
-            policy = subprocess.run(
-                [sys.executable, str(source / ".kilo/skills/git-worktree/scripts/guard.py"),
-                 "check-git", "--", "git init"], cwd=root,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            # Scoped init consent accepts ASK (3), never hard denials/errors.
-            if policy.returncode not in (0, 3):
-                raise ValueError("guard refused git init (exit {}); nothing created".format(policy.returncode))
+        source = real_path(Path(script_project_root()))
+        root = real_path(Path.cwd())
         if args.mode == "project":
             if root != source:
                 raise ValueError("run project mode from the factory checkout root")
-            destination = args.destination or root / "project"
-            if not destination.is_absolute():
-                destination = root / destination
-            result = project(source, destination)
-        else:
+            result = project(source, args.destination or root / "project")
+        elif args.mode == "app":
             result = app(source, root, args.name, args.git)
-        print("Initialized {} at {}; no files staged or committed".format(args.mode, result))
+        else:
+            result = restore(source, args.destination, args.project)
+        suffix = "tooling restored; source/index/HEAD unchanged" if args.mode == "restore" else (
+            "one initial source commit created" if args.mode == "project" or args.git == "separate"
+            else "source belongs to control Git; no staging or commit")
+        print("{}: {} at {}".format(args.mode, suffix, result))
         return 0
     except (OSError, ValueError) as error:
         print("bootstrap: " + str(error), file=sys.stderr)
