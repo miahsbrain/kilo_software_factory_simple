@@ -3,6 +3,14 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Clarify frontend design direction and composition
+**Type:** Docs
+**Board:** BOARD-120 | **Branch:** docs/clarify-frontend-design-direction-and-composition
+**Changed:** `.kilo/agent/frontend-dev.md`, `.kilo/scopes/web.md`, `AGENTS.md`, `templates/project/AGENTS.md`, `docs/UI-UX.md`, `templates/project/docs/UI-UX.md`, `docs/DECISIONS.md`, `docs/HANDOVER.md`, `docs/PROJECT_STATE.md`, `docs/changelog/CHANGELOG.md`.
+**Why:** Apply five explicitly approved permanent-rule clarifications in existing sections: builder role, substantive design brief, gallery scope, approved redesign scope, and chrome/content colors.
+**Impact:** Factory/template guidance only, reversible by a later approved rule change. Future frontend assignments are affected if the guidance is wrong; existing project copies and application behavior are unchanged. Approval, gallery-before-screens, reuse, accessibility, auth/API preservation, no-production-build and mandatory QA/critique/unslop gates remain. No new files/tools or competing workflow; optional plan/unslop commands already defer to these rules and remain unchanged.
+**Verification:** `git diff --check` passed (exit 0); orchestrator scoped diff review found no blocking inconsistency. Documentation-only: no build, tests, UI implementation or screenshots. Rule consistency does not prove visual results. User authorized committing the reviewed change and preparing human merge; Pending Merge follows commit and clean-tree verification.
+
 ## [2026-11-18] Ignore generated Playwright output in factory and template
 **Type:** Chore
 **Board:** BOARD-119 | **Branch:** chore/ignore-generated-playwright-output-in-factory
