@@ -78,7 +78,7 @@
       "*worktree.py*discard*": "deny"
     },
     "edit": {
-      "*": "deny",
+      "*": "ask",
       ".kilo/worktrees/**": "allow",
       "**/.kilo/worktrees/**": "allow",
       "artifacts/reviews/**": "allow",
