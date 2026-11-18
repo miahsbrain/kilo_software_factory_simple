@@ -197,7 +197,7 @@ around with a new tool.
 - **Commits** — `<emoji> [<type>] <scope>: <subject>`, with one bullet on what changed and why.
 - **Branches** — `feat|fix|chore|docs/<slug>`, derived from the board row's type and title.
 - **Artifacts** — `artifacts/<scope>/qa/<date>/<task-id>/`; the capture script computes the path.
-- **Review reports and ledgers** are documents, not artifacts: `docs/reviews/<task-id>-{qa,ui,ledger}.md`.
+- **Review reports and ledgers** are ignored review artifacts: `artifacts/reviews/<task-id>-{qa,ui,ledger}.md`.
 
 ## Status
 

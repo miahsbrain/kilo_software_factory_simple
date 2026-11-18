@@ -3,6 +3,13 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-18] Correct active lifecycle documentation paths
+**Type:** Docs
+**Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy
+**Changed:** Review-path guidance, lifecycle decisions, handover test inventory, and this changelog.
+**Why:** Remove stale active references to `docs/reviews/`, clarify superseded ADR claims, and identify the current script-level test modules.
+**Impact:** Documentation only; lifecycle behavior is unchanged.
+
 ## [2026-11-18] Align env status with recursive provisioning
 **Type:** Fix
 **Board:** BOARD-116 | **Branch:** chore/synchronize-factory-worktree-lifecycle-and-policy

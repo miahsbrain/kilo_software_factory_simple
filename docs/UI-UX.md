@@ -118,7 +118,7 @@ lives there, once.
 nine passes and checklist — in the same review round as the QA capture. The report records the
 direction and one line per sign. It is not a second opinion to skip when time is short. The
 `/unslop` command runs the whole procedure and writes the audit to
-`docs/reviews/<task-id>-unslop.md`.
+`artifacts/reviews/<task-id>-unslop.md`.
 
 ---
 
@@ -299,9 +299,9 @@ artifacts/
 The script computes that path itself, so no agent has to remember it. The artifacts folder
 belongs to the **main checkout**, so a capture taken from a worktree still lands in one place.
 
-Review reports and the ledger are **documents, not artifacts**. They stay where documents live:
-`docs/reviews/<task-id>-qa.md`, `docs/reviews/<task-id>-ui.md`, and
-`docs/reviews/<task-id>-ledger.md`.
+Review reports and the ledger are ignored review artifacts:
+`artifacts/reviews/<task-id>-qa.md`, `artifacts/reviews/<task-id>-ui.md`, and
+`artifacts/reviews/<task-id>-ledger.md`.
 
 Commit `notes.md` and small component shots. Keep full-page captures out of git unless the team
 wants a visual record — they are large and churn.

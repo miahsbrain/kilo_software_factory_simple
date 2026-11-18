@@ -382,9 +382,10 @@ The verification of other changes is the smallest relevant script run, recorded 
 its result and a `file:line` proof (AGENTS.md §B4 "Verification cost rule"). The dev container
 ships `.devcontainer/test-kilo-redact.sh`, which checks the redaction startup file.
 
-`python3 .kilo/skills/git-worktree/scripts/test_env.py` is the one script-level test: it builds
-a throwaway git repository under a temp directory and proves the env provisioning, the
-worktree reuse rules, the hand-off block and the teardown named by a board row.
+The script-level regression coverage includes `.kilo/skills/git-worktree/scripts/test_lifecycle.py`
+for lifecycle behavior and `.kilo/skills/qa-review/scripts/test_ledger.py` for shared review-ledger
+behavior. The older `test_env.py` self-test builds a throwaway git repository under a temp
+directory and covers env provisioning, worktree reuse, the hand-off block and board-row teardown.
 
 ## 11. Known issues and risks
 
