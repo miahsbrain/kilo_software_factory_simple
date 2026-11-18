@@ -888,7 +888,6 @@ def cmd_create(args, cwd):
     print("branch:   %s" % branch)
     print("worktree: %s" % os.path.abspath(path))
     print("base:     %s" % base)
-    provision_env(path, target)
     return OK
 
 
@@ -1010,7 +1009,6 @@ def cmd_resume(args, cwd):
         print("warning: row %s was not updated (%s)" % (args.board, exc), file=sys.stderr)
         return REFUSED
     print("board:    %s is In Progress" % args.board)
-    provision_env(path, target)
     return OK
 
 
@@ -1313,6 +1311,8 @@ def require_committed_merge(item, control, pending=None):
 
 
 def cmd_lifecycle(args, cwd):
+    if args.command not in ("handoff", "merge"):
+        raise ValueError("cmd_lifecycle handles handoff and merge only")
     root = control_root(cwd)
     board = load_board_module(script_root())
     if board is None:
@@ -1415,7 +1415,7 @@ def cmd_lifecycle(args, cwd):
         print("%s: %s %s (%s) -> %s" % ("apply" if apply else "preview", command,
               item["repo_id"], item["branch"], base))
     if command == "handoff":
-        for verb in ("merge", "discard"):
+        for verb in ("merge",):
             invocation = ["python3", script, verb]
             for board_id in args.board:
                 invocation.extend(["--board", board_id])
@@ -1859,11 +1859,6 @@ def main(argv):
 
     sub.add_parser("list", help="list worktrees")
 
-    p = sub.add_parser("handoff", help="print the hand-off block for a board row")
-    p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
-    p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
-    p.add_argument("--base", help="base branch (default: the repository's own default branch)")
-
     p = sub.add_parser("verify", help="check whether a worktree is ready to merge")
     p.add_argument("slug")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
@@ -1876,15 +1871,13 @@ def main(argv):
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
     p.add_argument("--repo", action="append", help="disambiguate repo ID")
 
-    for command in ("handoff", "merge", "discard"):
+    for command in ("handoff", "merge"):
         p = sub.add_parser(command, help="human CLI workspace %s (preview by default)" % command)
         p.add_argument("--board", action="append", required=True, help="board ID; repeat for a batch")
         p.add_argument("--repo", action="append", help="select repo IDs; default all required repos")
         p.add_argument("--target", help="explicit target branch; otherwise each workspace's own base")
-        if command != "handoff":
+        if command == "merge":
             p.add_argument("--apply", action="store_true", help="human CLI only: execute previewed operations")
-        if command == "discard":
-            p.add_argument("--discard", action="store_true", help="explicit consent to lose dirty/unmerged work")
 
     args = parser.parse_args(argv)
     if not args.command:
@@ -1893,7 +1886,7 @@ def main(argv):
     cwd = os.getcwd()
     if args.command == "mode":
         return cmd_mode(args, cwd)
-    if args.command in ("handoff", "merge", "discard"):
+    if args.command in ("handoff", "merge"):
         return cmd_lifecycle(args, cwd)
     if args.command == "create":
         return cmd_create(args, cwd)

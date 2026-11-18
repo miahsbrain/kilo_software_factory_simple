@@ -27,12 +27,9 @@ the script can do it — the script is where the naming rules and the refusals l
 
 | Script | Does |
 |---|---|
-<<<<<<< HEAD
 | `.kilo/skills/git-worktree/scripts/worktree.py` | mode · create/reuse · list · verify · handoff · merge · discard · cleanup |
-=======
 | `.kilo/skills/git-worktree/scripts/worktree.py` | create · resume · discard · handoff · list · verify · cleanup |
 | `.kilo/skills/git-worktree/scripts/env.py` | sync · status · clean — the env files of a worktree |
->>>>>>> origin/main
 | `.kilo/skills/git-worktree/scripts/guard.py` | check-delete · check-worktree · check-git · check-policy · sync · check-repos · install-hooks · policy |
 
 Python 3.9+, standard library only.
@@ -66,13 +63,11 @@ for new workspaces, when the branch or directory already exists, or
 when the row's type is unknown. It never deletes anything. It writes the board row in the **main
 checkout**, so the live board always points at the running worktree.
 
-<<<<<<< HEAD
 During new worktree creation, the script copies ignored, untracked regular `.env*` files from the
 target repository's primary checkout to matching paths, except `.env.example`. File permissions
 are preserved; missing sources and existing destinations are skipped. For the control repository,
 it also copies ignored `.kilo/local/qa-navigation.json` without overwriting. These local files stay
 untracked, and `.env*` remains unreadable to agents. Reused workspaces are not recopied.
-=======
 **When the row already has a live worktree, `create` refuses** and prints the three ways
 forward: `resume` the worktree, `discard` it, or create with `--slug <other-slug>`. A second
 worktree for one row is never created.
@@ -82,7 +77,6 @@ with a different message: it names the slug directory, the row that owns it when
 records one, and the ways that actually work — `--slug <other-slug>`, or
 `worktree.py discard --board <owning-row> --apply` for that other row. It never offers a
 `resume` for a row whose worktree does not exist.
->>>>>>> origin/main
 
 Before creating, check for an in-flight worktree on the same task:
 
@@ -427,7 +421,6 @@ The agent **never** merges.
 1. The orchestrator sets the board row to `Pending Merge` in the main checkout, with the
    worktree path and branch in the `Branch/Worktree` column.
 2. The agent reports: what was done, what is proven, what is not done and why, the next action.
-<<<<<<< HEAD
 3. Generate the all-repository handoff and let the human run the printed lifecycle commands.
 
 ```bash
@@ -435,7 +428,6 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board <ID>
 # human: preview, then apply; repeat --board for a batch
 python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board <ID>
 python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board <ID> --apply
-=======
 3. The agent prints the hand-off block for the human.
 
 ```bash
@@ -487,7 +479,6 @@ git merge --no-ff <type>/<slug> -m "merge: <slug>"
 
 # cleanup — run by the human, after the merge
 python3 .kilo/skills/git-worktree/scripts/worktree.py cleanup --board BOARD-00X --apply
->>>>>>> origin/main
 ```
 
 The human may select `--repo <ID>` and `--target <branch>`; the saved base is default. ALL clean
@@ -520,7 +511,6 @@ lane stays as it was and the cell keeps pointing at the live worktree.
 
 The script refuses when the branch has commits not reachable from the base, or when the worktree
 is dirty. It writes a recovery record to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before
-<<<<<<< HEAD
 acting. Preserve dirty/unmerged work unless the human explicitly requested destructive discard:
 
 ```bash
@@ -532,10 +522,8 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board <ID> --rep
 Discard previews by default; only selected mapped linked `.kilo/worktrees/` and feature branches
 may be removed, even dirty/unmerged. Never main/protected/outside-map checkouts. Fully discarded
 linked rows become `Dropped`; partial outcomes stay recorded. Agents never discard unasked.
-=======
 acting. It removes the env copies from the worktree first. **Never delete a worktree holding
 unmerged work.**
->>>>>>> origin/main
 
 ---
 
@@ -544,10 +532,8 @@ unmerged work.**
 | Symptom | Cause | Fix |
 |---|---|---|
 | `fatal: invalid reference: HEAD` | The repository has no commits | The base branch needs one commit before any worktree exists |
-<<<<<<< HEAD
 | `branch ... is already checked out` | The branch already has a workspace | Reuse the assigned existing path; do not duplicate it |
 | `worktree.py create` refuses | The slug, branch, or directory already exists | Inspect the existing assignment and reuse if it belongs to this change |
-=======
 | `branch ... is already checked out` | The branch already has a worktree | Use a new branch, or clean up the old worktree first |
 | `worktree.py create` refuses | The slug, branch, or directory already exists | Pick another slug, or clean up first |
 | `worktree.py create` refuses with resume / discard / new slug | The row already has a live worktree | `resume` it, `discard` it, or create with `--slug` — never a second worktree |
@@ -556,7 +542,6 @@ unmerged work.**
 | `worktree.py discard` refuses | The worktree is dirty or holds commits the base does not have | Commit or hand the work over first; unmerged work is never deleted |
 | `worktree.py discard --force` refuses | `--force` alone never acts | Read the plan, then run the same command with `--force --yes` |
 | The application does not start in a worktree | The env files were never provisioned | `env.py sync --board <BOARD-ID>` — never read the file yourself |
->>>>>>> origin/main
 | `guard.py check-delete` denies | The target is outside the worktree | Delete inside the worktree, use a temp dir, or ask the user |
 | Merge conflict at merge time | Both branches changed the same area | Preserve partial state; specialist resolves the existing conflict, human completes/retries |
 | `git stash` conflicts across worktrees | Stashes are shared | Do not stash. Resolve conflicts inside the worktree |
