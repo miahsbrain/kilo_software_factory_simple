@@ -39,9 +39,9 @@ Lanes: `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merg
   The human previews `worktree.py merge --board <ID>` and explicitly applies it with `--apply`.
   The CLI preflights clean workspaces, updates the board and removes merged source worktrees.
   Multi-repository merges are not atomic: stop on conflict and preserve partial outcomes.
-- **Frontend rows:** present the initial component gallery and ask whether unslop is wanted.
-  Run focused QA regardless, fix meaningful issues and recheck before composing screens.
-  Run UI critique and any requested read-only unslop in parallel against shared evidence;
+- **Frontend rows:** present the initial component gallery.
+  Run focused QA, fix meaningful issues and recheck before composing screens.
+  Run independent UI critique against shared evidence;
   approve the actual frontend flow before backend/API implementation.
 - `Merged` means the human lifecycle command completed all required repositories. Partial
   outcomes stay recorded; never mark the parent merged while a required surface is unfinished.

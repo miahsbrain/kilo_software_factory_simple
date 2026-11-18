@@ -29,7 +29,7 @@ Navigation supports `login` and `steps` arrays (up to 50 each), `authenticatedPa
 
 Check the actual user flow, relevant loading/empty/error states, keyboard focus and names, contrast, tap targets, responsive layout, and unexpected console/network failures. Auth, script, API, data-loss, and security failures remain meaningful blockers. A missing favicon is nonblocking only when proven development-only and harmless; retain its raw evidence and rationale rather than filtering logs or excusing other errors.
 
-Share one capture with `ui-critic` and a separate general read-only task loading `.kilo/skills/unslop/SKILL.md`, running in parallel. The critic reviews hierarchy/usability/product character; unslop focuses on relevant generic-design defects without a full checklist or source edits. Consolidate all findings once, deduplicate, and prioritize by user impact.
+Share one capture with `ui-critic` to review hierarchy, usability, and product character without source edits. Consolidate all findings once, deduplicate, and prioritize by user impact.
 
 ## Findings And Handoff
 
