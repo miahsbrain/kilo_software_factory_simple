@@ -1,6 +1,21 @@
 # HANDOVER — software factory
 
 > **Session Notes** (keep at the very top, updated every session)
+
+BOARD-119 adds directory-only Playwright output ignores to the existing factory `.gitignore`,
+`.kilo/.gitignore` and `templates/project/.gitignore`. Scope is factory/template only; no existing
+project, app, tracked-file removal or permanent rule changes. Work is on
+`chore/ignore-generated-playwright-output-in-factory` in
+`.kilo/worktrees/ignore-generated-playwright-output-in-factory`; the user authorized committing
+and preparing the change for human merge.
+`git check-ignore --no-index --verbose --non-matching` proved all five generated names ignored
+directly and nested at factory root and template, with configuration/test probes not ignored.
+The `.kilo` probes are masked by existing `.git/info/exclude:52` (`.kilo/`), including source probes;
+the source ignore behavior there is unverified. `git diff --check` passed (exit 0).
+Verification limited to file review and static Git probes because this was a low-risk config change.
+Diff review passed; the `.kilo` limitation is accepted for this low-risk static change, not a runtime pass.
+Next action: human review and merge after the committed workspace is marked Pending Merge.
+The five frontend design-rule clarifications are approved for a separate change after BOARD-119 merges.
 > - **2026-11-18, BOARD-118 shared correction:** in the original BOARD-117 workspace, changed
 >   two stale `test_lifecycle.py` wildcard expectations from `deny` to `ask` for required-mode
 >   regeneration and the copied base config. `guard.generated_permission()` retains the policy

@@ -12,6 +12,13 @@ artifacts/**/*.png
 artifacts/**/*.log
 artifacts/**/network.json
 
+# Generated Playwright output, at any depth.
+.playwright-mcp/
+.playwright/
+playwright-report/
+test-results/
+blob-report/
+
 # Local scratch
 .kilo/qa-local/
 .tmp/
