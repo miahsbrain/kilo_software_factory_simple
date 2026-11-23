@@ -9,13 +9,25 @@ Check the assigned behavior against observable acceptance criteria. Stay read-on
 
 ## Manual checklist
 
+Write for the person using the product. Start at the page they need, name the control they see, and tell them what success looks like. Use one short checkbox per outcome (24 words maximum). For example:
+
+```markdown
+## BOARD-021: Chat readability
+Changed: Chat text is larger.
+- [ ] Select a long message. Check that the text is easy to read.
+```
+
+Only include setup the tester needs. Keep branch history, test counts, approval language and infrastructure diagnostics out of UI steps. If a route is unavailable, say what must work before testing; do not ask the tester to debug it. For API or CLI changes, use the direct request or command instead. In chat, link the validated file. Do not wrap it in a board report unless the user also requests status.
+
+Before writing a page link, trace the route in the assigned revision: check the router or file-based route, its mount path, and the link or control that opens it. Verify the host against the intended environment. An example from a prompt, template, or previous guide is not route evidence. Use a full safe URL when known. For tenant hosts or dynamic IDs, give the verified entry path on the tester's signed-in host and the exact UI action that builds the real URL. Do not present a route pattern as a clickable URL or an API endpoint as a page. If neither a URL nor a navigation path can be verified, state `Blocked: Test URL not confirmed` instead of guessing. A source check establishes the route, not that the deployment is reachable.
+
 At completion, write and link the guide for every skipped QA or UI scope, even when nothing is blocked. Name the skipped scope and reason. For skipped critique include the relevant visual hierarchy, usability, accessibility and responsive checks; do not present them as observed results.
 
 If QA or UI critique cannot verify a criterion (for example, a redirect to an external identity provider, an unavailable service, or a missing device), keep the safe results already obtained and **write the manual guide before handing off**. Do not bypass the restriction or repeatedly retry it. Also produce a guide whenever the user asks for a QA checklist by board ID, feature name, or set of rows, even if automated QA succeeded. A checklist-only request needs no browser run, implementation or board transition.
 
 1. Resolve the requested rows from the shared board. Match feature names to their IDs; ask only if the match is ambiguous. For a whole board, list the included IDs, group checks by feature and identify dropped or not-yet-implemented items separately. Use board criteria, the actual implementation or diff, documented run commands and prior evidence. Describe what changed in user terms; distinguish planned behavior from delivered behavior.
 2. Give the tester the service/environment, revision (including uncommitted changes if relevant), start command and test role/data needed. Link directly to **each changed page**, using the known scheme, host, port and route from the assigned deployment or local run configuration. For redirects give the safe starting link, the expected destination and the visible sign of success. Never publish signed URLs, callback codes, secrets, personal IDs or passwords. If an origin or fixture ID is unknown or sensitive, say so and give a concrete way to obtain the URL from a known safe entry page; do not invent it. For non-UI changes use an exact safe command and working directory instead.
-3. Write compact Markdown in the assigned repo's ignored `artifacts/reviews/<board-id>-manual-qa.md` (safe feature slug for a multi-row guide). Verify the destination is untracked, ignored, within the assigned artifacts root and free of symlinks. Reuse a matching guide for the same revision; preserve a tester's notes/results when generating a newer version. Link the actual file in the response, including the worktree path when relevant. If writing is unavailable, supply the guide inline and state why no file exists.
+3. Write compact Markdown in the assigned repo's ignored `artifacts/reviews/<board-id>-manual-qa.md` (safe feature slug for a multi-row guide). Before writing, ensure `git check-ignore -q -- artifacts/` succeeds and `git ls-files -- artifacts` succeeds with no output. Check the destination is also ignored and has no symlink ancestors. If the whole artifacts directory is not private to the worktree in Git, stop; do not untrack or move existing files. Preserve tester notes and results. If saving or validation fails, report the reason instead of handing over an inline copy or saving elsewhere.
 
 ```markdown
 ## <BOARD-ID>: <feature>
@@ -26,9 +38,9 @@ Setup: <direct safe URL or command; include prerequisites only if needed>.
 - [ ] <Try the relevant failure or recovery action>. Check that <expected result>.
 ```
 
-Use this format in the artifact and any inline handover. Follow ASD-STE100 plain-writing principles: short imperative sentences, consistent terms, and one test per checkbox. Use a literal `- [ ]` for each pending check, not paragraphs, tables, or approval recommendations. If blocked, give one `Blocked:` line before the checks. Do not ask the tester to repeat accepted checks. Keep non-testable items in a short scope note. Do not check a box on the strength of automated evidence. Do not ask the human to perform destructive operations on real data. Generating a checklist is not approval or a lane change.
+Use this format for every manual QA or UI handoff. Follow ASD-STE100 plain-writing principles: short imperative sentences, consistent terms, and one test per checkbox. Use a literal `- [ ]` for each pending check, not paragraphs, tables, or approval recommendations. If blocked, give one `Blocked:` line before the checks. Do not ask the tester to repeat accepted checks. Keep non-testable items in a short scope note. Do not check a box on the strength of automated evidence. Do not ask the human to perform destructive operations on real data. Generating a checklist is not approval or a lane change.
 
-**Required before delivery:** Run `python3 .kilo/skills/qa-review/scripts/check-finding.py --manual-guide --body-file artifacts/reviews/<guide>.md` on every new guide (use the installed control script path if needed). For inline output, pass the exact guide on stdin with `--body-file -`. Fix validation errors and recheck before linking or posting. Keep a tester's completed copy intact; for a new revision validate a fresh guide containing only outstanding checks. A successful format check does not verify product behavior.
+**Required before delivery:** From the assigned Git root run `python3 .kilo/skills/qa-review/scripts/check-finding.py --manual-guide --body-file artifacts/reviews/<guide>.md` (use the installed control script path if needed). This gate applies to on-demand, blocked, skipped, and closeout guides, including UI-only work. Link the file only after validation passes. Keep a tester's completed copy intact; for a new revision validate a fresh guide containing only outstanding checks. A valid guide does not verify product behavior.
 
 ## Capture
 
