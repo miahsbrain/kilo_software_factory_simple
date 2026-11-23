@@ -106,6 +106,31 @@ class BootstrapTests(unittest.TestCase):
         self.assertTrue((root / ".devcontainer/Dockerfile").is_file())
         self.assertEqual(json.loads((root / "services.json").read_text()), {"services": []})
 
+    def test_project_delivers_engineering_practices_as_one_skill_with_passive_references(self):
+        skill = Path(".kilo/skills/engineering-practices")
+        installed = self.create() / skill
+        for relative in ("SKILL.md", "upstream/LICENSE", "upstream/skills/frontend-ui-engineering/guide.md",
+                         "upstream/references/accessibility-checklist.md", "upstream/references/testing-patterns.md"):
+            with self.subTest(relative=relative):
+                self.assertEqual((installed / relative).read_bytes(), (SOURCE / skill / relative).read_bytes())
+
+        for package in (SOURCE / skill, installed):
+            self.assertEqual(list(package.rglob("SKILL.md")), [package / "SKILL.md"])
+            upstream = package / "upstream"
+            for path in upstream.rglob("*"):
+                relative = path.relative_to(upstream)
+                self.assertNotIn("hooks", relative.parts)
+                if path.is_file():
+                    self.assertTrue(relative == Path("LICENSE") or path.suffix == ".md", relative)
+                    self.assertFalse(path.stat().st_mode & 0o111, relative)
+
+    def test_project_delivers_axe_browser_bundle_and_notices(self):
+        package = Path(".kilo/skills/qa-review/vendor/axe-core")
+        project = self.create()
+        for name in ("axe.min.js", "LICENSE", "LICENSE-3RD-PARTY.txt", "PROVENANCE.md"):
+            with self.subTest(name=name):
+                self.assertEqual((project / package / name).read_bytes(), (SOURCE / package / name).read_bytes())
+
     def test_project_omits_template_plans_and_ignores_only_plan_docs(self):
         plan = Path("docs/implementation_plans/fixture.md")
         template_plan = self.factory / "templates/project" / plan

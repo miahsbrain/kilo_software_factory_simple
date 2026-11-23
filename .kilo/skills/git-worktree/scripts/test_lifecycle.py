@@ -467,6 +467,10 @@ class LifecycleTests(unittest.TestCase):
 
     def test_sync_bootstraps_project_harness_without_scope_or_catalog_propagation(self):
         self.assertEqual(GUARD.SYNC_SLICE, ["agent", "command", "skills", "policies"])
+        skill = Path(".kilo/skills/engineering-practices")
+        shutil.copytree(SOURCE / skill, self.root / skill)
+        axe = Path(".kilo/skills/qa-review/vendor/axe-core")
+        shutil.copytree(SOURCE / axe, self.root / axe)
         for folder in ("agent", "command", "scopes", "catalog"):
             source = self.root / ".kilo" / folder
             source.mkdir(exist_ok=True)
@@ -481,6 +485,8 @@ class LifecycleTests(unittest.TestCase):
         (project / "docs/BOARD.md").write_bytes((self.root / "docs/BOARD.md").read_bytes())
         (project / "apps").mkdir()
         self.git(project, "init")
+        (project / axe).mkdir(parents=True)
+        (project / axe / "axe.min.js").write_text("previous distribution\n")
         (self.root / ".kilo/repos.json").write_text('{"control":".","new-project":"new-project"}')
         instructions = (project / "AGENTS.md").read_bytes()
         before = {path.relative_to(project): path.read_bytes()

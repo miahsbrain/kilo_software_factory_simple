@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp, writeFile, mkdir, symlink, readFile, stat, rm, readdir, copyFile} from 'node:fs/promises';
 import {tmpdir as osTmpdir} from 'node:os';
-import {join, resolve} from 'node:path';
+import {dirname, join, resolve} from 'node:path';
 import {execFileSync, execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createServer} from 'node:http';
@@ -73,7 +73,7 @@ test('automatic CLI requires valid enabled QA before artifact inspection or brow
     await writeFile(policy, 'import os, sys\nassert sys.argv[1:] == ["reviews", "status"]\n' +
       'assert os.getcwd() == ' + JSON.stringify(cwd) + '\n' + result);
     if (expected === pathCheck) refusal(expected, '--artifact-dir', fixture);
-    else refusal(expected); // Valid capture request must stop without creating even browser temp files.
+    else refusal(expected, '--axe'); // Even a requested scan cannot override the QA gate.
     assert.deepEqual(await readdir(cwd), ['.git']);
   }
 });
@@ -432,9 +432,11 @@ test('marker is checked again after navigation settles and before a screenshot',
   const page = fakePage();
   page.waitForURL = async () => { page.authenticated = false; };
   const result = await captureEntry(new PlaywrightPage({}, page), {baseUrl: base, artifactRoot: root, loginEnv: {},
-    components: [], navigationConfig: {authenticatedSelector: '#signed-in', steps: [{action: 'waitForURL', path: '/app'}]}},
+    axe: true, components: [], navigationConfig: {authenticatedSelector: '#signed-in', steps: [{action: 'waitForURL', path: '/app'}]}},
   '/app', {name: '320x800', width: 320, height: 800}, 'light', false);
   assert.match(result.error, /signed-in marker/);
+  assert.equal(result.axe, undefined);
+  await assert.rejects(stat(join(dirname(result.screenshot), 'axe.json')), {code: 'ENOENT'});
   assert.ok(!page.calls.some(call => call[0] === 'screenshot'));
 });
 
@@ -495,6 +497,12 @@ test('canonical browser script logs in and captures protected password settings 
       response.setHeader('Content-Type', 'text/html');
       response.setHeader('Cache-Control', 'no-store');
       if (request.url === '/favicon.ico') { response.writeHead(204).end(); return; }
+      if (['/clean', '/frame', '/csp'].includes(request.url)) {
+        if (request.url === '/csp') response.setHeader('Content-Security-Policy', "script-src 'none'");
+        const frame = request.url === '/frame' ? '<iframe title="Example" srcdoc="Nested document"></iframe>' : '';
+        response.end('<!doctype html><html lang="en"><title>Fixture</title><main><h1>Fixture</h1>' + frame + '</main></html>');
+        return;
+      }
       if (request.url === '/redirect-image') {
         response.writeHead(302, {Location: 'http://127.0.0.1:' + foreign.address().port + '/pixel'}).end(); return;
       }
@@ -526,6 +534,8 @@ test('canonical browser script logs in and captures protected password settings 
       if (request.url === '/app') appVisits += 1;
       if (request.url === '/settings') settingsVisits += 1;
       response.end('<!doctype html><main><a href="/settings">Settings</a>' +
+        (request.url === '/settings' ? '<button class="private-fixture-id"></button>' +
+          '<style>@media(min-width:600px){.private-fixture-id{display:none}}</style>' : '') +
         '<label>New password<input type="password" value="fixture-password-placeholder"></label></main>' +
         '<script>if(localStorage.fixture) { new Image().src="/redirect-image"; }' +
         'if((sessionStorage.fixture || localStorage.fixture) === "fixture-session-placeholder") {' +
@@ -580,6 +590,8 @@ test('canonical browser script logs in and captures protected password settings 
     for (const path of observedTempPaths) assert.ok(path.startsWith(join(central, 'tmp') + '/'));
     for (const result of summary.results) {
       assert.equal(result.error, null);
+      assert.equal(result.axe, undefined);
+      await assert.rejects(stat(join(dirname(result.screenshot), 'axe.json')), {code: 'ENOENT'});
       assert.equal(result.components.length, 1);
       assert.ok(result.components[0].startsWith(artifactDir + '/'));
       assert.equal((await readFile(result.screenshot)).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
@@ -593,7 +605,7 @@ test('canonical browser script logs in and captures protected password settings 
       assert.ok(!output.stderr.includes(value));
     }
     // Reuse the canonical command for comparison sheets, without another driver.
-    const comparison = await promisify(execFile)(process.execPath, [...args, '--label', 'after', '--compare', artifactDir,
+    const comparison = await promisify(execFile)(process.execPath, [...args, '--axe', '--label', 'after', '--compare', artifactDir,
       '--artifact-dir', 'artifacts/factory/qa/2026-11-18/BOARD134'],
       {cwd: root, timeout: 90000, env: {...process.env, QA_FIXTURE_EMAIL: 'fixture-user-placeholder',
         QA_FIXTURE_PASSWORD: 'fixture-password-placeholder'}});
@@ -601,6 +613,16 @@ test('canonical browser script logs in and captures protected password settings 
     assert.notEqual(compared.task_dir, artifactDir);
     assert.ok(compared.task_dir.startsWith(join(taskParent, 'run-')));
     for (const result of compared.results) {
+      assert.equal(result.axe.status, 'violations');
+      assert.equal(result.axe.report, join(dirname(result.screenshot), 'axe.json'));
+      const report = JSON.parse(await readFile(result.axe.report, 'utf8'));
+      assert.deepEqual(Object.keys(report).sort(), ['incomplete', 'status', 'violations']);
+      for (const rule of [...report.violations, ...report.incomplete]) {
+        assert.deepEqual(Object.keys(rule).sort(), ['id', 'impact', 'node_count']);
+        assert.ok(rule.node_count > 0);
+      }
+      assert.equal(report.violations.some(rule => rule.id === 'button-name'), result.width === 320);
+      assert.doesNotMatch(JSON.stringify(report), /private-fixture-id|fixture-.*-placeholder|New password/);
       assert.equal(result.compare_error, undefined);
       assert.ok(result.compare.startsWith(join(compared.task_dir, 'after') + '/'));
       assert.equal((await readFile(result.compare)).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
@@ -625,6 +647,18 @@ test('canonical browser script logs in and captures protected password settings 
     const other = await promisify(execFile)(process.execPath, [script, '--base-url', url, '--route', '/app',
       '--viewports', '320x800', '--artifact-dir', taskParent], {cwd: control});
     assert.notEqual(JSON.parse(other.stdout).task_dir, artifactDir);
+    await assert.rejects(promisify(execFile)(process.execPath, [script, '--axe', '--base-url', url,
+      '--route', '/clean', '--route', '/frame', '--route', '/csp', '--viewports', '320x800'], {cwd: control}), error => {
+      assert.equal(error.code, 2);
+      const [clean, frame, blocked] = JSON.parse(error.stdout).results;
+      assert.equal(clean.axe.status, 'zero-violations');
+      assert.equal(clean.error, null);
+      assert.equal(frame.axe.status, 'incomplete');
+      assert.equal(frame.error, null);
+      assert.equal(blocked.axe.status, 'scan-failed');
+      assert.match(blocked.error, /axe scan failed/);
+      return true;
+    });
     assert.deepEqual(JSON.parse(await readFile(join(artifactDir, 'summary.json'), 'utf8')), summary);
     for (const cwd of [control, primary, root]) {
       assert.equal(execFileSync('git', ['status', '--porcelain'], {cwd, encoding: 'utf8'}), '');
