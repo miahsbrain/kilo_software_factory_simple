@@ -7,4 +7,6 @@ color: "#F59E0B"
 
 Run focused behavior checks against acceptance criteria using existing capture tools. Report actionable expected-versus-actual findings with reproduction and evidence; do not fix source. A proven harmless development-only missing favicon is nonblocking; retain its raw evidence and do not dismiss auth, script, or API failures.
 
+Follow the QA skill from the assigned source worktree. All generated evidence/images/Playwright output and reports stay in its ignored `artifacts/`, with scratch review scripts in `artifacts/scripts/`; maintained tool source stays `.kilo/`. Use explicit `artifacts/...` MCP filenames even with its output-dir default, which is not a filesystem sandbox. Never use the root, `/tmp`, another checkout or an external destination for generated review output.
+
 Work only on the assigned task and paths. Follow the root working agreement. Reuse suitable existing code. Ask about material unknowns, not routine implementation details. Report changed files, actual checks, and limitations. Do not expand scope or perform unauthorized Git operations.

@@ -3,6 +3,53 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-23] Authorize combined commit and prepare human merge
+**Type:** Chore
+**Board:** BOARD-132 through BOARD-136 | **Branch:** chore/enforce-planned-product-role-service-boundaries
+**Changed:** User approved local staging/commit, lifecycle verification and all five Pending Merge transitions after repeated merge refusal; no agent merge/push. Current state/handover distinguish authorized preparation from pre-commit review history. Intended reviewed tracked files only; existing external projects remain unchanged.
+**Verification:** Final blocking reruns passed bootstrap/lifecycle 94 tests in 41.759s, browser 24 tests with zero skipped in 14.609s and ledger 8 tests in 0.260s. Earlier background monitors lost their handles, so their partial output was not treated as passing evidence. Independent reviews were already clear; final whitespace/staging checks and post-commit clean lifecycle verification gate the board transitions. Commit/readiness outcome is recorded on the live board.
+
+## [2026-11-23] Complete compact safeguards and correct merge instructions
+**Type:** Docs
+**Board:** BOARD-136 | **Branch:** chore/enforce-planned-product-role-service-boundaries (same assigned worktree)
+**Changed:** Agreements add material decisions/assumptions, safe backend logging, disposable fixtures, bounded retries and permanent-rule approval; 43 lines each. Worktree skill explicitly orders authorized commit, clean verification, all shared rows Pending Merge, then human preview/apply. Handoff printing neither commits nor advances status.
+**Why:** User requested more useful old guidance and reported the omitted Pending Merge gate. Actual branch remains dirty with zero commits ahead, so changing the board alone would not fix readiness. Newer workflow rules remain intact; no source/runtime changes or new files.
+**Verification:** Node parity/content/43-line/handoff-order assertions and `git diff --check` passed; independent re-review clear. No runtime tests, installs, existing-project sync, factory commit/merge/push or premature Pending Merge transitions.
+
+## [2026-11-23] Restore compact engineering steering
+**Type:** Docs
+**Board:** BOARD-136 | **Branch:** chore/enforce-planned-product-role-service-boundaries (existing shared worktree)
+**Changed:** Factory/template agreements restore functional core/explicit effects, immutability/dependencies, cohesive modules, reuse, documented context, bounded specialist delegation, evidence-based review and concise docs/comments. Both grow from 31 to 39 lines; no new files, procedural manuals or runtime changes.
+**Why:** User identified valuable guidance lost during minimization. Retain modern frontend-first/worktree-reuse/source-registration/artifact/authorization rules rather than restoring conflicting historical governance.
+**Verification:** Node shared-text parity/content/line-count assertions and whitespace checks passed; independent read-only review found no issues. File/static review only, no runtime tests/build/install or existing-project sync. Unstaged/uncommitted; no commit/merge/push. New instructions take effect through the reviewed factory/template copy, not automatic migration of existing projects.
+
+## [2026-11-18] Complete source-registration and review-output verification
+**Type:** Fix / Review
+**Board:** BOARD132, BOARD133, BOARD134, BOARD135 | **Branch:** chore/enforce-planned-product-role-service-boundaries (same assigned worktree, unstaged/uncommitted)
+**Repair:** Independent source review found terminal board status read from task title; use `cells[worktree.STATUS_INDEX]`. Regressions reproduced six failures across two tests in 1.053s before repair, then both passed in 0.989s. Merged/Dropped status under both ownerships refuses without source/primary/board/lifecycle writes; active titles remain valid. Independent re-review confirmed the P2 resolved with no new source findings.
+**Verification:** Final builder `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -q test_bootstrap test_lifecycle` passed 94 tests in 43.193s. Coordinator browser rerun passed 24 tests, zero skipped, in 15.242s using existing Chromium; ledger rerun passed 8 tests in 0.403s. Actual authenticated linked-worktree fixtures cover responsive screenshots, component/comparison PNGs and artifact-local Playwright profile/temp output. Independent artifact review found no issues and separately checked path assertions and installed MCP help; full suites were not rerun by reviewers. `git diff --check` passed; primary tracked status remained clean.
+**Limits:** MCP output-dir applies to automatically named output; explicit filenames require `artifacts/...`. Not an arbitrary-tool filesystem or OS cache/crash-output sandbox. Short relative browser temp paths avoid Unix-socket path limits without outside fallback. Existing projects, manifests and old output remain unchanged; no deployment, dependencies, factory staging/commit/merge/push, transaction/concurrent-writer serialization or hostile filesystem-race guarantee. Current state/handover now record final evidence rather than the earlier pending checkpoints below.
+
+## [2026-11-18] Extend service-role work to source-local registration and confined evidence
+**Type:** Fix
+**Board:** BOARD132, BOARD133, BOARD134 | **Branch:** chore/enforce-planned-product-role-service-boundaries (same worktree, unstaged/uncommitted)
+**Approved:** Keep tracked service registration in assigned linked control source, not primary; retain canonical separate repositories and ignored operational mapping. Keep all generated review evidence and ad-hoc scripts under assigned-workspace artifacts, without moving maintained tracked review tools into ignored output directories.
+**Guidance:** Root/template agreement, run command, frontend/docs roles and current scope docs distinguish tracked source from shared coordination and generated evidence. ADR-091/092 record the extension.
+**Verification:** BOARD133 builder `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -q test_bootstrap test_lifecycle` passed 92 tests in 41.133s (40 bootstrap plus 52 lifecycle), including source-local tracked registration, canonical separate-service create/resume, preserved multi-branch ignored mappings, prewrite safety and primary manifest/ignore/index/HEAD byte assertions. `git diff --check` passed; independent implementation review is pending. BOARD134 browser/output evidence remains pending; the previous 85-test role-only result is historical. No existing project manifests or old review files moved/deleted; no factory stage/commit/merge/push or dependency install.
+
+## [2026-11-18] Complete role-boundary independent review
+**Type:** Review
+**Board:** BOARD-132 | **Branch:** chore/enforce-planned-product-role-service-boundaries (unstaged/uncommitted)
+**Result:** Independent review found no actionable correctness or path-safety findings. Required role/helper checks, arbitrary multiword roles, sibling-service guidance, active examples and legacy three-field restore compatibility were inspected. Reviewer did not rerun the reported 85-test suite. Final coordinator `git diff --check` passed; no existing-project deployment or app renaming.
+
+## [2026-11-18] Enforce planned product-role service boundaries
+**Type:** Fix
+**Board:** BOARD132 | **Branch:** chore/enforce-planned-product-role-service-boundaries (assigned worktree, unstaged/uncommitted)
+**Changed:** `app(source, root, name, git_mode, role)` and CLI require explicit arbitrary safe kebab-case role plus matching full name with a valid nonempty product prefix before path/Git/manifest access. Separate/project Git remains independently required. Print selected role/full target without secrets. Preserve exact name/path/git manifest, legacy restore readability and full-name separate-only repo IDs; no persisted role/schema/migration/registry. Plan skill and /plan hand off approved full names/roles/sibling roots/responsibilities/stacks/ownership; /bootstrap follows them and /run checks assignment. Planned React frontend plus Python API example uses sibling camera-shop-frontend and camera-shop-api, not a product-only folder or nested role directories. No technology-driven unapproved splits; one approved runtime can stay one service. Clarify metadata-only backend bootstrap versus frontend-approved backend source/deps/routes/persistence/integration. Root/template agreements and README pair, worktree skill, current docs and appended ADR-090 align; historical commands remain historical.
+**Verification:** Two `python3 -B -m unittest test_lifecycle test_bootstrap` invocations from assigned scripts directory. First: 85 tests in 32.256s, two failures from argparse treating dash-prefixed fixture name as an option. Corrected test invocation with `--` and added empty-name coverage. Final: 85 tests passed in 32.359s, exit 0. Six added tests cover independent required flags, no-write CLI snapshots including parent entries/HEAD/index/manifest/map/ignore/config, direct helper rejection before I/O, sibling metadata-only roots in both modes/repeated collisions, custom multiword roles and unchanged legacy three-field restore. Lifecycle direct-Git `apps/api` fixtures unchanged; expected injected failures are fixture evidence.
+**Audit:** `git diff --check` passed; active factory/template app command examples include roles. Specialist agents only narrow the ambiguous scaffolding exemption to metadata-only bootstrap, preserving the backend approval gate.
+**Limits:** Creation-time check cannot prove prose-plan completeness/approval. Existing copied tools were not deployed, existing projects/apps were not edited/recovered/renamed. No primary writes, installs, factory stage/commit/merge/push, broad build/browser checks or hostile concurrent-filesystem guarantee. Live board remains coordinator-owned.
+
 ## [2026-11-18] Commit lifecycle recovery and prepare combined handoff
 **Type:** Fix
 **Board:** BOARD130, BOARD131 | **Branch:** chore/recover-partial-worktrees-and-inherit-control

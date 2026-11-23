@@ -248,22 +248,76 @@ def project(source, destination, allow_outside=False):
     return destination
 
 
-def app(source, root, name, git_mode):
+def app(source, root, name, git_mode, role):
+    if (not isinstance(role, str) or not NAME.fullmatch(role)
+            or not isinstance(name, str) or not name.endswith("-" + role)
+            or not NAME.fullmatch(name[:-(len(role) + 1)])):
+        raise ValueError("service name must be <product>-<role> with a valid nonempty lowercase "
+                         "kebab-case product prefix and explicit lowercase kebab-case role")
+    if git_mode not in ("separate", "project"):
+        raise ValueError("choose separate/project Git ownership")
     root = real_path(root)
+    if root != real_path(Path.cwd()):
+        raise ValueError("run app registration from the assigned control source worktree root")
     real_path(root / ".git")
-    if git_mode not in ("separate", "project") or not NAME.fullmatch(name) or name == "control":
-        raise ValueError("choose separate/project Git and a meaningful lowercase kebab-case service name; not control")
     if (root / "templates/project").exists():
         raise ValueError("run app mode from the project control root, not the factory")
-    if git("rev-parse", "--show-toplevel", cwd=root) != str(root) or not (root / ".git").is_dir():
-        raise ValueError("app creation requires the primary project control checkout")
+    import worktree
+    if git("rev-parse", "--show-toplevel", cwd=root) != str(root):
+        raise ValueError("app registration requires the assigned control worktree root")
+    primary = real_path(Path(worktree.main_checkout_root(str(root))))
+    if root == primary or not (root / ".git").is_file():
+        raise ValueError("app registration requires an assigned linked control source worktree; "
+                         "create/resume the assigned control worktree first; nothing created")
+    real_path(primary / ".git")
+    if ((primary / "templates/project").exists() or not (primary / ".git").is_dir()
+            or worktree.common_dir(str(root)) != worktree.common_dir(str(primary))):
+        raise ValueError("source is not a linked project control worktree")
+    board = worktree.load_board_module(str(primary))
+    table, error = board.read_table(str(real_path(primary / "docs/BOARD.md")))
+    if table is None:
+        raise ValueError(error)
+    column = board.field_index(table, "branch-worktree")
+    if column is None:
+        raise ValueError("control board has no workspace assignments")
+    assigned = False
+    for index in table["rows"]:
+        cells = board.cell_texts(table["lines"], index)
+        if cells[worktree.STATUS_INDEX] in ("Merged", "Dropped"):
+            continue
+        items = worktree.task_workspaces(str(primary), str(primary), "control", cells[0],
+                                        cells[column], selected=str(root))
+        if any(item["path"] == str(root) and item["linked"] for item in items):
+            assigned = True
+    record = worktree.local_state(str(primary))["workspaces"].get(str(root), {})
+    if (not assigned or record.get("error") or record.get("control") != str(primary)
+            or record.get("repo") != str(primary) or record.get("repo_id") != "control"):
+        raise ValueError("create/resume the assigned linked control worktree first; nothing created")
+    for checkout in (root, primary):
+        git("ls-files", "--error-unmatch", "--", "services.json", ".gitignore", cwd=checkout)
     data = read_services(root)
+    primary_data = read_services(primary)
     relative = "apps/" + name
-    if any(s["name"] == name or s["path"] == relative for s in data["services"]):
+    known = {}
+    for service in primary_data["services"] + data["services"]:
+        previous = known.setdefault(service["name"], service)
+        if previous != service:
+            raise ValueError("conflicting service manifest name/path/ownership; nothing created")
+    if name in known:
         raise ValueError("service name/path collision")
-    destination = real_path(root / relative)
-    if os.path.lexists(destination):
-        raise ValueError("app destination already exists; never overwrite or reinitialize")
+    destination = real_path((primary if git_mode == "separate" else root) / relative)
+    print("Control source: {}\nCanonical control: {}\nSelected role: {}\nFull service target: {}".format(
+        root, primary, role, destination), file=sys.stderr)
+    for checkout in (root, primary):
+        target = real_path(checkout / relative)
+        if os.path.lexists(target):
+            raise ValueError("app destination already exists; never overwrite or reinitialize")
+        tracked = set(git("ls-files", "-z", cwd=checkout).split("\0"))
+        protected = {relative, "apps", ".kilo", ".kilo/repos.json"}
+        if (tracked & protected or any(path.startswith(relative + "/")
+                                       or path.startswith(".kilo/repos.json/") for path in tracked)):
+            raise ValueError("app target or operational map has tracked paths/ancestors; nothing created")
+        git("check-ignore", "-q", "--", ".kilo/repos.json", cwd=checkout)
     apps = destination.parent
     if apps.exists() and not apps.is_dir():
         raise ValueError("apps must be a real directory")
@@ -274,14 +328,44 @@ def app(source, root, name, git_mode):
     ignore_rules = "".join(line for line in project_ignores.splitlines(keepends=True)
                            if line.strip() != "apps/*/" and not line.startswith("!/apps/"))
     ignore_rules += "\n" + "\n".join(LOCAL) + "\n"
-    map_path = real_path(root / ".kilo/repos.json")
-    if not map_path.is_file() or json.loads(map_path.read_text()) != repo_map(data):
-        raise ValueError("local repo map differs from manifest; restore project tooling first")
+    map_path = real_path(primary / ".kilo/repos.json")
+    source_map = real_path(root / ".kilo/repos.json")
+    merged = {"control": "."}
+    for path in (map_path, source_map):
+        if not path.exists() and path == source_map:
+            continue
+        if not path.is_file():
+            raise ValueError("missing regular local repo map; restore project tooling first")
+        mapping = json.loads(path.read_text(), object_pairs_hook=unique_object)
+        if not isinstance(mapping, dict) or mapping.get("control") != ".":
+            raise ValueError("invalid control repo map; nothing created")
+        for key, value in mapping.items():
+            if key == "control":
+                continue
+            if (not NAME.fullmatch(key) or value != "apps/" + key
+                    or (key in known and known[key]["git"] != "separate")):
+                raise ValueError("conflicting repo map name/path/ownership; nothing created")
+            target = real_path(primary / value)
+            if (not (real_path(target / ".git")).is_dir()
+                    or git("rev-parse", "--show-toplevel", cwd=target) != str(target)
+                    or Path(worktree.main_checkout_root(str(target))) != target):
+                raise ValueError("stale or foreign repo map target; nothing created")
+            merged[key] = value
+    for service in known.values():
+        if service["git"] == "separate" and service["name"] not in merged:
+            raise ValueError("local repo map differs from manifest; restore project tooling first")
+    if name in merged:
+        raise ValueError("service name/path collision with another source registration")
+    real_path(source_map.parent)
+    if source_map.parent.exists() and not source_map.parent.is_dir():
+        raise ValueError("source .kilo must be a real directory")
     if git_mode == "separate":
         bootstrap_policy(source, [".gitignore"])
-        if root != source:
+        if primary != source:
+            bootstrap_policy(primary, [".gitignore"])
+        if root != source and (root / ".kilo/policies/git-policy.json").exists():
             bootstrap_policy(root, [".gitignore"])
-        identity(root)
+        identity(primary)
     apps.mkdir(exist_ok=True)
     destination.mkdir()
     try:
@@ -293,7 +377,11 @@ def app(source, root, name, git_mode):
             ignore_path.write_text(project_ignores + "\n!/" + relative + "/\n", encoding="utf-8")
         data["services"].append({"name": name, "path": relative, "git": git_mode})
         (root / "services.json").write_bytes(encoded(data))
-        map_path.write_bytes(encoded(repo_map(data)))
+        if git_mode == "separate":
+            merged[name] = relative
+        map_path.write_bytes(encoded(merged))
+        source_map.parent.mkdir(exist_ok=True)
+        source_map.write_bytes(encoded(merged))
     except (OSError, ValueError) as error:
         raise ValueError(str(error) + "; partial state retained at " + str(destination)
                          + "; inspect services.json and local repo map before retrying") from None
@@ -378,8 +466,9 @@ def main(argv=None):
     project_parser.add_argument("--destination", type=Path)
     project_parser.add_argument("--allow-outside", action="store_true",
                                 help="permit an external destination only after explicit user approval")
-    application = modes.add_parser("app", help="create apps/<meaningful-service-name>")
+    application = modes.add_parser("app", help="create apps/<product-role> from approved service intent")
     application.add_argument("name")
+    application.add_argument("--role", required=True, help="explicit lowercase kebab-case role; name must end in -<role>")
     application.add_argument("--git", choices=("separate", "project"), required=True)
     restoration = modes.add_parser("restore", help="rehydrate ignored tooling from this factory checkout")
     restoration.add_argument("--destination", type=Path, required=True)
@@ -397,7 +486,7 @@ def main(argv=None):
                 raise ValueError("run project mode from the factory checkout root")
             result = project(source, args.destination or root / "project", args.allow_outside)
         elif args.mode == "app":
-            result = app(source, root, args.name, args.git)
+            result = app(source, root, args.name, args.git, args.role)
         else:
             result = restore(source, args.destination, args.project)
         suffix = "tooling restored; source/index/HEAD unchanged" if args.mode == "restore" else (
