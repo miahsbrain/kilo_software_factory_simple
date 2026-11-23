@@ -6,6 +6,8 @@ Read applicable local instructions and the documented layout, state, domain and 
 
 ## Code Quality Standards
 
+For feature implementation, read the plan linked in the board Notes on assignment and resume. All assigned repositories use the same primary-control `docs/implementation_plans/` file. The coordinator maintains it per the plan skill; specialists report evidence for their phase.
+
 Name new features with a past-tense description, without emoji or a repository/folder label. Use `Added kus deployment manifests` for the board title, `feat/added-kus-deployment-manifests` for the branch, and `[feat] Added kus deployment manifests` for an authorized commit. Do not rename existing branches or rewrite history to apply this convention.
 
 For a quick Fix, Chore or Docs edit, use the workspace skill's `--skip-worktree` eligibility check in optional or adaptive mode. Do not create a worktree when the requested current checkout passes. Do not change the user's saved mode implicitly.

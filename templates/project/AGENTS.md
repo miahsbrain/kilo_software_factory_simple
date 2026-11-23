@@ -1,5 +1,7 @@
 # Working Agreement
 
+For feature implementation, read the plan linked in the board Notes on assignment and resume. All assigned repositories use the same primary-control `docs/implementation_plans/` file. The coordinator maintains it per the plan skill; specialists report evidence for their phase.
+
 Name new features with a past-tense description, without emoji or a repository/folder label. Example: `Added kus deployment manifests`, branch `feat/added-kus-deployment-manifests`, commit `[feat] Added kus deployment manifests`. Leave existing branches and history alone.
 
 Build useful, distinctive software. Favor clear code, focused modules, existing conventions, and the smallest sound solution. Avoid speculative abstractions.
