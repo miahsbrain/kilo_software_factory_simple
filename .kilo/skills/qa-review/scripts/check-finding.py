@@ -12,7 +12,7 @@ Usage:
                    [--category functional|visual|network|console|a11y|data|testability]
                    [--route <path>]
                     [--fingerprint <value>]
-  check-finding.py --manual-guide --body-file <path.md or - for stdin>
+  check-finding.py --manual-guide --body-file artifacts/reviews/<guide>.md
 
 Exit codes:
   0  body accepted
@@ -24,7 +24,10 @@ On acceptance the computed fingerprint is printed on stdout as
 """
 
 import argparse
+import os
+from pathlib import Path
 import re
+import subprocess
 import sys
 
 KINDS = ("bug", "ux", "tests", "docs", "tech-debt")
@@ -65,7 +68,7 @@ def parse_args(argv):
         description="Validate a QA finding markdown body before it becomes a board row.",
     )
     parser.add_argument("--body-file", required=True,
-                        help="Markdown file to validate; with --manual-guide, use - for stdin.")
+                        help="Markdown file to validate; manual guides must be saved under artifacts/reviews/.")
     parser.add_argument("--manual-guide", action="store_true",
                         help="Validate a new manual QA checklist instead of a finding.")
     parser.add_argument("--kind", default=None, choices=list(KINDS), help="Finding kind.")
@@ -234,6 +237,7 @@ GUIDE_ACTION = re.compile(
     r"send|set|sign|start|stop|submit|switch|tab|tap|toggle|try|type|use|verify|visit|wait)\b",
     re.IGNORECASE,
 )
+MAX_GUIDE_STEP_WORDS = 24
 GUIDE_RESULT = re.compile(
     r"(?:(?:^|[.;:,]\s+|\s+(?:and|then)\s+)(?:check (?:that|for)|confirm|verify|ensure|"
     r"expect|expected(?: result)?:|note)\s+(?:that\s+)?(?!that\b)|\bshould\s+)(?=[^\w]*\w)",
@@ -268,6 +272,8 @@ def validate_manual_guide(body):
                 problems.append(f"line {number} ({section}): expected 'Changed: <text>'")
         elif line.startswith("- [ ] "):
             step = line[len("- [ ] "):]
+            if len(step.split()) > MAX_GUIDE_STEP_WORDS:
+                problems.append(f"line {number} ({section}): split or shorten the test to {MAX_GUIDE_STEP_WORDS} words")
             if not GUIDE_ACTION.match(step) or not GUIDE_RESULT.search(INLINE_CODE_RE.sub(" code ", step)):
                 problems.append(f"line {number} ({section}): give an action and its expected result")
             has_step = True
@@ -294,17 +300,53 @@ def resolve_fingerprint(args, body):
     return compute_fingerprint(args.kind, args.category, args.route, fingerprint_subject(body))
 
 
+def manual_guide_path(filename):
+    path = Path.cwd() / filename
+    if '..' in path.parts or path.suffix != '.md':
+        raise ValueError('expected a .md file under artifacts/reviews/ without traversal')
+
+    # Inspect the actual worktree and index, not caller-supplied Git overrides.
+    env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+
+    def git(*args, cwd=None):
+        return subprocess.run(['git', *args], cwd=cwd, env=env,
+                              capture_output=True, check=True).stdout
+
+    def git_root(cwd):
+        return Path(os.fsdecode(git('rev-parse', '--show-toplevel', cwd=cwd).removesuffix(b'\n')))
+
+    root = git_root(Path.cwd())
+    if not path.is_relative_to(root / 'artifacts/reviews'):
+        raise ValueError('manual guide must be under the current worktree artifacts/reviews/')
+    if path.resolve(strict=True) != path or not path.is_file():
+        raise ValueError('manual guide must be a regular file without symlinks')
+    if '.git' in path.relative_to(root).parts or git_root(path.parent) != root:
+        raise ValueError('manual guide belongs to a nested repository')
+
+    for target in ('artifacts', path.relative_to(root)):
+        git('check-ignore', '-q', '--', target, cwd=root)
+    # The index covers tracked files and additions; a staged deletion only appears in the diff.
+    if (git('ls-files', '--cached', '--', 'artifacts', cwd=root) or
+            git('diff', '--cached', '--name-only', '--no-renames', '--', 'artifacts', cwd=root)):
+        raise ValueError('artifacts/ contains tracked or staged paths')
+    return path
+
+
 def main(argv):
     args = parse_args(argv)
-    try:
-        if args.manual_guide and args.body_file == "-":
-            body = sys.stdin.read()
-        else:
+    if args.manual_guide:
+        try:
+            body = manual_guide_path(args.body_file).read_text(encoding='utf-8')
+        except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as error:
+            sys.stderr.write(f'check-finding: cannot validate manual guide: {error}\n')
+            return 66
+    else:
+        try:
             with open(args.body_file, "r", encoding="utf-8") as handle:
                 body = handle.read()
-    except OSError as error:
-        sys.stderr.write("check-finding: cannot read body file: " + str(error) + "\n")
-        return 66
+        except OSError as error:
+            sys.stderr.write("check-finding: cannot read body file: " + str(error) + "\n")
+            return 66
 
     problems = validate_manual_guide(body) if args.manual_guide else validate(body)
     if problems:

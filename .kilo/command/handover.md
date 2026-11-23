@@ -9,3 +9,4 @@ In the completion report link the QA skill's manual QA/UI checklist for any skip
 
 For manual review, use the QA skill's checkbox format: board ID, one `Changed:` sentence, then `- [ ]` tester actions with expected results. Do not replace the checklist with a status narrative.
 Run the skill's `--manual-guide` format check before sending the guide.
+For every tester handoff, link the validated file in the assigned worktree's ignored `artifacts/reviews/`. Do not substitute an inline checklist.
