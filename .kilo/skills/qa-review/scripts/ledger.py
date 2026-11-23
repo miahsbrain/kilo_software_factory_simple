@@ -23,6 +23,7 @@ import argparse
 import importlib.util
 import os
 import re
+import subprocess
 import sys
 
 MAX_ROUNDS = 3
@@ -31,7 +32,31 @@ ROUND_RE = re.compile(r"^## Round (\d+)\s*$")
 
 
 def ledger_path(ledger_dir, task_id):
+    if not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", task_id):
+        raise ValueError("task-id must be a safe path segment")
     return os.path.join(ledger_dir, "%s-ledger.md" % task_id)
+
+
+def artifact_path(path, cwd=None):
+    cwd = cwd or os.getcwd()
+    result = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd,
+                            capture_output=True, text=True,
+                            env={key: value for key, value in os.environ.items()
+                                 if not key.startswith("GIT_")})
+    # Explicit overrides support non-Git fixtures, confined to their own cwd.
+    source = result.stdout.strip() if result.returncode == 0 else cwd
+    root = os.path.abspath(os.path.join(source, "artifacts"))
+    target = os.path.abspath(os.path.join(cwd, path))
+    if os.path.commonpath([root, target]) != root:
+        raise ValueError("output must stay inside caller worktree artifacts/")
+    if os.path.realpath(target) != target or os.path.realpath(root) != root:
+        raise ValueError("artifact output has a symlink ancestor or destination")
+    current = target
+    while current != os.path.dirname(root):
+        if os.path.islink(current):
+            raise ValueError("artifact output has a symlink ancestor or destination")
+        current = os.path.dirname(current)
+    return target
 
 
 def default_ledger_dir(cwd):
@@ -44,7 +69,8 @@ def default_ledger_dir(cwd):
     if not (os.path.isfile(os.path.join(root, ".kilo", "repos.json"))
             and os.path.isfile(os.path.join(root, "docs", "BOARD.md"))):
         raise ValueError("cannot resolve control root: repo map and board are required")
-    return os.path.join(root, "artifacts", "reviews")
+    source_root = worktree.checked_git(cwd, "rev-parse", "--show-toplevel")
+    return artifact_path(os.path.join(source_root, "artifacts", "reviews"), cwd)
 
 
 def parse_ledger(text):
@@ -86,6 +112,7 @@ def read_ledger(path):
 
 
 def write_ledger(path, header, rounds):
+    path = artifact_path(path)
     directory = os.path.dirname(os.path.abspath(path)) or "."
     if not os.path.isdir(directory):
         os.makedirs(directory)
@@ -216,7 +243,8 @@ def main(argv):
         description="Track the bounded QA/fix rounds of one board row.")
     parser.add_argument("--ledger-dir",
                         help="explicit directory, relative to cwd when not absolute; "
-                             "default: shared control-root artifacts/reviews (never commit)")
+                              "must stay in caller worktree artifacts/; "
+                              "default: source-worktree artifacts/reviews (never commit)")
     sub = parser.add_subparsers(dest="command")
 
     for name, help_text in (
@@ -255,6 +283,8 @@ def main(argv):
     try:
         if args.ledger_dir is None:
             args.ledger_dir = default_ledger_dir(os.getcwd())
+        args.ledger_dir = artifact_path(args.ledger_dir)
+        artifact_path(ledger_path(args.ledger_dir, args.task_id))
         return handler(args)
     except (OSError, ValueError) as error:
         print("refused: %s" % error, file=sys.stderr)

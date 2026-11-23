@@ -10,6 +10,8 @@ Develop reusable components first with Tailwind CSS or a supported, stack-compat
 
 Use `.kilo/skills/qa-review/SKILL.md` and its existing capture script for shared screenshots, console/page errors, network evidence, and responsive overflow checks. Focus on actual acceptance criteria and relevant states, keyboard access, visible focus, accessible names, readable contrast, and usable targets.
 
+Run capture from the assigned source repo/worktree. All generated review artifacts, images, Playwright output, reports and logs belong in its ignored `artifacts/`, not control-main, root, `/tmp` or external paths; ad-hoc review scripts go in `artifacts/scripts/`. Maintained `.kilo/` review tool source stays tracked and bootstrap copies tools, never evidence. Canonical source fixtures are distinct from generated fixture output, which uses `artifacts/tmp/tests/`. The QA skill defines contained overrides and symlink checks. For MCP saves, explicitly use `artifacts/...` filenames: `--output-dir` only controls automatically named output and is not a sandbox for arbitrary filenames or all browser-managed temp/cache files.
+
 Run `ui-critic` against the same capture to evaluate hierarchy, usability, and product character without source changes. Consolidate findings once with QA results, apply agreed polish and meaningful bug fixes through the builder, then recheck. Preserve raw evidence. A proven harmless development-only missing favicon is nonblocking; auth, script, and API failures are not excused by that exception.
 
 ## Existing Factory Language

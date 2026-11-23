@@ -1,14 +1,20 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, writeFile, mkdir, symlink, readFile, stat, rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {mkdtemp, writeFile, mkdir, symlink, readFile, stat, rm, readdir} from 'node:fs/promises';
+import {tmpdir as osTmpdir} from 'node:os';
+import {join, resolve} from 'node:path';
 import {execFileSync, execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {createServer} from 'node:http';
 import {fileURLToPath} from 'node:url';
 import {parseArgs, safeUrl, validateNavigation, localJson, runSteps, stateSecrets, redact,
-  PlaywrightPage, captureEntry} from './browser-review.mjs';
+  PlaywrightPage, captureEntry, callerRoot, taskDirectory, prepareArtifacts, artifactPath,
+  browserTemp} from './browser-review.mjs';
+
+const fixtures = join(callerRoot(), 'artifacts', 'tmp', 'tests');
+await artifactPath(fixtures);
+await mkdir(fixtures, {recursive: true});
+const tmpdir = () => fixtures;
 
 const base = 'http://localhost:4173';
 const state = {cookies: [{value: 'test-session-placeholder'}], origins: [
@@ -22,6 +28,77 @@ test('CLI accepts state/navigation paths and explicit destructive authorization'
   assert.equal(options.navigation, '.kilo/qa-local/navigation.json');
   assert.equal(options.allowDestructive, true);
   assert.equal(options.viewports.length, 5);
+});
+
+test('unsafe scope/task/label/date are refused, including with explicit artifact override', () => {
+  for (const flag of ['--scope', '--task-id', '--label', '--date']) {
+    for (const segment of ['..', '.', '../escape', '/absolute', 'a/b', 'a\\b', '']) {
+      assert.throws(() => parseArgs(['--base-url', base, '--route', '/', '--artifact-dir', fixtures, flag, segment]));
+    }
+  }
+  const options = parseArgs(['--base-url', base, '--route', '/', '--task-id', 'BOARD134']);
+  assert.equal(taskDirectory(options), join(callerRoot(), 'artifacts', 'factory', 'qa', options.date, 'BOARD134'));
+});
+
+test('outside overrides and symlink ancestors/files are refused before any writes or browser access', async t => {
+  const root = await mkdtemp(join(fixtures, 'qa-path-test-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const outside = join(callerRoot(), 'BOARD134-must-not-exist');
+  const options = dir => parseArgs(['--base-url', base, '--route', '/', '--artifact-dir', dir]);
+  await assert.rejects(prepareArtifacts(options(outside)), /inside caller worktree artifacts/);
+  await assert.rejects(prepareArtifacts(options(join(callerRoot(), 'artifacts', '..', 'escape'))));
+  await assert.rejects(stat(outside), {code: 'ENOENT'});
+  await mkdir(join(root, 'target'));
+  await symlink(join(root, 'target'), join(root, 'link'));
+  await assert.rejects(prepareArtifacts(options(join(root, 'link', 'absent', 'child'))), /symlink/);
+  await mkdir(join(root, 'capture'));
+  await symlink(join(root, 'target', 'summary.json'), join(root, 'capture', 'summary.json'));
+  await assert.rejects(prepareArtifacts(options(join(root, 'capture'))), /symlink/);
+  assert.deepEqual(await readdir(join(root, 'target')), []);
+  // The artifacts root itself must not be a symlink, even to another in-workspace path.
+  const fixture = join(root, 'non-git');
+  await mkdir(fixture);
+  execFileSync('git', ['init', '-q'], {cwd: fixture});
+  await symlink(join(root, 'target'), join(fixture, 'artifacts'));
+  const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
+  assert.throws(() => execFileSync(process.execPath, [script, '--base-url', base, '--route', '/'],
+    {cwd: fixture, stdio: 'pipe'}), error => error.status === 2 && /symlink/.test(error.stderr));
+  assert.deepEqual(await readdir(join(root, 'target')), []);
+});
+
+test('browser temp and Playwright output directories are artifact-local and env restores on failure', async t => {
+  const root = await mkdtemp(join(fixtures, 'qa-temp-test-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const saved = Object.fromEntries(['TMPDIR', 'TMP', 'TEMP'].map(key => [key, process.env[key]]));
+  const temp = await browserTemp();
+  t.after(() => rm(temp.path, {recursive: true, force: true}));
+  try {
+    assert.equal(resolve(osTmpdir()), temp.path);
+    for (const key of Object.keys(saved)) assert.equal(resolve(process.env[key]), temp.path);
+    assert.ok(temp.path.startsWith(join(callerRoot(), 'artifacts', 'tmp') + '/'));
+    assert.equal(await artifactPath(join(temp.path, 'downloads')), join(temp.path, 'downloads'));
+  } finally { temp.restore(); }
+  for (const [key, value] of Object.entries(saved)) assert.equal(process.env[key], value);
+});
+
+test('dot route slugs, components and error logs stay under artifacts', async t => {
+  const root = await mkdtemp(join(fixtures, 'qa-dot-test-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  for (const route of ['/.', '/..']) {
+    const page = fakePage();
+    page.evaluate = async expression => typeof expression === 'string' && expression.includes('getBoundingClientRect')
+      ? [{x: 0, y: 0, width: 20, height: 20}] : [];
+    const session = new PlaywrightPage({storageState: async () => state}, page);
+    const result = await captureEntry(session, {baseUrl: base, artifactRoot: root, loginEnv: {}, components: ['main'],
+      navigationConfig: {}}, route, {name: '320x800', width: 320, height: 800}, 'light', false);
+    assert.ok(result.screenshot.startsWith(join(root, 'root') + '/'));
+    assert.equal(await readFile(join(root, 'root', '320x800', 'light', 'network.json'), 'utf8'), '[]');
+    page.goto = async () => { throw new Error('fixture failure'); };
+    const failed = await captureEntry(session, {baseUrl: base, artifactRoot: root, loginEnv: {}, components: [],
+      navigationConfig: {}}, route, {name: '320x800', width: 320, height: 800}, 'light', false);
+    assert.ok(failed.error);
+    assert.equal(await readFile(join(root, 'root', '320x800', 'light', 'network.json'), 'utf8'), '[]');
+  }
 });
 
 test('secret CLI arguments and URL credentials/query/fragment fail without echoing values', () => {
@@ -311,19 +388,33 @@ test('public capture remains available without login/state or an authenticated m
 
 test('canonical browser script logs in and captures protected password settings using its existing browser resolver',
   {timeout: 120000}, async t => {
-    const root = await mkdtemp(join(tmpdir(), 'qa-real-browser-test-'));
-    t.after(() => rm(root, {recursive: true, force: true}));
-    execFileSync('git', ['init', '-q'], {cwd: root, stdio: 'ignore'});
+    const fixture = await mkdtemp(join(tmpdir(), 'qa-real-browser-test-'));
+    t.after(() => rm(fixture, {recursive: true, force: true}));
+    const primary = join(fixture, 'primary');
+    const root = join(fixture, 'linked');
+    await mkdir(primary);
+    execFileSync('git', ['init', '-q'], {cwd: primary, stdio: 'ignore'});
+    await writeFile(join(primary, '.gitignore'), 'artifacts/\nlocal/\n');
+    execFileSync('git', ['add', '.gitignore'], {cwd: primary, stdio: 'ignore'});
+    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+      '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture'], {cwd: primary, stdio: 'ignore'});
+    execFileSync('git', ['worktree', 'add', '-qb', 'review', root], {cwd: primary, stdio: 'ignore'});
+    assert.equal(callerRoot(root), root);
     await mkdir(join(root, 'local'));
     await writeFile(join(root, '.gitignore'), 'local/\n');
     let logins = 0;
     let appVisits = 0;
     let settingsVisits = 0;
+    const observedTempPaths = new Set();
     const server = createServer(async (request, response) => {
       response.setHeader('Content-Type', 'text/html');
       response.setHeader('Cache-Control', 'no-store');
       if (request.url === '/favicon.ico') { response.writeHead(204).end(); return; }
       if (request.url === '/login' && request.method === 'GET') {
+        for (const name of await readdir(join(root, 'artifacts', 'tmp'))) {
+          const temp = join(root, 'artifacts', 'tmp', name);
+          for (const child of await readdir(temp)) observedTempPaths.add(join(temp, child));
+        }
         response.end('<!doctype html><form method="post" action="/login"><input name="email" id="email">' +
           '<input name="password" id="password" type="password"><button type="submit">Sign in</button></form>');
         return;
@@ -366,15 +457,19 @@ test('canonical browser script logs in and captures protected password settings 
       {action: 'waitForURL', path: '/settings'}, {action: 'waitForSelector', selector: 'main'},
     ]};
     await writeFile(join(root, 'local', 'navigation.json'), JSON.stringify(config), {mode: 0o600});
-    const artifactDir = join(root, 'artifacts');
+    const artifactDir = join(root, 'artifacts', 'factory', 'qa', '2026-11-18', 'BOARD134');
     const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
     const args = [script, '--base-url', url, '--route', '/app', '--project', root,
-      '--navigation', 'local/navigation.json', '--artifact-dir', artifactDir, '--viewports', '320x800,834x1112'];
+      '--navigation', 'local/navigation.json', '--date', '2026-11-18', '--task-id', 'BOARD134',
+      '--component', 'main', '--viewports', '320x800,834x1112'];
     let output;
     try {
       output = await promisify(execFile)(process.execPath, args, {cwd: root, timeout: 90000,
         env: {...process.env, QA_FIXTURE_EMAIL: 'fixture-user-placeholder', QA_FIXTURE_PASSWORD: 'fixture-password-placeholder'}});
     } catch (error) {
+      if (/Playwright was not found|no chromium browser was found/.test(error.stderr || '')) {
+        t.skip('Existing Playwright/browser unavailable; no installation attempted'); return;
+      }
       assert.fail('Canonical command: ' + [process.execPath, ...args].join(' ') + '\nExit: ' + error.code +
         '\n' + (error.stderr || error.message));
     }
@@ -384,8 +479,16 @@ test('canonical browser script logs in and captures protected password settings 
     assert.equal(logins, 1);
     assert.ok(appVisits >= 2);
     assert.equal(settingsVisits, 2);
+    await assert.rejects(stat(join(primary, 'artifacts')), {code: 'ENOENT'});
+    const tempChildren = await readdir(join(root, 'artifacts', 'tmp'));
+    assert.ok(tempChildren.some(name => name.startsWith('browser-')));
+    assert.ok([...observedTempPaths].some(path => path.includes('/playwright-artifacts-')));
+    assert.ok([...observedTempPaths].some(path => path.includes('/playwright_chromiumdev_profile-')));
+    for (const path of observedTempPaths) assert.ok(path.startsWith(join(root, 'artifacts', 'tmp') + '/'));
     for (const result of summary.results) {
       assert.equal(result.error, null);
+      assert.equal(result.components.length, 1);
+      assert.ok(result.components[0].startsWith(artifactDir + '/'));
       assert.equal((await readFile(result.screenshot)).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
       for (const name of ['console.log', 'page-errors.log', 'network.json']) {
         const artifact = await readFile(join(artifactDir, 'app', result.viewport, 'light', name), 'utf8');
@@ -395,5 +498,15 @@ test('canonical browser script logs in and captures protected password settings 
     for (const value of ['fixture-password-placeholder', 'fixture-session-placeholder']) {
       assert.ok(!output.stdout.includes(value));
       assert.ok(!output.stderr.includes(value));
+    }
+    // Reuse the canonical command for comparison sheets, without another driver.
+    await promisify(execFile)(process.execPath, [...args, '--label', 'after', '--compare', artifactDir],
+      {cwd: root, timeout: 90000, env: {...process.env, QA_FIXTURE_EMAIL: 'fixture-user-placeholder',
+        QA_FIXTURE_PASSWORD: 'fixture-password-placeholder'}});
+    const compared = JSON.parse(await readFile(join(artifactDir, 'summary.json'), 'utf8'));
+    for (const result of compared.results) {
+      assert.equal(result.compare_error, undefined);
+      assert.ok(result.compare.startsWith(join(artifactDir, 'after') + '/'));
+      assert.equal((await readFile(result.compare)).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
     }
   });

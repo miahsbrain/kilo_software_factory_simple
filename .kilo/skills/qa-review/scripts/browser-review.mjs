@@ -17,8 +17,8 @@
  *                            [--component <css-selector>] [--compare <dir>]
  *                            [--chromium <path>]
  *
- * Without --artifact-dir the capture lands in the canonical artifacts folder of
- * the main checkout: <repo-root>/artifacts/<scope>/qa/<date>/<task-id>/.
+ * All output stays in the caller's Git worktree artifacts folder (cwd for
+ * non-Git fixtures): <worktree>/artifacts/<scope>/qa/<date>/<task-id>/.
  *
  * For every route x viewport x scheme it writes a screenshot plus console,
  * page-error and network-failure logs, then a summary.json and a notes.md for
@@ -28,14 +28,13 @@
 import {createRequire} from 'node:module';
 import {resolve, join, dirname, relative, isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {writeFile, mkdir, readdir, readFile, realpath, lstat} from 'node:fs/promises';
+import {writeFile, mkdir, mkdtemp, readdir, readFile, realpath, lstat} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 
 const DEFAULT_VIEWPORTS = '390x844,834x1112,1440x900,1920x1080,320x800';
 const SCHEMES = ['light', 'dark'];
 const COMMON_GLOBAL_ROOT = '/usr/local/share/npm-global/lib/node_modules';
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 
 function usage() {
   return [
@@ -56,7 +55,7 @@ function usage() {
     '  --scope        Scope folder under artifacts/. Default: factory.',
     '  --task-id      Task folder under qa/<date>/. Default: adhoc.',
     '  --date         Capture date folder YYYY-MM-DD. Default: today.',
-    '  --artifact-dir Optional override for the task directory.',
+    '  --artifact-dir Override within caller worktree artifacts/ only (no symlinks).',
     '  --project      Directory whose package.json provides Playwright. Default: cwd.',
     '  --viewports    Comma-separated WIDTHxHEIGHT list. Default: ' + DEFAULT_VIEWPORTS,
     '  --label        Optional slug mixed into the artifact directory name.',
@@ -93,31 +92,91 @@ function today() {
   return now.getFullYear() + '-' + month + '-' + day;
 }
 
-function mainCheckoutRoot() {
+export function callerRoot(cwd = process.cwd()) {
   try {
-    const output = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    for (const line of output.split('\n')) {
-      if (line.startsWith('worktree ')) return line.slice('worktree '.length).trim();
-    }
+      env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
+    }).trim();
   } catch {
-    /* git is not available here */
+    return resolve(cwd); // Non-Git fixtures remain confined to their own cwd.
   }
-  let current = SCRIPT_DIR;
-  while (true) {
-    if (existsSync(join(current, '.git'))) return current;
-    const parent = dirname(current);
-    if (parent === current) break;
-    current = parent;
-  }
-  return SCRIPT_DIR;
 }
 
-function taskDirectory(options) {
-  if (options.artifactDir) return resolve(options.artifactDir);
-  return join(mainCheckoutRoot(), 'artifacts', options.scope, 'qa', options.date, options.taskId);
+function safeSegment(value, name) {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-][A-Za-z0-9._-]*$/.test(value)) {
+    fail(name + ' must be a safe path segment');
+  }
+}
+
+export async function artifactPath(path) {
+  const root = resolve(callerRoot(), 'artifacts');
+  const target = resolve(path);
+  const rel = relative(root, target);
+  if (rel === '..' || rel.startsWith('../') || isAbsolute(rel)) fail('output must stay inside caller worktree artifacts/');
+  // Check existing ancestors even when the leaf does not exist. No symlinks in
+  // the output tree, including in-root links and links at the artifacts root.
+  if (await realpath(dirname(root)) !== dirname(root)) fail('artifact root has a symlink ancestor');
+  let current = root;
+  for (const segment of ['', ...rel.split('/').filter(Boolean)]) {
+    if (segment) current = join(current, segment);
+    try {
+      if ((await lstat(current)).isSymbolicLink() || await realpath(current) !== current) {
+        fail('artifact output has a symlink ancestor or destination');
+      }
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+  return target;
+}
+
+async function outputFile(path, data) {
+  return writeFile(await artifactPath(path), data);
+}
+
+export function taskDirectory(options) {
+  for (const key of ['scope', 'taskId', 'date']) safeSegment(options[key], key);
+  if (options.label !== undefined) safeSegment(options.label, 'label');
+  if (options.artifactDir !== undefined) return resolve(options.artifactDir);
+  return join(callerRoot(), 'artifacts', options.scope, 'qa', options.date, options.taskId);
+}
+
+export async function prepareArtifacts(options) {
+  options.taskDir = await artifactPath(taskDirectory(options));
+  options.artifactRoot = await artifactPath(options.label ? join(options.taskDir, options.label) : options.taskDir);
+  // Refuse pre-existing output links before launching or contacting the app.
+  async function inspect(path) {
+    await artifactPath(path);
+    let children;
+    try { children = await readdir(path, {withFileTypes: true}); }
+    catch (error) { if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return; throw error; }
+    for (const child of children) {
+      const target = join(path, child.name);
+      await artifactPath(target);
+      if (child.isDirectory()) await inspect(target);
+    }
+  }
+  await inspect(options.taskDir);
+}
+
+export async function browserTemp() {
+  const parent = await artifactPath(join(callerRoot(), 'artifacts', 'tmp'));
+  await mkdir(parent, {recursive: true});
+  const temp = await mkdtemp(join(parent, 'browser-'));
+  const saved = Object.fromEntries(['TMPDIR', 'TMP', 'TEMP'].map(key => [key, process.env[key]]));
+  // Chromium's singleton Unix socket has a small pathname limit. A relative
+  // TMPDIR keeps that socket short without writing outside this worktree.
+  const envPath = relative(process.cwd(), temp);
+  await artifactPath(resolve(envPath));
+  for (const key of Object.keys(saved)) process.env[key] = envPath;
+  return {path: temp, restore() {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }};
 }
 
 export function parseArgs(argv) {
@@ -203,6 +262,7 @@ export function parseArgs(argv) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(options.date)) fail('--date must be YYYY-MM-DD');
   if (!options.scope) fail('--scope is required');
   if (!options.taskId) fail('--task-id is required');
+  taskDirectory(options);
   if (!['light', 'dark', 'both'].includes(options.scheme)) {
     fail('--scheme must be light, dark, or both');
   }
@@ -220,7 +280,7 @@ export function parseArgs(argv) {
 
 function routeSlug(route) {
   const slug = route.replace(/^\/+/, '').replace(/\/+$/, '').replace(/[^A-Za-z0-9._-]+/g, '-');
-  return slug || 'root';
+  return !slug || slug === '.' || slug === '..' ? 'root' : slug;
 }
 
 function joinUrl(baseUrl, route) {
@@ -681,6 +741,7 @@ function sheetHtml(beforeUri, afterUri, beforeLabel, afterLabel) {
 }
 
 async function writeCompareSheet(browser, beforeBuffer, afterBuffer, sheetPath, beforeLabel, afterLabel) {
+  await artifactPath(sheetPath);
   const uri = buffer => 'data:image/png;base64,' + buffer.toString('base64');
   const html = sheetHtml(uri(beforeBuffer), uri(afterBuffer), beforeLabel, afterLabel);
   const context = await browser.handle.newContext({viewport: {width: 1600, height: 900}});
@@ -723,7 +784,9 @@ function renderNotes(options, summary) {
 
 export async function captureEntry(session, options, route, viewport, scheme, allSchemes) {
   const url = joinUrl(options.baseUrl, route);
-  const dir = join(options.artifactRoot, routeSlug(route), viewport.name, scheme);
+  safeSegment(viewport.name, 'viewport');
+  safeSegment(scheme, 'scheme');
+  const dir = await artifactPath(join(options.artifactRoot, routeSlug(route), viewport.name, scheme));
   await mkdir(dir, {recursive: true});
 
   const name = screenshotName(scheme, viewport, allSchemes);
@@ -773,7 +836,7 @@ export async function captureEntry(session, options, route, viewport, scheme, al
     entry.horizontal_overflow_check_passed = entry.horizontal_overflow === null ? null : !entry.horizontal_overflow;
 
     const image = await session.screenshotFull();
-    await writeFile(screenshot, image);
+    await outputFile(screenshot, image);
 
     if (options.components.length) {
       const boxes = await session.evaluate(boxesExpression(options.components));
@@ -784,7 +847,7 @@ export async function captureEntry(session, options, route, viewport, scheme, al
             : 'component-' + (index + 1) + '.png';
           const componentPath = join(dir, componentName);
           try {
-            await writeFile(componentPath, await session.screenshotClip(boxes[index]));
+            await outputFile(componentPath, await session.screenshotClip(boxes[index]));
             entry.components.push(componentPath);
           } catch {
             entry.components.push(null);
@@ -801,20 +864,21 @@ export async function captureEntry(session, options, route, viewport, scheme, al
     entry.page_error_count = logs.pageErrors.length;
     entry.network_failure_count = logs.networkFailures.length;
 
-    await writeFile(join(dir, 'console.log'), logs.consoleErrors.join('\n') + (logs.consoleErrors.length ? '\n' : ''));
-    await writeFile(join(dir, 'page-errors.log'), logs.pageErrors.join('\n') + (logs.pageErrors.length ? '\n' : ''));
-    await writeFile(join(dir, 'network.json'), JSON.stringify(logs.networkFailures, null, 2));
+    await outputFile(join(dir, 'console.log'), logs.consoleErrors.join('\n') + (logs.consoleErrors.length ? '\n' : ''));
+    await outputFile(join(dir, 'page-errors.log'), logs.pageErrors.join('\n') + (logs.pageErrors.length ? '\n' : ''));
+    await outputFile(join(dir, 'network.json'), JSON.stringify(logs.networkFailures, null, 2));
   } catch (error) {
     entry.error = error instanceof ReviewError ? error.message + ' ' + ACCESS_REQUEST : 'capture failed (details withheld)';
-    await writeFile(join(dir, 'console.log'), '').catch(() => {});
-    await writeFile(join(dir, 'page-errors.log'), '').catch(() => {});
-    await writeFile(join(dir, 'network.json'), '[]').catch(() => {});
+    await outputFile(join(dir, 'console.log'), '').catch(() => {});
+    await outputFile(join(dir, 'page-errors.log'), '').catch(() => {});
+    await outputFile(join(dir, 'network.json'), '[]').catch(() => {});
   }
   return entry;
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  await prepareArtifacts(options);
   options.navigationConfig = validateNavigation(options.navigation
     ? await localJson(options.navigation, resolve(options.project)) : {approved: true, steps: [], login: []},
   options.baseUrl, options.allowDestructive, Boolean(options.storageState));
@@ -826,112 +890,115 @@ async function main() {
       options.loginEnv[step.env] = process.env[step.env];
     }
   }
-  const playwright = await loadPlaywright(options.project);
-  const allSchemes = options.scheme === 'both';
-  const schemes = schemeList(options.scheme);
-
-  if (!playwright) {
-    fail('Playwright was not found in the project "' + resolve(options.project) +
-      '" or in the global npm install. Searched the project directory and the global npm root' +
-      ' (npm root -g, NODE_PATH, ' + COMMON_GLOBAL_ROOT + ').');
-  }
-
-  options.taskDir = taskDirectory(options);
-  options.artifactRoot = options.label
-    ? join(options.taskDir, options.label)
-    : options.taskDir;
-
-  const launchOptions = {headless: true, args: ['--no-sandbox']};
-  const resolution = resolveChromium(playwright, options);
-  if (!resolution.path) abort(noChromiumMessage(resolution));
-  launchOptions.executablePath = resolution.path;
-
-  const summary = {
-    base_url: options.baseUrl,
-    project: resolve(options.project),
-    artifact_dir: options.artifactRoot,
-    task_dir: options.taskDir,
-    scope: options.scope,
-    task_id: options.taskId,
-    date: options.date,
-    scheme: options.scheme,
-    viewports: options.viewports.map(viewport => viewport.name),
-    routes: options.routes,
-    components: options.components,
-    compare: options.compare || null,
-    driver: 'playwright',
-    browser_executable: resolution.path,
-    results: [],
-  };
-
-  let browser = null;
+  // Set temp roots before importing Playwright as well as before launch: some
+  // installed versions resolve internal artifact prefixes at module load time.
+  const temp = await browserTemp();
   try {
-    browser = {kind: 'playwright', handle: await playwright.chromium.launch(launchOptions)};
-  } catch (error) {
-    abort(launchFailureMessage(resolution, error));
-  }
+    const playwright = await loadPlaywright(options.project);
+    const allSchemes = options.scheme === 'both';
+    const schemes = schemeList(options.scheme);
 
-  try {
-    const context = await browser.handle.newContext({
-      viewport: {width: options.viewports[0].width, height: options.viewports[0].height},
-      locale: 'en-US', timezoneId: 'UTC', colorScheme: schemes[0], storageState,
-    });
-    const page = await context.newPage();
-    page.setDefaultTimeout(15000);
-    if (options.navigationConfig.login?.length) {
-      await runSteps(page, options.navigationConfig.login, options.baseUrl, options.loginEnv);
-      try {
-        await page.waitForURL(safeUrl(options.navigationConfig.authenticatedPath, options.baseUrl), {timeout: 30000, waitUntil: 'load'});
-      } catch {
-        fail('authenticated route was not reached. ' + ACCESS_REQUEST);
-      }
-      await proveAuthentication(page, options.navigationConfig);
+    if (!playwright) {
+      fail('Playwright was not found in the project "' + resolve(options.project) +
+        '" or in the global npm install. Searched the project directory and the global npm root' +
+        ' (npm root -g, NODE_PATH, ' + COMMON_GLOBAL_ROOT + ').');
     }
-    const secrets = [...Object.values(options.loginEnv), ...stateSecrets(await context.storageState())];
-    const session = new PlaywrightPage(context, page, secrets);
-    for (const route of options.routes) {
-      for (const viewport of options.viewports) {
-        for (const scheme of schemes) {
-          await page.setViewportSize({width: viewport.width, height: viewport.height});
-          await page.emulateMedia({colorScheme: scheme});
 
-          const entry = await captureEntry(session, options, route, viewport, scheme, allSchemes);
-          summary.results.push(entry);
+    const launchOptions = {headless: true, args: ['--no-sandbox']};
+    const resolution = resolveChromium(playwright, options);
+    if (!resolution.path) fail(noChromiumMessage(resolution));
+    launchOptions.executablePath = resolution.path;
 
-          if (options.compare && !entry.error) {
-            const before = await findBeforeImage(resolve(options.compare), options.label, routeSlug(route), viewport, scheme);
-            if (before) {
-              const sheetPath = join(options.artifactRoot, routeSlug(route), viewport.name, scheme, 'compare.png');
-              try {
-                await writeCompareSheet(
-                  browser,
-                  await readFile(before),
-                  await readFile(entry.screenshot),
-                  sheetPath,
-                  resolve(options.compare).split('/').pop() || 'before',
-                  options.label || 'after',
-                );
-                entry.compare = sheetPath;
-              } catch (error) {
-                entry.compare_error = 'comparison failed (details withheld)';
+    const summary = {
+      base_url: options.baseUrl,
+      project: resolve(options.project),
+      artifact_dir: options.artifactRoot,
+      task_dir: options.taskDir,
+      scope: options.scope,
+      task_id: options.taskId,
+      date: options.date,
+      scheme: options.scheme,
+      viewports: options.viewports.map(viewport => viewport.name),
+      routes: options.routes,
+      components: options.components,
+      compare: options.compare || null,
+      driver: 'playwright',
+      browser_executable: resolution.path,
+      results: [],
+    };
+
+    launchOptions.downloadsPath = await artifactPath(join(temp.path, 'downloads'));
+    launchOptions.tracesDir = await artifactPath(join(temp.path, 'traces'));
+    let browser = null;
+    try {
+      browser = {kind: 'playwright', handle: await playwright.chromium.launch(launchOptions)};
+    } catch (error) {
+      fail(launchFailureMessage(resolution, error));
+    }
+
+    try {
+      const context = await browser.handle.newContext({
+        viewport: {width: options.viewports[0].width, height: options.viewports[0].height},
+        locale: 'en-US', timezoneId: 'UTC', colorScheme: schemes[0], storageState,
+      });
+      const page = await context.newPage();
+      page.setDefaultTimeout(15000);
+      if (options.navigationConfig.login?.length) {
+        await runSteps(page, options.navigationConfig.login, options.baseUrl, options.loginEnv);
+        try {
+          await page.waitForURL(safeUrl(options.navigationConfig.authenticatedPath, options.baseUrl), {timeout: 30000, waitUntil: 'load'});
+        } catch {
+          fail('authenticated route was not reached. ' + ACCESS_REQUEST);
+        }
+        await proveAuthentication(page, options.navigationConfig);
+      }
+      const secrets = [...Object.values(options.loginEnv), ...stateSecrets(await context.storageState())];
+      const session = new PlaywrightPage(context, page, secrets);
+      for (const route of options.routes) {
+        for (const viewport of options.viewports) {
+          for (const scheme of schemes) {
+            await page.setViewportSize({width: viewport.width, height: viewport.height});
+            await page.emulateMedia({colorScheme: scheme});
+
+            const entry = await captureEntry(session, options, route, viewport, scheme, allSchemes);
+            summary.results.push(entry);
+
+            if (options.compare && !entry.error) {
+              const before = await findBeforeImage(resolve(options.compare), options.label, routeSlug(route), viewport, scheme);
+              if (before) {
+                const sheetPath = join(options.artifactRoot, routeSlug(route), viewport.name, scheme, 'compare.png');
+                try {
+                  await writeCompareSheet(
+                    browser,
+                    await readFile(before),
+                    await readFile(entry.screenshot),
+                    sheetPath,
+                    resolve(options.compare).split('/').pop() || 'before',
+                    options.label || 'after',
+                  );
+                  entry.compare = sheetPath;
+                } catch (error) {
+                  entry.compare_error = 'comparison failed (details withheld)';
+                }
               }
             }
           }
-
         }
       }
+      await session.close();
+      await context.close();
+    } finally {
+      await browser.handle.close().catch(() => {});
     }
-    await session.close();
-    await context.close();
-  } finally {
-    await browser.handle.close().catch(() => {});
-  }
 
-  await mkdir(options.taskDir, {recursive: true});
-  await writeFile(join(options.taskDir, 'summary.json'), JSON.stringify(summary, null, 2));
-  await writeFile(join(options.taskDir, 'notes.md'), renderNotes(options, summary));
-  process.stdout.write(JSON.stringify(summary) + '\n');
-  if (summary.results.some(entry => entry.error)) process.exitCode = 2;
+    await mkdir(await artifactPath(options.taskDir), {recursive: true});
+    await outputFile(join(options.taskDir, 'summary.json'), JSON.stringify(summary, null, 2));
+    await outputFile(join(options.taskDir, 'notes.md'), renderNotes(options, summary));
+    process.stdout.write(JSON.stringify(summary) + '\n');
+    if (summary.results.some(entry => entry.error)) process.exitCode = 2;
+  } finally {
+    temp.restore();
+  }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

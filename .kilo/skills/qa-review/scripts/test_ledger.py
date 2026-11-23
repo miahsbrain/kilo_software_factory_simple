@@ -13,10 +13,19 @@ import ledger
 
 class LedgerTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
+        source = subprocess.run(["git", "rev-parse", "--show-toplevel"], check=True,
+                                capture_output=True, text=True).stdout.strip()
+        fixtures = Path(source) / "artifacts" / "tmp" / "tests"
+        ledger.artifact_path(str(fixtures))
+        fixtures.mkdir(parents=True, exist_ok=True)
+        self.temp = tempfile.TemporaryDirectory(prefix="qa-ledger-", dir=fixtures)
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.directory = self.root / "artifacts" / "reviews"
+        self.git(self.root, "init", "--quiet")
+        cwd = patch("os.getcwd", return_value=str(self.root))
+        cwd.start()
+        self.addCleanup(cwd.stop)
 
     def run_ledger(self, *args):
         output, errors = io.StringIO(), io.StringIO()
@@ -28,7 +37,7 @@ class LedgerTests(unittest.TestCase):
         return subprocess.run(["git", "-C", str(cwd), *args], check=True,
                               capture_output=True, text=True).stdout.strip()
 
-    def test_main_and_linked_checkout_share_ignored_outputs(self):
+    def test_linked_checkout_keeps_outputs_in_source_worktree(self):
         self.git(self.root, "init", "--quiet")
         (self.root / ".kilo").mkdir()
         (self.root / ".kilo" / "repos.json").write_text('{"control": "."}\n')
@@ -43,16 +52,17 @@ class LedgerTests(unittest.TestCase):
         self.git(self.root, "worktree", "add", "--quiet", "-b", "review", str(linked))
         for cwd in (self.root, linked, linked / "docs"):
             with self.subTest(cwd=cwd):
-                self.assertEqual(ledger.default_ledger_dir(str(cwd)), str(self.directory))
+                expected = self.directory if cwd == self.root else linked / "artifacts" / "reviews"
+                self.assertEqual(ledger.default_ledger_dir(str(cwd)), str(expected))
                 with patch("os.getcwd", return_value=str(cwd)):
                     self.assertEqual(self.run_ledger("status", "--task-id", "BOARD-TEST")[0], 0)
         with patch("os.getcwd", return_value=str(linked)):
             self.assertEqual(self.run_ledger("next-round", "--task-id", "BOARD-TEST")[0], 0)
-        self.assertTrue((self.directory / "BOARD-TEST-ledger.md").exists())
+        self.assertTrue((linked / "artifacts" / "reviews" / "BOARD-TEST-ledger.md").exists())
         for suffix in ("qa", "ui", "review", "ledger"):
             path = "artifacts/reviews/BOARD-TEST-%s.md" % suffix
             self.assertEqual(self.git(self.root, "check-ignore", path), path)
-        self.assertFalse((linked / "artifacts").exists())
+        self.assertFalse(self.directory.exists())
         self.assertEqual(self.git(self.root, "ls-files", "artifacts"), "")
 
     def test_three_rounds_then_refusal_preserves_bytes_and_escalates_conditionally(self):
@@ -76,7 +86,7 @@ class LedgerTests(unittest.TestCase):
         self.assertNotIn("Blocked", output)
 
     def test_explicit_override_needs_no_control_root(self):
-        relative = os.path.relpath(self.directory)
+        relative = os.path.relpath(self.directory, self.root)
         with patch("os.getcwd", return_value=str(self.root)), \
                 patch.object(ledger, "default_ledger_dir", side_effect=AssertionError("resolved")):
             code, _, _ = self.run_ledger("--ledger-dir", str(self.directory), "next-round",
@@ -87,15 +97,46 @@ class LedgerTests(unittest.TestCase):
         self.assertEqual(relative_code, 0)
         self.assertTrue((self.directory / "BOARD-RELATIVE-ledger.md").exists())
         self.assertEqual(ledger.ledger_path("relative", "BOARD-TEST"),
-                         os.path.join("relative", "BOARD-TEST-ledger.md"))
+                          os.path.join("relative", "BOARD-TEST-ledger.md"))
+
+    def test_outside_directory_and_task_traversal_refuse_without_writes(self):
+        for directory in (self.root / "outside", self.root / "artifacts" / ".." / "outside"):
+            code, _, error = self.run_ledger("--ledger-dir", str(directory), "next-round", "--task-id", "BOARD-TEST")
+            self.assertEqual(code, 1)
+            self.assertIn("inside caller worktree artifacts/", error)
+            self.assertFalse(directory.exists())
+        for task in (".", "..", "../escape", "/absolute", "a/b", "a\\b", ""):
+            code, _, error = self.run_ledger("--ledger-dir", str(self.directory), "next-round", "--task-id", task)
+            self.assertEqual(code, 1)
+            self.assertIn("safe path segment", error)
+        self.assertFalse(self.directory.exists())
+
+    def test_symlink_root_ancestors_and_ledger_refuse_without_writes(self):
+        target = self.root / "target"
+        target.mkdir()
+        artifacts = self.root / "artifacts"
+        artifacts.symlink_to(target, target_is_directory=True)
+        self.assertEqual(self.run_ledger("--ledger-dir", str(self.directory), "next-round", "--task-id", "BOARD-TEST")[0], 1)
+        self.assertEqual(list(target.iterdir()), [])
+        artifacts.unlink()
+        artifacts.mkdir()
+        (artifacts / "link").symlink_to(target, target_is_directory=True)
+        self.assertEqual(self.run_ledger("--ledger-dir", str(artifacts / "link" / "absent"),
+                                        "next-round", "--task-id", "BOARD-TEST")[0], 1)
+        self.directory.mkdir()
+        (self.directory / "BOARD-TEST-ledger.md").symlink_to(target / "untouched.md")
+        self.assertEqual(self.run_ledger("--ledger-dir", str(self.directory), "next-round", "--task-id", "BOARD-TEST")[0], 1)
+        self.assertEqual(list(target.iterdir()), [])
 
     def test_unknown_control_root_refuses_without_fallback(self):
-        with patch("os.getcwd", return_value=str(self.root)):
-            code, _, error = self.run_ledger("next-round", "--task-id", "BOARD-TEST")
-        self.assertEqual(code, 1)
-        self.assertIn("refused:", error)
-        self.git(self.root, "init", "--quiet")
-        with patch("os.getcwd", return_value=str(self.root)):
+        exists = os.path.exists
+        # Fixtures now live inside the factory's artifacts tree. Hide only the
+        # surrounding control markers so this test still represents an unknown repo.
+        def isolated_exists(path):
+            if str(path).endswith((".kilo/repos.json", "docs/BOARD.md")):
+                return False
+            return exists(path)
+        with patch("os.path.exists", side_effect=isolated_exists):
             code, _, error = self.run_ledger("next-round", "--task-id", "BOARD-TEST")
         self.assertEqual(code, 1)
         self.assertIn("repo map and board are required", error)

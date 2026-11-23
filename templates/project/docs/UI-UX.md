@@ -8,4 +8,6 @@ Design deliberate hierarchy, useful density, specific content, and responsive co
 
 Use the existing `browser-review.mjs` capture through `.kilo/skills/qa-review/SKILL.md`. Share evidence with `ui-critic`. Focus on meaningful defects, consolidate findings once, then have the builder fix and recheck; reviewers do not edit source. Keep raw evidence and report limitations. A proven harmless development-only missing favicon is nonblocking; do not ignore auth, script, or API failures.
 
+Run capture from the assigned source repo/worktree. All generated review artifacts, images, Playwright output, reports and logs belong in its ignored `artifacts/`, not control-main, root, `/tmp` or external paths; ad-hoc review scripts go in `artifacts/scripts/`. Maintained `.kilo/` review tool source stays tracked and bootstrap copies tools, never evidence. Canonical source fixtures are distinct from generated fixture output, which uses `artifacts/tmp/tests/`. The QA skill defines contained overrides and symlink checks. For MCP saves, explicitly use `artifacts/...` filenames: `--output-dir` only controls automatically named output and is not a sandbox for arbitrary filenames or all browser-managed temp/cache files.
+
 Project direction and approved styling choices: TBD.

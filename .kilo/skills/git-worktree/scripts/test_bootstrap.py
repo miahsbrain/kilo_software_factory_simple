@@ -104,6 +104,15 @@ class BootstrapTests(unittest.TestCase):
         (root / "docs/BOARD.md").write_text(text)
         return root
 
+    def app_fixture(self):
+        primary = self.lifecycle_fixture()
+        self.lifecycle(primary, "create", "--board", "BOARD-001")
+        self.primary = primary
+        return primary / ".kilo/worktrees/inherited-control"
+
+    def service_target(self, root, name, mode):
+        return (self.primary if mode == "separate" else root) / "apps" / name
+
     def lifecycle(self, root, *args, ok=True, override=None):
         env = dict(self.env)
         env.pop("KILO_CONFIG", None)
@@ -233,7 +242,7 @@ class BootstrapTests(unittest.TestCase):
     def test_allow_outside_is_project_only(self):
         root = self.create()
         clone = self.clone(root)
-        for cwd, args in ((root, ["app", "billing-worker", "--git", "project"]),
+        for cwd, args in ((root, ["app", "billing-worker", "--role", "worker", "--git", "project"]),
                           (self.factory, ["restore", "--destination", str(clone)])):
             before = self.state(cwd) if cwd == root else self.state(clone)
             result = subprocess.run([sys.executable,
@@ -275,13 +284,14 @@ class BootstrapTests(unittest.TestCase):
                          "templates/project/docs/BOARD.md")
 
     def test_service_roles_and_both_git_ownerships(self):
-        root = self.create()
+        root = self.app_fixture()
         before = self.state(root)[:2]
-        for name, mode in (("shop-frontend", "separate"), ("shop-backend", "project"),
-                           ("shop-backend-experimental", "separate"), ("billing-worker", "project"),
-                           ("inventory-cron", "project"), ("shop-public-frontdoor", "project")):
-            self.cli(root, "app", name, "--git", mode, script_root=root)
-            app = root / "apps" / name
+        primary_before = self.app_snapshot(self.primary)
+        for name, role, mode in (("shop-frontend", "frontend", "separate"), ("shop-backend", "backend", "project"),
+                           ("shop-backend-experimental", "backend-experimental", "separate"), ("billing-worker", "worker", "project"),
+                           ("inventory-cron", "cron", "project"), ("shop-public-frontdoor", "public-frontdoor", "project")):
+            self.cli(root, "app", name, "--role", role, "--git", mode, script_root=self.primary)
+            app = self.service_target(root, name, mode)
             self.assertEqual((app / ".git").is_dir(), mode == "separate")
             if mode == "separate":
                 self.assertEqual(self.git(app, "rev-list", "--count", "HEAD").stdout.strip(), "1")
@@ -292,16 +302,280 @@ class BootstrapTests(unittest.TestCase):
             for path in ("AGENTS.md", ".devcontainer/Dockerfile", "kilo.jsonc", ".kilo/local/a", ".env", "secret.key"):
                 self.assertEqual(self.git(app, "check-ignore", "--no-index", path, ok=False).returncode, 0, name + path)
         self.assertEqual(self.state(root)[:2], before)
+        for relative in ("services.json", ".gitignore", ".git/HEAD", ".git/index"):
+            self.assertEqual((self.primary / relative).read_bytes(), primary_before[1][relative])
         data = json.loads((root / "services.json").read_text())
         self.assertEqual(len(data["services"]), 6)
         self.assertEqual(json.loads((root / ".kilo/repos.json").read_text()), {
             "control": ".", "shop-frontend": "apps/shop-frontend",
             "shop-backend-experimental": "apps/shop-backend-experimental"})
 
-    def test_project_clone_restore_twice_preserves_source_index_head(self):
+    def app_snapshot(self, root):
+        files = ("services.json", ".kilo/repos.json", ".gitignore", "kilo.jsonc")
+        contents = {p: (root / p).read_bytes() if (root / p).is_file() else None for p in files}
+        for name in ("HEAD", "index", "config"):
+            path = Path(self.git(root, "rev-parse", "--path-format=absolute", "--git-path", name).stdout.strip())
+            contents[".git/" + name] = path.read_bytes() if path.is_file() else None
+        apps = root / "apps"
+        return (self.state(root), contents, set(root.parent.iterdir()), set(root.iterdir()),
+                set(apps.iterdir()) if apps.is_dir() else set())
+
+    def test_app_role_and_ownership_are_independently_required_without_writes(self):
         root = self.create()
-        self.cli(root, "app", "shop-frontend", "--git", "separate")
-        self.cli(root, "app", "billing-worker", "--git", "project")
+        before = self.app_snapshot(root)
+        for options, missing in ((("--git", "project"), "--role"),
+                                 (("--role", "frontend"), "--git")):
+            result = subprocess.run([sys.executable,
+                str(self.factory / ".kilo/skills/git-worktree/scripts/bootstrap.py"),
+                "app", "camera-shop-frontend", *options], cwd=root, env=self.env,
+                text=True, capture_output=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("required: " + missing, result.stderr)
+            self.assertEqual(self.app_snapshot(root), before)
+
+    def test_app_invalid_role_or_product_prefix_rejects_without_writes(self):
+        root = self.create()
+        before = self.app_snapshot(root)
+        cases = (("camera-shop", "frontend"), ("camera-shop-api", "frontend"),
+                 ("frontend", "frontend"), ("-frontend", "frontend"), ("", "frontend"),
+                 ("9shop-frontend", "frontend"), ("shop--frontend", "frontend"),
+                 ("bad_name-frontend", "frontend"), ("shop/inner-frontend", "frontend"),
+                 ("shop-frontend", ""), ("shop-frontend", "FrontEnd"),
+                 ("shop-frontend", "../frontend"), ("shop-frontend", "front--end"),
+                 ("shop-frontend", "9frontend"), ("shop-frontend", "front_end"))
+        for name, role in cases:
+            for mode in ("separate", "project"):
+                with self.subTest(name=name, role=role, mode=mode):
+                    result = self.cli(root, "app", "--role=" + role, "--git", mode, "--", name, ok=False)
+                    self.assertIn("service name must be <product>-<role>", result.stderr)
+                    self.assertEqual(self.app_snapshot(root), before)
+
+    def test_direct_app_helper_requires_role_before_any_io(self):
+        root = self.create()
+        before = self.app_snapshot(root)
+        with patch.object(bootstrap, "real_path", side_effect=AssertionError("unexpected path access")), \
+                patch.object(bootstrap, "read_services", side_effect=AssertionError("unexpected manifest read")), \
+                patch.object(bootstrap, "git", side_effect=AssertionError("unexpected Git access")):
+            with self.assertRaises(TypeError):
+                bootstrap.app(self.factory, root, "camera-shop-frontend", "project")
+            for name, role in (("camera-shop", "frontend"), ("frontend", "frontend"),
+                               ("-api", "api"), ("", "api"), ("bad--api", "api"), ("shop-api", None),
+                               ("shop-api", "../api"), (None, "api")):
+                with self.subTest(name=name, role=role):
+                    with self.assertRaisesRegex(ValueError, "service name must be"):
+                        bootstrap.app(self.factory, root, name, "project", role)
+            with self.assertRaisesRegex(ValueError, "choose separate/project"):
+                bootstrap.app(self.factory, root, "shop-api", None, "api")
+        self.assertEqual(self.app_snapshot(root), before)
+
+    def test_planned_react_frontend_python_api_siblings_in_both_modes(self):
+        root = self.app_fixture()
+        for mode in ("separate", "project"):
+            product = "camera-shop-" + mode
+            names = (product + "-frontend", product + "-api")
+            before = self.state(root)[:2]
+            for name, role in zip(names, ("frontend", "api")):
+                result = self.cli(root, "app", name, "--role", role, "--git", mode)
+                target = self.service_target(root, name, mode)
+                self.assertIn("Selected role: " + role, result.stderr)
+                self.assertIn("Full service target: " + str(target), result.stderr)
+                self.assertEqual({p.name for p in target.iterdir()},
+                                 {".gitignore", ".git"} if mode == "separate" else {".gitignore"})
+                self.assertEqual(target.parent, (self.primary if mode == "separate" else root) / "apps")
+                snapshot = self.app_snapshot(root)
+                for repeated_mode in ("separate", "project"):
+                    self.assertIn("collision", self.cli(root, "app", name, "--role", role,
+                        "--git", repeated_mode, ok=False).stderr)
+                    self.assertEqual(self.app_snapshot(root), snapshot)
+            self.assertEqual(self.state(root)[:2], before)
+        services = json.loads((root / "services.json").read_text())["services"]
+        self.assertEqual(services, [{"name": "camera-shop-" + mode + "-" + role,
+            "path": "apps/camera-shop-" + mode + "-" + role, "git": mode}
+            for mode in ("separate", "project") for role in ("frontend", "api")])
+        self.assertEqual(json.loads((root / ".kilo/repos.json").read_text()), {
+            "control": ".", **{s["name"]: s["path"] for s in services if s["git"] == "separate"}})
+
+    def test_custom_multiword_role_is_explicit_not_derived(self):
+        root = self.app_fixture()
+        self.cli(root, "app", "inventory-stock-worker", "--role", "stock-worker", "--git", "project")
+        self.assertEqual(json.loads((root / "services.json").read_text()), {"services": [
+            {"name": "inventory-stock-worker", "path": "apps/inventory-stock-worker", "git": "project"}]})
+
+    def test_primary_and_unassigned_linked_callers_refuse_without_mutation(self):
+        root = self.create()
+        before = self.app_snapshot(root)
+        result = self.cli(root, "app", "shop-api", "--role", "api", "--git", "separate", ok=False)
+        self.assertIn("create/resume", result.stderr)
+        self.assertEqual(self.app_snapshot(root), before)
+        linked = root / ".kilo/worktrees/unassigned"
+        self.git(root, "worktree", "add", "-b", "fixture-unassigned", str(linked))
+        before = self.app_snapshot(root), self.app_snapshot(linked)
+        for mode in ("separate", "project"):
+            self.cli(linked, "app", "shop-api", "--role", "api", "--git", mode, ok=False)
+            self.assertEqual((self.app_snapshot(root), self.app_snapshot(linked)), before)
+
+    def test_assignment_metadata_mismatch_and_incomplete_registration_refuse(self):
+        root = self.app_fixture()
+        state = worktree.local_state(str(self.primary))
+        record = state["workspaces"][str(root)]
+        for key, value in (("repo_id", "other"), ("control", str(self.factory)),
+                           ("repo", str(self.factory)), ("branch", "other"),
+                           ("outcome", "merged"), ("error", "incomplete")):
+            saved = dict(record)
+            record[key] = value
+            worktree.local_state(str(self.primary), state)
+            before = self.app_snapshot(self.primary), self.app_snapshot(root)
+            self.cli(root, "app", "shop-api", "--role", "api", "--git", "project", ok=False)
+            self.assertEqual((self.app_snapshot(self.primary), self.app_snapshot(root)), before)
+            record.clear()
+            record.update(saved)
+        worktree.local_state(str(self.primary), state)
+
+    def test_terminal_board_status_refuses_with_active_linked_metadata_without_mutation(self):
+        root = self.app_fixture()
+        board_path = self.primary / "docs/BOARD.md"
+        original = board_path.read_text()
+        metadata = worktree.local_state(str(self.primary))
+        self.assertEqual(metadata["workspaces"][str(root)]["outcome"], "active")
+        self.assertIn(str(root.relative_to(self.primary)), original)
+        self.assertIn("| In Progress |", original)
+        for status in ("Merged", "Dropped"):
+            for mode in ("project", "separate"):
+                with self.subTest(status=status, mode=mode):
+                    board_path.write_text(original.replace("| In Progress |", "| " + status + " |"))
+                    board_before = board_path.read_bytes()
+                    before = self.app_snapshot(self.primary), self.app_snapshot(root)
+                    result = self.cli(root, "app", status.lower() + "-" + mode + "-api",
+                                      "--role", "api", "--git", mode, ok=False)
+                    self.assertIn("create/resume", result.stderr)
+                    self.assertEqual((self.app_snapshot(self.primary), self.app_snapshot(root)), before)
+                    self.assertEqual(board_path.read_bytes(), board_before)
+                    self.assertEqual(worktree.local_state(str(self.primary)), metadata)
+
+    def test_active_board_task_titled_merged_or_dropped_registers(self):
+        root = self.app_fixture()
+        board_path = self.primary / "docs/BOARD.md"
+        original = board_path.read_text()
+        for title in ("Merged", "Dropped"):
+            with self.subTest(title=title):
+                board_path.write_text(original.replace("| Inherited control |", "| " + title + " |"))
+                name = title.lower() + "-api"
+                self.cli(root, "app", name, "--role", "api", "--git", "project")
+                self.assertIn({"name": name, "path": "apps/" + name, "git": "project"},
+                              json.loads((root / "services.json").read_text())["services"])
+
+    def test_separate_registration_resolves_canonical_service_lifecycle(self):
+        root = self.app_fixture()
+        before = self.app_snapshot(self.primary)
+        self.cli(root, "app", "shop-api", "--role", "api", "--git", "separate")
+        target = self.primary / "apps/shop-api"
+        self.assertFalse((root / "apps/shop-api").exists())
+        self.assertEqual(json.loads((self.primary / "services.json").read_text()), {"services": []})
+        for relative in ("services.json", ".gitignore", ".git/HEAD", ".git/index"):
+            self.assertEqual((self.primary / relative).read_bytes(), before[1][relative])
+        repos, error = worktree.load_repos(str(self.primary))
+        self.assertIsNone(error)
+        self.assertEqual(worktree.resolve_repo(str(self.primary), repos, "shop-api"), (str(target), None))
+        self.lifecycle(self.primary, "create", "--board", "BOARD-001", "--repo", "shop-api")
+        service_tree = target / ".kilo/worktrees/inherited-control"
+        self.assertTrue((service_tree / ".git").is_file())
+        self.lifecycle(self.primary, "resume", "--board", "BOARD-001", "--repo", "shop-api")
+        self.assertEqual(worktree.main_checkout_root(str(service_tree)), str(target))
+
+    def test_shared_map_preserves_other_branch_source_registrations(self):
+        first = self.app_fixture()
+        self.cli(first, "app", "shop-api", "--role", "api", "--git", "separate")
+        board_path = self.primary / "docs/BOARD.md"
+        board_path.write_text(board_path.read_text() +
+            "| BOARD-002 | Second control | Feature | Ready | P2 | low | None. | control | - | fixture |\n")
+        self.lifecycle(self.primary, "create", "--board", "BOARD-002", "--new")
+        second = self.primary / ".kilo/worktrees/second-control"
+        self.cli(second, "app", "billing-worker", "--role", "worker", "--git", "separate")
+        self.cli(first, "app", "shop-web", "--role", "web", "--git", "project")
+        expected = {"control": ".", "shop-api": "apps/shop-api", "billing-worker": "apps/billing-worker"}
+        self.assertEqual(json.loads((self.primary / ".kilo/repos.json").read_text()), expected)
+        self.assertEqual(json.loads((first / ".kilo/repos.json").read_text()), expected)
+        self.assertEqual(json.loads((second / ".kilo/repos.json").read_text()), expected)
+        before = self.app_snapshot(self.primary), self.app_snapshot(first)
+        self.cli(first, "app", "billing-worker", "--role", "worker", "--git", "project", ok=False)
+        self.assertEqual((self.app_snapshot(self.primary), self.app_snapshot(first)), before)
+
+    def test_manifest_map_divergence_and_existing_targets_fail_before_writes(self):
+        root = self.app_fixture()
+        service = {"name": "legacy-api", "path": "apps/legacy-api", "git": "project"}
+        (self.primary / "services.json").write_bytes(bootstrap.encoded({"services": [service]}))
+        (root / "services.json").write_bytes(bootstrap.encoded({"services": [{**service, "git": "separate"}]}))
+        before = self.app_snapshot(self.primary), self.app_snapshot(root)
+        result = self.cli(root, "app", "shop-api", "--role", "api", "--git", "project", ok=False)
+        self.assertIn("conflicting service manifest", result.stderr)
+        self.assertEqual((self.app_snapshot(self.primary), self.app_snapshot(root)), before)
+        (root / "services.json").write_bytes(bootstrap.encoded({"services": [service]}))
+        mapping = self.primary / ".kilo/repos.json"
+        for value in ("apps/other-api", "../foreign", "apps/legacy-api"):
+            mapping.write_bytes(bootstrap.encoded({"control": ".", "legacy-api": value}))
+            before = self.app_snapshot(self.primary), self.app_snapshot(root)
+            self.cli(root, "app", "shop-api", "--role", "api", "--git", "separate", ok=False)
+            self.assertEqual((self.app_snapshot(self.primary), self.app_snapshot(root)), before)
+        mapping.write_bytes(bootstrap.encoded({"control": "."}))
+        for checkout in (root, self.primary):
+            apps = checkout / "apps"
+            apps.mkdir(exist_ok=True)
+            target = apps / "shop-api"
+            for kind in ("partial", "foreign", "symlink"):
+                if kind == "symlink":
+                    target.symlink_to(self.factory, target_is_directory=True)
+                else:
+                    target.mkdir()
+                    if kind == "foreign":
+                        self.git(target, "init")
+                before = self.app_snapshot(self.primary), self.app_snapshot(root)
+                for mode in ("separate", "project"):
+                    self.cli(root, "app", "shop-api", "--role", "api", "--git", mode, ok=False)
+                    self.assertEqual((self.app_snapshot(self.primary), self.app_snapshot(root)), before)
+                if kind == "symlink":
+                    target.unlink()
+                else:
+                    shutil.rmtree(target)
+
+    def test_tracked_operational_map_refuses_before_source_or_primary_mutation(self):
+        root = self.app_fixture()
+        self.git(self.primary, "add", "-f", ".kilo/repos.json")
+        before = self.app_snapshot(self.primary), self.app_snapshot(root)
+        result = self.cli(root, "app", "shop-api", "--role", "api", "--git", "separate", ok=False)
+        self.assertIn("tracked paths/ancestors", result.stderr)
+        self.assertEqual((self.app_snapshot(self.primary), self.app_snapshot(root)), before)
+
+    def test_deleted_tracked_primary_app_source_is_not_replaced_by_separate_repo(self):
+        root = self.app_fixture()
+        target = self.primary / "apps/shop-api"
+        target.mkdir()
+        (target / ".gitignore").write_text("fixture\n")
+        self.git(self.primary, "add", "-f", "apps/shop-api/.gitignore")
+        shutil.rmtree(target)
+        before = self.app_snapshot(self.primary), self.app_snapshot(root)
+        result = self.cli(root, "app", "shop-api", "--role", "api", "--git", "separate", ok=False)
+        self.assertIn("tracked paths/ancestors", result.stderr)
+        self.assertEqual((self.app_snapshot(self.primary), self.app_snapshot(root)), before)
+
+    def test_legacy_three_field_manifest_restore_unchanged(self):
+        root = self.create()
+        manifest = b'{"services":[{"name":"api","path":"apps/api","git":"separate"},\n' \
+                   b'{"name":"camera-shop","path":"apps/camera-shop","git":"project"}]}\n'
+        (root / "services.json").write_bytes(manifest)
+        self.git(root, "add", "services.json")
+        self.git(root, "commit", "-m", "fixture legacy manifest")
+        clone = self.clone(root)
+        before = self.state(clone)
+        self.cli(self.factory, "restore", "--destination", str(clone))
+        self.assertEqual((clone / "services.json").read_bytes(), manifest)
+        self.assertEqual(self.state(clone), before)
+        self.assertEqual(json.loads((clone / ".kilo/repos.json").read_text()), {
+            "control": ".", "api": "apps/api"})
+
+    def test_project_clone_restore_twice_preserves_source_index_head(self):
+        root = self.app_fixture()
+        self.cli(root, "app", "shop-frontend", "--role", "frontend", "--git", "separate")
+        self.cli(root, "app", "billing-worker", "--role", "worker", "--git", "project")
         self.git(root, "add", "services.json", ".gitignore", "apps/billing-worker/.gitignore")
         self.git(root, "commit", "-m", "fixture service registration")
         clone = self.clone(root)
@@ -328,15 +602,15 @@ class BootstrapTests(unittest.TestCase):
             self.assertEqual((clone / p).read_bytes(), content)
 
     def test_separate_clone_restore_context_and_lifecycle_root(self):
-        root = self.create()
-        self.cli(root, "app", "shop-frontend", "--git", "separate")
+        root = self.app_fixture()
+        self.cli(root, "app", "shop-frontend", "--role", "frontend", "--git", "separate")
         self.git(root, "add", "services.json")
         self.git(root, "commit", "-m", "fixture manifest")
         clone = self.clone(root)
         self.cli(self.factory, "restore", "--destination", str(clone))
         app = clone / "apps/shop-frontend"
         app.parent.mkdir(exist_ok=True)
-        self.git(clone, "clone", str(root / "apps/shop-frontend"), str(app))
+        self.git(clone, "clone", str(self.primary / "apps/shop-frontend"), str(app))
         before, control_before = self.state(app), self.state(clone)
         restored = self.cli(self.factory, "restore", "--destination", str(app), "--project", str(clone))
         self.assertIn("without an app devcontainer", restored.stdout)
@@ -357,7 +631,7 @@ class BootstrapTests(unittest.TestCase):
             text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), str(clone))
-        standalone = self.clone(root / "apps/shop-frontend", "standalone")
+        standalone = self.clone(self.primary / "apps/shop-frontend", "standalone")
         self.assertIn("requires --project", self.cli(self.factory, "restore", "--destination", str(standalone), ok=False).stderr)
         self.assertIn("must occupy", self.cli(self.factory, "restore", "--destination", str(standalone), "--project", str(clone), ok=False).stderr)
 
@@ -527,8 +801,8 @@ class BootstrapTests(unittest.TestCase):
                 self.assertEqual(self.state(root), before)
 
     def test_factory_app_cli_honors_target_control_policy_denials(self):
-        root = self.create()
-        policy_path = root / ".kilo/policies/git-policy.json"
+        root = self.app_fixture()
+        policy_path = self.primary / ".kilo/policies/git-policy.json"
         original = json.loads(policy_path.read_text())
         for index, command in enumerate(("git init*", "git add*", "git commit*")):
             with self.subTest(command=command):
@@ -537,18 +811,18 @@ class BootstrapTests(unittest.TestCase):
                 policy_path.write_text(json.dumps(policy))
                 before = self.state(root)
                 manifest = (root / "services.json").read_bytes()
-                mapping = (root / ".kilo/repos.json").read_bytes()
-                name = "denied-worker-" + str(index)
-                result = self.cli(root, "app", name, "--git", "separate", ok=False,
+                mapping = (self.primary / ".kilo/repos.json").read_bytes()
+                name = "denied-" + str(index) + "-worker"
+                result = self.cli(root, "app", name, "--role", "worker", "--git", "separate", ok=False,
                                   script_root=self.factory)
                 self.assertIn("guard refused", result.stderr)
-                self.assertFalse((root / "apps" / name).exists())
+                self.assertFalse((self.primary / "apps" / name).exists())
                 self.assertEqual((root / "services.json").read_bytes(), manifest)
-                self.assertEqual((root / ".kilo/repos.json").read_bytes(), mapping)
+                self.assertEqual((self.primary / ".kilo/repos.json").read_bytes(), mapping)
                 self.assertEqual(self.state(root), before)
 
     def test_app_unsafe_ignore_or_stale_map_creates_nothing(self):
-        root = self.create()
+        root = self.app_fixture()
         ignore = root / ".gitignore"
         content = ignore.read_bytes()
         before = (root / "services.json").read_bytes()
@@ -559,15 +833,15 @@ class BootstrapTests(unittest.TestCase):
             elif kind == "symlink":
                 ignore.symlink_to(self.factory / "templates/project/.gitignore")
             for mode in ("separate", "project"):
-                self.cli(root, "app", "billing-worker", "--git", mode, ok=False)
+                self.cli(root, "app", "billing-worker", "--role", "worker", "--git", mode, ok=False)
                 self.assertFalse((root / "apps/billing-worker").exists())
             if ignore.is_dir():
                 ignore.rmdir()
             elif ignore.is_symlink():
                 ignore.unlink()
             ignore.write_bytes(content)
-        (root / ".kilo/repos.json").write_text('{"control":".","stale":"apps/stale"}')
-        self.cli(root, "app", "billing-worker", "--git", "project", ok=False)
+        (self.primary / ".kilo/repos.json").write_text('{"control":".","stale":"apps/stale"}')
+        self.cli(root, "app", "billing-worker", "--role", "worker", "--git", "project", ok=False)
         self.assertFalse((root / "apps/billing-worker").exists())
         self.assertEqual((root / "services.json").read_bytes(), before)
 
@@ -580,15 +854,15 @@ class BootstrapTests(unittest.TestCase):
         self.assertFalse((self.factory / "project").exists())
 
     def test_hard_policy_denials_not_bypassed_and_integrated_no_commit(self):
-        root = self.create()
+        root = self.app_fixture()
         policy_path = self.factory / ".kilo/policies/git-policy.json"
         policy = json.loads(policy_path.read_text())
         policy["bash"].append({"pattern": "git commit*", "action": "deny", "reason": "fixture denial"})
         policy_path.write_text(json.dumps(policy))
-        self.cli(root, "app", "shop-frontend", "--git", "separate", ok=False)
+        self.cli(root, "app", "shop-frontend", "--role", "frontend", "--git", "separate", ok=False)
         self.assertFalse((root / "apps/shop-frontend").exists())
         before = self.state(root)[:2]
-        self.cli(root, "app", "billing-worker", "--git", "project")
+        self.cli(root, "app", "billing-worker", "--role", "worker", "--git", "project")
         self.assertEqual(self.state(root)[:2], before)
         destination = self.base / "denied"
         result = self.cli(self.factory, "project", "--destination", str(destination), "--allow-outside", ok=False)
@@ -596,15 +870,15 @@ class BootstrapTests(unittest.TestCase):
         self.assertFalse(destination.exists())
 
     def test_invalid_names_collisions_existing_paths_and_required_git_choice(self):
-        root = self.create()
+        root = self.app_fixture()
         for name in ("Bad_Name", "../escape", "control", "worker--one"):
-            self.cli(root, "app", name, "--git", "separate", ok=False)
+            self.cli(root, "app", name, "--role", "frontend", "--git", "separate", ok=False)
         result = subprocess.run([sys.executable, str(self.factory / ".kilo/skills/git-worktree/scripts/bootstrap.py"),
-                                 "app", "shop-frontend"], cwd=root, env=self.env, capture_output=True)
+                                 "app", "shop-frontend", "--role", "frontend"], cwd=root, env=self.env, capture_output=True)
         self.assertEqual(result.returncode, 2)
-        self.cli(root, "app", "shop-frontend", "--git", "separate")
+        self.cli(root, "app", "shop-frontend", "--role", "frontend", "--git", "separate")
         before = self.state(root)
-        self.cli(root, "app", "shop-frontend", "--git", "project", ok=False)
+        self.cli(root, "app", "shop-frontend", "--role", "frontend", "--git", "project", ok=False)
         self.assertEqual(self.state(root), before)
         self.cli(self.factory, "project", ok=False)
         alias = self.base / "alias"
