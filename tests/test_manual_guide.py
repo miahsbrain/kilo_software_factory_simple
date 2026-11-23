@@ -27,9 +27,13 @@ class ManualGuideTests(unittest.TestCase):
         self.guide.write_text(SECTION)
         subprocess.run(['git', 'init', '-q'], cwd=self.repo, check=True)
         (self.repo / '.gitignore').write_text('/artifacts/\n')
+        (self.repo / 'docs').mkdir()
+        (self.repo / 'docs/BOARD.md').touch()
+        (self.repo / '.kilo').mkdir()
+        (self.repo / '.kilo/repos.json').write_text('{"control":".","web":"apps/web"}')
 
     def check_path(self, path, **kwargs):
-        return subprocess.run([sys.executable, CLI, '--manual-guide', '--body-file', path],
+        return subprocess.run([sys.executable, '-B', CLI, '--manual-guide', '--body-file', path],
                               cwd=kwargs.pop('cwd', self.repo), text=True, capture_output=True, **kwargs)
 
     def validate(self, body):
@@ -45,7 +49,20 @@ class ManualGuideTests(unittest.TestCase):
                      'artifacts/reviews/missing.md'):
             with self.subTest(path=path):
                 self.assertEqual(self.check_path(path, input=SECTION, timeout=5).returncode, 66)
-        self.assertEqual(self.check_path('chat.md', cwd=self.guide.parent).returncode, 0)
+        self.assertEqual(self.check_path('artifacts/reviews/chat.md', cwd=self.guide.parent).returncode, 0)
+
+    def test_mapped_service_validates_only_projects_guide(self):
+        service = self.repo / 'apps/web'
+        service.mkdir(parents=True)
+        subprocess.run(['git', 'init', '-q'], cwd=service, check=True)
+        relative = self.guide.relative_to(self.repo)
+        local = service / relative
+        local.parent.mkdir(parents=True)
+        local.write_text('invalid source-local guide')
+        self.assertEqual(self.check_path(relative, cwd=service).returncode, 0)
+        self.assertEqual(self.check_path(local, cwd=service).returncode, 66)
+        self.guide.unlink()
+        self.assertEqual(self.check_path(relative, cwd=service).returncode, 66)
 
     def test_refuses_symlink_file_and_ancestor_even_with_internal_target(self):
         link = self.guide.with_name('link.md')

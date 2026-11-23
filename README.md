@@ -26,7 +26,7 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py reviews both off  # Manual
 python3 .kilo/skills/git-worktree/scripts/worktree.py reviews both on   # Restore both; qa/ui also accept on
 ```
 
-At the end of the fix, the agent links a manual QA/UI checklist for skipped checks in the assigned checkout's `artifacts/reviews/`. Normal code tests still run. Skipped reviews do not count as passed. If only UI critique is enabled it can use existing evidence, not launch a new QA capture. Saved Playwright evidence uses the confined `browser-review.mjs` runner, not the unrestricted MCP server. Restart Kilo after adopting the updated MCP config; this does not move historical images.
+At the end of the fix, the agent links a manual QA/UI checklist for skipped checks in the owning project's primary control `artifacts/reviews/`. Normal code tests still run. Skipped reviews do not count as passed. If only UI critique is enabled it can use existing evidence, not launch a new QA capture. Saved Playwright evidence uses the confined `browser-review.mjs` runner, not the unrestricted MCP server. Restart Kilo after adopting the updated MCP config; this does not move historical images.
 
 
 ## Contents
@@ -37,7 +37,7 @@ To publish any Markdown plan from the control root, run `python3 .kilo/skills/pl
 
 **Common tasks**
 
-- **Get a manual QA guide:** Run `/ui checklist BOARD-123` or ask for a checklist by feature name or for the whole board. The reviewer hands back a Markdown file in the assigned checkout's `artifacts/reviews/` with what changed, where to test, and what to expect. Inaccessible QA/UI checks trigger the same guide automatically; delivery does not mark them passed.
+- **Get a manual QA guide:** Run `/ui checklist BOARD-123` or ask for a checklist by feature name or for the whole board. The reviewer hands back a Markdown file in the owning project's primary control `artifacts/reviews/` with what changed, where to test, and what to expect. Inaccessible QA/UI checks trigger the same guide automatically; delivery does not mark them passed.
 
 - **Review a protected page:** Use the [QA profile instructions](.kilo/skills/qa-review/SKILL.md#authentication) to point the standalone browser reviewer at an ignored, human-prepared test session. No production password belongs in the repository. The origin and a visible signed-in marker are checked on capture.
 - **Accept a manual review:** Tell the coordinator what you tested. It records `board.py approve-review <ID> --scope <scope> --evidence "<decision reference>"`. Only `review:<scope>` is cleared. A separate defect, dependency, or merge decision is not silently approved.
@@ -132,7 +132,7 @@ Ignored control configuration inherits verified ancestors within the actual cont
 
 Existing tools use Git 2.30+, Python 3.9+, and Node.js 18+ with available Playwright/Chromium for UI capture. The board's existing stylesheet authoring requires Node 22; serving it is Python-only and offline. Do not install missing dependencies without authorization.
 
-Harness sync copies only `agent`, `command`, `skills`, and `policies`, plus the harness ignore file and generated permissions, into mapped project control repositories. App sync and worktree creation do not generate instruction files or copy scope/catalog layers; existing handwritten app instructions are left alone. Apps inherit the project's local configuration. See `docs/PROJECT_STATE.md`, `docs/DECISIONS.md`, and `docs/changelog/CHANGELOG.md` for verification and current status. Review artifacts remain ignored under `artifacts/`; the live board is ignored, while the blank template board stays tracked.
+Harness sync copies only `agent`, `command`, `skills`, and `policies`, plus the harness ignore file and generated permissions, into mapped project control repositories. App sync and worktree creation do not generate instruction files or copy scope/catalog layers; existing handwritten app instructions are left alone. Apps inherit the project's local configuration. See `docs/PROJECT_STATE.md`, `docs/DECISIONS.md`, and `docs/changelog/CHANGELOG.md` for verification and current status. From assigned source, run `python3 <qa scripts>/ledger.py artifact-root` to resolve the owning project's ignored primary control `artifacts/` for every service and worktree. Stop on refusal; never use the factory parent, service or linked checkout instead. Keep captures, raw files, logs and scratch output there without migrating old evidence. Link each validated manual guide by absolute workspace path; the live board is ignored, while the blank template board stays tracked.
 
 ## Licence
 

@@ -45,6 +45,8 @@ Restore control first; missing service checkouts are reported. App restore requi
 
 ## Delivery
 
+From assigned source, run `python3 <qa scripts>/ledger.py artifact-root` with this project's installed QA scripts. All services and worktrees use the returned primary control checkout's ignored `artifacts/`, never a service, linked checkout or factory parent. Stop on refusal. Keep raw captures, logs and scratch output there, leave old evidence in place, and return absolute workspace links to validated manual guides under `reviews/`. Plans stay in the separate primary control `docs/implementation_plans/` directory.
+
 Build the frontend flow for user approval before backend/APIs for new apps and user-facing features, using clearly labeled fixtures. Backend-only maintenance needs no unrelated frontend. Use the working agreement and existing board/lifecycle/capture tools. Record the actual stack, development command, and ports in `docs/STACK.md`; no product stack is selected by this template.
 
 Metadata-only backend bootstrap (.gitignore/Git/manifest) may precede frontend-flow approval. Backend framework source, dependencies, routes, persistence and integration must wait for approval, except backend-only maintenance.

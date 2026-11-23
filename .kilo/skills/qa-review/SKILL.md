@@ -9,6 +9,8 @@ Check the assigned behavior against observable acceptance criteria. Stay read-on
 
 ## Manual checklist
 
+From the assigned source Git root, set `qa_scripts` to the absolute path of the owning project's installed `.kilo/skills/qa-review/scripts`. Resolve the destination before any artifact write: `artifact_root=$(python3 "$qa_scripts/ledger.py" artifact-root) || exit 1`. Verify the returned absolute path is the owning project's primary control `artifacts/`, not a factory parent, service or linked checkout. Refusal, unexpected ownership, tracked output or an unsafe destination means stop, not a fallback. All artifact subpaths below are relative to this root.
+
 Write for the person using the product. Start at the page they need, name the control they see, and tell them what success looks like. Use one short checkbox per outcome (24 words maximum). For example:
 
 ```markdown
@@ -27,7 +29,7 @@ If QA or UI critique cannot verify a criterion (for example, a redirect to an ex
 
 1. Resolve the requested rows from the shared board. Match feature names to their IDs; ask only if the match is ambiguous. For a whole board, list the included IDs, group checks by feature and identify dropped or not-yet-implemented items separately. Use board criteria, the actual implementation or diff, documented run commands and prior evidence. Describe what changed in user terms; distinguish planned behavior from delivered behavior.
 2. Give the tester the service/environment, revision (including uncommitted changes if relevant), start command and test role/data needed. Link directly to **each changed page**, using the known scheme, host, port and route from the assigned deployment or local run configuration. For redirects give the safe starting link, the expected destination and the visible sign of success. Never publish signed URLs, callback codes, secrets, personal IDs or passwords. If an origin or fixture ID is unknown or sensitive, say so and give a concrete way to obtain the URL from a known safe entry page; do not invent it. For non-UI changes use an exact safe command and working directory instead.
-3. Write compact Markdown in the assigned repo's ignored `artifacts/reviews/<board-id>-manual-qa.md` (safe feature slug for a multi-row guide). Before writing, ensure `git check-ignore -q -- artifacts/` succeeds and `git ls-files -- artifacts` succeeds with no output. Check the destination is also ignored and has no symlink ancestors. If the whole artifacts directory is not private to the worktree in Git, stop; do not untrack or move existing files. Preserve tester notes and results. If saving or validation fails, report the reason instead of handing over an inline copy or saving elsewhere.
+3. Write compact Markdown to `$artifact_root/reviews/<board-id>-manual-qa.md` (safe feature slug for a multi-row guide). Verify the actual destination is ignored in the primary control checkout, untracked and free of symlinks, including its ancestors. Preserve tester notes and results. If saving or validation fails, report the reason instead of handing over an inline copy or saving elsewhere.
 
 ```markdown
 ## <BOARD-ID>: <feature>
@@ -40,7 +42,7 @@ Setup: <direct safe URL or command; include prerequisites only if needed>.
 
 Use this format for every manual QA or UI handoff. Follow ASD-STE100 plain-writing principles: short imperative sentences, consistent terms, and one test per checkbox. Use a literal `- [ ]` for each pending check, not paragraphs, tables, or approval recommendations. If blocked, give one `Blocked:` line before the checks. Do not ask the tester to repeat accepted checks. Keep non-testable items in a short scope note. Do not check a box on the strength of automated evidence. Do not ask the human to perform destructive operations on real data. Generating a checklist is not approval or a lane change.
 
-**Required before delivery:** From the assigned Git root run `python3 .kilo/skills/qa-review/scripts/check-finding.py --manual-guide --body-file artifacts/reviews/<guide>.md` (use the installed control script path if needed). This gate applies to on-demand, blocked, skipped, and closeout guides, including UI-only work. Link the file only after validation passes. Keep a tester's completed copy intact; for a new revision validate a fresh guide containing only outstanding checks. A valid guide does not verify product behavior.
+**Required before delivery:** Set `guide` to the absolute path of the saved guide. From the assigned Git root run `python3 "$qa_scripts/check-finding.py" --manual-guide --body-file "$guide"`. This gate applies to on-demand, blocked, skipped, and closeout guides, including UI-only work. Return an absolute workspace link to that exact file only after validation passes. Keep a tester's completed copy intact; for a new revision validate a fresh guide containing only outstanding checks. A valid guide does not verify product behavior.
 
 ## Capture
 
@@ -63,15 +65,15 @@ node .kilo/skills/qa-review/scripts/browser-review.mjs --base-url <url> --route 
 
 It captures screenshots, console/page errors, network failures, and overflow at its configured mobile/tablet/desktop/wide viewports, including the 320px floor. Exit 0 means capture completed, even with errors; exit 2 means fatal/capture/authentication failure. Report the command, error, and exit code on failure; do not install tools or invent a substitute capture mechanism.
 
-Use `--scheme light|dark|both`, `--component <selector>`, `--compare <dir>`, or `--label <slug>` when relevant. `--chromium <path>` selects an available approved browser. Keep raw captures unchanged in the caller's assigned Git top-level `artifacts/<scope>/qa/<date>/<ID>/`, including screenshots, components, comparisons, error logs, `summary.json`, and notes. Do not redirect worktree review evidence into control-main. Scope, date, task ID and label must be safe single path segments, not `.` or `..`. `--artifact-dir` is only an override within that same artifacts root; symlink roots/ancestors/destinations are refused before browser launch.
+Use `--scheme light|dark|both`, `--component <selector>`, `--compare <dir>`, or `--label <slug>` when relevant. `--chromium <path>` selects an available approved browser. Keep raw captures unchanged in the fresh run directory under `$artifact_root/<scope>/qa/<date>/<ID>/`. Use the reported `task_dir` for `summary.json` and notes, and `artifact_dir` for screenshots, components and comparison inputs. Scope, date, task ID and label must be safe single path segments, not `.` or `..`. Use only verified destinations beneath the central root for `--artifact-dir`.
 
-All newly generated review artifacts, images, reports, snapshots, network/console logs, and Playwright output belong under ignored `artifacts/` in the assigned repo/worktree, never the root, `/tmp`, or an external directory. Non-capture scratch scripts belong in `artifacts/scripts/`. Maintained review tool source remains tracked in `.kilo/skills/qa-review/`; bootstrap copies that source, never evidence. Legitimate canonical test fixtures may remain source, but generated fixture captures and test temporary directories use `artifacts/tmp/tests/` and are cleaned safely by the tests. Do not move or delete old project output without authorization. Never stage or commit artifacts.
+Store all generated review images, reports, snapshots, network/console logs, downloads and Playwright output beneath the verified central root; use its `scripts/` for scratch scripts. Bootstrap copies maintained `.kilo/skills/qa-review/` source, never evidence. Tracked test fixtures and disposable test repositories are not project review evidence. Leave historical output in place; never stage or commit artifacts.
 
-Capture sets `TMPDIR`, `TMP`, and `TEMP` before loading/launching Playwright and restores them in `finally`. Their short relative paths resolve to the caller's `artifacts/tmp/browser-*/`, avoiding Chromium's Unix-socket pathname limit without external temp output; downloads and trace destinations are there too. Run from the assigned Git root to keep those paths short. It does not enable tracing or video. This confines the capture tool's configured and Playwright-managed output, not every Chromium/OS cache or crash artifact. Report any inaccessible browser-managed locations as a limitation rather than claiming universal filesystem enforcement.
+Run capture from the assigned source for project and authentication inputs. Browser temporary output, downloads and trace destinations must remain under the verified central root. Capture does not enable tracing or video. Report inaccessible browser or OS cache/crash locations as a limitation; this is not a filesystem sandbox.
 
 Factory Playwright MCP is disabled by default. For saved browser evidence use only the existing runner from the assigned Git root; do not enable MCP, use alternate browser save tools or write ad-hoc capture scripts as a workaround.
 
-Reports/findings/ledgers belong in ignored `artifacts/reviews/`. Run ledger commands from the assigned control source worktree; board coordination still resolves the shared control root, while evidence stays in the caller's Git root. `python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id <ID>` prints that ledger path. An explicit override is `python3 .kilo/skills/qa-review/scripts/ledger.py --ledger-dir artifacts/reviews status --task-id <ID>`; outside-root and symlink overrides are refused.
+Reports, findings and ledgers use `$artifact_root/reviews/`. Run `python3 "$qa_scripts/ledger.py" status --task-id <ID>` from the assigned source to obtain its ledger path; never use a service-local override.
 
 ## Authentication
 
@@ -93,18 +95,21 @@ Run this Bash block yourself, replacing the example origin first. It refuses an 
   config=.kilo/local/qa-auth.json
   state=.kilo/local/qa-storage-state.json
   test "$(pwd -P)" = "$(git rev-parse --show-toplevel)"
-  for path in .kilo .kilo/local "$config" "$state" artifacts artifacts/tmp; do
+  artifact_root=$(python3 "${qa_scripts:?Set qa_scripts to the project QA scripts directory}/ledger.py" artifact-root)
+  for path in .kilo .kilo/local "$config" "$state" "$artifact_root" "$artifact_root/tmp"; do
     test ! -L "$path"
   done
-  for path in "$config" "$state" artifacts/tmp/qa-browser-probe; do
+  for path in "$config" "$state"; do
     git check-ignore -q -- "$path"  # Without --no-index: tracked paths fail too.
   done
   test ! -e "$state"
-  mkdir -p .kilo/local artifacts/tmp
+  git -C "${artifact_root%/artifacts}" check-ignore -q -- artifacts/tmp/qa-browser-probe
+  mkdir -p .kilo/local "$artifact_root/tmp"
   chmod 700 .kilo/local
   if test -e "$config"; then test -f "$config"; else touch "$config"; fi
   chmod 600 "$config"
-  export TMPDIR=$(mktemp -d artifacts/tmp/qa-browser-XXXXXX)
+  TMPDIR=$(mktemp -d "$artifact_root/tmp/qa-browser-XXXXXX")
+  export TMPDIR
   test -d "$TMPDIR"
   export TMP="$TMPDIR" TEMP="$TMPDIR"
   playwright open --browser chromium --save-storage "$state" "$origin"
@@ -134,7 +139,7 @@ Read the row's `[user-approved:<scope>]` note and evidence. Report the user's de
 Actionable findings state `Summary`, `Repro steps`, `Expected behavior`, `Actual behavior`, `Evidence`, `Acceptance criteria`, and `Risk`. Validate persisted findings with:
 
 ```bash
-python3 .kilo/skills/qa-review/scripts/check-finding.py --body-file artifacts/reviews/<finding.md> --kind bug --priority medium --category functional --route /path
+python3 "$qa_scripts/check-finding.py" --body-file "$artifact_root/reviews/<finding.md>" --kind bug --priority medium --category functional --route /path
 ```
 
 Exit 0 accepts and prints a fingerprint; exit 66 means the finding needs better detail. The coordinator uses `board.py` for Fix rows and existing fingerprints for deduplication; reviewers report, not edit the board. Fixes reuse the original workspace and recheck affected criteria.

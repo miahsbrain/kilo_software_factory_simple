@@ -17,9 +17,11 @@ BOARD-137. Checked items identify delivered behavior or guidance, not guarantees
 
 ## Reproduce checks
 
+For a new run, resolve `artifact_root=$(python3 .kilo/skills/qa-review/scripts/ledger.py artifact-root) || exit 1` from the assigned source and verify the central directory before using it for temporary output. The results and evidence links below describe the original run, not new verification.
+
 | Command | Result |
 | --- | --- |
-| `TMPDIR=artifacts python3 -B -m unittest discover -s .kilo/skills/git-worktree/scripts` (existing ignored `artifacts/` directory) | 99 passed: bootstrap/restore and lifecycle |
+| `TMPDIR="$artifact_root" python3 -B -m unittest discover -s .kilo/skills/git-worktree/scripts` (existing verified directory; repositories created by the tests are disposable fixtures) | 99 passed: bootstrap/restore and lifecycle |
 | `python3 -B .kilo/skills/git-worktree/scripts/test_env.py` | All standalone provisioning and reuse checks passed |
 | `python3 -B -m unittest discover -s tests -v` | 10 passed: approval replay, mismatched gates, gallery controls and cross-CLI maintenance workflow |
 | `node --test .kilo/skills/qa-review/scripts/browser-review.test.mjs` | 25 passed, none skipped, including Chromium against disposable protected routes |

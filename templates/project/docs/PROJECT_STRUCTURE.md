@@ -13,6 +13,6 @@ Record actual paths as the project grows; preserve an existing project's layout.
 | `.kilo/worktrees/` | Ignored assigned change workspaces |
 | `docs/` | Concise current project context, decisions, and engineering history |
 | `docs/BOARD.md` | Local live board, ignored after bootstrap |
-| `artifacts/` | Ignored shared QA captures and review reports |
+| `artifacts/` | Ignored QA captures and review reports shared by all services in the primary control checkout |
 
 Git does not preserve empty directories. Initialize Git in a genuinely new app directory immediately when created, then register its ID/path before work. There are no fixed app slots, scope-rule files, or app-level `AGENTS.md` requirements. See `README.md` for full harness copy and initial-commit authorization.

@@ -8,5 +8,5 @@ Read the changed areas in the assigned workspace and refresh relevant handover n
 In the completion report link the QA skill's manual QA/UI checklist for any skipped review scopes, including policy skips without a blocker. Do not count a checklist as a pass or a lane transition.
 
 For manual review, use the QA skill's checkbox format: board ID, one `Changed:` sentence, then `- [ ]` tester actions with expected results. Do not replace the checklist with a status narrative.
-Run the skill's `--manual-guide` format check before sending the guide.
-For every tester handoff, link the validated file in the assigned worktree's ignored `artifacts/reviews/`. Do not substitute an inline checklist.
+Run the skill's `--manual-guide` format check before sending an absolute workspace link to the centrally saved guide.
+For every tester handoff, return an absolute workspace link to the validated file in the owning project's primary control `artifacts/reviews/`. Do not substitute an inline checklist.

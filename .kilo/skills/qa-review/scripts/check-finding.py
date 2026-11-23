@@ -24,11 +24,12 @@ On acceptance the computed fingerprint is printed on stdout as
 """
 
 import argparse
-import os
 from pathlib import Path
 import re
-import subprocess
 import sys
+
+sys.dont_write_bytecode = True
+from ledger import artifact_path
 
 KINDS = ("bug", "ux", "tests", "docs", "tech-debt")
 PRIORITIES = ("high", "medium", "low")
@@ -301,34 +302,9 @@ def resolve_fingerprint(args, body):
 
 
 def manual_guide_path(filename):
-    path = Path.cwd() / filename
-    if '..' in path.parts or path.suffix != '.md':
-        raise ValueError('expected a .md file under artifacts/reviews/ without traversal')
-
-    # Inspect the actual worktree and index, not caller-supplied Git overrides.
-    env = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
-
-    def git(*args, cwd=None):
-        return subprocess.run(['git', *args], cwd=cwd, env=env,
-                              capture_output=True, check=True).stdout
-
-    def git_root(cwd):
-        return Path(os.fsdecode(git('rev-parse', '--show-toplevel', cwd=cwd).removesuffix(b'\n')))
-
-    root = git_root(Path.cwd())
-    if not path.is_relative_to(root / 'artifacts/reviews'):
-        raise ValueError('manual guide must be under the current worktree artifacts/reviews/')
-    if path.resolve(strict=True) != path or not path.is_file():
-        raise ValueError('manual guide must be a regular file without symlinks')
-    if '.git' in path.relative_to(root).parts or git_root(path.parent) != root:
-        raise ValueError('manual guide belongs to a nested repository')
-
-    for target in ('artifacts', path.relative_to(root)):
-        git('check-ignore', '-q', '--', target, cwd=root)
-    # The index covers tracked files and additions; a staged deletion only appears in the diff.
-    if (git('ls-files', '--cached', '--', 'artifacts', cwd=root) or
-            git('diff', '--cached', '--name-only', '--no-renames', '--', 'artifacts', cwd=root)):
-        raise ValueError('artifacts/ contains tracked or staged paths')
+    path = Path(artifact_path(filename, reviews_only=True))
+    if path.suffix != '.md' or not path.is_file():
+        raise ValueError('manual guide must be a regular .md file')
     return path
 
 
@@ -337,14 +313,17 @@ def main(argv):
     if args.manual_guide:
         try:
             body = manual_guide_path(args.body_file).read_text(encoding='utf-8')
-        except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as error:
+        except (OSError, RuntimeError, ValueError) as error:
             sys.stderr.write(f'check-finding: cannot validate manual guide: {error}\n')
             return 66
     else:
         try:
-            with open(args.body_file, "r", encoding="utf-8") as handle:
+            filename = Path(args.body_file)
+            if filename.parts[:1] == ('artifacts',):
+                filename = Path(artifact_path(filename))
+            with open(filename, "r", encoding="utf-8") as handle:
                 body = handle.read()
-        except OSError as error:
+        except (OSError, RuntimeError, ValueError) as error:
             sys.stderr.write("check-finding: cannot read body file: " + str(error) + "\n")
             return 66
 
