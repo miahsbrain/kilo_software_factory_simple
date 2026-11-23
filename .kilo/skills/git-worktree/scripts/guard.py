@@ -52,7 +52,6 @@ RM_CMDS = {"rm", "rmdir", "unlink", "trash"}
 TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
 GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 ADD_VALUE_OPTS = {"-b", "-B", "--reason"}
-LINKED_MARKER = os.sep + ".kilo" + os.sep + "worktrees" + os.sep
 SYNC_SLICE = ["agent", "command", "skills", "policies"]
 SCHEMA_URL = "https://app.kilo.ai/config.json"
 
@@ -186,12 +185,15 @@ def repo_context(cwd):
     main = wts[0]["path"] if wts else top
     repo_root = real(main)
     top_real = real(top)
+    worktrees_root = os.path.join(repo_root, ".kilo", "worktrees")
+    registered_link = any(real(wt["path"]) == top_real for wt in wts[1:])
     return {
         "top": top_real,
         "repo_root": repo_root,
-        "worktrees_root": os.path.join(repo_root, ".kilo", "worktrees"),
+        "worktrees_root": worktrees_root,
         "common": os.path.abspath(common) if common else None,
-        "linked": LINKED_MARKER in top_real + os.sep,
+        "registered_link": registered_link,
+        "linked": registered_link and os.path.dirname(top_real) == worktrees_root,
     }
 
 
@@ -536,24 +538,6 @@ def git_commands(command, cwd=None):
     return found
 
 
-def is_linked_worktree(cwd):
-    """True only when cwd is inside a linked worktree under .kilo/worktrees/.
-
-    A linked worktree has a git dir that differs from the common dir. The path check keeps
-    the rule tied to worktree.py's location, so a hand-made worktree elsewhere does not count.
-    """
-    git_dir = git_out(cwd, "rev-parse", "--absolute-git-dir")
-    common = git_out(cwd, "rev-parse", "--git-common-dir")
-    top = git_out(cwd, "rev-parse", "--show-toplevel")
-    if not git_dir or not common or not top:
-        return False
-    common_path = common if os.path.isabs(common) else os.path.join(cwd, common)
-    linked = os.path.realpath(git_dir) != os.path.realpath(common_path)
-    normalised = os.path.realpath(top).replace(os.sep, "/")
-    under = "/.kilo/worktrees/" in normalised + "/"
-    return bool(linked and under)
-
-
 def context_verdict(policy, command, cwd, ctx):
     """The context rule that fires for this command, or None."""
     for rule in policy.get("context", []):
@@ -569,13 +553,16 @@ def context_verdict(policy, command, cwd, ctx):
             top = git_out(cwd, "rev-parse", "--show-toplevel") or cwd
             fired = branch in protected_branch_names(top, policy)
         elif check == "in_worktree":
-            fired = load_worktree_module().workspace_mode(cwd) == "required" and not is_linked_worktree(cwd)
+            mode = load_worktree_module().workspace_mode(cwd)
+            fired = mode != "optional" and not (ctx and ctx["linked"])
+            if fired and mode == "adaptive":
+                return {**rule, "reason": "Adaptive commit checks have no board-row context; use an assigned linked worktree to commit."}
         elif check == "branch_switch_in_worktree":
             parts = command.split()
             sub = parts[1] if len(parts) > 1 else ""
             rest = parts[2:]
             switches = sub in ("checkout", "switch") and not (sub == "checkout" and rest[:1] == ["--"])
-            fired = bool(ctx and ctx.get("linked")) and switches
+            fired = bool(ctx and ctx["registered_link"]) and switches
         else:
             fired = False
         if fired:
@@ -704,8 +691,12 @@ def generated_permission(policy, mode="required"):
         mapping = {FALLBACK_KEY: fallback}
         for rule in policy.get(kind, []):
             action = rule["action"]
-            if kind == "edit" and rule.get("workspace_default") and mode == "optional":
-                action = "allow"
+            if kind == "edit" and rule.get("workspace_default"):
+                # Static path rules cannot tell a maintenance edit from Feature work.
+                if mode == "optional":
+                    action = "allow"
+                elif mode == "adaptive" and action != "deny":
+                    action = "ask"
             mapping[rule["pattern"]] = action
         block[kind] = mapping
     hidden = policy.get("hidden_paths") or {}

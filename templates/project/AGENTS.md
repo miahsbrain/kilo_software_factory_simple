@@ -2,6 +2,10 @@
 
 Build useful, distinctive software. Favor clear code, focused modules, existing conventions, and the smallest sound solution. Avoid speculative abstractions.
 
+Write readable code with domain names and focused functions. Comment the reason for a surprising choice, not what the next line does. For web UI, verify the component import and its consumer before composing a screen. Use shadcn/ui by default on compatible stacks unless another library is approved.
+
+For quick Fix, Chore or Docs edits, use the workspace skill's `--skip-worktree` eligibility check in optional or adaptive mode. Do not implicitly change modes. When the user accepts a scoped manual review, the coordinator records it with `board.py approve-review`; do not request the same approval again or treat it as automated verification or permission to merge.
+
 Read applicable local instructions and the documented layout, state, domain and approved decisions before editing; use targeted reads thereafter. Follow the approved stack and contracts, not assumed frameworks or folder names.
 
 Prefer a functional core with explicit effects: deterministic domain functions, immutable inputs/outputs and dependencies passed explicitly. Keep filesystem, network, persistence, time, randomness and logging at thin boundaries. Avoid hidden shared state and unnecessary reactive/callback machinery; respect framework conventions where effects are required.

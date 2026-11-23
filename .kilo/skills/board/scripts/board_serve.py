@@ -1555,10 +1555,9 @@ def build_gallery_html():
         wb_filter_selects("side", visible_labels=True),
         '</div>',
         '<div class="wb-side-footer">',
-        '<p class="wb-live"><span class="wb-live-dot" aria-hidden="true"></span>'
-        '<span>updated %s</span></p>' % datetime.datetime.now().strftime("%H:%M:%S"),
+        '<p class="wb-live">Static fixture</p>',
         '<div class="wb-side-actions">',
-        '<button type="button" class="wb-btn" id="pause" aria-pressed="false">Pause</button>',
+        '<button type="button" class="wb-btn" disabled>Pause</button>',
         '<button type="button" class="wb-btn" data-wb-theme aria-label="Colour theme">System</button>',
         '<button type="button" class="wb-btn" data-wb-density aria-pressed="false" '
         'aria-label="Density">Comfortable</button>',
@@ -1566,8 +1565,8 @@ def build_gallery_html():
         '<main class="wb-main">',
         '<header class="wb-page-head">',
         '<div class="min-w-0"><h1 class="wb-title">Factory board</h1>',
-        '<p class="wb-sub">Lanes, cards and live worktrees — what is in flight right now</p></div>',
-        '<button type="button" class="wb-btn" id="refresh-now">Refresh now</button>',
+        '<p class="wb-sub">Component gallery with static sample data. Live updates are off.</p></div>',
+        '<button type="button" class="wb-btn" disabled>Refresh now</button>',
         '</header>',
         '<section class="wb-kpi" aria-label="Board summary">',
         '<div class="wb-kpi-primary"><span class="wb-kpi-num">%d</span>'

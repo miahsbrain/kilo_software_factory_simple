@@ -64,6 +64,7 @@ function usage() {
     '  --compare      Directory holding a previous capture; writes a before | after sheet.',
     '  --chromium     Path to a chromium binary. Overrides $PLAYWRIGHT_CHROMIUM_PATH.',
     '  --storage-state Ignored local Playwright state JSON (read only; never saved).',
+    '                 Default: use caller .kilo/local/qa-auth.json if present.',
     '  --navigation   Ignored local JSON: approved:true, login:[], steps:[].',
     '                 Actions: goto/path, fill/selector/env, click/selector/intent,',
     '                 waitForURL/path, waitForSelector/selector. No literal fill values.',
@@ -289,7 +290,7 @@ function joinUrl(baseUrl, route) {
   return base + path;
 }
 
-const ACCESS_REQUEST = 'Ask the user for authorized test access via named environment variables or an ignored local Playwright storage-state file. For MFA/SSO, ask the user to log in manually and supply that state; never bypass authentication.';
+const ACCESS_REQUEST = 'Ask the user for authorized human-prepared local test state. For MFA/SSO, the user signs in manually; never bypass authentication.';
 
 export function safeUrl(value, baseUrl) {
   let url;
@@ -339,8 +340,9 @@ export function validateNavigation(config, baseUrl, allowDestructive = false, us
 
 export async function localJson(path, projectDir, state = false) {
   try {
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
     const root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
-      cwd: projectDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+      cwd: projectDir, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     const absolute = resolve(projectDir, path);
     const canonical = await realpath(absolute);
@@ -348,11 +350,11 @@ export async function localJson(path, projectDir, state = false) {
     if (rel.startsWith('..') || isAbsolute(rel) || canonical !== absolute || !(await lstat(absolute)).isFile()) {
       fail('local authentication files must be regular, non-symlink files inside the project repository');
     }
-    const tracked = execFileSync('git', ['ls-files', '--', rel], {
-      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
+    const tracked = execFileSync('git', ['--literal-pathspecs', 'ls-files', '--', rel], {
+      cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'],
     });
     if (tracked.trim()) fail('local authentication files must not be tracked');
-    execFileSync('git', ['check-ignore', '-q', '--', rel], {cwd: root, stdio: 'ignore'});
+    execFileSync('git', ['check-ignore', '-q', '--', rel], {cwd: root, env, stdio: 'ignore'});
     const data = JSON.parse(await readFile(absolute, 'utf8'));
     if (state && (!data || !Array.isArray(data.cookies) || !Array.isArray(data.origins))) {
       fail('invalid Playwright storage state');
@@ -361,6 +363,53 @@ export async function localJson(path, projectDir, state = false) {
   } catch {
     fail('cannot use local authentication JSON: require an existing, ignored, untracked regular file inside --project. ' + ACCESS_REQUEST);
   }
+}
+
+export async function reviewAccess(options) {
+  const root = callerRoot();
+  const project = resolve(options.project);
+  const origin = new URL(options.baseUrl).origin;
+  let config;
+  for (const path of ['.kilo', '.kilo/local', '.kilo/local/qa-auth.json']) {
+    try {
+      if ((await lstat(join(root, path))).isSymbolicLink()) fail('unsafe local QA config path');
+    } catch (error) { if (error.code === 'ENOENT') break; throw error; }
+    if (path.endsWith('.json')) config = await localJson(path, root);
+  }
+  if ((config !== undefined || options.storageState || options.navigation) &&
+      (await realpath(project) !== project || callerRoot(project) !== root)) {
+    fail('protected review requires --project inside the caller worktree');
+  }
+  let navigation = options.navigation ? await localJson(options.navigation, project) : {approved: true};
+  let statePath = options.storageState;
+  if (config !== undefined) {
+    if (config?.approved !== true || config.origin !== origin || config.storageState !== 'qa-storage-state.json' ||
+        typeof config.authenticatedSelector !== 'string' || !config.authenticatedSelector.trim() ||
+        Object.keys(config).some(key => !['approved', 'origin', 'storageState', 'authenticatedSelector'].includes(key))) {
+      fail('invalid or mismatched local QA auth configuration. ' + ACCESS_REQUEST);
+    }
+    if (statePath || navigation.login?.length || navigation.steps?.some(step => step.action === 'fill') ||
+        (navigation.authenticatedSelector !== undefined && navigation.authenticatedSelector !== config.authenticatedSelector)) {
+      fail('local QA auth conflicts with explicit state, login, fill, or signed-in marker');
+    }
+    navigation = {...navigation, authenticatedSelector: config.authenticatedSelector};
+    statePath = join(root, '.kilo/local', config.storageState);
+  }
+  const {hostname: host, protocol} = new URL(origin);
+  if (statePath && protocol !== 'https:' && host !== 'localhost' && host !== '[::1]' &&
+      !/^127(?:\.\d{1,3}){3}$/.test(host)) {
+    fail('protected storage state requires HTTPS except on loopback');
+  }
+  if (statePath && !/^(?:[a-z0-9.-]+|\[[0-9a-f:]+\])$/i.test(host)) {
+    fail('unsupported hostname for origin-bound state');
+  }
+  const navigationConfig = validateNavigation(navigation, origin, options.allowDestructive, Boolean(statePath));
+  const storageState = statePath ? await localJson(statePath, project, true) : undefined;
+  if (storageState && (storageState.origins.some(item => item?.origin !== origin || item.indexedDB !== undefined) ||
+      storageState.cookies.some(cookie => cookie?.domain !== host || cookie.partitionKey !== undefined))) {
+    fail('storage state must contain only host-only cookies and local storage for the authorized origin');
+  }
+  return {navigationConfig, storageState};
 }
 
 export async function runSteps(page, steps, baseUrl, env) {
@@ -879,10 +928,8 @@ export async function captureEntry(session, options, route, viewport, scheme, al
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   await prepareArtifacts(options);
-  options.navigationConfig = validateNavigation(options.navigation
-    ? await localJson(options.navigation, resolve(options.project)) : {approved: true, steps: [], login: []},
-  options.baseUrl, options.allowDestructive, Boolean(options.storageState));
-  const storageState = options.storageState ? await localJson(options.storageState, resolve(options.project), true) : undefined;
+  const {navigationConfig, storageState} = await reviewAccess(options);
+  options.navigationConfig = navigationConfig;
   options.loginEnv = {};
   for (const step of [...(options.navigationConfig.login || []), ...(options.navigationConfig.steps || [])]) {
     if (step.env) {
@@ -905,6 +952,15 @@ async function main() {
     }
 
     const launchOptions = {headless: true, args: ['--no-sandbox']};
+    if (storageState) {
+      // Cookies are not port-scoped. Apply Chromium's network policy even to redirects
+      // and subresources, not just the top-level URL checked after navigation.
+      const url = new URL(options.baseUrl);
+      const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+      launchOptions.args.push('--proxy-server=http://qa-deny.invalid:9',
+        '--host-resolver-rules=MAP qa-deny.invalid ~NOTFOUND',
+        `--proxy-bypass-list=<-loopback>;${url.protocol}//${url.hostname}:${port}`);
+    }
     const resolution = resolveChromium(playwright, options);
     if (!resolution.path) fail(noChromiumMessage(resolution));
     launchOptions.executablePath = resolution.path;

@@ -15,6 +15,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import guard
 
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 REPO_SCRIPTS = os.path.abspath(os.path.join(SCRIPTS, "..", ".."))
@@ -86,6 +87,10 @@ def make_repo(base):
         "| BOARD-911 | Discard a worktree | Feature | Ready | P2 | "
         "test | None. | control | - | explicit destructive consent |\n"))
     write(os.path.join(repo, "README.md"), "scratch\n")
+    write(os.path.join(repo, '.gitignore'), '.kilo/local/\n.kilo/worktrees/\n__pycache__/\n')
+    permissions, error = guard.write_permission_map(os.path.join(repo, 'kilo.jsonc'),
+        guard.load_policy(os.path.join(repo, guard.POLICY_REL)), mode='required')
+    assert permissions is not None, error
     git(repo, "init", "-b", "main")
     git(repo, "config", "user.email", "test@example.invalid")
     git(repo, "config", "user.name", "Test")
@@ -119,7 +124,11 @@ def row_state(repo, board_id):
 
 
 def main():
-    base = tempfile.mkdtemp(prefix="factory-env-test-")
+    fixtures = os.path.join(REPO_ROOT, 'artifacts', 'tmp', 'tests')
+    if os.path.realpath(fixtures) != fixtures:
+        raise ValueError('unsafe test fixture directory')
+    os.makedirs(fixtures, exist_ok=True)
+    base = tempfile.mkdtemp(prefix="factory-env-test-", dir=fixtures)
     repo = make_repo(base)
     worktree_script = os.path.join(repo, ".kilo", "skills", "git-worktree", "scripts",
                                    "worktree.py")
@@ -143,6 +152,10 @@ def main():
     navigation = os.path.join(repo, ".kilo", "local", "qa-navigation.json")
     os.makedirs(os.path.dirname(navigation))
     write(navigation, '{"qa": "%s"}\n' % MARKER)
+    auth = os.path.join(os.path.dirname(navigation), 'qa-auth.json')
+    state = os.path.join(os.path.dirname(navigation), 'qa-storage-state.json')
+    write(auth, '{}')
+    write(state, MARKER)
 
     code, out, err = call(worktree_script, "create", "--board", "BOARD-900")
     check(code == 0, "create failed: %s%s" % (out, err))
@@ -177,22 +190,60 @@ def main():
     navigation_copy = os.path.join(worktree, ".kilo", "local", "qa-navigation.json")
     check(os.path.isfile(nested_copy), "nested env file was not provisioned")
     check(os.path.isfile(navigation_copy), "QA navigation config was not provisioned")
+    auth_copy = os.path.join(os.path.dirname(navigation_copy), 'qa-auth.json')
+    state_copy = os.path.join(os.path.dirname(navigation_copy), 'qa-storage-state.json')
+    for path in (auth_copy, state_copy):
+        check(os.path.isfile(path) and stat.S_IMODE(os.stat(path).st_mode) == 0o600,
+              'QA config and state copies must be private')
+    write(auth_copy, 'keep')
+    code, _, _ = call(env_script, 'sync', '--worktree', worktree)
+    with open(auth_copy) as stream:
+        check(code == 0 and stream.read() == 'keep', 'sync replaced existing QA config')
+    os.unlink(state_copy)
+    git(worktree, 'add', '-f', '.kilo/local/qa-auth.json')
+    os.unlink(auth_copy)
+    os.rename(os.path.dirname(navigation), os.path.join(base, 'local-source'))
+    os.symlink(os.path.join(base, 'local-source'), os.path.dirname(navigation))
+    call(env_script, 'sync', '--worktree', worktree)
+    check(not os.path.exists(state_copy), 'sync followed QA source parent symlink')
+    os.unlink(os.path.dirname(navigation))
+    os.rename(os.path.join(base, 'local-source'), os.path.dirname(navigation))
+    git(repo, 'add', '-f', '.kilo/local/qa-storage-state.json')
+    call(env_script, 'sync', '--worktree', worktree)
+    check(not os.path.exists(auth_copy), 'sync recreated a tracked deleted QA destination')
+    check(not os.path.exists(state_copy), 'sync copied a tracked QA source')
+    git(repo, 'rm', '--cached', '.kilo/local/qa-storage-state.json')
+    git(worktree, 'rm', '--cached', '.kilo/local/qa-auth.json')
+    os.rename(os.path.dirname(navigation_copy), os.path.join(base, 'local-destination'))
+    os.symlink(os.path.join(base, 'local-destination'), os.path.dirname(navigation_copy))
+    call(env_script, 'sync', '--worktree', worktree)
+    check(not os.path.exists(state_copy), 'sync followed QA destination parent symlink')
+    os.unlink(os.path.dirname(navigation_copy))
+    os.rename(os.path.join(base, 'local-destination'), os.path.dirname(navigation_copy))
+    fake = os.path.join(repo, '.kilo/worktrees/unregistered')
+    os.mkdir(fake)
+    code, _, _ = call(env_script, 'sync', '--worktree', fake)
+    check(code != 0 and not os.listdir(fake), 'sync wrote to an unregistered destination')
 
     code, out, err = call(worktree_script, "create", "--board", "BOARD-900")
     check(code != 0, "create did not refuse for a row that already has a live worktree")
-    check("resume" in out + err, "the refusal does not name the resume option")
-    check("discard" in out + err, "the refusal does not name the discard option")
+    check("resume --board BOARD-900 --repo control" in out + err and worktree in out + err,
+          "the refusal does not identify the assigned workspace to resume")
 
     code, out, err = call(worktree_script, "create", "--board", "BOARD-901")
+    check(code != 0 and "--reuse" in out + err and "--new" in out + err,
+          "create did not require an explicit workspace choice for another row")
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-901", "--new")
     check(code != 0, "create did not refuse for a row whose slug directory is taken")
     check("BOARD-900" in out + err, "the refusal does not name the row that owns the worktree")
     check("resume" not in out + err,
           "the refusal offers a resume for a row that has no worktree")
-    check("--slug" in out + err, "the refusal does not offer a new slug")
+    check("inspect" in out + err and "--slug" not in out + err,
+          "the refusal should direct inspection, not a retry with another slug")
 
     code, out, err = call(env_script, "status", "--board", "BOARD-900")
     check(code == 0, "status failed: %s%s" % (out, err))
-    for name in env_names(repo):
+    for name in [*env_names(repo), '.kilo/local/qa-auth.json', '.kilo/local/qa-storage-state.json']:
         check(name in out, "status does not report %s" % name)
 
     code, out, err = call(env_script, "clean", "--board", "BOARD-900")
@@ -234,7 +285,10 @@ def main():
     check(code == 0, "second resume failed: %s%s" % (out, err))
     with open(os.path.join(worktree, ".env.local"), encoding="utf-8") as fh:
         check(fh.read() == "LOCAL=worktree-value\n", "resume overwrote a local file")
-    check(not os.path.exists(nested_copy), "resume recopied a removed local file")
+    check(os.path.isfile(nested_copy), "resume did not restore the missing nested env file")
+    if os.path.isfile(nested_copy):
+        with open(nested_copy, encoding="utf-8") as fh:
+            check(fh.read() == "NESTED=%s\n" % MARKER, "resume restored incorrect env contents")
 
     marker_file = os.path.join(worktree, "dirty.txt")
     write(marker_file, "uncommitted\n")
@@ -293,7 +347,8 @@ def handoff(repo, worktree_script, call, check):
 
     code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")
     check(code == 0, "handoff failed: %s%s" % (out, err))
-    check(worktree in out, "the block does not name the worktree path")
+    check("workspace: " + os.path.relpath(worktree, repo) in out.splitlines(),
+          "the block does not name the control-root-relative worktree path")
     check("feat/hand-off-a-worktree" in out, "the block does not name the branch")
     diff_at = out.find("diff main")
     merge_at = out.find("merge --board BOARD-904")

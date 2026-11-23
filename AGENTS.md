@@ -6,6 +6,10 @@ Read applicable local instructions and the documented layout, state, domain and 
 
 ## Code Quality Standards
 
+For a quick Fix, Chore or Docs edit, use the workspace skill's `--skip-worktree` eligibility check in optional or adaptive mode. Do not create a worktree when the requested current checkout passes. Do not change the user's saved mode implicitly.
+
+When the user explicitly accepts a scoped manual review, the coordinator records it with `board.py approve-review`; specialists report the decision, not a fabricated automated pass. Do not wait for the same approval again. Independent blockers and merge requirements still apply.
+
 Write human-readable code. Clear names and obvious structure matter more than cleverness. Comments explain only "why" decisions were made, never "what" the code does — the code itself must be self-documenting. Keep functions small and focused. Name variables, functions, and types precisely: `getUsersByActiveStatus` not `get`, `isEmailValid` not `check`, `orderTotal` not `data`. Avoid abbreviations except universally known ones (HTTP, URL, ID). No magic numbers — use named constants. No premature abstraction — wait for genuine reuse across three or more call sites before extracting shared behavior.
 
 Prefer a functional core with explicit effects: deterministic domain functions, immutable inputs/outputs and dependencies passed explicitly. Keep filesystem, network, persistence, time, randomness and logging at thin boundaries. Avoid hidden shared state and unnecessary reactive/callback machinery; respect framework conventions where effects are required.

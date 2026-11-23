@@ -1,173 +1,38 @@
-# Factory Rebuild Checklist — 2026-11-23
+# Factory rebuild verification
 
-Comprehensive quality-of-life improvements and agent overhaul.
+BOARD-137. Checked items identify delivered behavior or guidance, not guarantees about future agent output. Run the commands below from the factory implementation worktree.
 
-## Core Philosophy
-- Agents do stellar work following best practices
-- Human-readable code is mandatory
-- Comments only for "why", never for "what"
-- Components and abstractions must have clear purpose
-- The factory helps, never fights
+## Implementation
 
-## Implementation Checklist
+- [x] **1. Frontend:** On a compatible stack, trace the approved library (default shadcn/ui) through its alias, export and screen import. Review gallery states, token use, focus and responsive layout before screen approval. See `.kilo/agent/frontend-dev.md` and `docs/UI-UX.md`.
+- [x] **2. Backend:** Preserve existing request, response and error contracts. Separate domain decisions from I/O; check authorization, validation, failure handling and query behavior. See `.kilo/agent/backend-dev.md`.
+- [x] **3. Specialists:** All seven roles specify what to inspect, what evidence to return and when to escalate. Root and generated instructions prioritize readable names, focused code and comments explaining decisions rather than mechanics.
+- [x] **4. Authenticated QA:** The browser runner discovers the ignored profile and reuses a human-prepared test session. Require the exact origin and visible signed-in indicator; refuse invalid configuration. Provision only named QA files without overwriting current copies. Example: `.kilo/skills/qa-review/qa-auth.example.json`. Do not put passwords in tracked templates.
+- [x] **5. Board:** `approve-review` records the user's decision by scope, removes only the matching gate and returns the row to In Review only when no other blockers remain. A duplicate finding does not silently escalate. Acceptance is not a merge, automated check or new authorization.
+- [x] **6. Workspace:** `mode adaptive` and `create --skip-worktree` permit eligible maintenance on an unprotected mapped checkout. Required mode refuses skipping. Features remain linked. Check the lane, blockers, assignment and effective permission map without switching branches or persisting a new assignment.
+- [x] **7. Workflow:** `/run`, `/board`, `/ui` and `/closeout` reuse recorded decisions and distinguish acceptance, verification and Git handoff. Workspace refusals identify recovery/eligibility issues. Existing planning and initial gallery gates remain; no blanket permission override was added.
+- [x] **8. Documentation:** README quick paths, working agreements, specialist and skill docs, UI guidance, decisions ADR-093 through ADR-095 and CHANGELOG describe the shipped behavior.
+- [x] **9. Regression coverage:** Board approval plus adaptive checkout are exercised together against a disposable repository. Browser tests exercise protected routes, session reuse and denied access; lifecycle tests cover all three modes and nested checkouts. Reproduction commands below.
+- [x] **10. Templates:** New projects receive local tooling and the credential-free example, not the factory's private state. New projects generate required-mode permissions independently of the factory; control restore respects the destination mode. Project instructions and UI guidance reflect the new conventions.
 
-### 1. Frontend Agent Overhaul ✓ / ✗
-- [ ] Strengthen component library enforcement (shadcn/ui default)
-- [ ] Add explicit design system requirements
-  - [ ] Spacing scale enforcement (4/8/12/16/24/32/48)
-  - [ ] Typography hierarchy rules
-  - [ ] Color system enforcement
-  - [ ] Consistent border radius
-- [ ] Add pre-flight component reuse check
-- [ ] Self-verification against design standards before completion
-- [ ] Explicit responsive behavior requirements
-- [ ] Accessibility as mandatory (not optional)
-- [ ] Remove vague "good design" language, add concrete rules
+## Reproduce checks
 
-### 2. Backend Agent Overhaul ✓ / ✗
-- [ ] Functional core / imperative shell enforcement
-- [ ] Explicit dependency injection patterns
-- [ ] No hidden state, no global mutations
-- [ ] Pure functions return values, never mutate inputs
-- [ ] Effects at boundaries only (HTTP, DB, filesystem, time)
-- [ ] Error handling patterns (Result types, explicit errors)
-- [ ] API contract validation
-- [ ] Security patterns (input validation, sanitization)
-- [ ] Performance awareness (N+1 queries, caching)
+| Command | Result |
+| --- | --- |
+| `TMPDIR=artifacts python3 -B -m unittest discover -s .kilo/skills/git-worktree/scripts` (existing ignored `artifacts/` directory) | 99 passed: bootstrap/restore and lifecycle |
+| `python3 -B .kilo/skills/git-worktree/scripts/test_env.py` | All standalone provisioning and reuse checks passed |
+| `python3 -B -m unittest discover -s tests -v` | 10 passed: approval replay, mismatched gates, gallery controls and cross-CLI maintenance workflow |
+| `node --test .kilo/skills/qa-review/scripts/browser-review.test.mjs` | 25 passed, none skipped, including Chromium against disposable protected routes |
+| `python3 -B -m unittest discover -s .kilo/skills/qa-review/scripts -p test_ledger.py` | 8 passed |
+| `bash .devcontainer/test-kilo-redact.sh` | 26 passed |
 
-### 3. All Agent Code Quality Standards ✓ / ✗
-- [ ] Update frontend-dev.md with code quality rules
-- [ ] Update backend-dev.md with code quality rules
-- [ ] Update mobile-dev.md with code quality rules
-- [ ] Update qa-reviewer.md with verification standards
-- [ ] Update ui-critic.md with critique standards
-- [ ] Update docs-writer.md with documentation standards
-- [ ] Update merge-conflict-resolver.md
-- [ ] Add to AGENTS.md root agreement:
-  - [ ] Human-readable code is mandatory
-  - [ ] Comments only explain "why", never "what"
-  - [ ] Clear naming over clever code
-  - [ ] Small, focused functions/modules
-  - [ ] No premature abstraction
-  - [ ] Reuse requires genuine shared behavior
+## Verification limits
 
-### 4. QA Authentication System ✓ / ✗
-- [ ] Create `.kilo/local/` directory structure
-- [ ] Add `qa-auth.json` schema documentation
-- [ ] Update `.gitignore` to exclude `.kilo/local/`
-- [ ] Modify `env.py` to handle auth config
-- [ ] Update `browser-review.mjs` to auto-load credentials
-- [ ] Add auth config to worktree provisioning
-- [ ] Document in QA skill
-- [ ] Add example template file
-- [ ] Test with real login flow
+Follow-up Chromium review: the gallery fit all five configured viewports from 320 to 1920 px without horizontal overflow or reported console, page or network errors. Static update controls are disabled and labeled as fixture UI. Keyboard activation of the live refresh control reloaded the board with HTTP 200 at 390 and 1440 px. Evidence: `artifacts/reviews/gallery-refresh-recheck.json` and `artifacts/factory/qa/2026-11-23/gallery-refresh-fix/summary.json`.
 
-### 5. Board State Intelligence ✓ / ✗
-- [ ] Analyze current board.py state transitions
-- [ ] Add "user-approved" state detection
-- [ ] Fix agents to respect manual approvals
-- [ ] Stop auto-blocking when evidence exists
-- [ ] Add explicit approval markers agents can read
-- [ ] Update board.py with new state logic
-- [ ] Update all agent instructions about board states
-- [ ] Document new state handling
+The QA skill now documents human session creation and renewal with the installed Playwright CLI. Private-path preflight and disposable session reuse were tested. Interactive window-close-to-save was not exercised in this environment (no `xauth`).
 
-### 6. Flexible Worktree Mode ✓ / ✗
-- [ ] Design "adaptive" mode logic:
-  - [ ] Required: Feature rows
-  - [ ] Optional: Fix/Chore/Docs rows
-- [ ] Add `--skip-worktree` flag to worktree.py
-- [ ] Update mode command with "adaptive" option
-- [ ] Modify permission generation for adaptive mode
-- [ ] Update all agent instructions about when worktrees matter
-- [ ] Add clear error messages for mode violations
-- [ ] Document new mode in git-worktree skill
-- [ ] Test all three modes (required/optional/adaptive)
-
-### 7. Workflow Streamlining ✓ / ✗
-- [ ] Review all skills for redundant steps
-- [ ] Simplify overly complex procedures
-- [ ] Improve error messages in all scripts
-- [ ] Clearer handoff instructions
-- [ ] Remove unnecessary approval gates
-- [ ] Consolidate related checks
-- [ ] Update documentation for clarity
-
-### 8. Documentation Updates ✓ / ✗
-- [ ] Update README.md with new features
-- [ ] Update AGENTS.md with code quality standards
-- [ ] Update all agent markdown files
-- [ ] Update git-worktree SKILL.md
-- [ ] Update qa-review SKILL.md
-- [ ] Update docs/UI-UX.md
-- [ ] Add new ADRs for major changes
-- [ ] Update CHANGELOG.md
-
-### 9. Testing & Verification ✓ / ✗
-- [ ] Run all existing tests (bootstrap, lifecycle, env)
-- [ ] Test frontend agent with real component library
-- [ ] Test backend agent with real API code
-- [ ] Test QA with auth config
-- [ ] Test adaptive worktree mode
-- [ ] Test board state transitions
-- [ ] Verify no regressions in existing functionality
-- [ ] Test full workflow end-to-end
-
-### 10. Template Synchronization ✓ / ✗
-- [ ] Update templates/project/.gitignore
-- [ ] Update templates/project/AGENTS.md
-- [ ] Add templates/project/.kilo/local/ structure
-- [ ] Ensure bootstrap copies new structure
-- [ ] Test fresh project bootstrap
-- [ ] Verify restore works with new structure
-
-## Success Criteria
-
-### Frontend Must
-- ✓ Agent uses shadcn/ui by default
-- ✓ Design system enforced (spacing, type, color)
-- ✓ Components built before screens
-- ✓ No generic dashboard templates
-- ✓ Responsive and accessible by default
-
-### Backend Must
-- ✓ Functional core with explicit effects
-- ✓ No hidden state or global mutations
-- ✓ Clear error handling
-- ✓ Security patterns enforced
-- ✓ API contracts validated
-
-### Code Quality Must
-- ✓ All code is human-readable
-- ✓ Comments only for "why"
-- ✓ Clear names over clever code
-- ✓ Small focused units
-- ✓ Genuine reuse only
-
-### QA Must
-- ✓ Auth config loads automatically
-- ✓ No manual login per test
-- ✓ Config stays ignored/secret
-
-### Board Must
-- ✓ Respects manual approvals
-- ✓ No incorrect blocked states
-- ✓ Clear state transitions
-
-### Worktree Must
-- ✓ Adaptive mode works
-- ✓ Quick edits possible for non-features
-- ✓ Clear when worktrees required
-
-## Rollback Plan
-If any change breaks existing functionality:
-1. Git revert the specific commit
-2. Document the issue
-3. Fix and re-test before re-applying
-4. Keep working changes, only revert broken ones
-
-## Notes
-- Maintain backward compatibility where possible
-- Test incrementally after each major change
-- Keep existing projects working (they're independent)
-- Document all breaking changes
+- The factory gallery and board rows use the same `wb_card` function. In-process HTTP handler checks exercised `/health`, `/api/worktrees` with empty injected state, and an unknown route. This is not an end-to-end product design evaluation.
+- [ ] Compile a real shadcn screen and evaluate its design against the user's brief in an assigned product. This factory contains no tracked shadcn app. No dependency was installed to manufacture a pass.
+- [ ] Confirm session reuse with the intended product's dedicated test identity. Only disposable local accounts/sessions were exercised; real SSO, MFA and cross-origin identity flows were not tested. Sign-in and renewal remain human steps for reusable state.
+- No existing independent project was migrated, no live workspace mode was switched, and no merge was performed.

@@ -19,4 +19,20 @@ Check existing rows before adding work. Record checkable acceptance criteria, ri
 
 Consolidate review findings once. Use `check-finding.py` from the QA skill for actionable Fix rows and its fingerprint to avoid duplicates. Fixes reuse the original workspace. Record a blocker and what resolves it rather than silently dropping work.
 
+## Manual Review
+
+Read `board.py show <ID>` before requesting review. Record a pending manual decision in `Blocked by` as `review:<scope>`, using a lowercase kebab-case identifier for the specific deliverable and revision, e.g. `review:checkout-flow-v2`. Separate independent blockers with semicolons; keep all existing reasons. Never infer approval from a passing test, screenshot, silence or an agent's report.
+
+Only after the user explicitly approves that scope, the coordinator records the decision once:
+
+```bash
+python3 .kilo/skills/board/scripts/board.py approve-review BOARD-005 --scope checkout-flow-v2 --evidence "User accepted checkout flow v2 in review message 42"
+```
+
+`show` exposes the Notes entry `[user-approved:checkout-flow-v2]` and its evidence. Append notes instead of replacing approval history. Honor that decision for the same scope and revision; do not ask again or re-block solely for missing automated review of that decision. Material changes need a new scope. The command clears only the exact `review:<scope>` entry. A `Blocked` row returns to `In Review` only if that was its last reason; unknown or legacy free text is never guessed away. A duplicate fingerprint is refused without changing the original row. Escalate a genuine new blocker explicitly with its reason.
+
+Before recording a decision, compare the revision the user saw with the current deliverable. Replace a superseded gate with a fresh revision-specific scope; never relabel an old decision as approval of the new revision. A repeat for an already recorded scope leaves the row and first evidence unchanged. A new decision must match a pending review gate if any are listed. Legacy rows without a structured gate can still record evidence, so the coordinator must verify the revision even there.
+
+This records a review outcome, not a QA pass, commit, merge, or permission to start new work. Independently verify outstanding criteria and lifecycle prerequisites.
+
 For the read-only viewer, run `python3 .kilo/skills/board/scripts/board_serve.py --port 15180` as a tracked background process and report readiness and URL.

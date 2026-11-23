@@ -43,6 +43,10 @@ class LifecycleTests(unittest.TestCase):
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(SOURCE / relative, destination)
+        # A new fixture has no saved mode; do not inherit the developer's active edit map.
+        policy = GUARD.load_policy(str(self.root / GUARD.POLICY_REL))
+        permissions, error = GUARD.write_permission_map(str(self.root / "kilo.jsonc"), policy, mode="required")
+        self.assertIsNotNone(permissions, error)
         (self.root / "docs").mkdir()
         (self.root / ".kilo/repos.json").write_text('{"control": "."}\n')
         (self.root / ".gitignore").write_text(
@@ -157,6 +161,78 @@ class LifecycleTests(unittest.TestCase):
         self.initialize(other)
         self.assertEqual(WORKTREE.local_state(str(other))["mode"], "required")
 
+    def test_skip_worktree_mode_matrix_never_changes_assignment(self):
+        for number, kind in enumerate(("Fix", "Chore", "Docs", "Research"), start=2):
+            self.add_row("BOARD-%03d" % number, kind + " task", kind)
+        self.git(self.root, "switch", "-c", "maintenance/local")
+        for mode in ("required", "optional", "adaptive"):
+            self.cli("mode", mode)
+            board_path = self.root / "docs/BOARD.md"
+            state_path = self.root / ".git/kilo-workspace.json"
+            config_path = self.root / "kilo.jsonc"
+            paths = (board_path, state_path, config_path)
+            before = [path.read_bytes() for path in paths]
+            for number in range(1, 6):
+                eligible = mode != "required" and number in (2, 3, 4)
+                with self.subTest(mode=mode, number=number):
+                    response = self.cli("create", "--board", "BOARD-%03d" % number,
+                                        "--skip-worktree", success=eligible)
+                    if eligible:
+                        self.assertIn("no workspace created or recorded", response.stdout)
+                    else:
+                        self.assertIn("cannot skip", response.stderr)
+            self.assertEqual(before, [path.read_bytes() for path in paths])
+            self.assertFalse((self.root / ".kilo/worktrees").exists())
+            self.assertEqual(self.git(self.root, "branch", "--show-current").stdout.strip(), "maintenance/local")
+
+    def test_adaptive_skip_refuses_unsafe_targets_and_conflicting_options(self):
+        api = self.add_repo("api")
+        self.add_row("BOARD-002", "Small adjustment", "Docs", repos="api")
+        self.cli("mode", "adaptive")
+        args = ("create", "--board", "BOARD-002", "--skip-worktree")
+        self.assertIn("does not assign", self.cli(*args, success=False).stderr)
+        args += ("--repo", "api")
+        self.assertIn("primary checkout", self.cli(*args, success=False).stderr)
+        self.assertIn("protected branch", self.cli(*args, cwd=api, success=False).stderr)
+        self.git(api, "checkout", "--detach")
+        self.assertIn("detached HEAD", self.cli(*args, cwd=api, success=False).stderr)
+        self.git(api, "switch", "-c", "docs/local")
+        self.cli(*args, cwd=api)
+        for options in (("--reuse", "BOARD-001"), ("--new",), ("--base", "main"), ("--slug", "other")):
+            self.assertIn("cannot be combined", self.cli(*args, *options, cwd=api, success=False).stderr)
+        self.cli("create", "--board", "BOARD-002", "--repo", "api")
+        self.write_board()  # Simulate a lost board link, not a lost Git assignment.
+        self.assertIn("resume", self.cli(*args, cwd=api, success=False).stderr)
+
+    def test_adaptive_unscoped_commit_needs_managed_worktree(self):
+        self.cli("mode", "adaptive")
+        self.git(self.root, "switch", "-c", "docs/local")
+        args = ("check-git", "--", "git commit -m test")
+        self.assertIn("no board-row context", self.cli(*args, guard=True, success=False).stdout)
+        path = self.create(change=False)
+        self.cli(*args, guard=True, cwd=path)
+        lookalike = self.root / "elsewhere/.kilo/worktrees/lookalike"
+        self.git(self.root, "worktree", "add", "-b", "docs/lookalike", str(lookalike))
+        self.cli(*args, guard=True, cwd=lookalike, success=False)
+
+    def test_skip_refuses_blocked_row_closed_row_and_stale_permissions(self):
+        self.add_row("BOARD-002", "Maintenance", "Fix", blocked="BOARD-001")
+        self.git(self.root, "switch", "-c", "fix/current")
+        self.cli("mode", "adaptive")
+        args = ("create", "--board", "BOARD-002", "--skip-worktree")
+        self.assertIn("dependency", self.cli(*args, success=False).stderr)
+        self.rows[-1][6] = "- None."
+        self.write_board()
+        self.set_status("BOARD-002", "Merged")
+        self.assertIn("Ready or In Progress", self.cli(*args, success=False).stderr)
+        self.set_status("BOARD-002", "In Progress")
+        config_path = self.root / "kilo.jsonc"
+        config = json.loads(config_path.read_text())
+        config["permission"]["edit"]["*"] = "allow"
+        config_path.write_text(json.dumps(config))
+        self.assertIn("disagrees with saved mode", self.cli(*args, success=False).stderr)
+        self.assertEqual(config, json.loads(config_path.read_text()))
+
     def test_guard_resolves_git_C_and_denies_missing_context(self):
         path = self.create(change=False)
         self.cli("check-git", "--", "git commit -m test", cwd=path, guard=True)
@@ -172,8 +248,25 @@ class LifecycleTests(unittest.TestCase):
         for arguments in ("-C", "-c", "--config-env", "--git-dir=.git", "--work-tree ."):
             with self.subTest(arguments=arguments):
                 self.cli("check-git", "--", "git " + arguments, cwd=path, guard=True, success=False)
-        self.cli("check-git", "--", "git commit -m test", cwd=self.temporary.name,
-                  guard=True, success=False)
+        # A bare repo stops Git discovery even when TMPDIR is inside another checkout.
+        bare = Path(self.temporary.name) / "no-working-tree.git"
+        self.git(self.root, "init", "--bare", str(bare))
+        result = self.cli("check-git", "--", "git commit -m test", cwd=bare,
+                          guard=True, success=False)
+        self.assertIn("not inside a git repository; refusing operation", result.stderr)
+        result = self.cli("check-git", "--", "git -C %s commit -m test" % shlex.quote(str(bare)),
+                          cwd=path, guard=True, success=False)
+        self.assertIn("cannot establish git repository context", result.stderr)
+
+    def test_nested_primary_is_not_a_managed_link(self):
+        checkout = self.create(change=False)
+        nested = checkout / "separate"
+        nested.mkdir()
+        self.initialize(nested)
+        self.git(nested, "switch", "-c", "fix/local")
+        self.assertTrue(GUARD.repo_context(str(checkout))["linked"])
+        self.assertFalse(GUARD.repo_context(str(nested))["linked"])
+        self.cli("check-git", "--", "git commit -m test", cwd=nested, guard=True, success=False)
 
     def test_guard_rejects_directory_chains_without_executing_commits(self):
         path = self.create(change=False)
@@ -272,7 +365,7 @@ class LifecycleTests(unittest.TestCase):
         (self.root / "public/.env.open").write_text("not ignored")
         source = self.root / ".env.local"
         source.write_text("source")
-        target = Path(self.temporary.name) / "copy"
+        target = self.root / WORKTREE.WORKTREES_DIR / "copy"
         self.git(self.root, "worktree", "add", str(target), "-b", "feat/copy", "main")
         (target / ".env.tracked").unlink()
         (target / ".env.local").write_text("keep")
@@ -1131,14 +1224,14 @@ class LifecycleTests(unittest.TestCase):
     def test_generated_map_matches_policy_and_apply_requires_approval(self):
         policy = json.loads((SOURCE / ".kilo/policies/git-policy.json").read_text())
         config = json.loads((SOURCE / "kilo.jsonc").read_text())
-        self.assertEqual(config["permission"], GUARD.generated_permission(policy))
+        self.assertEqual(config["permission"], GUARD.generated_permission(policy, WORKTREE.workspace_mode(str(SOURCE))))
         self.assertEqual(GUARD.bash_verdict(policy, "python3 worktree.py merge --board BOARD-001 --apply")[0], "ask")
         self.assertEqual(GUARD.bash_verdict(policy, "python3 worktree.py discard --board BOARD-001 --apply --discard")[0], "deny")
         self.assertEqual(GUARD.bash_verdict(policy, "git status")[0], "allow")
 
-    def test_review_artifact_permissions_preserve_protections_in_both_modes(self):
+    def test_review_artifact_permissions_preserve_protections_in_all_modes(self):
         policy = json.loads((SOURCE / ".kilo/policies/git-policy.json").read_text())
-        for mode in ("required", "optional"):
+        for mode in ("required", "optional", "adaptive"):
             with self.subTest(mode=mode):
                 expected = GUARD.generated_permission(policy, mode)
                 mapping = expected["edit"]
@@ -1148,7 +1241,10 @@ class LifecycleTests(unittest.TestCase):
                     self.assertLess(patterns.index(pattern), patterns.index("docs/BOARD.md"))
                     self.assertLess(patterns.index(pattern), patterns.index("**/.env"))
                 cases = {}
-                for prefix in ("", str(self.root) + "/"):
+                # Edit globs match path strings, not Git roots. Model both absolute
+                # contexts explicitly rather than depending on the host's TMPDIR.
+                linked_prefix = "/workspace/control/.kilo/worktrees/assigned/"
+                for prefix in ("", "/workspace/control/", linked_prefix):
                     for name in ("BOARD-113-qa.md", "BOARD-113-review.md", "BOARD-113-ledger.md"):
                         cases[prefix + "artifacts/reviews/" + name] = "allow"
                     for name in (".env", ".env.local", ".npmrc", "private.pem", "private.key",
@@ -1157,7 +1253,7 @@ class LifecycleTests(unittest.TestCase):
                     cases[prefix + "artifacts/reviews/docs/BOARD.md"] = "deny"
                     cases[prefix + "docs/BOARD.md"] = "deny"
                     for name in ("apps/web/src/main.ts", "artifacts/other/report.md"):
-                        cases[prefix + name] = "allow" if mode == "optional" else "ask"
+                        cases[prefix + name] = "allow" if mode == "optional" or prefix == linked_prefix else "ask"
                     cases[prefix + ".kilo/worktrees/assigned/apps/web/src/main.ts"] = "allow"
                 for path, action in cases.items():
                     with self.subTest(path=path):
@@ -1176,7 +1272,7 @@ class LifecycleTests(unittest.TestCase):
                                                           GUARD.repo_context(str(self.root))), 0)
         config = json.loads((SOURCE / "kilo.jsonc").read_text())
         self.assertTrue(GUARD.permission_maps_match(config["permission"],
-                                                   GUARD.generated_permission(policy)))
+                                                   GUARD.generated_permission(policy, WORKTREE.workspace_mode(str(SOURCE)))))
 
 
 if __name__ == "__main__":

@@ -58,13 +58,9 @@ python3 .kilo/skills/git-worktree/scripts/guard.py check-repos
 Lifecycle `--board`/`--repo` may repeat; `--target` overrides the saved base. Merge preflights all
 clean sources/targets except live board metadata, readiness and commits; non-atomic failures
 preserve progress. Human completes conflicts in existing checkouts, then retries. No agent merges.
-QA capture uses the existing `browser-review.mjs` flags `--storage-state <ignored-local.json>` and
-`--navigation <ignored-local.json>`; schema and destructive-approval rules are in the QA skill.
-Storage-state or login also requires ignored navigation config with an app-specific
-`authenticatedSelector`, for example `"authenticatedSelector": "[data-testid='signed-in-shell']"`.
-Check the signed-in marker is visible after navigation settles, before capture; route-only proof
-can accept a same-URL MFA/SSO gate. Do not use password-input heuristics. Page-changing navigation
-declares the final destination via an existing step, e.g. `{"action":"waitForURL","path":"/app"}`.
+For protected pages, follow the [QA state setup](../.kilo/skills/qa-review/SKILL.md#authentication).
+The runner discovers the local profile and verifies the origin and visible signed-in marker;
+no navigation file is required.
 
 | Port | What | Notes |
 |---|---|---|

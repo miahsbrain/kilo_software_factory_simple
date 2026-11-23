@@ -5,15 +5,13 @@ The user populates real secrets.
 
 | Variable | Where used | Required | Default | Notes |
 |---|---|---|---|---|
-| `QA_TEST_EMAIL` | QA navigation `fill.env` example | no | none | Authorized test account; user supplies outside CLI/evidence/commits. |
-| `QA_TEST_PASSWORD` | QA navigation `fill.env` example | no | none | Name only; never print its value. Manual user MFA/SSO, never bypass. |
 
 ## Config keys
 
 | Key | Where | Notes |
 |---|---|---|
 | `mode` | common Git directory `kilo-workspace.json` | Project-local required (default) / optional; regenerate permissions and restart Kilo. |
-| `approved`, `login`, `authenticatedPath`, `authenticatedSelector`, `steps` | ignored local navigation JSON | Storage-state or login requires an app-specific visible signed-in marker checked after navigation settles; page-changing navigation declares final destination via waitForURL. No password-input heuristic. Storage state is also local/ignored. |
+| `.kilo/local/qa-auth.json`, `.kilo/local/qa-storage-state.json` | standalone QA capture | Human prepares ignored, private state for this project. See the installed [setup and renewal](../.kilo/skills/qa-review/SKILL.md#authentication); no login environment variables required. |
 
 ## Rules
 

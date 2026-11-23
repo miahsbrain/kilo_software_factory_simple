@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 
-from guard import bash_verdict, load_policy, pattern_matches, script_project_root
+from guard import bash_verdict, load_policy, pattern_matches, script_project_root, write_permission_map
 
 
 NAME = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z")
@@ -119,7 +119,7 @@ def collect(root, target, plan):
             plan[output] = path.read_bytes()
 
 
-def local_plan(source):
+def local_plan(source, *, mode=None):
     plan = {}
     for name in HARNESS:
         collect(source / ".kilo" / name, Path(".kilo") / name, plan)
@@ -128,6 +128,12 @@ def local_plan(source):
         if not path.is_file():
             raise ValueError("missing regular source: " + relative)
         plan[Path(relative)] = path.read_bytes()
+    if mode is not None:
+        policy = load_policy(str(real_path(source / ".kilo/policies/git-policy.json")))
+        permissions, text = write_permission_map(source / "kilo.jsonc", policy, mode=mode, preview=True)
+        if permissions is None:
+            raise ValueError(text)
+        plan[Path("kilo.jsonc")] = text.encode("utf-8")
     collect(source / ".devcontainer", Path(".devcontainer"), plan)
     config_path = Path(".devcontainer/devcontainer.json")
     if any(Path(p) not in plan for p in (".devcontainer/devcontainer.json", ".devcontainer/Dockerfile", ".devcontainer/kilo-redact.sh")):
@@ -230,7 +236,7 @@ def project(source, destination, allow_outside=False):
     template = factory_template(source)
     plan = {}
     collect(template, Path("."), plan)
-    plan.update(local_plan(source))
+    plan.update(local_plan(source, mode="required"))
     plan[Path(".kilo/repos.json")] = encoded({"control": "."})
     files = [str(p) for p in plan if p.parts[0] not in (".kilo", ".devcontainer")
              and str(p) not in ("AGENTS.md", "kilo.jsonc", "docs/BOARD.md")]
@@ -391,7 +397,6 @@ def app(source, root, name, git_mode, role):
 def restore(source, destination, control=None):
     template = factory_template(source)
     # Validate complete factory sources even when an app inherits its project's harness.
-    factory_local = local_plan(source)
     destination = real_path(destination)
     real_path(destination / ".git")
     if (destination == source or (destination / "templates/project").exists()):
@@ -401,7 +406,8 @@ def restore(source, destination, control=None):
         raise ValueError("restore requires an existing primary repository checkout, not a linked worktree")
     if control is None and (destination / "services.json").is_file():
         data = read_services(destination)
-        plan = factory_local
+        from worktree import local_state
+        plan = local_plan(source, mode=local_state(str(destination))["mode"])
         for relative in ("AGENTS.md", "docs/BOARD.md"):
             plan[Path(relative)] = real_path(template / relative).read_bytes()
         plan[Path(".kilo/repos.json")] = encoded(repo_map(data))
@@ -410,6 +416,7 @@ def restore(source, destination, control=None):
             if not checkout.is_dir() or (service["git"] == "separate" and not (checkout / ".git").is_dir()):
                 print("Missing service checkout: " + service["path"] + " (" + service["git"] + ")")
     else:
+        local_plan(source)  # App restore also requires a complete factory source.
         if control is None:
             candidate = destination.parent.parent
             if destination.parent.name != "apps" or not (candidate / "services.json").is_file():
