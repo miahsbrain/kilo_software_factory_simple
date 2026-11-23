@@ -35,6 +35,7 @@ existing row with `board.py note`.
 Exit codes: 0 ok, 1 refusal, 2 usage error, 66 invalid input.
 """
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -58,6 +59,68 @@ OK = 0
 REFUSED = 1
 USAGE = 2
 INVALID = 66
+
+# Only inflect known task verbs. The groups describe spelling, not rules for
+# guessing whether an arbitrary product name or noun is a verb.
+PAST_VERBS = {
+    **{v: v + "ed" for v in ("add adjust align clean deploy discard document hand implement install "
+                              "provision refactor refresh register repair support test").split()},
+    **{v: v + "d" for v in ("automate configure create delete disable enable generate improve integrate "
+                             "migrate move refuse remove rename replace resolve restore update validate").split()},
+    "bring": "brought", "build": "built", "choose": "chose", "fix": "fixed", "make": "made", "plan": "planned",
+    "rebuild": "rebuilt", "rewrite": "rewrote", "run": "ran", "set": "set",
+    "send": "sent", "ship": "shipped", "simplify": "simplified", "split": "split", "write": "wrote",
+}
+NOUN_MODIFIERS = {"build", "clean", "deploy", "document", "fix", "hand", "plan", "run", "set", "support", "test", "update"}
+OBJECT_MARKERS = {"a", "an", "the", "all", "new", "existing", "missing", "each", "our"}
+# Common unambiguous task objects also occur without an article ("fix bugs").
+TASK_OBJECTS = {"build": {"apps", "artifacts", "components"}, "clean": {"up"}, "hand": {"off"},
+                "fix": {"bug", "bugs", "typo", "typos", "crash", "crashes"},
+                "update": {"dependencies", "docs", "documentation", "readme", "tests"}}
+
+# Unicode Emoji property (17.0); ASCII keycap bases are emoji only in a sequence.
+EMOJI_BASE = (
+    "©®‼⁉™ℹ↔-↙↩-↪⌚-⌛⌨⏏⏩-⏳⏸-⏺Ⓜ▪-▫▶◀◻-◾☀-☄☎☑☔-☕☘☝☠☢-☣☦☪☮-☯☸-☺♀♂♈-♓♟-♠♣♥-♦♨♻♾-♿"
+    "⚒-⚗⚙⚛-⚜⚠-⚡⚧⚪-⚫⚰-⚱⚽-⚾⛄-⛅⛈⛎-⛏⛑⛓-⛔⛩-⛪⛰-⛵⛷-⛺⛽✂✅✈-✍✏✒✔✖✝✡✨✳-✴❄❇❌❎❓-❕❗❣-❤➕-➗➡➰➿"
+    "⤴-⤵⬅-⬇⬛-⬜⭐⭕〰〽㊗㊙🀄🃏🅰-🅱🅾-🅿🆎🆑-🆚🇦-🇿🈁-🈂🈚🈯🈲-🈺🉐-🉑🌀-🌡🌤-🎓🎖-🎗🎙-🎛🎞-🏰🏳-🏵🏷-📽📿-🔽"
+    "🕉-🕎🕐-🕧🕯-🕰🕳-🕺🖇🖊-🖍🖐🖕-🖖🖤-🖥🖨🖱-🖲🖼🗂-🗄🗑-🗓🗜-🗞🗡🗣🗨🗯🗳🗺-🙏🚀-🛅🛋-🛒🛕-🛘🛜-🛥🛩🛫-🛬🛰🛳-🛼"
+    "🟠-🟫🟰🤌-🤺🤼-🥅🥇-🧿🩰-🩼🪀-🪊🪎-🫆🫈🫍-🫜🫟-🫪🫯-🫸"
+)
+EMOJI_PART = rf"[{EMOJI_BASE}][\ufe0e\ufe0f]?[\U000e0020-\U000e007f]*"
+EMOJI = re.compile(rf"[0-9#*]\ufe0f?\u20e3|{EMOJI_PART}(?:\u200d{EMOJI_PART})*")
+
+
+def generated_title(title, scopes):
+    title = " ".join(EMOJI.sub(" ", title).split())
+    labels = {s.casefold() for s in scopes if s and s not in {".", "-"}}
+    labels.update(t.lower() for t in TYPES)
+    labels.update(("feat", "inhouz_agentic_ms"))  # Known legacy repository label.
+    label = "(?:" + "|".join(re.escape(s) for s in sorted(labels, key=len, reverse=True)) + ")"
+    prefix = rf"(?:\[{label}\]\s*[:/\-]?|{label}(?:\({label}\))?\s*(?::|/|\s-\s))\s*"
+    title = re.sub(rf"^(?:{prefix})+", "", title, flags=re.IGNORECASE)
+    verb, _, rest = title.partition(" ")
+    key = verb.lower()
+    if rest and (verb.islower() or verb.istitle()) and key in PAST_VERBS:
+        obj = rest.split()[0].lower()
+        if key not in NOUN_MODIFIERS or obj in OBJECT_MARKERS or obj in TASK_OBJECTS.get(key, ()):
+            return PAST_VERBS[key].capitalize() + " " + rest
+    if verb.islower() and verb in PAST_VERBS.values():
+        return verb.capitalize() + (" " + rest if rest else "")
+    return title
+
+
+def naming_scopes(root, repo_cell, repos):
+    scopes = set(re.split(r"[,;\s]+", repo_cell or "")) | {os.path.basename(root), os.path.basename(os.getcwd())}
+    for name, path in repos.items():
+        if isinstance(path, str):
+            scopes.update((name, path, os.path.basename(os.path.normpath(path))))
+    for parent in (root, os.path.join(root, "apps")):
+        try:
+            with os.scandir(parent) as entries:
+                scopes.update(entry.name for entry in entries if entry.is_dir(follow_symlinks=False))
+        except OSError:
+            pass  # An optional folder is not required to name a task.
+    return scopes
 
 
 def control_root(cwd):
@@ -387,9 +450,20 @@ def cmd_add(args, path):
             print("  python3 %s note %s --value \"<the new evidence>\"" %
                   (sys.argv[0], existing_id), file=sys.stderr)
             return REFUSED
+    parent = os.path.dirname(os.path.abspath(path))
+    root = os.path.dirname(parent) if os.path.basename(parent) == "docs" else parent
+    try:
+        with open(os.path.join(root, ".kilo", "repos.json"), encoding="utf-8") as source:
+            repos = json.load(source)
+    except (OSError, ValueError):
+        repos = {}
+    title = generated_title(args.task, naming_scopes(root, args.repos, repos if isinstance(repos, dict) else {}))
+    if not title:
+        print("invalid --task: no task title remains after removing labels", file=sys.stderr)
+        return INVALID
     by_column = {
         "ID": args.id,
-        "Task": args.task,
+        "Task": title,
         "Type": args.type,
         "Status": args.status,
         "Priority": args.priority,

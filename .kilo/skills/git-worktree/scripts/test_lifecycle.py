@@ -140,6 +140,18 @@ class LifecycleTests(unittest.TestCase):
         self.commit(self.root)
         return path
 
+    def test_create_from_legacy_title_does_not_rename_task_or_override_slug(self):
+        legacy = '\U0001f680 [feat] inhouz_agentic_ms: add kus deployment manifests'
+        self.add_row('BOARD-002', legacy)
+        self.add_row('BOARD-003', legacy)
+        self.cli('create', '--board', 'BOARD-002')
+        self.cli('create', '--board', 'BOARD-003', '--new', '--slug', 'add-custom')
+        self.cli('resume', '--board', 'BOARD-003')
+        for board_id, slug in [('BOARD-002', 'added-kus-deployment-manifests'), ('BOARD-003', 'add-custom')]:
+            path = self.root / '.kilo/worktrees' / slug
+            self.assertEqual(self.git(path, 'branch', '--show-current').stdout.strip(), 'feat/' + slug)
+            self.assertIn(f'| {board_id} | {legacy} |', (self.root / 'docs/BOARD.md').read_text())
+
     def test_mode_is_local_persistent_and_regenerates_permissions(self):
         self.assertIn("required", self.cli("mode", "status").stdout)
         self.git(self.root, "checkout", "-b", "feat/current")

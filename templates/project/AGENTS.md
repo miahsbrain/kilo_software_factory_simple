@@ -1,5 +1,7 @@
 # Working Agreement
 
+Name new features with a past-tense description, without emoji or a repository/folder label. Example: `Added kus deployment manifests`, branch `feat/added-kus-deployment-manifests`, commit `[feat] Added kus deployment manifests`. Leave existing branches and history alone.
+
 Build useful, distinctive software. Favor clear code, focused modules, existing conventions, and the smallest sound solution. Avoid speculative abstractions.
 
 Write readable code with domain names and focused functions. Comment the reason for a surprising choice, not what the next line does. For web UI, verify the component import and its consumer before composing a screen. Use shadcn/ui by default on compatible stacks unless another library is approved.

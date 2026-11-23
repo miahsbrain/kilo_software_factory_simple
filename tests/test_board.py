@@ -1,3 +1,4 @@
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -6,6 +7,28 @@ from pathlib import Path
 
 FACTORY = Path(__file__).resolve().parents[1]
 BOARD_CLI = FACTORY / '.kilo/skills/board/scripts/board.py'
+
+
+class TitleTests(unittest.TestCase):
+    def test_generated_titles_preserve_vocabulary_and_are_idempotent(self):
+        spec = importlib.util.spec_from_file_location('board_titles', BOARD_CLI)
+        board = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(board)
+        for source, expected in (
+            ('feat(web): rewrite the HTTP client', 'Rewrote the HTTP client'),
+            ('[Feature] web: build a CLI', 'Built a CLI'),
+            ('fix/ web - simplify OAuth2', 'Simplified OAuth2'),
+            ('update docs', 'Updated docs'),
+            ('added API support', 'Added API support'),
+            ('add\U0001f469\U0001f3fd\u200d\U0001f4bbAPI 1\ufe0f\u20e3 v2', 'Added API v2'),
+            ('Build pipeline', 'Build pipeline'), ('Test coverage', 'Test coverage'),
+            ('WebSocket retry', 'WebSocket retry'), ('xAPI: add docs', 'xAPI: add docs'),
+            ('re-add TLS', 're-add TLS'), ('ADD opcode', 'ADD opcode'),
+            ('add C# and UTF-8', 'Added C# and UTF-8'),
+        ):
+            with self.subTest(source=source):
+                self.assertEqual(board.generated_title(source, {'web'}), expected)
+                self.assertEqual(board.generated_title(expected, {'web'}), expected)
 
 
 class ManualReviewTests(unittest.TestCase):
@@ -31,6 +54,26 @@ class ManualReviewTests(unittest.TestCase):
 
     def approve(self, evidence='User decision #42', expected=0):
         self.cli('approve-review', 'A', '--scope', 'flow-v1', '--evidence', evidence, expected=expected)
+
+    def test_add_names_only_new_task_cell(self):
+        root = self.path.parent
+        (root / '.kilo').mkdir()
+        (root / '.kilo/repos.json').write_text('{"billing":"apps/payments"}')
+        (root / 'frontend').mkdir()
+        legacy = '\U0001f680 [feat] inhouz_agentic_ms: add kus deployment manifests'
+        for row, task, name in [('A', legacy, 'Added kus deployment manifests'),
+                                ('B', '[billing] frontend: payments: write docs', 'Wrote docs')]:
+            before = self.path.read_text().splitlines()
+            self.cli('add', '--id', row, '--task', task, '--type', 'Feature', '--status', 'Ready',
+                     '--priority', 'P2', '--risk', 'low', '--note', legacy)
+            shown = self.cli('show', row)
+            self.assertTrue(shown.startswith(f'{row} | {name} | Feature |'), shown)
+            self.assertIn(legacy, shown)
+            self.assertTrue(all(line in self.path.read_text().splitlines() for line in before))
+        before = self.path.read_bytes()
+        self.cli('add', '--id', 'C', '--task', '\U0001f680 [feat]', '--type', 'Feature',
+                 '--status', 'Ready', '--priority', 'P2', '--risk', 'low', expected=66)
+        self.assertEqual(self.path.read_bytes(), before)
 
     def test_only_matching_gate_returns_to_review_with_visible_evidence(self):
         self.add()
