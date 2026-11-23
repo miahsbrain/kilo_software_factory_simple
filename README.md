@@ -2,11 +2,38 @@
 
 A small delivery harness for [Kilo Code](https://kilo.ai): a working agreement, specialist agents, a live board, and scripts for workspaces and review evidence. This repository maintains the harness, not a product. The existing `project/` is an independent ignored repository and is not migrated by factory changes.
 
+## Factory switches
+
+Run these commands from the factory or installed project control root. QA and UI switches are independent, default to **on**, and take effect on the next review without restarting Kilo.
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/worktree.py status           # Workspace mode, automatic QA and UI critique
+python3 .kilo/skills/git-worktree/scripts/worktree.py reviews qa off    # Skip automatic QA
+python3 .kilo/skills/git-worktree/scripts/worktree.py reviews ui off    # Skip automatic UI critique
+python3 .kilo/skills/git-worktree/scripts/worktree.py reviews both off  # Manual review only
+python3 .kilo/skills/git-worktree/scripts/worktree.py reviews both on   # Restore both; qa/ui also accept on
+```
+
+At the end of the fix, the agent links a manual QA/UI checklist for skipped checks in the assigned checkout's `artifacts/reviews/`. Normal code tests still run. Skipped reviews do not count as passed. If only UI critique is enabled it can use existing evidence, not launch a new QA capture. Saved Playwright evidence uses the confined `browser-review.mjs` runner, not the unrestricted MCP server. Restart Kilo after adopting the updated MCP config; this does not move historical images.
+
+**Work without an extra worktree for maintenance:**
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode adaptive
+# Restart Kilo after changing workspace mode. From the eligible primary checkout:
+python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-123 --repo control --skip-worktree
+# Restore mandatory worktrees:
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode required
+```
+
+Replace `BOARD-123` with the actual Fix, Chore or Docs ID. This allows eligible edits in the primary **checkout**, not on the protected `main` **branch**; Features still require a linked worktree. Workspace mode and review switches do not change one another.
+
 ## Contents
 
 **Common tasks**
 
-- **Quick maintenance edit:** Set project mode with `python3 .kilo/skills/git-worktree/scripts/worktree.py mode adaptive` and restart Kilo once. From the mapped primary checkout on a nonprotected branch, run `worktree.py create --board <ID> --repo control --skip-worktree` using the same script path. This checks eligibility for a Fix, Chore or Docs row without creating or switching branches. Features still use linked worktrees. Use a linked workspace from the outset for a commit/merge handoff.
+- **Get a manual QA guide:** Run `/ui checklist BOARD-123` or ask for a checklist by feature name or for the whole board. The reviewer hands back a Markdown file in the assigned checkout's `artifacts/reviews/` with what changed, where to test, and what to expect. Inaccessible QA/UI checks trigger the same guide automatically; delivery does not mark them passed.
+
 - **Review a protected page:** Use the [QA profile instructions](.kilo/skills/qa-review/SKILL.md#authentication) to point the standalone browser reviewer at an ignored, human-prepared test session. No production password belongs in the repository. The origin and a visible signed-in marker are checked on capture.
 - **Accept a manual review:** Tell the coordinator what you tested. It records `board.py approve-review <ID> --scope <scope> --evidence "<decision reference>"`. Only `review:<scope>` is cleared. A separate defect, dependency, or merge decision is not silently approved.
 - **Review frontend work:** Ask for the component module and consuming screen, the gallery with its interaction states, and the narrow/wide capture. A library name in a plan is not evidence that the screen uses it.

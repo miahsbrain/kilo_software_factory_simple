@@ -19,6 +19,8 @@ Check existing rows before adding work. Record checkable acceptance criteria, ri
 
 Consolidate review findings once. Use `check-finding.py` from the QA skill for actionable Fix rows and its fingerprint to avoid duplicates. Fixes reuse the original workspace. Record a blocker and what resolves it rather than silently dropping work.
 
+Board gallery and review guidance is subject to `worktree.py reviews status`. Follow `/components` and `/ui` for the independent gates. Link the manual QA/UI checklist for skipped scopes even without a blocker; policy skips and checklist delivery do not change a lane or prove a pass.
+
 ## Manual Review
 
 Read `board.py show <ID>` before requesting review. Record a pending manual decision in `Blocked by` as `review:<scope>`, using a lowercase kebab-case identifier for the specific deliverable and revision, e.g. `review:checkout-flow-v2`. Separate independent blockers with semicolons; keep all existing reasons. Never infer approval from a passing test, screenshot, silence or an agent's report.

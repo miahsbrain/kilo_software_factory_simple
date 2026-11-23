@@ -18,6 +18,16 @@ import worktree
 SOURCE = Path(__file__).resolve().parents[4]
 
 
+class BrowserConfigTests(unittest.TestCase):
+    def test_inherited_playwright_server_is_disabled(self):
+        # Bootstrap/restore regenerate permissions for control; app restore copies control config.
+        for mode in (None, "required", "optional", "adaptive"):
+            with self.subTest(mode=mode):
+                plan = bootstrap.local_plan(SOURCE, mode=mode)
+                config = json.loads(plan[Path("kilo.jsonc")])
+                self.assertIs(config["mcp"]["playwright"]["enabled"], False)
+
+
 class BootstrapTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="bootstrap-test-")

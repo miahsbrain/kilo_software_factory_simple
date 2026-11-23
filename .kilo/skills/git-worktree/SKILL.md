@@ -19,11 +19,14 @@ Both modes write safe app-local project-ignore snapshots without control service
 
 ```bash
 python3 .kilo/skills/git-worktree/scripts/worktree.py mode status
+python3 .kilo/skills/git-worktree/scripts/worktree.py reviews status
 python3 .kilo/skills/git-worktree/scripts/worktree.py list
 python3 .kilo/skills/git-worktree/scripts/worktree.py resume --board <ID>
 python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <ID> --repo <repo-id> --base <branch>
 python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <NEW-ID> --reuse <EXISTING-ID> --repo <repo-id>
 ```
+
+`reviews status` reads independent automatic `qa` and `ui` booleans (both default on). Check from the assigned root before review delegation and again in the reviewer. An unreadable or invalid result requires manual review; do not change policy to unblock automation. See the QA skill for capture limits and the mandatory skipped-scope checklist link at completion. These switches do not disable ordinary code tests or change board lanes.
 
 Create only an authorized workspace. `--reuse` supports Feature rows as well as Fix rows, retaining the existing branch/base and recording the new assignment. Feature implementation always needs an assigned linked worktree. Bootstrap's one initial commit in a genuinely new repository precedes feature assignment.
 

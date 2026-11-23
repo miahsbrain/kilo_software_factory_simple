@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, writeFile, mkdir, symlink, readFile, stat, rm, readdir} from 'node:fs/promises';
+import {mkdtemp, writeFile, mkdir, symlink, readFile, stat, rm, readdir, copyFile} from 'node:fs/promises';
 import {tmpdir as osTmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {execFileSync, execFile} from 'node:child_process';
@@ -17,6 +17,7 @@ await mkdir(fixtures, {recursive: true});
 const tmpdir = () => fixtures;
 
 const base = 'http://localhost:4173';
+const manualCapture = '--human-requested-manual-capture';
 const state = {cookies: [{value: 'test-session-placeholder'}], origins: [
   {origin: base, localStorage: [{name: 'session', value: 'test-local-placeholder'}]},
 ]};
@@ -28,6 +29,41 @@ test('CLI accepts state/navigation paths and explicit destructive authorization'
   assert.equal(options.navigation, '.kilo/qa-local/navigation.json');
   assert.equal(options.allowDestructive, true);
   assert.equal(options.viewports.length, 5);
+});
+
+test('automatic CLI requires valid enabled QA before artifact inspection or browser launch', async t => {
+  const fixture = await mkdtemp(join(fixtures, 'capture-policy-'));
+  t.after(() => rm(fixture, {recursive: true, force: true}));
+  const cwd = join(fixture, 'assigned-app');
+  const scripts = join(fixture, '.kilo/skills');
+  const captureDir = join(scripts, 'qa-review/scripts');
+  const policyDir = join(scripts, 'git-worktree/scripts');
+  await mkdir(cwd);
+  execFileSync('git', ['init', '-q'], {cwd});
+  await mkdir(captureDir, {recursive: true});
+  await mkdir(policyDir, {recursive: true});
+  const script = join(captureDir, 'browser-review.mjs');
+  await copyFile(new URL('./browser-review.mjs', import.meta.url), script);
+  const policy = join(policyDir, 'worktree.py');
+  const refusal = (reason, ...flags) => assert.throws(() => execFileSync(process.execPath,
+    [script, '--base-url', base, '--route', '/', ...flags], {cwd, stdio: 'pipe'}),
+    error => error.status === 2 && reason.test(error.stderr));
+  const invalid = /cannot verify review policy/;
+  const pathCheck = /inside caller worktree artifacts/;
+  refusal(invalid); // Missing policy CLI.
+  refusal(pathCheck, manualCapture, '--artifact-dir', fixture); // Manual capture still enforces confinement.
+  for (const [result, expected] of [
+    ['raise SystemExit(1)', invalid], ["print('invalid')", invalid],
+    ["print('{\"qa\":true}')", invalid], ["print('{\"qa\":\"false\",\"ui\":true}')", invalid],
+    ["print('{\"qa\":false,\"ui\":true}')", /automatic QA capture is off/],
+    ["print('{\"qa\":true,\"ui\":false}')", pathCheck],
+  ]) {
+    await writeFile(policy, 'import os, sys\nassert sys.argv[1:] == ["reviews", "status"]\n' +
+      'assert os.getcwd() == ' + JSON.stringify(cwd) + '\n' + result);
+    if (expected === pathCheck) refusal(expected, '--artifact-dir', fixture);
+    else refusal(expected); // Valid capture request must stop without creating even browser temp files.
+    assert.deepEqual(await readdir(cwd), ['.git']);
+  }
 });
 
 test('unsafe scope/task/label/date are refused, including with explicit artifact override', () => {
@@ -61,7 +97,7 @@ test('outside overrides and symlink ancestors/files are refused before any write
   execFileSync('git', ['init', '-q'], {cwd: fixture});
   await symlink(join(root, 'target'), join(fixture, 'artifacts'));
   const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
-  assert.throws(() => execFileSync(process.execPath, [script, '--base-url', base, '--route', '/'],
+  assert.throws(() => execFileSync(process.execPath, [script, manualCapture, '--base-url', base, '--route', '/'],
     {cwd: fixture, stdio: 'pipe'}), error => error.status === 2 && /symlink/.test(error.stderr));
   assert.deepEqual(await readdir(join(root, 'target')), []);
 });
@@ -467,7 +503,7 @@ test('canonical browser script logs in and captures protected password settings 
     await writeFile(join(root, 'local', 'navigation.json'), JSON.stringify(config), {mode: 0o600});
     const artifactDir = join(root, 'artifacts', 'factory', 'qa', '2026-11-18', 'BOARD134');
     const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
-    const args = [script, '--base-url', url, '--route', '/app', '--project', root,
+    const args = [script, manualCapture, '--base-url', url, '--route', '/app', '--project', root,
       '--navigation', 'local/navigation.json', '--date', '2026-11-18', '--task-id', 'BOARD134',
       '--component', 'main', '--viewports', '320x800,834x1112'];
     let output;
@@ -527,7 +563,7 @@ test('canonical browser script logs in and captures protected password settings 
       localStorage: [{name: 'fixture', value: 'fixture-session-placeholder'}]}]};
     await writeFile(join(local, auth.storageState), JSON.stringify(prepared));
     const before = logins;
-    const capture = await promisify(execFile)(process.execPath, [script, '--base-url', url, '--route', '/app',
+    const capture = await promisify(execFile)(process.execPath, [script, manualCapture, '--base-url', url, '--route', '/app',
       '--viewports', '320x800'], {cwd: root});
     const entry = JSON.parse(capture.stdout).results[0];
     assert.equal(entry.error, null);
@@ -549,7 +585,7 @@ test('discovery fails closed before launch on unsafe config, foreign origin/stat
   const file = join(local, 'qa-auth.json');
   const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
   const refusal = (...extra) => assert.throws(() => execFileSync(process.execPath,
-    [script, '--base-url', base, '--route', '/', ...extra], {cwd: root, stdio: 'pipe'}),
+    [script, manualCapture, '--base-url', base, '--route', '/', ...extra], {cwd: root, stdio: 'pipe'}),
     error => error.status === 2 && !error.stderr.includes('SECRET-MARKER'));
   for (const changed of [{approved: false}, {origin: 'https://localhost:4173'}, {origin: 'http://localhost:4174'},
     {storageState: '../SECRET-MARKER'}, {password: 'SECRET-MARKER'}]) {
