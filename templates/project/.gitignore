@@ -47,3 +47,5 @@ id_rsa*
 # The copied project's live board is local; the factory template remains tracked.
 /docs/BOARD.md
 **/docs/BOARD.md
+**/docs/implementation_plans/
+./docs/implementation_plans/

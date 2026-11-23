@@ -40,3 +40,5 @@ id_rsa*
 docs/BOARD.md
 **/docs/BOARD.md
 !/templates/project/docs/BOARD.md
+**/docs/implementation_plans/
+./docs/implementation_plans/
