@@ -2,6 +2,8 @@
 description: Implement and verify one assigned board task
 ---
 
+Use `engineering-practices` to select the applicable implementation, contract, testing or debugging guide. Pass the selected guide and the actual acceptance criterion to the assigned specialist; do not run a second autonomous workflow.
+
 For a feature, read the shared implementation plan linked in the board Notes before starting or resuming. Resolve it against the owning primary control checkout, not the current service. Pass its absolute path, phase and acceptance criteria to every implementation agent. If it is missing, resolve the plan with the coordinator instead of creating a second copy.
 
 Read the row and relevant context. Use its assigned workspace and existing lifecycle tools; keep the board current through the coordinator. Implement the smallest sound solution, using specialists through short explicit assignments when useful. For new apps and user-facing features, get frontend-flow approval before backend work; fixtures must be labeled.

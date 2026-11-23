@@ -2,6 +2,8 @@
 description: Plan a product or substantial feature around the user flow
 ---
 
+Use `engineering-practices` for discovery or task-breakdown guidance when useful; keep the factory plan skill and its writer as the sole planning workflow.
+
 Publish the approved working checklist through the plan skill's `scripts/plan.py` writer. Pass a stable key and Markdown on stdin; link the returned path rather than writing a second plan in a service worktree.
 
 Load `.kilo/skills/plan/SKILL.md`. Read relevant existing context, resolve material unknowns, and produce an ordered plan with checkable outcomes. For new apps and user-facing features, start with the frontend flow and user approval, then backend/API implementation and integration. Keep product documents in the project repository, not the factory.

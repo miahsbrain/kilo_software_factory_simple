@@ -2,6 +2,10 @@
 description: Review UI evidence or hand over a manual test checklist for a board or feature
 ---
 
+Use the `engineering-practices` accessibility or performance guide for questions the approved evidence can actually answer; neither guide overrides review settings or authorizes additional browser tools.
+
+For requested accessibility scans, use the QA runner's `--axe` flag under the existing capture policy. Report failed or incomplete scans separately from observed violations. Do not turn a checklist-only request into a capture.
+
 Follow `.kilo/skills/qa-review/SKILL.md` for focused behavior checks and the existing `browser-review.mjs` capture. Use the original assigned workspace and shared evidence; reviewers do not modify application source.
 
 For `/ui checklist <board ID or feature>`, follow the skill's **Manual checklist** section and return an absolute workspace link to the validated guide without launching the browser. During a normal review, use that same handoff if any criterion is inaccessible, even if other checks passed.

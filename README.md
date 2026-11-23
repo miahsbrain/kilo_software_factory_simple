@@ -31,6 +31,10 @@ At the end of the fix, the agent links a manual QA/UI checklist for skipped chec
 
 ## Contents
 
+**Optional accessibility scan:** Add `--axe` to a normal `browser-review.mjs` capture. It uses bundled axe-core without a runtime install and saves `axe.json` beside each screenshot. See the [QA capture guide](.kilo/skills/qa-review/SKILL.md#capture). Existing projects receive both runner and engine with the normal project sync after merge.
+
+The factory includes [Addy Osmani's engineering practices](.kilo/skills/engineering-practices/SKILL.md) as pinned, offline reference material. `/plan`, `/run`, `/components`, `/ui` and `/closeout` select relevant guides without changing the factory's commands, approval gates or QA switches. New project bootstrap and the existing project tooling sync distribute the pack.
+
 Feature plans live in the owning control checkout's ignored `docs/implementation_plans/`. After ideation, `/plan` breaks the feature into phases with repo owners, dependencies and verification checks. Follow the plan link in the board Notes; all service worktrees share that copy. See the [feature checklist example](.kilo/skills/plan/SKILL.md#shared-feature-checklist).
 
 To publish any Markdown plan from the control root, run `python3 .kilo/skills/plan/scripts/plan.py create rollout-audit < draft.md`. The command prints the absolute path and never overwrites an existing plan. Use `update` with the same key to replace its content.

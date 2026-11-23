@@ -46,6 +46,8 @@ Use this format for every manual QA or UI handoff. Follow ASD-STE100 plain-writi
 
 ## Capture
 
+For a requested accessibility scan, append `--axe` to the normal `browser-review.mjs` invocation. This opt-in uses the bundled engine on the same page after navigation and any signed-in marker checks. Inspect `axe.json` beside each viewport/scheme screenshot. Reports contain rule IDs, impacts and affected-node counts, not markup or page text. Read both `violations` and `incomplete`; both can occur in one scan. Exit 0 means capture completed, not that accessibility passed. `scan-failed` (including a CSP refusal) is unverified; do not relax CSP or enable another browser tool to obtain a pass. Keep keyboard operation, focus return and visual quality as separate checks. Without `--axe`, normal capture does not run the scanner.
+
 Before delegating and again in the specialist, run `python3 .kilo/skills/git-worktree/scripts/worktree.py reviews status` from the assigned Git root (use the inherited script's absolute path if needed). Read the returned `qa` and `ui` booleans; both default to true. A failed command or invalid policy means both scopes are manual, not permission to assume defaults. Do not change settings to run a review.
 
 | `qa` | `ui` | Automatic work |

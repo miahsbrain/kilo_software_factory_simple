@@ -16,6 +16,7 @@
  *                            [--label <slug>] [--scheme light|dark|both]
  *                            [--component <css-selector>] [--compare <dir>]
  *                            [--chromium <path>]
+ *                            [--axe]
  *                            [--human-requested-manual-capture]
  *
  * Evidence: <primary-control>/artifacts/<scope>/qa/<date>/<task-id>/run-<unique>/.
@@ -62,6 +63,8 @@ function usage() {
     '  --scheme       Colour scheme to capture: light, dark, or both. Default: light.',
     '  --component    CSS selector whose matched elements are captured as crops. Repeatable.',
     '  --compare      Directory holding a previous capture; writes a before | after sheet.',
+    '  --axe          Run vendored axe on each captured page; write axe.json beside the screenshot.',
+    '                 Findings need review. Scan failure (including CSP refusal) exits 2.',
     '  --chromium     Path to a chromium binary. Overrides $PLAYWRIGHT_CHROMIUM_PATH.',
     '  --storage-state Ignored local Playwright state JSON (read only; never saved).',
     '                 Default: use caller .kilo/local/qa-auth.json if present.',
@@ -252,6 +255,9 @@ export function parseArgs(argv) {
         break;
       case '--compare':
         options.compare = next();
+        break;
+      case '--axe':
+        options.axe = true;
         break;
       case '--chromium':
         options.chromium = next();
@@ -821,6 +827,31 @@ async function writeCompareSheet(root, browser, beforeBuffer, afterBuffer, sheet
 
 /* ---------- capture ---------- */
 
+async function scanAxe(page) {
+  try {
+    const source = await readFile(new URL('../vendor/axe-core/axe.min.js', import.meta.url), 'utf8');
+    const {violations, incomplete} = await page.evaluate(async source => {
+      // A normal inline script respects the document's CSP. Never fall back to
+      // evaluating the engine directly or using a page-provided axe instance.
+      const script = document.createElement('script');
+      script.textContent = source + '\n;document.currentScript.engine = window.axe;';
+      document.head.append(script);
+      script.remove();
+      const result = await script.engine.run(document, {
+        preload: false, resultTypes: ['violations', 'incomplete'], rules: {'frame-tested': {enabled: true}},
+      });
+      const rules = entries => entries.map(({id, impact, nodes}) => ({id, impact, node_count: nodes.length}));
+      return {violations: rules(result.violations), incomplete: rules(result.incomplete)};
+    }, source);
+    const status = violations.length ? 'violations' : incomplete.length ? 'incomplete' : 'zero-violations';
+    return {status, violations, incomplete};
+  } catch {
+    // Engine errors can include page content. Do not persist the exception or
+    // empty findings arrays that could be mistaken for a completed scan.
+    return {status: 'scan-failed'};
+  }
+}
+
 function renderNotes(options, summary) {
   const lines = [];
   lines.push('# QA capture — ' + options.taskId);
@@ -888,11 +919,14 @@ export async function captureEntry(session, options, route, viewport, scheme, al
     const finalStep = [...(options.navigationConfig.steps || [])].reverse().find(step => step.action === 'waitForURL');
     const expectedUrl = finalStep ? safeUrl(finalStep.path, options.baseUrl) : safeUrl(url);
     await new Promise(resolveWait => setTimeout(resolveWait, 750));
-    await proveAuthentication(session.page, options.navigationConfig);
-    if (safeUrl(session.page.url(), options.baseUrl) !== expectedUrl) {
-      fail('final navigation URL did not match; declare page changes with waitForURL. ' + ACCESS_REQUEST);
-    }
-    if (session.accessDenied) fail('an authenticated request was denied; capture withheld. ' + ACCESS_REQUEST);
+    const verifyFinalState = async () => {
+      await proveAuthentication(session.page, options.navigationConfig);
+      if (safeUrl(session.page.url(), options.baseUrl) !== expectedUrl) {
+        fail('final navigation URL did not match; declare page changes with waitForURL. ' + ACCESS_REQUEST);
+      }
+      if (session.accessDenied) fail('an authenticated request was denied; capture withheld. ' + ACCESS_REQUEST);
+    };
+    await verifyFinalState();
     session.secrets = [...new Set([...session.secrets, ...stateSecrets(await session.context.storageState()),
       ...await session.page.evaluate(() => Object.values(sessionStorage))])];
 
@@ -921,6 +955,15 @@ export async function captureEntry(session, options, route, viewport, scheme, al
       }
     }
 
+    if (options.axe) {
+      await verifyFinalState();
+      const report = await scanAxe(session.page);
+      await verifyFinalState();
+      const path = join(dir, 'axe.json');
+      await save(path, JSON.stringify(report, null, 2));
+      entry.axe = {status: report.status, report: path};
+      if (report.status === 'scan-failed') entry.error = 'axe scan failed (details withheld)';
+    }
     const logs = session.logs();
     entry.console_errors = logs.consoleErrors;
     entry.page_errors = logs.pageErrors;
