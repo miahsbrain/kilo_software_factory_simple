@@ -86,6 +86,7 @@ def repo_map(data):
 def excluded(relative):
     parts, name = relative.parts, relative.name
     return (any(part in OUTPUTS for part in parts)
+            or parts[:2] == ("docs", "implementation_plans")
             or any(parts[i] == ".kilo" and parts[i + 1] in
                    {"local", "qa-local", "worktrees"} for i in range(len(parts) - 1))
             or name == "agent-manager.json"

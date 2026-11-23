@@ -20,6 +20,33 @@ metadata:
 
 # Plan
 
+## Shared feature checklist
+
+After ideation, turn the agreed feature scope into one implementation checklist before delegating work. The coordinator keeps it at `docs/implementation_plans/<lead-board-id>-<feature>.md` in the **owning primary control checkout**, beside its live board. For factory work use the factory control; for product work use the product control. Do not resolve this path against a service or linked worktree. Create the directory on first use; first confirm the destination is within the control root, has no symlink components, is ignored by Git, and `git ls-files -- docs/implementation_plans` is empty. Do not force-add, copy into each repo, or overwrite an existing plan on resume.
+
+Use the maintained writer for all plan creation and updates, not direct file edits. From the owning control Git root or its linked control worktree root, pass the complete Markdown on stdin. Use a stable key, not a path or extension. Feature plans use the lead board ID; other plans can use a descriptive key without a board ID. Use the printed absolute path for assignments. Read the current file before updating so existing decisions, checks and evidence are preserved. A refused write is not permission to save elsewhere.
+
+```bash
+python3 .kilo/skills/plan/scripts/plan.py create BOARD-123-order-cancellation < draft.md
+python3 .kilo/skills/plan/scripts/plan.py update BOARD-123-order-cancellation < revised.md
+python3 .kilo/skills/plan/scripts/plan.py create rollout-audit < audit.md
+```
+
+Use only the phases the feature needs. For example:
+
+```markdown
+# BOARD-123: Order cancellation
+Outcome: Customers can cancel their own pending orders. Shipped orders are out of scope.
+## Phase 1: Frontend (web, BOARD-123)
+- [ ] Show Cancel on a pending-order fixture. Verify the approved confirmation and error states.
+## Phase 2: API (orders-api, BOARD-124; after flow approval)
+- [ ] Allow only the owner to cancel a pending order. Verify that a shipped order stays unchanged.
+## Final verification (web + orders-api)
+- [ ] Cancel a disposable pending order from the UI. Reload and confirm it still shows Canceled.
+```
+
+Include dependencies, affected repo IDs, linked board IDs, acceptance criteria, and unresolved decisions. Put the same control-relative plan path in each involved board row's Notes. Give each implementer its resolved path, assigned phase and scope. Specialists read it before work and on resume, then report results or blockers. The coordinator alone updates it, recording evidence next to each verified checkbox. At closeout reconcile every phase and cross-repo outcome; keep unverified items open. A plan is not approval, a board transition, or a replacement for durable decisions or the manual tester checklist in `artifacts/reviews/`. Ignored plans are local to this clone, not shared by Git across machines.
+
 Plan new products or substantial features around the user's actual task. Read relevant existing requirements and decisions first. Ask concise, grouped questions only about missing choices with material consequences; do not turn routine details into approval gates.
 
 1. Describe the user, outcome, scope, core flow, and checkable acceptance criteria.

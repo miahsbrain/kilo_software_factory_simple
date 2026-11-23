@@ -31,6 +31,10 @@ At the end of the fix, the agent links a manual QA/UI checklist for skipped chec
 
 ## Contents
 
+Feature plans live in the owning control checkout's ignored `docs/implementation_plans/`. After ideation, `/plan` breaks the feature into phases with repo owners, dependencies and verification checks. Follow the plan link in the board Notes; all service worktrees share that copy. See the [feature checklist example](.kilo/skills/plan/SKILL.md#shared-feature-checklist).
+
+To publish any Markdown plan from the control root, run `python3 .kilo/skills/plan/scripts/plan.py create rollout-audit < draft.md`. The command prints the absolute path and never overwrites an existing plan. Use `update` with the same key to replace its content.
+
 **Common tasks**
 
 - **Get a manual QA guide:** Run `/ui checklist BOARD-123` or ask for a checklist by feature name or for the whole board. The reviewer hands back a Markdown file in the assigned checkout's `artifacts/reviews/` with what changed, where to test, and what to expect. Inaccessible QA/UI checks trigger the same guide automatically; delivery does not mark them passed.

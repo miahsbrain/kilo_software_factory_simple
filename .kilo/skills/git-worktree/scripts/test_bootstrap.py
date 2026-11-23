@@ -106,6 +106,21 @@ class BootstrapTests(unittest.TestCase):
         self.assertTrue((root / ".devcontainer/Dockerfile").is_file())
         self.assertEqual(json.loads((root / "services.json").read_text()), {"services": []})
 
+    def test_project_omits_template_plans_and_ignores_only_plan_docs(self):
+        plan = Path("docs/implementation_plans/fixture.md")
+        template_plan = self.factory / "templates/project" / plan
+        template_plan.parent.mkdir(exist_ok=True)
+        template_plan.write_text("template-only plan\n")
+
+        root = self.create()
+        self.assertFalse((root / plan.parent).exists())
+        (root / plan.parent).mkdir()
+        (root / plan).write_text("project-local plan\n")
+        (root / "docs/normal.md").write_text("product documentation\n")
+        self.assertEqual(self.git(root, "check-ignore", "--", plan).stdout.strip(), str(plan))
+        self.assertEqual(self.git(root, "status", "--porcelain", "--untracked-files=all").stdout,
+                         "?? docs/normal.md\n")
+
     def lifecycle_fixture(self):
         root = self.create()
         board = worktree.load_board_module(str(root))

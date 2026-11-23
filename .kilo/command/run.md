@@ -2,6 +2,8 @@
 description: Implement and verify one assigned board task
 ---
 
+For a feature, read the shared implementation plan linked in the board Notes before starting or resuming. Resolve it against the owning primary control checkout, not the current service. Pass its absolute path, phase and acceptance criteria to every implementation agent. If it is missing, resolve the plan with the coordinator instead of creating a second copy.
+
 Read the row and relevant context. Use its assigned workspace and existing lifecycle tools; keep the board current through the coordinator. Implement the smallest sound solution, using specialists through short explicit assignments when useful. For new apps and user-facing features, get frontend-flow approval before backend work; fixtures must be labeled.
 
 Follow the exact approved service map from `/plan`: full name, role, sibling `apps/<full-name>` root, responsibility/stack and separate/project ownership. Resolve missing material decisions, never infer unapproved services or collapse a planned multi-service product into one folder. Bootstrap with `bootstrap.py app <product-role> --role <role> --git separate|project`; verify the implementation assignment targets that service (control worktree for project ownership, full-name repo ID for separate). Metadata-only backend bootstrap (.gitignore/Git/manifest) may precede frontend-flow approval; backend framework source, dependencies, routes, persistence and integration may not, except backend-only maintenance.
