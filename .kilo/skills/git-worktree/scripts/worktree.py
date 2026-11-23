@@ -918,8 +918,9 @@ def cmd_create(args, cwd):
                ", ".join("%s -> %s" % (k, v) for k, v in TYPE_MAP.items())),
               file=sys.stderr)
         return INVALID
-    derived = slugify(task)
-    if not derived:
+    repo_cell = cells[repos_index] if repos_index is not None and repos_index < len(cells) else ""
+    derived = slugify(board.generated_title(task, board.naming_scopes(root, repo_cell, repos)))
+    if not derived and not (args.slug or recovery or args.reuse):
         print("row %s has an empty task title; the task title needs a real name" % args.board,
               file=sys.stderr)
         return INVALID

@@ -159,7 +159,7 @@ def main():
 
     code, out, err = call(worktree_script, "create", "--board", "BOARD-900")
     check(code == 0, "create failed: %s%s" % (out, err))
-    slug = "provision-env-files-in-the-scratch-repo"
+    slug = "provisioned-env-files-in-the-scratch-repo"
     worktree = os.path.join(repo, ".kilo", "worktrees", slug)
     check(os.path.isdir(worktree), "the worktree was not created at %s" % worktree)
 
@@ -341,7 +341,7 @@ def handoff(repo, worktree_script, call, check):
 
     code, out, err = call(worktree_script, "create", "--board", "BOARD-904")
     check(code == 0, "create failed for BOARD-904: %s%s" % (out, err))
-    slug = "hand-off-a-worktree"
+    slug = "handed-off-a-worktree"
     worktree = os.path.join(repo, ".kilo", "worktrees", slug)
     check(os.path.isdir(worktree), "the BOARD-904 worktree was not created")
 
@@ -349,7 +349,7 @@ def handoff(repo, worktree_script, call, check):
     check(code == 0, "handoff failed: %s%s" % (out, err))
     check("workspace: " + os.path.relpath(worktree, repo) in out.splitlines(),
           "the block does not name the control-root-relative worktree path")
-    check("feat/hand-off-a-worktree" in out, "the block does not name the branch")
+    check("feat/" + slug in out, "the block does not name the branch")
     diff_at = out.find("diff main")
     merge_at = out.find("merge --board BOARD-904")
     check(diff_at != -1, "the block has no diff command")
@@ -361,7 +361,7 @@ def handoff(repo, worktree_script, call, check):
     write(os.path.join(worktree, "kept.txt"), "committed on the branch\n")
     git(worktree, "add", "-A")
     git(worktree, "commit", "-m", "a commit on the branch")
-    git(repo, "merge", "--no-ff", "feat/hand-off-a-worktree", "-m", "merge: hand-off-a-worktree")
+    git(repo, "merge", "--no-ff", "feat/" + slug, "-m", "merge: " + slug)
 
     code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")
     check(code == 0, "handoff failed after the merge: %s%s" % (out, err))
@@ -372,7 +372,7 @@ def handoff(repo, worktree_script, call, check):
 
 def cleanup_merged(repo, worktree_script, call, check):
     """cleanup --board on a merged, clean worktree: the worktree, the branch and the cell go."""
-    slug = "hand-off-a-worktree"
+    slug = "handed-off-a-worktree"
     worktree = os.path.join(repo, ".kilo", "worktrees", slug)
     check(os.path.isdir(worktree), "the BOARD-904 worktree is gone before the cleanup")
 
@@ -390,7 +390,7 @@ def cleanup_by_board(repo, worktree_script, call, check):
     """cleanup --board on an unmerged branch: the refusal, and nothing destroyed."""
     code, out, err = call(worktree_script, "create", "--board", "BOARD-905")
     check(code == 0, "create failed for BOARD-905: %s%s" % (out, err))
-    slug = "clean-up-a-worktree-by-board-row"
+    slug = "cleaned-up-a-worktree-by-board-row"
     worktree = os.path.join(repo, ".kilo", "worktrees", slug)
     check(os.path.isdir(worktree), "the BOARD-905 worktree was not created")
 
