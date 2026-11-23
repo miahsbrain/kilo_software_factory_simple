@@ -123,7 +123,7 @@ def local_state(root, value=None):
             return {"mode": "required", "workspaces": {}}
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
-        if data.get("mode") not in ("required", "optional") or not isinstance(data.get("workspaces"), dict):
+        if data.get("mode") not in ("required", "optional", "adaptive") or not isinstance(data.get("workspaces"), dict):
             raise ValueError("invalid local workspace state")
         return data
     fd, temporary = tempfile.mkstemp(dir=common, prefix=".workspace-")
@@ -413,10 +413,17 @@ def provision_local_files(primary, destination, include_navigation=False):
     primary, destination = Path(primary), Path(destination)
     candidates = list(eligible_env_files(primary))
     if include_navigation:
+        # QA navigation config
         navigation = primary / ".kilo/local/qa-navigation.json"
         if navigation.is_file() and not navigation.is_symlink() and not git_out(
                 str(primary), "ls-files", "--", ".kilo/local/qa-navigation.json"):
             candidates.append((navigation, Path(".kilo/local/qa-navigation.json")))
+        
+        # QA authentication config
+        qa_auth = primary / ".kilo/local/qa-auth.json"
+        if qa_auth.is_file() and not qa_auth.is_symlink() and not git_out(
+                str(primary), "ls-files", "--", ".kilo/local/qa-auth.json"):
+            candidates.append((qa_auth, Path(".kilo/local/qa-auth.json")))
 
     required_exclusions = []
     for source, relative in candidates:
@@ -1767,7 +1774,7 @@ def main(argv):
     sub = parser.add_subparsers(dest="command")
 
     p = sub.add_parser("mode", help="project-local workspace requirement; restart Kilo after changes")
-    p.add_argument("value", choices=("required", "optional", "status"))
+    p.add_argument("value", choices=("required", "optional", "adaptive", "status"))
 
     p = sub.add_parser("create", help="create a worktree named from a board row")
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")

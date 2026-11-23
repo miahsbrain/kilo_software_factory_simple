@@ -9,7 +9,7 @@ kilo.jsonc
 
 # Assigned linked worktrees; explicitly assigned features may share a worktree/branch.
 .kilo/worktrees/
-.kilo/local/qa-navigation.json
+.kilo/local/
 .kilo/agent-manager.json
 
 # Local review and QA evidence, including reports, ledgers, notes and summaries. Never commit.

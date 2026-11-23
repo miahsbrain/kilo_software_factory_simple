@@ -4,6 +4,10 @@ Build useful, distinctive software. Favor clear code, focused modules, existing 
 
 Read applicable local instructions and the documented layout, state, domain and approved decisions before editing; use targeted reads thereafter. Follow the approved stack and contracts, not assumed frameworks or folder names.
 
+## Code Quality Standards
+
+Write human-readable code. Clear names and obvious structure matter more than cleverness. Comments explain only "why" decisions were made, never "what" the code does — the code itself must be self-documenting. Keep functions small and focused. Name variables, functions, and types precisely: `getUsersByActiveStatus` not `get`, `isEmailValid` not `check`, `orderTotal` not `data`. Avoid abbreviations except universally known ones (HTTP, URL, ID). No magic numbers — use named constants. No premature abstraction — wait for genuine reuse across three or more call sites before extracting shared behavior.
+
 Prefer a functional core with explicit effects: deterministic domain functions, immutable inputs/outputs and dependencies passed explicitly. Keep filesystem, network, persistence, time, randomness and logging at thin boundaries. Avoid hidden shared state and unnecessary reactive/callback machinery; respect framework conventions where effects are required.
 
 Organize code by cohesive domain and responsibility. Keep transport, framework and persistence details behind clear boundaries; share only stable, genuinely reused behavior. Avoid generic helpers grab bags, forwarding-only wrappers and premature abstractions.
