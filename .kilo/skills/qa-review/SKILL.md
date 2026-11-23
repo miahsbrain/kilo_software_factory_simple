@@ -18,17 +18,17 @@ If QA or UI critique cannot verify a criterion (for example, a redirect to an ex
 3. Write compact Markdown in the assigned repo's ignored `artifacts/reviews/<board-id>-manual-qa.md` (safe feature slug for a multi-row guide). Verify the destination is untracked, ignored, within the assigned artifacts root and free of symlinks. Reuse a matching guide for the same revision; preserve a tester's notes/results when generating a newer version. Link the actual file in the response, including the worktree path when relevant. If writing is unavailable, supply the guide inline and state why no file exists.
 
 ```markdown
-# Manual QA: <feature> (<board IDs>)
-Revision / setup: <revision, environment, prerequisites>. Automation: <verified scope; blocked scope and reason>.
+## <BOARD-ID>: <feature>
+Changed: <one sentence about the observable change>.
 
-| Result | Change / board ID | How to test, in order | Expected result |
-| --- | --- | --- | --- |
-| Not tested | <specific fix and ID> | 1. Open <full safe URL>. 2. <action using disposable data>. | <observable page, message, status or state> |
-
-Limits: <unknown URL, unavailable dependency or unimplemented criterion, only if applicable>.
+Setup: <direct safe URL or command; include prerequisites only if needed>.
+- [ ] <Do one action>. Check that <observable result>.
+- [ ] <Try the relevant failure or recovery action>. Check that <expected result>.
 ```
 
-Cover each requested acceptance criterion, including relevant failure/recovery cases. Keep one independently testable outcome per row. Leave manual results **Not tested** until the human reports Pass, Fail or Blocked; keep automated evidence separate. Do not ask the human to perform destructive operations on real data. Generating or returning a checklist is not review approval, evidence of passing, or a reason by itself to move a board row. Record later explicit scoped acceptance through the existing board workflow.
+Use this format in the artifact and any inline handover. Follow ASD-STE100 plain-writing principles: short imperative sentences, consistent terms, and one test per checkbox. Use a literal `- [ ]` for each pending check, not paragraphs, tables, or approval recommendations. If blocked, give one `Blocked:` line before the checks. Do not ask the tester to repeat accepted checks. Keep non-testable items in a short scope note. Do not check a box on the strength of automated evidence. Do not ask the human to perform destructive operations on real data. Generating a checklist is not approval or a lane change.
+
+**Required before delivery:** Run `python3 .kilo/skills/qa-review/scripts/check-finding.py --manual-guide --body-file artifacts/reviews/<guide>.md` on every new guide (use the installed control script path if needed). For inline output, pass the exact guide on stdin with `--body-file -`. Fix validation errors and recheck before linking or posting. Keep a tester's completed copy intact; for a new revision validate a fresh guide containing only outstanding checks. A successful format check does not verify product behavior.
 
 ## Capture
 

@@ -1,5 +1,17 @@
 # Kilo Software Factory
 
+## Worktree mode: on or off
+
+Run from the factory or project control root:
+
+```bash
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode required  # ON: require linked worktrees
+python3 .kilo/skills/git-worktree/scripts/worktree.py mode optional  # OFF: allow eligible maintenance in the primary checkout
+python3 .kilo/skills/git-worktree/scripts/worktree.py status         # Show the saved mode and both review switches
+```
+
+Restart Kilo after changing mode. Off means **optional**, not disabled: Features still need a linked worktree, and protected branches stay protected. For a Fix, Chore or Docs row on a nonprotected branch, check eligibility with `python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-123 --repo control --skip-worktree` (replace the ID). Use `mode adaptive` instead if you want primary edits to prompt for permission.
+
 A small delivery harness for [Kilo Code](https://kilo.ai): a working agreement, specialist agents, a live board, and scripts for workspaces and review evidence. This repository maintains the harness, not a product. The existing `project/` is an independent ignored repository and is not migrated by factory changes.
 
 ## Factory switches
@@ -16,17 +28,6 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py reviews both on   # Restor
 
 At the end of the fix, the agent links a manual QA/UI checklist for skipped checks in the assigned checkout's `artifacts/reviews/`. Normal code tests still run. Skipped reviews do not count as passed. If only UI critique is enabled it can use existing evidence, not launch a new QA capture. Saved Playwright evidence uses the confined `browser-review.mjs` runner, not the unrestricted MCP server. Restart Kilo after adopting the updated MCP config; this does not move historical images.
 
-**Work without an extra worktree for maintenance:**
-
-```bash
-python3 .kilo/skills/git-worktree/scripts/worktree.py mode adaptive
-# Restart Kilo after changing workspace mode. From the eligible primary checkout:
-python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-123 --repo control --skip-worktree
-# Restore mandatory worktrees:
-python3 .kilo/skills/git-worktree/scripts/worktree.py mode required
-```
-
-Replace `BOARD-123` with the actual Fix, Chore or Docs ID. This allows eligible edits in the primary **checkout**, not on the protected `main` **branch**; Features still require a linked worktree. Workspace mode and review switches do not change one another.
 
 ## Contents
 
