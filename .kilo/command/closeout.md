@@ -6,3 +6,4 @@ In the assigned workspace, update the affected essential docs and engineering ch
 Distinguish the user's scoped manual review decision (`board.py show <ID>`) from verified checks, unresolved blockers, and actual Git state. A recorded approval alone is not `Pending Merge` or `Merged`.
 
 Check `worktree.py reviews status` and the actual review record. Link the QA skill's manual QA/UI checklist for all scopes skipped by policy or unavailable evidence, even with no blocker. Report skipped work separately from verified tests. Neither the settings nor checklist delivery authorizes a pass or lane transition.
+Before linking a generated guide, require the QA skill's `--manual-guide` format check to pass.

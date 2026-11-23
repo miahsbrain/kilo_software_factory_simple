@@ -11,7 +11,8 @@ Usage:
                    [--priority high|medium|low]
                    [--category functional|visual|network|console|a11y|data|testability]
                    [--route <path>]
-                   [--fingerprint <value>]
+                    [--fingerprint <value>]
+  check-finding.py --manual-guide --body-file <path.md or - for stdin>
 
 Exit codes:
   0  body accepted
@@ -63,7 +64,10 @@ def parse_args(argv):
         prog="check-finding.py",
         description="Validate a QA finding markdown body before it becomes a board row.",
     )
-    parser.add_argument("--body-file", required=True, help="Path to the finding markdown file.")
+    parser.add_argument("--body-file", required=True,
+                        help="Markdown file to validate; with --manual-guide, use - for stdin.")
+    parser.add_argument("--manual-guide", action="store_true",
+                        help="Validate a new manual QA checklist instead of a finding.")
     parser.add_argument("--kind", default=None, choices=list(KINDS), help="Finding kind.")
     parser.add_argument("--priority", default=None, choices=list(PRIORITIES), help="Finding priority.")
     parser.add_argument("--category", default=None, choices=list(CATEGORIES), help="Finding category.")
@@ -221,6 +225,63 @@ def validate(body):
     return problems
 
 
+GUIDE_ACTION = re.compile(
+    r"(?:(?:from|in|on|using|with|while|at|after|before) .+?,\s+)?"
+    r"(?:activate|add|attempt|cancel|change|check|choose|clear|click|close|compare|confirm|"
+    r"connect|copy|create|disable|disconnect|drag|edit|enable|enter|expand|export|fill|focus|"
+    r"follow|hover|import|inspect|launch|load|log|navigate|open|paste|press|read|refresh|"
+    r"reload|remove|repeat|resize|restart|retry|return|review|run|save|scroll|search|select|"
+    r"send|set|sign|start|stop|submit|switch|tab|tap|toggle|try|type|use|verify|visit|wait)\b",
+    re.IGNORECASE,
+)
+GUIDE_RESULT = re.compile(
+    r"(?:(?:^|[.;:,]\s+|\s+(?:and|then)\s+)(?:check (?:that|for)|confirm|verify|ensure|"
+    r"expect|expected(?: result)?:|note)\s+(?:that\s+)?(?!that\b)|\bshould\s+)(?=[^\w]*\w)",
+    re.IGNORECASE,
+)
+
+
+def validate_manual_guide(body):
+    problems = []
+    section = None
+    changed = has_step = has_title = False
+    for number, raw in enumerate(body.splitlines(), 1):
+        line = raw.rstrip()
+        if not line:
+            continue
+        if not section and not has_title and re.fullmatch(r"# \S.*", line):
+            has_title = True
+            continue
+        heading = re.fullmatch(r"## (BOARD-[0-9]+): \S.*", line)
+        if heading:
+            if section and not has_step:
+                problems.append(f"{section}: missing unchecked step")
+            section = heading[1]
+            changed = has_step = False
+            continue
+        if not section:
+            problems.append(f"line {number}: expected '## BOARD-<number>: <title>'")
+        elif not changed:
+            if re.fullmatch(r"Changed: \S.*", line):
+                changed = True
+            else:
+                problems.append(f"line {number} ({section}): expected 'Changed: <text>'")
+        elif line.startswith("- [ ] "):
+            step = line[len("- [ ] "):]
+            if not GUIDE_ACTION.match(step) or not GUIDE_RESULT.search(INLINE_CODE_RE.sub(" code ", step)):
+                problems.append(f"line {number} ({section}): give an action and its expected result")
+            has_step = True
+        elif re.fullmatch(r"(?:Setup|Blocked): \S.*", line) and not has_step:
+            continue
+        elif not re.fullmatch(r"(?:Scope|Not ready to test): \S.*", line):
+            problems.append(f"line {number} ({section}): expected a labeled note or '- [ ]' step")
+    if not section:
+        problems.append("guide needs a BOARD section")
+    elif not has_step:
+        problems.append(f"{section}: missing unchecked step")
+    return problems
+
+
 def resolve_fingerprint(args, body):
     """The fingerprint of the finding: an explicit override wins over the derived one."""
     override = (args.fingerprint or "").strip()
@@ -236,18 +297,26 @@ def resolve_fingerprint(args, body):
 def main(argv):
     args = parse_args(argv)
     try:
-        with open(args.body_file, "r", encoding="utf-8") as handle:
-            body = handle.read()
+        if args.manual_guide and args.body_file == "-":
+            body = sys.stdin.read()
+        else:
+            with open(args.body_file, "r", encoding="utf-8") as handle:
+                body = handle.read()
     except OSError as error:
         sys.stderr.write("check-finding: cannot read body file: " + str(error) + "\n")
         return 66
 
-    problems = validate(body)
+    problems = validate_manual_guide(body) if args.manual_guide else validate(body)
     if problems:
-        sys.stderr.write("check-finding: finding body is weak\n")
+        kind = "manual guide" if args.manual_guide else "finding body"
+        sys.stderr.write(f"check-finding: {kind} is weak\n")
         for problem in problems:
             sys.stderr.write("  - " + problem + "\n")
         return 66
+
+    if args.manual_guide:
+        sys.stdout.write("check-finding: manual guide accepted\n")
+        return 0
 
     try:
         fingerprint = resolve_fingerprint(args, body)
