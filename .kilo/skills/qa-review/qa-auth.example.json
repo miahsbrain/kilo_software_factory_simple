@@ -1,0 +1,6 @@
+{
+  "approved": false,
+  "origin": "http://localhost:3000",
+  "storageState": "qa-storage-state.json",
+  "authenticatedSelector": "[data-testid='signed-in-account-menu']"
+}

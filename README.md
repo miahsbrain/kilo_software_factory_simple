@@ -4,6 +4,15 @@ A small delivery harness for [Kilo Code](https://kilo.ai): a working agreement, 
 
 ## Contents
 
+**Common tasks**
+
+- **Quick maintenance edit:** Set project mode with `python3 .kilo/skills/git-worktree/scripts/worktree.py mode adaptive` and restart Kilo once. From the mapped primary checkout on a nonprotected branch, run `worktree.py create --board <ID> --repo control --skip-worktree` using the same script path. This checks eligibility for a Fix, Chore or Docs row without creating or switching branches. Features still use linked worktrees. Use a linked workspace from the outset for a commit/merge handoff.
+- **Review a protected page:** Use the [QA profile instructions](.kilo/skills/qa-review/SKILL.md#authentication) to point the standalone browser reviewer at an ignored, human-prepared test session. No production password belongs in the repository. The origin and a visible signed-in marker are checked on capture.
+- **Accept a manual review:** Tell the coordinator what you tested. It records `board.py approve-review <ID> --scope <scope> --evidence "<decision reference>"`. Only `review:<scope>` is cleared. A separate defect, dependency, or merge decision is not silently approved.
+- **Review frontend work:** Ask for the component module and consuming screen, the gallery with its interaction states, and the narrow/wide capture. A library name in a plan is not evidence that the screen uses it.
+
+### Repository map
+
 | Path | Purpose |
 |---|---|
 | `AGENTS.md` | Compact working agreement |

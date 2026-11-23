@@ -7,7 +7,7 @@
     env.py clean --board BOARD-00X [--repo <id>] [--apply]
 
 sync delegates to worktree.py's canonical recursive copier for ignored or
-untracked regular .env* files and the QA navigation file. Existing destinations
+untracked regular .env* files and the allowlisted ignored QA local files. Existing destinations
 are preserved; file values are never printed. Copied env paths are listed in
 the repository's .git/info/exclude.
 
@@ -105,8 +105,8 @@ def sync_into(worktree_path, repo_root):
                       (worktree_path, os.path.join(repo_root, WORKTREES_DIR)))
     try:
         wt.provision_local_files(source_root(repo_root), worktree_path, include_navigation=True)
-    except OSError as error:
-        return None, "cannot provision local files: %s" % error.strerror
+    except (OSError, ValueError):
+        return None, "cannot safely provision local files into the requested worktree"
     return ["safe provisioning complete; existing destinations were preserved"], None
 
 
@@ -114,14 +114,15 @@ def status_into(worktree_path, repo_root):
     """(lines, error). Per file: whether the source and the copy exist."""
     source = source_root(repo_root)
     lines = []
-    for _, relative in worktree_module().eligible_env_files(source):
+    wt = worktree_module()
+    for relative in [*(rel for _, rel in wt.eligible_env_files(source)), *wt.QA_LOCAL_FILES]:
         name = relative.as_posix()
         src = os.path.join(source, name)
         dst = os.path.join(worktree_path, name)
         lines.append("%s | main checkout: %s | worktree: %s" %
                      (name,
-                      "present" if os.path.isfile(src) else "absent",
-                      "present" if os.path.isfile(dst) else "absent"))
+                      "present" if os.path.realpath(src) == src and os.path.isfile(src) else "absent",
+                      "present" if os.path.realpath(dst) == dst and os.path.isfile(dst) else "absent"))
     return lines, None
 
 

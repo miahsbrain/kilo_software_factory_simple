@@ -25,7 +25,17 @@ python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <ID> --repo
 python3 .kilo/skills/git-worktree/scripts/worktree.py create --board <NEW-ID> --reuse <EXISTING-ID> --repo <repo-id>
 ```
 
-Create only an authorized workspace. `--reuse` supports Feature rows as well as Fix rows, retaining the existing branch/base and recording the new assignment; it does not require one worktree per feature. Required mode uses linked `.kilo/worktrees/`; optional mode permits an assigned nonprotected current checkout for non-feature maintenance only; adaptive mode requires worktrees for Feature rows but treats Fix/Chore/Docs as optional (use current checkout allowed). Do not change saved mode or permissions to encode feature assignment. Changing mode regenerates permissions and requires a Kilo restart. Bootstrap creates the user-authorized initial source commit only in genuinely new repositories created by that invocation, before linked worktrees become usable; feature implementation waits for successful initialization and assignment.
+Create only an authorized workspace. `--reuse` supports Feature rows as well as Fix rows, retaining the existing branch/base and recording the new assignment. Feature implementation always needs an assigned linked worktree. Bootstrap's one initial commit in a genuinely new repository precedes feature assignment.
+
+| Saved mode | `create --skip-worktree` | Ordinary primary-checkout edits | Guarded primary-checkout commits |
+|---|---|---|---|
+| `required` (default for new state) | Refused for every row | Ask | Refused |
+| `optional` | Eligible Fix, Chore or Docs only | Allow by default | Existing named, nonprotected branch only |
+| `adaptive` | Eligible Fix, Chore or Docs only | Ask | Refused: Git has no board-row context |
+
+From the assigned mapped repository's primary checkout, run `worktree.py create --board <ID> --repo <repo-id> --skip-worktree` for an explicitly assigned maintenance edit. It checks the row is Ready/In Progress, has no workspace assignment or blocker, and the current branch is named and nonprotected. A pass prints the checkout and branch; it **does not** create, switch, record a workspace, change mode, grant edit/commit approval, or provide a merge handoff. Choose a linked worktree from the start if adaptive work needs a commit or managed handoff.
+
+Static edit permissions and bare Git commands cannot identify a task type. The board-aware skip check enforces task eligibility; do not treat an optional permission default as authorization for Feature work. Protected-file and secret rules remain in force in every mode. Read the current mode with `mode status`; only a separately authorized `mode required|optional|adaptive` changes the project-local setting and regenerates permission maps. Restart Kilo after a change; never toggle mode for one task.
 
 Reuse first: the same task's metadata-backed live workspace blocks `create`, even with a different `--slug` or `--new`. A missing board cell is not proof the assignment is gone. `resume --board <ID> --repo <repo-id>` validates exact metadata ownership, Git registration/common directory, confined path, branch/base and nonlocked/nonprunable state, then retries initialization and nonoverwriting provisioning before updating the board. Failures preserve files, metadata/error and board linkage. No branch creation or reinitialization occurs during recovery. Missing registration with leftover directories/branches requires inspection; never delete leftovers automatically.
 

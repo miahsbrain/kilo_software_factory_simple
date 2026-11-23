@@ -11,8 +11,6 @@ The user populates real secrets.
 | `OPENROUTER_API_KEY` | the agent's model provider | no | — | Value lives in the host environment and is passed through `remoteEnv`. |
 | `DEEPSEEK_API_KEY` | the agent's model provider | no | — | Value lives in the host environment and is passed through `remoteEnv`. |
 | `CARGO_BUILD_JOBS` | Rust builds | no | `2` | Passed through `remoteEnv` from `FACTORY_CARGO_JOBS`. |
-| `QA_TEST_EMAIL` | approved QA navigation `fill.env` example | no | none | User supplies authorized test access outside CLI/evidence/commits. |
-| `QA_TEST_PASSWORD` | approved QA navigation `fill.env` example | no | none | Name only; never read or print the value. MFA/SSO is manual user login. |
 
 ## Config keys
 
@@ -22,7 +20,7 @@ The user populates real secrets.
 | `/home/node/.git-credentials` | the whole dev container | The git credential store, mode `600`. Never commit it and never read it into a transcript. |
 | `/home/node/.gitconfig` | the whole dev container | Holds `credential.helper`, `user.*` and `safe.directory`. It must not hold a `url.*.insteadOf` rewrite that embeds a credential. |
 | `mode` | control repo common Git directory `kilo-workspace.json` | Project-local `required` (default) or `optional`; regenerate permissions and restart Kilo after changing. |
-| `approved`, `login`, `authenticatedPath`, `authenticatedSelector`, `steps` | ignored local QA navigation JSON | Storage-state or login requires an app-specific visible signed-in marker checked after navigation settles; page-changing navigation declares final destination via waitForURL. No password-input heuristic. Never commit credential/session JSON. |
+| `.kilo/local/qa-auth.json`, `.kilo/local/qa-storage-state.json` | standalone QA capture | Human prepares ignored, private state for this project. See [setup and renewal](../.kilo/skills/qa-review/SKILL.md#authentication); no login environment variables required. |
 
 ## Rules
 

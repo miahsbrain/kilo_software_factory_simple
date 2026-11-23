@@ -38,8 +38,8 @@ flowchart TD
   non-atomic. Preserve partial state; specialist resolves existing conflicts, human completes
   and retries. Merged requires all surfaces; merged cleanup is automatic. Discard needs explicit
   loss approval and remains confined to selected mapped linked worktrees/feature branches.
-- **Authenticated QA:** existing capture script accepts ignored local storage-state/approved
-  env-backed navigation. Explicit authorization for destructive actions; no bypass or secrets
+- **Authenticated QA:** the human prepares a project-specific test session; the reviewer uses
+  ignored, origin-bound state. Explicit authorization for destructive actions; no bypass or secrets
   in CLI/commits/evidence. See UI-UX and QA skill; evidence/accessibility requirements stay intact.
 
 - **Error handling:** <policy>

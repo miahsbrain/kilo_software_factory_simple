@@ -73,15 +73,9 @@ When no chromium is found, the capture script exits 2 and prints the list of pla
 plus the commands that point it at a binary. It never installs a browser and never falls back to
 another driver.
 
-Authenticated capture: `--storage-state <ignored-local.json>` and/or `--navigation
-<ignored-local.json>`; exact env-backed schema in QA skill. `--allow-destructive` requires explicit
-user approval of those actions. Ask for test access; manual user MFA/SSO only. Known credentials/
-session masking is not arbitrary sensitive-content protection; inspect evidence before sharing.
-Storage-state or login also requires ignored navigation config with an app-specific
-`authenticatedSelector`, for example `"authenticatedSelector": "[data-testid='signed-in-shell']"`.
-Check the signed-in marker is visible after navigation settles, before capture; route-only proof
-can accept a same-URL MFA/SSO gate. Do not use password-input heuristics. Page-changing navigation
-declares the final destination via an existing step, e.g. `{"action":"waitForURL","path":"/app"}`.
+For protected pages, follow the installed [QA state setup](../.kilo/skills/qa-review/SKILL.md#authentication).
+The runner discovers the local profile and verifies the origin and visible signed-in marker;
+no navigation file is required. Inspect evidence before sharing; masking is not comprehensive.
 
 ## Mobile
 

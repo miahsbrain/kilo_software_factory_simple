@@ -7,6 +7,6 @@ color: "#8B5CF6"
 
 Build distinctive, accessible mobile flows that respect platform conventions and responsive behavior. Present the frontend flow for user approval before backend implementation, using clearly labeled fixtures when needed. Preserve platform permissions and navigation behavior outside the task.
 
-Work only on the assigned task and paths. Follow the root working agreement. Reuse suitable existing code. Ask about material unknowns, not routine implementation details. Report changed files, actual checks, and limitations. Do not expand scope or perform unauthorized Git operations.
+Trace an existing platform component, its tokens and a consuming screen before adding a primitive. Compose the approved kit, keep component inputs and state ownership clear, and keep permission, storage and network effects out of rendering. Present the initial component gallery, fix focused QA findings and recheck before screen composition.
 
-FEATURE implementation requires an assigned linked worktree, never the primary checkout. Explicitly assigned features may reuse its branch/worktree with `worktree.py create --board NEW --reuse EXISTING --repo ID`; preserve scope/ownership, never auto-switch branches or change policy mode. Project-tracked apps use control's worktree; separate apps use their mapped repo's worktree. Initial scaffolding/bootstrap is exempt until an authorized initial commit enables worktrees; feature implementation waits.
+Exercise the affected navigation and back behavior, safe areas, text scaling, accessible labels and relevant denied/offline states. Report which platform, device or simulator was actually checked and which was not. Follow the root working agreement and assigned workspace.

@@ -405,11 +405,18 @@ test('canonical browser script logs in and captures protected password settings 
     let logins = 0;
     let appVisits = 0;
     let settingsVisits = 0;
-    const observedTempPaths = new Set();
+     const observedTempPaths = new Set();
+     let foreignRequests = 0;
+     const foreign = createServer((_req, res) => { foreignRequests++; res.end(); });
+     await new Promise(resolve => foreign.listen(0, '127.0.0.1', resolve));
+     t.after(() => new Promise(resolve => { foreign.close(resolve); foreign.closeAllConnections(); }));
     const server = createServer(async (request, response) => {
       response.setHeader('Content-Type', 'text/html');
       response.setHeader('Cache-Control', 'no-store');
       if (request.url === '/favicon.ico') { response.writeHead(204).end(); return; }
+      if (request.url === '/redirect-image') {
+        response.writeHead(302, {Location: 'http://127.0.0.1:' + foreign.address().port + '/pixel'}).end(); return;
+      }
       if (request.url === '/login' && request.method === 'GET') {
         for (const name of await readdir(join(root, 'artifacts', 'tmp'))) {
           const temp = join(root, 'artifacts', 'tmp', name);
@@ -439,7 +446,8 @@ test('canonical browser script logs in and captures protected password settings 
       if (request.url === '/settings') settingsVisits += 1;
       response.end('<!doctype html><main><a href="/settings">Settings</a>' +
         '<label>New password<input type="password" value="fixture-password-placeholder"></label></main>' +
-        '<script>if(sessionStorage.getItem("fixture") === "fixture-session-placeholder") {' +
+        '<script>if(localStorage.fixture) { new Image().src="/redirect-image"; }' +
+        'if((sessionStorage.fixture || localStorage.fixture) === "fixture-session-placeholder") {' +
         'const marker=document.createElement("nav"); marker.id="signed-in"; marker.textContent="Signed in";' +
         'document.body.append(marker);}</script>');
     });
@@ -509,4 +517,57 @@ test('canonical browser script logs in and captures protected password settings 
       assert.ok(result.compare.startsWith(join(artifactDir, 'after') + '/'));
       assert.equal((await readFile(result.compare)).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
     }
+    const local = join(root, '.kilo/local');
+    await mkdir(local, {recursive: true});
+    await writeFile(join(root, '.gitignore'), 'local/\n.kilo/local/\n');
+    const auth = {approved: true, origin: url, storageState: 'qa-storage-state.json', authenticatedSelector: '#signed-in'};
+    await writeFile(join(local, 'qa-auth.json'), JSON.stringify(auth));
+    const prepared = {cookies: [{name: 'fixture_session', value: 'fixture-session-placeholder', domain: '127.0.0.1',
+      path: '/', expires: -1, httpOnly: true, secure: false, sameSite: 'Strict'}], origins: [{origin: url,
+      localStorage: [{name: 'fixture', value: 'fixture-session-placeholder'}]}]};
+    await writeFile(join(local, auth.storageState), JSON.stringify(prepared));
+    const before = logins;
+    const capture = await promisify(execFile)(process.execPath, [script, '--base-url', url, '--route', '/app',
+      '--viewports', '320x800'], {cwd: root});
+    const entry = JSON.parse(capture.stdout).results[0];
+    assert.equal(entry.error, null);
+    assert.ok(entry.network_failure_count > 0);
+    assert.equal(foreignRequests, 0, 'redirect to the same hostname on another port must not reach the server');
+    assert.equal(logins, before);
+    assert.ok(!capture.stdout.includes('fixture-session-placeholder'));
   });
+
+test('discovery fails closed before launch on unsafe config, foreign origin/state, or conflicting inputs', async t => {
+  const root = await mkdtemp(join(fixtures, 'auth-config-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const git = (...args) => execFileSync('git', args, {cwd: root, stdio: 'ignore'});
+  git('init', '-q');
+  const local = join(root, '.kilo/local');
+  await mkdir(local, {recursive: true});
+  await writeFile(join(root, '.gitignore'), '.kilo/local/\n');
+  const config = {approved: true, origin: base, authenticatedSelector: '#signed-in', storageState: 'qa-storage-state.json'};
+  const file = join(local, 'qa-auth.json');
+  const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
+  const refusal = (...extra) => assert.throws(() => execFileSync(process.execPath,
+    [script, '--base-url', base, '--route', '/', ...extra], {cwd: root, stdio: 'pipe'}),
+    error => error.status === 2 && !error.stderr.includes('SECRET-MARKER'));
+  for (const changed of [{approved: false}, {origin: 'https://localhost:4173'}, {origin: 'http://localhost:4174'},
+    {storageState: '../SECRET-MARKER'}, {password: 'SECRET-MARKER'}]) {
+    await writeFile(file, JSON.stringify({...config, ...changed})); refusal();
+  }
+  await writeFile(file, JSON.stringify(config));
+  refusal('--storage-state', 'somewhere'); refusal('--project', fixtures); refusal();
+  const stateFile = join(local, config.storageState);
+  const insecureOrigin = 'http://fixture.invalid';
+  await writeFile(file, JSON.stringify({...config, origin: insecureOrigin}));
+  await writeFile(stateFile, JSON.stringify({cookies: [], origins: []}));
+  refusal('--base-url', insecureOrigin);
+  await writeFile(file, JSON.stringify(config));
+  for (const bad of [{cookies: [], origins: [{origin: 'https://foreign.invalid'}]},
+    {cookies: [{domain: '.localhost', value: 'SECRET-MARKER'}], origins: []}]) {
+    await writeFile(stateFile, JSON.stringify(bad)); refusal();
+  }
+  git('add', '-f', '.kilo/local/qa-auth.json'); refusal();
+  await rm(file); await symlink(join(root, 'missing'), file); refusal();
+  await assert.rejects(stat(join(root, 'artifacts')), {code: 'ENOENT'});
+});

@@ -8,6 +8,7 @@
                  [--fingerprint "kind|category|route|subject"]
     board.py add-column --name Repos [--after "Blocked by"]
     board.py note <ID> --value "..." [--escalate]
+    board.py approve-review <ID> --scope <slug> --evidence "user decision and reference"
     board.py set-status <ID> "<new status>"
     board.py set-field <ID> --field risk|priority|blocked-by|repos|branch-worktree|notes --value "..."
     board.py remove <ID>
@@ -306,24 +307,58 @@ def cmd_show(args, path):
         if wanted and cells[0] != wanted:
             continue
         found = True
-        print(" | ".join(cells[:-1]))
+        print(" | ".join(cells))
     if wanted and not found:
         print("no row with ID %s" % wanted, file=sys.stderr)
         return REFUSED
     return OK
 
 
-def escalate_repeat(table, existing_id, fingerprint):
-    """A repeat finding: the existing row carries it and is escalated to Blocked."""
-    index = row_by_id(table, existing_id)
-    if index is None:
-        return
-    notes_index = field_index(table, "notes")
-    cells = cell_texts(table["lines"], index)
-    notes = cells[notes_index] if notes_index is not None and len(cells) > notes_index else ""
-    merged = notes + " · repeat finding: fingerprint " + fingerprint
-    table["lines"][index] = replace_cell(table["lines"][index], notes_index, merged)
-    table["lines"][index] = replace_cell(table["lines"][index], 3, "Blocked")
+def cmd_approve_review(args, path):
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", args.scope):
+        print("invalid --scope: use a lowercase kebab-case review identifier", file=sys.stderr)
+        return INVALID
+    evidence = args.evidence.strip()
+    if not evidence or reject_unsafe_value("--evidence", args.evidence):
+        print("provide a one-line reference to the user's scoped review decision", file=sys.stderr)
+        return INVALID
+    table, err = read_table(path)
+    if err:
+        print(err, file=sys.stderr)
+        return REFUSED
+    index = row_by_id(table, args.id)
+    status, blockers, notes = (column_index(table, name) for name in ("Status", "Blocked by", "Notes"))
+    if index is None or None in (status, blockers, notes):
+        print("approval requires an existing row with Status, Blocked by and Notes", file=sys.stderr)
+        return REFUSED
+    lines = table["lines"]
+    cells = cell_texts(lines, index)
+    if cells[status] not in ("In Progress", "In Review", "Blocked"):
+        print("record review approval only for active implementation or review", file=sys.stderr)
+        return REFUSED
+
+    marker = "[user-approved:%s] " % args.scope
+    previous = cells[notes]
+    gate = "review:" + args.scope
+    reasons = [part.strip() for part in cells[blockers].split(";")]
+    if any(note.startswith(marker) for note in previous.split(" · ")):
+        print("%s: review already recorded for %s (status: %s)" % (args.id, args.scope, cells[status]))
+        return OK
+    if gate not in reasons and any(reason.startswith("review:") for reason in reasons):
+        print("no matching pending review gate: %s" % gate, file=sys.stderr)
+        return REFUSED
+
+    entry = marker + evidence
+    updated = entry if previous in ("", "-") else previous + " · " + entry
+    lines[index] = replace_cell(lines[index], notes, updated)
+    if gate in reasons:
+        remaining = [reason for reason in reasons if reason and reason != gate]
+        lines[index] = replace_cell(lines[index], blockers, "; ".join(remaining) or "- None.")
+        if not remaining and cells[status] == "Blocked":
+            lines[index] = replace_cell(lines[index], status, "In Review")
+    write_atomic(path, lines)
+    print("%s: %s (status: %s)" % (args.id, entry, cell_texts(lines, index)[status]))
+    return OK
 
 
 def cmd_add(args, path):
@@ -346,13 +381,8 @@ def cmd_add(args, path):
     if fingerprint:
         existing_id, existing_status = find_open_fingerprint(table, fingerprint)
         if existing_id is not None:
-            escalate_repeat(table, existing_id, fingerprint)
-            note_uncommitted(path)
-            write_atomic(path, table["lines"])
             print("refused: fingerprint %s is already open on %s (status: %s)" %
                   (fingerprint, existing_id, existing_status), file=sys.stderr)
-            print("this is a repeat finding: %s now carries it and is Blocked" % existing_id,
-                  file=sys.stderr)
             print("add the new evidence to it with:", file=sys.stderr)
             print("  python3 %s note %s --value \"<the new evidence>\"" %
                   (sys.argv[0], existing_id), file=sys.stderr)
@@ -455,7 +485,17 @@ def cmd_note(args, path):
     lines = list(table["lines"])
     lines[index] = replace_cell(lines[index], notes_index, merged)
     if args.escalate:
-        lines[index] = replace_cell(lines[index], 3, "Blocked")
+        blockers = field_index(table, "blocked-by")
+        status = column_index(table, "Status")
+        if None in (blockers, status) or not args.value.strip():
+            print("escalation requires Status, Blocked by and a concrete reason", file=sys.stderr)
+            return REFUSED
+        reasons = cells[blockers]
+        reason = "Escalation: " + args.value
+        if reasons not in ("", "-", "None.", "- None."):
+            reason = reasons + "; " + reason
+        lines[index] = replace_cell(lines[index], blockers, reason)
+        lines[index] = replace_cell(lines[index], status, "Blocked")
     note_uncommitted(path)
     write_atomic(path, lines)
     print("%s notes updated%s" % (args.id, " and escalated to Blocked" if args.escalate else ""))
@@ -571,6 +611,11 @@ def main(argv):
     p.add_argument("--escalate", action="store_true",
                    help="also move the row to Blocked")
 
+    p = sub.add_parser("approve-review", help="record a user's scoped manual review decision")
+    p.add_argument("id")
+    p.add_argument("--scope", required=True, help="review identifier matching review:<scope> in Blocked by")
+    p.add_argument("--evidence", required=True, help="one-line reference to the user's explicit decision")
+
     p = sub.add_parser("set-status", help="change only the status cell")
     p.add_argument("id")
     p.add_argument("status")
@@ -607,6 +652,8 @@ def main(argv):
         return cmd_add_column(args, path)
     if args.command == "note":
         return cmd_note(args, path)
+    if args.command == "approve-review":
+        return cmd_approve_review(args, path)
     if args.command == "set-status":
         if args.status not in STATUSES:
             print("invalid status %r: use one of %s" % (args.status, ", ".join(STATUSES)),

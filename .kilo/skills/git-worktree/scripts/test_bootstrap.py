@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import patch
 
 import bootstrap
+import guard
 import worktree
 
 
@@ -126,9 +127,17 @@ class BootstrapTests(unittest.TestCase):
         return result
 
     def test_bootstrapped_ignored_control_inherits_unchanged_config_and_mode(self):
+        factory_config = self.factory / "kilo.jsonc"
+        policy = guard.load_policy(str(self.factory / guard.POLICY_REL))
+        permissions, message = guard.write_permission_map(factory_config, policy, mode="optional")
+        self.assertIsNotNone(permissions, message)
+        factory_bytes = factory_config.read_bytes()
         root = self.lifecycle_fixture()
         config = root / "kilo.jsonc"
         original = config.read_bytes()
+        self.assertEqual(factory_config.read_bytes(), factory_bytes)
+        self.assertTrue(guard.permission_maps_match(json.loads(original)["permission"],
+                                                   guard.generated_permission(policy, "required")))
         self.assertNotIn("kilo.jsonc", self.git(root, "ls-files").stdout)
         self.assertNotIn(".kilo/repos.json", self.git(root, "ls-files").stdout)
         self.lifecycle(root, "create", "--board", "BOARD-001", override=config)

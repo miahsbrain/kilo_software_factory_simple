@@ -7,7 +7,8 @@
     worktree.py merge --board BOARD-00X [--target <branch>] [--apply]
     worktree.py discard --board BOARD-00X [--repo <id>] [--apply --discard]
     worktree.py cleanup [<slug> | --board BOARD-00X] [--apply]
-    worktree.py list | verify <slug> | mode required|optional|status
+    worktree.py list | verify <slug> | mode required|optional|adaptive|status
+    worktree.py create --board BOARD-00X [--repo ID] --skip-worktree
 
 create reads the board row named by --board from docs/BOARD.md, derives the
 branch type from its Type column and the slug from its task title, then makes
@@ -408,29 +409,33 @@ def eligible_env_files(primary, destination=None):
         yield source, relative
 
 
+QA_LOCAL_FILES = tuple(Path('.kilo/local') / name for name in
+                       ('qa-navigation.json', 'qa-auth.json', 'qa-storage-state.json'))
+
+
 def provision_local_files(primary, destination, include_navigation=False):
     """Copy untracked local config without replacing worktree files."""
     primary, destination = Path(primary), Path(destination)
+    if (primary.resolve() != primary or destination.resolve() != destination or
+            destination.parent != primary / WORKTREES_DIR or not is_git_repo(destination) or
+            repo_of_path(destination) != str(primary) or not any(
+                wt['path'] == str(destination) and not wt.get('prunable') and not wt.get('locked')
+                for wt in list_worktrees(primary))):
+        raise ValueError('local provisioning requires a registered linked worktree of the source')
     candidates = list(eligible_env_files(primary))
     if include_navigation:
-        # QA navigation config
-        navigation = primary / ".kilo/local/qa-navigation.json"
-        if navigation.is_file() and not navigation.is_symlink() and not git_out(
-                str(primary), "ls-files", "--", ".kilo/local/qa-navigation.json"):
-            candidates.append((navigation, Path(".kilo/local/qa-navigation.json")))
-        
-        # QA authentication config
-        qa_auth = primary / ".kilo/local/qa-auth.json"
-        if qa_auth.is_file() and not qa_auth.is_symlink() and not git_out(
-                str(primary), "ls-files", "--", ".kilo/local/qa-auth.json"):
-            candidates.append((qa_auth, Path(".kilo/local/qa-auth.json")))
+        candidates.extend((primary / rel, rel) for rel in QA_LOCAL_FILES)
 
     required_exclusions = []
     for source, relative in candidates:
         rel = relative.as_posix()
         destination_file = destination / relative
         is_env = source.name.startswith(".env") and source.name != ".env.example"
-        if destination_file.is_symlink() or (is_env and git_out(str(destination), "ls-files", "--", rel)):
+        if (source.resolve() != source or not source.is_file() or destination_file.is_symlink() or
+                any(git_out(str(root), '--literal-pathspecs', 'ls-files', '--', rel) != ''
+                    for root in (primary, destination))):
+            continue
+        if not is_env and any(git(root, 'check-ignore', '-q', '--', rel)[0] for root in (primary, destination)):
             continue
         if any(part.is_symlink() for part in destination_file.parents
                if part != destination and os.path.commonpath([str(part), str(destination)]) == str(destination)):
@@ -454,12 +459,12 @@ def provision_local_files(primary, destination, include_navigation=False):
                 try:
                     destination_fd = os.open(
                         str(destination_file), os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                        stat.S_IMODE(source_stat.st_mode))
+                        stat.S_IMODE(source_stat.st_mode) if is_env else 0o600)
                 except FileExistsError:
                     continue
                 with os.fdopen(destination_fd, "wb") as destination_stream:
                     shutil.copyfileobj(source_stream, destination_stream)
-                os.chmod(destination_file, stat.S_IMODE(source_stat.st_mode), follow_symlinks=False)
+                    os.fchmod(destination_stream.fileno(), stat.S_IMODE(source_stat.st_mode) if is_env else 0o600)
                 if is_env:
                     required_exclusions.append(rel)
         except OSError:
@@ -469,6 +474,8 @@ def provision_local_files(primary, destination, include_navigation=False):
         if not common:
             raise OSError("cannot find repository git directory for local-file exclusions")
         exclude = os.path.join(common, "info", "exclude")
+        if os.path.realpath(exclude) != exclude or (os.path.exists(exclude) and not os.path.isfile(exclude)):
+            raise ValueError('unsafe local-file exclusion destination')
         try:
             with open(exclude, encoding="utf-8") as stream:
                 existing = stream.read()
@@ -660,23 +667,17 @@ def list_worktrees(cwd):
     return wts
 
 
-def slug_of(path, root):
-    marker = os.sep + WORKTREES_DIR + os.sep
-    at = path.find(marker)
-    if at == -1:
-        return os.path.basename(path)
-    rest = path[at + len(marker):]
-    return rest.split(os.sep)[0]
-
-
 def worktree_path(root, slug):
     return os.path.join(root, WORKTREES_DIR, slug)
 
 
 def find_worktree(cwd, slug):
-    for wt in list_worktrees(cwd):
-        if slug_of(wt["path"], None) == slug:
-            return wt
+    worktrees = list_worktrees(cwd)
+    if worktrees and SLUG_RE.fullmatch(slug):
+        expected = worktree_path(worktrees[0]["path"], slug)
+        for wt in worktrees[1:]:
+            if wt["path"] == expected:
+                return wt
     return None
 
 
@@ -780,6 +781,50 @@ def recovery_options(items, board_id, repo_id):
                                   "--repo", repo_id, "--worktree", item["path"]]) for item in items)
 
 
+def check_current_checkout(args, cwd, root, target, board, table, cells):
+    """Read-only preflight; a primary checkout is not a managed lifecycle workspace."""
+    if args.reuse or args.new or args.base or args.slug:
+        raise ValueError("--skip-worktree cannot be combined with --reuse, --new, --base or --slug")
+    mode = workspace_mode(cwd)
+    if mode == "required":
+        raise ValueError("required mode needs a linked worktree for every row; cannot skip")
+
+    def column(name):
+        index = board.column_index(table, name)
+        if index is None or len(cells) <= index:
+            raise ValueError("missing board field: " + name)
+        return cells[index].strip()
+
+    if column("Type") not in ("Fix", "Chore", "Docs"):
+        raise ValueError("%s rows require an assigned linked worktree; cannot skip" % column("Type"))
+    if column("Status") not in ("Ready", "In Progress"):
+        raise ValueError("current-checkout work requires a Ready or In Progress row")
+    if column("Branch/Worktree") not in ("", "-") or column("Blocked by") not in ("", "-", "None.", "- None."):
+        raise ValueError("row has a workspace link or dependency; inspect its assignment instead of skipping")
+    if any(record.get("outcome") == "active" and args.board in record.get("boards", [])
+           for record in local_state(root)["workspaces"].values()):
+        raise ValueError("row has an active workspace assignment; resume instead of skipping")
+    if (args.repo or "control") not in {value.strip() for value in column("Repos").split(",")}:
+        raise ValueError("row does not assign the requested repository")
+    if checked_git(cwd, "rev-parse", "--show-toplevel") != target or main_checkout_root(cwd) != target:
+        raise ValueError("run --skip-worktree from the assigned repository's primary checkout")
+    guard, policy = load_guard_policy(root)
+    branch = git_out(cwd, "symbolic-ref", "--short", "HEAD")
+    if not branch or branch in guard.protected_branch_names(target, policy):
+        raise ValueError("cannot skip on a protected branch or detached HEAD; no branch was switched")
+    configs = effective_configs(target, root)
+    override = os.environ.get("KILO_CONFIG")
+    if override and os.path.abspath(override) not in configs:
+        raise ValueError("KILO_CONFIG is outside the assigned checkout's effective configurations")
+    expected = guard.generated_permission(policy, mode)
+    for path in configs:
+        config, _ = guard.load_config(path)
+        if not isinstance(config, dict) or not guard.permission_maps_match(config.get("permission"), expected):
+            raise ValueError("permission map missing, invalid or disagrees with saved mode: %s" % path)
+    print("%s: current checkout eligible: %s (%s); no workspace created or recorded" % (args.board, target, branch))
+    return OK
+
+
 def cmd_create(args, cwd):
     root = control_root(cwd)
     board = load_board_module(script_root())
@@ -807,6 +852,8 @@ def cmd_create(args, cwd):
               % (target, repo_id), file=sys.stderr)
         return REFUSED
     confined(board_file, root)
+    if getattr(args, "skip_worktree", False):
+        return check_current_checkout(args, cwd, root, target, board, table, cells)
     branch_index = board.field_index(table, "branch-worktree")
     repos_index = board.field_index(table, "repos")
     if branch_index is None:
@@ -1481,7 +1528,7 @@ def cmd_list(args, cwd):
             path = os.path.abspath(wt["path"])
             kind = "main" if os.path.realpath(path) == main else "linked"
             state = worktree_state(board, control, table, path, wt["branch"], base, target)
-            print("%s | %s | %s | %s | %s | %s | %s" % (repo_id, slug_of(path, target), path,
+            print("%s | %s | %s | %s | %s | %s | %s" % (repo_id, os.path.basename(path), path,
                                                        wt["branch"] or "(detached)", wt["head"],
                                                        kind, state))
     return OK
@@ -1783,6 +1830,7 @@ def main(argv):
     p.add_argument("--repo", help="repo id from .kilo/repos.json (default: control)")
     p.add_argument("--reuse", help="reuse the workspace of another board row")
     p.add_argument("--new", action="store_true", help="create an independent workspace only with explicit user approval")
+    p.add_argument("--skip-worktree", action="store_true", help="validate current maintenance checkout without creating or recording a worktree")
 
     p = sub.add_parser("resume", help="reuse the live worktree of a board row")
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")

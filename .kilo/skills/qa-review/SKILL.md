@@ -29,9 +29,51 @@ Reports/findings/ledgers belong in ignored `artifacts/reviews/`. Run ledger comm
 
 ## Authentication
 
-Use authorized ignored local `--storage-state <file>` and/or `--navigation <file>`. Ask for test access when absent; MFA/SSO remains manual, never bypassed. Login/state capture requires navigation with `approved: true` and an app-specific `authenticatedSelector` visible after navigation. A matching URL or missing password form does not prove login.
+Prefer a dedicated test account and human-prepared Playwright state. Never automate authentication in the integrated browser or MCP, bypass MFA/SSO, or ask for passwords or state contents in chat. If authorized state is missing or expired, report the protected criteria as unverified. Never print, inspect in chat, stage, or attach the state. Review evidence before sharing: screenshot masking is not comprehensive.
 
-Navigation supports `login` and `steps` arrays (up to 50 each), `authenticatedPath` for login, and actions `goto/path`, `fill/selector/env`, `click/selector/intent`, `waitForURL/path`, `waitForSelector/selector`. Page changes declare the final destination with `waitForURL`; paths stay same-origin without credentials/query/fragment. Click intents are `login`, `navigation`, or `destructive`; destructive actions also require explicit user authorization and `--allow-destructive`. Use environment-variable names for credentials, never literals. Inspect evidence for sensitive content before sharing; masking is not comprehensive.
+The standalone capture command discovers `.kilo/local/qa-auth.json` in the caller's assigned Git root, not in an ancestor or sibling checkout. The human can use the skill's `qa-auth.example.json` as the template: `approved` must be `true`, `origin` must be the exact canonical HTTP(S) origin (scheme, host, port; no slash or path), `storageState` must be `qa-storage-state.json`, and `authenticatedSelector` must identify a visible signed-in-only element. No other keys, credentials, arbitrary paths or scripts. The human places the state next to the config; keep both private (0600), ignored, untracked and free of symlinks. Use HTTPS except on loopback. State may contain only test host-only cookies and local storage for this origin; indexedDB, partitioned cookies, cross-origin resources/SSO and cross-origin API flows are not supported for state reuse. An invalid config stops capture, not an anonymous fallback.
+
+### Human setup and renewal
+
+Use a private graphical terminal in the **assigned project's Git root**. Verify `pwd -P` matches the assignment. Use the installed `playwright open --help` (look for `--save-storage`); if the CLI, approved browser or display is unavailable, stop rather than installing anything. Choose a test origin whose entire login and review flow stays on that origin. Do not continue to an external identity provider, edit exported cookies, or import your personal browser profile.
+
+Run this Bash block yourself, replacing the example origin first. It refuses an existing state file. A failed check means **stop before login**; correct the path, ignore rule or permissions first.
+
+```bash
+(
+  set -eu
+  umask 077
+  origin=http://localhost:3000
+  config=.kilo/local/qa-auth.json
+  state=.kilo/local/qa-storage-state.json
+  test "$(pwd -P)" = "$(git rev-parse --show-toplevel)"
+  for path in .kilo .kilo/local "$config" "$state" artifacts artifacts/tmp; do
+    test ! -L "$path"
+  done
+  for path in "$config" "$state" artifacts/tmp/qa-browser-probe; do
+    git check-ignore -q -- "$path"  # Without --no-index: tracked paths fail too.
+  done
+  test ! -e "$state"
+  mkdir -p .kilo/local artifacts/tmp
+  chmod 700 .kilo/local
+  if test -e "$config"; then test -f "$config"; else touch "$config"; fi
+  chmod 600 "$config"
+  export TMPDIR=$(mktemp -d artifacts/tmp/qa-browser-XXXXXX)
+  test -d "$TMPDIR"
+  export TMP="$TMPDIR" TEMP="$TMPDIR"
+  playwright open --browser chromium --save-storage "$state" "$origin"
+  test -s "$state"
+  chmod 600 "$state"
+)
+```
+
+Each invocation opens a new context for this project: do not pass `--user-data-dir` or `--load-storage`, record a login, or enable traces/HAR. In that window, sign in manually with the dedicated test account, complete any same-origin MFA, and verify the signed-in-only element on the intended page. Close the browser window normally to save state. If login fails or redirects off-origin, do not approve or use the resulting file.
+
+Privately edit the prepared config using `qa-auth.example.json` above as the shape. Set the actual origin and signed-in selector, then `approved: true` only for the authorized review. Run the normal capture command above with the matching `--base-url` and protected `--route`; no auth flags or navigation file are required. A missing marker or rejected state is not a pass. On expiry, revoke the old test session as appropriate, remove only the known stale private state, and repeat the preflight and manual login from a fresh context. Never share state across projects, even on the same hostname.
+
+Create/resume provisioning and `env.py sync` can copy the two fixed ignored files from the corresponding primary checkout without replacing existing files; `env.py status` reports presence, not validity or values. Provision just the assigned worktree directly if reuse across that repo's worktrees is not authorized. The reviewer never saves or renews state; the human must renew any authorized stale copies.
+
+Optional `--navigation` must be ignored, untracked, `approved: true` and use reviewed same-origin steps. With discovered state, login, fill, alternate state and conflicting markers are refused. Declare page changes with `waitForURL`; a URL alone does not prove login. The standalone CLI also accepts explicitly authorized `--storage-state` plus a navigation file with a signed-in marker when no local auth config exists. Destructive steps still require explicit user authorization and `--allow-destructive`.
 
 ## Review
 
@@ -40,6 +82,8 @@ Check the actual user flow, relevant loading/empty/error states, keyboard focus 
 Share one capture with `ui-critic` to review hierarchy, usability, and product character without source edits. Consolidate all findings once, deduplicate, and prioritize by user impact.
 
 ## Findings And Handoff
+
+Read the row's `[user-approved:<scope>]` note and evidence. Report the user's decision separately from checks you performed: do not request the same review again or treat missing automation alone as a blocker for an explicitly accepted manual criterion. Preserve independent failures and unverified criteria. Changed scope is not covered, and review evidence never grants new authorization or establishes commit or merge status.
 
 Actionable findings state `Summary`, `Repro steps`, `Expected behavior`, `Actual behavior`, `Evidence`, `Acceptance criteria`, and `Risk`. Validate persisted findings with:
 
