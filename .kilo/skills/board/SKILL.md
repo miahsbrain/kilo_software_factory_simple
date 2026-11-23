@@ -19,7 +19,7 @@ Check existing rows before adding work. Record checkable acceptance criteria, ri
 
 Consolidate review findings once. Use `check-finding.py` from the QA skill for actionable Fix rows and its fingerprint to avoid duplicates. Fixes reuse the original workspace. Record a blocker and what resolves it rather than silently dropping work.
 
-Board gallery and review guidance is subject to `worktree.py reviews status`. Follow `/components` and `/ui` for the independent gates. Link the manual QA/UI checklist for skipped scopes even without a blocker; policy skips and checklist delivery do not change a lane or prove a pass.
+Board gallery and review guidance is subject to `worktree.py reviews status`. Follow `/components` and `/ui` for the independent gates. Link the validated central manual QA/UI checklist by absolute workspace path for skipped scopes even without a blocker; policy skips and checklist delivery do not change a lane or prove a pass.
 
 ## Manual Review
 

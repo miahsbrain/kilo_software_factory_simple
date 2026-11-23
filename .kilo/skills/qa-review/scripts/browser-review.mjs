@@ -18,8 +18,7 @@
  *                            [--chromium <path>]
  *                            [--human-requested-manual-capture]
  *
- * All output stays in the caller's Git worktree artifacts folder (cwd for
- * non-Git fixtures): <worktree>/artifacts/<scope>/qa/<date>/<task-id>/.
+ * Evidence: <primary-control>/artifacts/<scope>/qa/<date>/<task-id>/run-<unique>/.
  *
  * For every route x viewport x scheme it writes a screenshot plus console,
  * page-error and network-failure logs, then a summary.json and a notes.md for
@@ -56,7 +55,7 @@ function usage() {
     '  --scope        Scope folder under artifacts/. Default: factory.',
     '  --task-id      Task folder under qa/<date>/. Default: adhoc.',
     '  --date         Capture date folder YYYY-MM-DD. Default: today.',
-    '  --artifact-dir Override within caller worktree artifacts/ only (no symlinks).',
+    '  --artifact-dir Run parent inside primary control artifacts/ (primary-relative or absolute; no symlinks).',
     '  --project      Directory whose package.json provides Playwright. Default: cwd.',
     '  --viewports    Comma-separated WIDTHxHEIGHT list. Default: ' + DEFAULT_VIEWPORTS,
     '  --label        Optional slug mixed into the artifact directory name.',
@@ -72,7 +71,7 @@ function usage() {
     '                 Login requires authenticatedPath. State/login require authenticatedSelector.',
     '                 Steps run after each target goto; page changes require waitForURL.',
     '  --allow-destructive Explicit authorization for steps with intent:destructive.',
-    '  --human-requested-manual-capture Run one manual capture, including outside project control.',
+    '  --human-requested-manual-capture Run one manual capture in a verified project.',
     '                 Use only when a human explicitly requests this capture. Agents must not',
     '                 add this flag on their own. Otherwise a valid enabled QA policy is required.',
     '  --help         Show this message and exit.',
@@ -106,7 +105,7 @@ export function callerRoot(cwd = process.cwd()) {
       env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
     }).trim();
   } catch {
-    return resolve(cwd); // Non-Git fixtures remain confined to their own cwd.
+    fail('cannot verify source Git root');
   }
 }
 
@@ -116,11 +115,28 @@ function safeSegment(value, name) {
   }
 }
 
-export async function artifactPath(path) {
-  const root = resolve(callerRoot(), 'artifacts');
+export function controlArtifacts(target) {
+  const cli = fileURLToPath(new URL('./ledger.py', import.meta.url));
+  let path;
+  try {
+    path = execFileSync('python3', ['-B', cli, 'artifact-root', ...(target === undefined ? [] : [target])], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
+    }).replace(/\n$/, '');
+  } catch { fail('cannot verify owning primary control artifacts/'); }
+  if (!isAbsolute(path) || path !== resolve(path) || /[\r\n\0]/.test(path) ||
+      (target === undefined ? !path.endsWith('/artifacts') : path !== target)) {
+    fail('invalid primary control artifacts path');
+  }
+  return path;
+}
+
+export async function artifactPath(path, root) {
   const target = resolve(path);
   const rel = relative(root, target);
-  if (rel === '..' || rel.startsWith('../') || isAbsolute(rel)) fail('output must stay inside caller worktree artifacts/');
+  if (rel === '..' || rel.startsWith('../') || rel.split('/').includes('.git') || isAbsolute(rel)) {
+    fail('output must stay inside primary control artifacts/');
+  }
   // Check existing ancestors even when the leaf does not exist. No symlinks in
   // the output tree, including in-root links and links at the artifacts root.
   if (await realpath(dirname(root)) !== dirname(root)) fail('artifact root has a symlink ancestor');
@@ -138,46 +154,37 @@ export async function artifactPath(path) {
   return target;
 }
 
-async function outputFile(path, data) {
-  return writeFile(await artifactPath(path), data);
+async function outputFile(root, path, data) {
+  return writeFile(await artifactPath(path, root), data);
 }
 
 export function taskDirectory(options) {
-  for (const key of ['scope', 'taskId', 'date']) safeSegment(options[key], key);
-  if (options.label !== undefined) safeSegment(options.label, 'label');
-  if (options.artifactDir !== undefined) return resolve(options.artifactDir);
-  return join(callerRoot(), 'artifacts', options.scope, 'qa', options.date, options.taskId);
+  const root = options.controlArtifacts;
+  if (options.artifactDir !== undefined) return resolve(dirname(root), options.artifactDir);
+  return join(root, options.scope, 'qa', options.date, options.taskId);
 }
 
 export async function prepareArtifacts(options) {
-  options.taskDir = await artifactPath(taskDirectory(options));
-  options.artifactRoot = await artifactPath(options.label ? join(options.taskDir, options.label) : options.taskDir);
-  // Refuse pre-existing output links before launching or contacting the app.
-  async function inspect(path) {
-    await artifactPath(path);
-    let children;
-    try { children = await readdir(path, {withFileTypes: true}); }
-    catch (error) { if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return; throw error; }
-    for (const child of children) {
-      const target = join(path, child.name);
-      await artifactPath(target);
-      if (child.isDirectory()) await inspect(target);
-    }
-  }
-  await inspect(options.taskDir);
+  const parent = await artifactPath(taskDirectory(options), options.controlArtifacts);
+  controlArtifacts(parent);
+  controlArtifacts(join(options.controlArtifacts, 'tmp'));
+  await mkdir(parent, {recursive: true});
+  options.taskDir = await mkdtemp(join(parent, 'run-'));
+  options.artifactRoot = options.label ? join(options.taskDir, options.label) : options.taskDir;
 }
 
-export async function browserTemp() {
-  const parent = await artifactPath(join(callerRoot(), 'artifacts', 'tmp'));
+export async function browserTemp(root) {
+  const parent = await artifactPath(join(root, 'tmp'), root);
   await mkdir(parent, {recursive: true});
   const temp = await mkdtemp(join(parent, 'browser-'));
   const saved = Object.fromEntries(['TMPDIR', 'TMP', 'TEMP'].map(key => [key, process.env[key]]));
   // Chromium's singleton Unix socket has a small pathname limit. A relative
-  // TMPDIR keeps that socket short without writing outside this worktree.
-  const envPath = relative(process.cwd(), temp);
-  await artifactPath(resolve(envPath));
-  for (const key of Object.keys(saved)) process.env[key] = envPath;
+  // TMPDIR relative to scratch stays short even for distant source worktrees.
+  const sourceCwd = process.cwd();
+  process.chdir(temp);
+  for (const key of Object.keys(saved)) process.env[key] = '.';
   return {path: temp, restore() {
+    process.chdir(sourceCwd);
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
     }
@@ -270,7 +277,8 @@ export function parseArgs(argv) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(options.date)) fail('--date must be YYYY-MM-DD');
   if (!options.scope) fail('--scope is required');
   if (!options.taskId) fail('--task-id is required');
-  taskDirectory(options);
+  for (const key of ['scope', 'taskId', 'date']) safeSegment(options[key], key);
+  if (options.label !== undefined) safeSegment(options.label, 'label');
   if (!['light', 'dark', 'both'].includes(options.scheme)) {
     fail('--scheme must be light, dark, or both');
   }
@@ -582,7 +590,7 @@ function resolveChromium(playwright, options) {
   const resolution = {
     project: resolve(options.project),
     flag: options.chromium || null,
-    env: process.env.PLAYWRIGHT_CHROMIUM_PATH || null,
+    env: options.chromiumEnv || null,
     path: null,
   };
   if (resolution.flag) {
@@ -796,8 +804,8 @@ function sheetHtml(beforeUri, afterUri, beforeLabel, afterLabel) {
     '<figure><figcaption>AFTER · ' + afterLabel + '</figcaption><img src="' + afterUri + '"></figure>';
 }
 
-async function writeCompareSheet(browser, beforeBuffer, afterBuffer, sheetPath, beforeLabel, afterLabel) {
-  await artifactPath(sheetPath);
+async function writeCompareSheet(root, browser, beforeBuffer, afterBuffer, sheetPath, beforeLabel, afterLabel) {
+  await artifactPath(sheetPath, root);
   const uri = buffer => 'data:image/png;base64,' + buffer.toString('base64');
   const html = sheetHtml(uri(beforeBuffer), uri(afterBuffer), beforeLabel, afterLabel);
   const context = await browser.handle.newContext({viewport: {width: 1600, height: 900}});
@@ -842,7 +850,8 @@ export async function captureEntry(session, options, route, viewport, scheme, al
   const url = joinUrl(options.baseUrl, route);
   safeSegment(viewport.name, 'viewport');
   safeSegment(scheme, 'scheme');
-  const dir = await artifactPath(join(options.artifactRoot, routeSlug(route), viewport.name, scheme));
+  const dir = await artifactPath(join(options.artifactRoot, routeSlug(route), viewport.name, scheme), options.controlArtifacts);
+  const save = (path, data) => outputFile(options.controlArtifacts, path, data);
   await mkdir(dir, {recursive: true});
 
   const name = screenshotName(scheme, viewport, allSchemes);
@@ -892,7 +901,7 @@ export async function captureEntry(session, options, route, viewport, scheme, al
     entry.horizontal_overflow_check_passed = entry.horizontal_overflow === null ? null : !entry.horizontal_overflow;
 
     const image = await session.screenshotFull();
-    await outputFile(screenshot, image);
+    await save(screenshot, image);
 
     if (options.components.length) {
       const boxes = await session.evaluate(boxesExpression(options.components));
@@ -903,7 +912,7 @@ export async function captureEntry(session, options, route, viewport, scheme, al
             : 'component-' + (index + 1) + '.png';
           const componentPath = join(dir, componentName);
           try {
-            await outputFile(componentPath, await session.screenshotClip(boxes[index]));
+            await save(componentPath, await session.screenshotClip(boxes[index]));
             entry.components.push(componentPath);
           } catch {
             entry.components.push(null);
@@ -920,14 +929,14 @@ export async function captureEntry(session, options, route, viewport, scheme, al
     entry.page_error_count = logs.pageErrors.length;
     entry.network_failure_count = logs.networkFailures.length;
 
-    await outputFile(join(dir, 'console.log'), logs.consoleErrors.join('\n') + (logs.consoleErrors.length ? '\n' : ''));
-    await outputFile(join(dir, 'page-errors.log'), logs.pageErrors.join('\n') + (logs.pageErrors.length ? '\n' : ''));
-    await outputFile(join(dir, 'network.json'), JSON.stringify(logs.networkFailures, null, 2));
+    await save(join(dir, 'console.log'), logs.consoleErrors.join('\n') + (logs.consoleErrors.length ? '\n' : ''));
+    await save(join(dir, 'page-errors.log'), logs.pageErrors.join('\n') + (logs.pageErrors.length ? '\n' : ''));
+    await save(join(dir, 'network.json'), JSON.stringify(logs.networkFailures, null, 2));
   } catch (error) {
     entry.error = error instanceof ReviewError ? error.message + ' ' + ACCESS_REQUEST : 'capture failed (details withheld)';
-    await outputFile(join(dir, 'console.log'), '').catch(() => {});
-    await outputFile(join(dir, 'page-errors.log'), '').catch(() => {});
-    await outputFile(join(dir, 'network.json'), '[]').catch(() => {});
+    await save(join(dir, 'console.log'), '').catch(() => {});
+    await save(join(dir, 'page-errors.log'), '').catch(() => {});
+    await save(join(dir, 'network.json'), '[]').catch(() => {});
   }
   return entry;
 }
@@ -949,7 +958,11 @@ async function main() {
     }
     if (!policy.qa) fail('automatic QA capture is off; no evidence captured');
   }
-  await prepareArtifacts(options);
+  options.controlArtifacts = controlArtifacts();
+  options.project = resolve(options.project);
+  if (options.chromium) options.chromium = resolve(options.chromium);
+  if (process.env.PLAYWRIGHT_CHROMIUM_PATH) options.chromiumEnv = resolve(process.env.PLAYWRIGHT_CHROMIUM_PATH);
+  if (options.compare) options.compare = resolve(options.compare);
   const {navigationConfig, storageState} = await reviewAccess(options);
   options.navigationConfig = navigationConfig;
   options.loginEnv = {};
@@ -961,7 +974,8 @@ async function main() {
   }
   // Set temp roots before importing Playwright as well as before launch: some
   // installed versions resolve internal artifact prefixes at module load time.
-  const temp = await browserTemp();
+  await prepareArtifacts(options);
+  const temp = await browserTemp(options.controlArtifacts);
   try {
     const playwright = await loadPlaywright(options.project);
     const allSchemes = options.scheme === 'both';
@@ -1005,8 +1019,8 @@ async function main() {
       results: [],
     };
 
-    launchOptions.downloadsPath = await artifactPath(join(temp.path, 'downloads'));
-    launchOptions.tracesDir = await artifactPath(join(temp.path, 'traces'));
+    launchOptions.downloadsPath = await artifactPath(join(temp.path, 'downloads'), options.controlArtifacts);
+    launchOptions.tracesDir = await artifactPath(join(temp.path, 'traces'), options.controlArtifacts);
     let browser = null;
     try {
       browser = {kind: 'playwright', handle: await playwright.chromium.launch(launchOptions)};
@@ -1047,6 +1061,7 @@ async function main() {
                 const sheetPath = join(options.artifactRoot, routeSlug(route), viewport.name, scheme, 'compare.png');
                 try {
                   await writeCompareSheet(
+                    options.controlArtifacts,
                     browser,
                     await readFile(before),
                     await readFile(entry.screenshot),
@@ -1069,9 +1084,8 @@ async function main() {
       await browser.handle.close().catch(() => {});
     }
 
-    await mkdir(await artifactPath(options.taskDir), {recursive: true});
-    await outputFile(join(options.taskDir, 'summary.json'), JSON.stringify(summary, null, 2));
-    await outputFile(join(options.taskDir, 'notes.md'), renderNotes(options, summary));
+    await outputFile(options.controlArtifacts, join(options.taskDir, 'summary.json'), JSON.stringify(summary, null, 2));
+    await outputFile(options.controlArtifacts, join(options.taskDir, 'notes.md'), renderNotes(options, summary));
     process.stdout.write(JSON.stringify(summary) + '\n');
     if (summary.results.some(entry => entry.error)) process.exitCode = 2;
   } finally {

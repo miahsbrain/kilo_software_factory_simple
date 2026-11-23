@@ -4,7 +4,7 @@ Design for a named user doing a real task, with the product's own content and ch
 
 ## Delivery
 
-All gallery QA and critique below are conditional: check `worktree.py reviews status` before delegation and in the specialist. Run only enabled scopes, use existing evidence only for critique with QA off, and use manual review if policy is invalid. At completion link the manual checklist for skipped scopes even without a blocker.
+All gallery QA and critique below are conditional: check `worktree.py reviews status` before delegation and in the specialist. Run only enabled scopes, use existing evidence only for critique with QA off, and use manual review if policy is invalid. At completion, return an absolute workspace link to the validated central manual checklist for skipped scopes even without a blocker.
 
 Default to shadcn/ui with Tailwind for compatible web apps; retain an approved alternative. Before proposing a primitive, trace a real screen import through the project's alias configuration to its exported component. For shadcn, check `components.json`, the actual UI directory and its exports; the registry name alone is not an import path. Report the module and caller, or the missing piece. Obtain authorization before installing dependencies or generating components. In the factory's Python-rendered board, trace rendering functions instead: `wb_row_card` uses `wb_card` in `.kilo/skills/board/scripts/board_serve.py`. This is reuse, not a shadcn installation.
 
@@ -14,7 +14,7 @@ Use the approved spacing, type, color-role, radius and elevation tokens. Present
 
 Use `.kilo/skills/qa-review/SKILL.md` and its existing capture script for shared screenshots, console/page errors, network evidence, and responsive overflow checks. Focus on actual acceptance criteria and relevant states, keyboard access, visible focus, accessible names, readable contrast, and usable targets.
 
-When capture is authorized, run `browser-review.mjs` from the assigned source worktree. Its Git working directory, not `--project` or the script location, selects the `artifacts/` root. Keep generated fixtures in `artifacts/tmp/tests/` and scratch scripts in `artifacts/scripts/`; bootstrap copies maintained `.kilo/` tools, never evidence.
+When capture is authorized, run `browser-review.mjs` from the assigned source worktree. Resolve `python3 <qa scripts>/ledger.py artifact-root` there and keep captures, raw files, logs and scratch scripts beneath the returned primary control artifacts root. Bootstrap copies maintained `.kilo/` tools, never evidence.
 
 The factory disables Playwright MCP. Its output directory does not constrain explicit screenshot, snapshot or log filenames. Use a live read-only inspection without saving, or the confined runner for saved browser evidence. Do not use an external tool as a capture fallback. This default is not a system-wide sandbox or a migration of existing installs.
 

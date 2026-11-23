@@ -8,13 +8,25 @@ import {promisify} from 'node:util';
 import {createServer} from 'node:http';
 import {fileURLToPath} from 'node:url';
 import {parseArgs, safeUrl, validateNavigation, localJson, runSteps, stateSecrets, redact,
-  PlaywrightPage, captureEntry, callerRoot, taskDirectory, prepareArtifacts, artifactPath,
+  PlaywrightPage, captureEntry as runCaptureEntry, callerRoot, controlArtifacts, taskDirectory, prepareArtifacts, artifactPath,
   browserTemp} from './browser-review.mjs';
 
-const fixtures = join(callerRoot(), 'artifacts', 'tmp', 'tests');
-await artifactPath(fixtures);
+const evidence = controlArtifacts();
+const fixtures = join(evidence, 'tmp', 'tests');
+await artifactPath(controlArtifacts(fixtures), evidence);
 await mkdir(fixtures, {recursive: true});
 const tmpdir = () => fixtures;
+
+const captureEntry = (session, options, ...args) => runCaptureEntry(session, {controlArtifacts: evidence, ...options}, ...args);
+
+async function initControl(root, repos = {control: '.'}) {
+  execFileSync('git', ['init', '-q'], {cwd: root});
+  await mkdir(join(root, '.kilo'), {recursive: true});
+  await mkdir(join(root, 'docs'), {recursive: true});
+  await writeFile(join(root, 'docs/BOARD.md'), '# Board\n');
+  await writeFile(join(root, '.kilo/repos.json'), JSON.stringify(repos));
+  await writeFile(join(root, '.gitignore'), '/artifacts/\n/.kilo/local/\n');
+}
 
 const base = 'http://localhost:4173';
 const manualCapture = '--human-requested-manual-capture';
@@ -49,9 +61,9 @@ test('automatic CLI requires valid enabled QA before artifact inspection or brow
     [script, '--base-url', base, '--route', '/', ...flags], {cwd, stdio: 'pipe'}),
     error => error.status === 2 && reason.test(error.stderr));
   const invalid = /cannot verify review policy/;
-  const pathCheck = /inside caller worktree artifacts/;
+  const pathCheck = /cannot verify owning primary control artifacts/;
   refusal(invalid); // Missing policy CLI.
-  refusal(pathCheck, manualCapture, '--artifact-dir', fixture); // Manual capture still enforces confinement.
+  refusal(pathCheck, manualCapture); // Even explicitly requested capture needs an owner.
   for (const [result, expected] of [
     ['raise SystemExit(1)', invalid], ["print('invalid')", invalid],
     ["print('{\"qa\":true}')", invalid], ["print('{\"qa\":\"false\",\"ui\":true}')", invalid],
@@ -73,15 +85,15 @@ test('unsafe scope/task/label/date are refused, including with explicit artifact
     }
   }
   const options = parseArgs(['--base-url', base, '--route', '/', '--task-id', 'BOARD134']);
-  assert.equal(taskDirectory(options), join(callerRoot(), 'artifacts', 'factory', 'qa', options.date, 'BOARD134'));
+  assert.equal(taskDirectory({...options, controlArtifacts: evidence}), join(evidence, 'factory', 'qa', options.date, 'BOARD134'));
 });
 
 test('outside overrides and symlink ancestors/files are refused before any writes or browser access', async t => {
   const root = await mkdtemp(join(fixtures, 'qa-path-test-'));
   t.after(() => rm(root, {recursive: true, force: true}));
   const outside = join(callerRoot(), 'BOARD134-must-not-exist');
-  const options = dir => parseArgs(['--base-url', base, '--route', '/', '--artifact-dir', dir]);
-  await assert.rejects(prepareArtifacts(options(outside)), /inside caller worktree artifacts/);
+  const options = dir => ({...parseArgs(['--base-url', base, '--route', '/', '--artifact-dir', dir]), controlArtifacts: evidence});
+  await assert.rejects(prepareArtifacts(options(outside)), /inside primary control artifacts/);
   await assert.rejects(prepareArtifacts(options(join(callerRoot(), 'artifacts', '..', 'escape'))));
   await assert.rejects(stat(outside), {code: 'ENOENT'});
   await mkdir(join(root, 'target'));
@@ -89,32 +101,58 @@ test('outside overrides and symlink ancestors/files are refused before any write
   await assert.rejects(prepareArtifacts(options(join(root, 'link', 'absent', 'child'))), /symlink/);
   await mkdir(join(root, 'capture'));
   await symlink(join(root, 'target', 'summary.json'), join(root, 'capture', 'summary.json'));
-  await assert.rejects(prepareArtifacts(options(join(root, 'capture'))), /symlink/);
+  await assert.rejects(artifactPath(join(root, 'capture', 'summary.json'), evidence), /symlink/);
   assert.deepEqual(await readdir(join(root, 'target')), []);
   // The artifacts root itself must not be a symlink, even to another in-workspace path.
-  const fixture = join(root, 'non-git');
+  const fixture = join(root, 'standalone-control');
   await mkdir(fixture);
-  execFileSync('git', ['init', '-q'], {cwd: fixture});
+  await initControl(fixture);
   await symlink(join(root, 'target'), join(fixture, 'artifacts'));
   const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
   assert.throws(() => execFileSync(process.execPath, [script, manualCapture, '--base-url', base, '--route', '/'],
-    {cwd: fixture, stdio: 'pipe'}), error => error.status === 2 && /symlink/.test(error.stderr));
+    {cwd: fixture, stdio: 'pipe'}), error => error.status === 2 && /cannot verify owning primary control/.test(error.stderr));
   assert.deepEqual(await readdir(join(root, 'target')), []);
+});
+
+test('manual capture rejects an unmanaged caller, tracked evidence and nested Git destinations', async t => {
+  const root = await mkdtemp(join(fixtures, 'unsafe-control-'));
+  t.after(() => rm(root, {recursive: true, force: true}));
+  const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
+  const refusal = (...args) => assert.throws(() => execFileSync(process.execPath,
+    [script, manualCapture, '--base-url', base, '--route', '/', ...args], {cwd: root, stdio: 'pipe'}),
+    error => error.status === 2 && /cannot verify owning primary control/.test(error.stderr));
+  execFileSync('git', ['init', '-q'], {cwd: root});
+  refusal();
+  await assert.rejects(stat(join(root, 'artifacts')), {code: 'ENOENT'});
+  await initControl(root);
+  const artifacts = join(root, 'artifacts');
+  const nested = join(artifacts, 'nested');
+  await mkdir(nested, {recursive: true});
+  execFileSync('git', ['init', '-q'], {cwd: nested});
+  refusal('--artifact-dir', 'artifacts/nested/output');
+  assert.deepEqual(await readdir(nested), ['.git']);
+  await writeFile(join(artifacts, 'tracked'), 'preserve');
+  execFileSync('git', ['add', '-f', 'artifacts/tracked'], {cwd: root});
+  refusal();
+  assert.deepEqual((await readdir(artifacts)).sort(), ['nested', 'tracked']);
 });
 
 test('browser temp and Playwright output directories are artifact-local and env restores on failure', async t => {
   const root = await mkdtemp(join(fixtures, 'qa-temp-test-'));
   t.after(() => rm(root, {recursive: true, force: true}));
   const saved = Object.fromEntries(['TMPDIR', 'TMP', 'TEMP'].map(key => [key, process.env[key]]));
-  const temp = await browserTemp();
+  const source = process.cwd();
+  const temp = await browserTemp(evidence);
   t.after(() => rm(temp.path, {recursive: true, force: true}));
   try {
     assert.equal(resolve(osTmpdir()), temp.path);
     for (const key of Object.keys(saved)) assert.equal(resolve(process.env[key]), temp.path);
-    assert.ok(temp.path.startsWith(join(callerRoot(), 'artifacts', 'tmp') + '/'));
-    assert.equal(await artifactPath(join(temp.path, 'downloads')), join(temp.path, 'downloads'));
+    assert.equal(process.env.TMPDIR, '.');
+    assert.ok(temp.path.startsWith(join(evidence, 'tmp') + '/'));
+    assert.equal(await artifactPath(join(temp.path, 'downloads'), evidence), join(temp.path, 'downloads'));
   } finally { temp.restore(); }
   for (const [key, value] of Object.entries(saved)) assert.equal(process.env[key], value);
+  assert.equal(process.cwd(), source);
 });
 
 test('dot route slugs, components and error logs stay under artifacts', async t => {
@@ -426,18 +464,25 @@ test('canonical browser script logs in and captures protected password settings 
   {timeout: 120000}, async t => {
     const fixture = await mkdtemp(join(tmpdir(), 'qa-real-browser-test-'));
     t.after(() => rm(fixture, {recursive: true, force: true}));
-    const primary = join(fixture, 'primary');
-    const root = join(fixture, 'linked');
-    await mkdir(primary);
+    const control = join(fixture, 'control');
+    const primary = join(control, 'apps/service');
+    const root = join(primary, '.kilo/worktrees', 'nested/'.repeat(40), 'service');
+    await mkdir(primary, {recursive: true});
+    await initControl(control, {control: '.', service: 'apps/service'});
+    await writeFile(join(control, '.git/info/exclude'), '/apps/\n');
+    execFileSync('git', ['add', '.gitignore', '.kilo/repos.json', 'docs/BOARD.md'], {cwd: control});
+    execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+      '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture control'], {cwd: control});
+    const central = join(control, 'artifacts');
     execFileSync('git', ['init', '-q'], {cwd: primary, stdio: 'ignore'});
-    await writeFile(join(primary, '.gitignore'), 'artifacts/\nlocal/\n');
+    await writeFile(join(primary, '.gitignore'), 'local/\n.kilo/local/\n.kilo/worktrees/\n');
     execFileSync('git', ['add', '.gitignore'], {cwd: primary, stdio: 'ignore'});
     execFileSync('git', ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
       '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture'], {cwd: primary, stdio: 'ignore'});
     execFileSync('git', ['worktree', 'add', '-qb', 'review', root], {cwd: primary, stdio: 'ignore'});
     assert.equal(callerRoot(root), root);
     await mkdir(join(root, 'local'));
-    await writeFile(join(root, '.gitignore'), 'local/\n');
+    assert.throws(() => execFileSync('git', ['check-ignore', '-q', '--', 'artifacts/'], {cwd: root}), {status: 1});
     let logins = 0;
     let appVisits = 0;
     let settingsVisits = 0;
@@ -454,8 +499,8 @@ test('canonical browser script logs in and captures protected password settings 
         response.writeHead(302, {Location: 'http://127.0.0.1:' + foreign.address().port + '/pixel'}).end(); return;
       }
       if (request.url === '/login' && request.method === 'GET') {
-        for (const name of await readdir(join(root, 'artifacts', 'tmp'))) {
-          const temp = join(root, 'artifacts', 'tmp', name);
+        for (const name of await readdir(join(central, 'tmp'))) {
+          const temp = join(central, 'tmp', name);
           for (const child of await readdir(temp)) observedTempPaths.add(join(temp, child));
         }
         response.end('<!doctype html><form method="post" action="/login"><input name="email" id="email">' +
@@ -501,9 +546,9 @@ test('canonical browser script logs in and captures protected password settings 
       {action: 'waitForURL', path: '/settings'}, {action: 'waitForSelector', selector: 'main'},
     ]};
     await writeFile(join(root, 'local', 'navigation.json'), JSON.stringify(config), {mode: 0o600});
-    const artifactDir = join(root, 'artifacts', 'factory', 'qa', '2026-11-18', 'BOARD134');
+    const taskParent = join(central, 'factory', 'qa', '2026-11-18', 'BOARD134');
     const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
-    const args = [script, manualCapture, '--base-url', url, '--route', '/app', '--project', root,
+    const args = [script, '--base-url', url, '--route', '/app', '--project', '.',
       '--navigation', 'local/navigation.json', '--date', '2026-11-18', '--task-id', 'BOARD134',
       '--component', 'main', '--viewports', '320x800,834x1112'];
     let output;
@@ -517,18 +562,22 @@ test('canonical browser script logs in and captures protected password settings 
       assert.fail('Canonical command: ' + [process.execPath, ...args].join(' ') + '\nExit: ' + error.code +
         '\n' + (error.stderr || error.message));
     }
+    const artifactDir = JSON.parse(output.stdout).task_dir;
+    assert.ok(artifactDir.startsWith(join(taskParent, 'run-')));
     const summary = JSON.parse(await readFile(join(artifactDir, 'summary.json'), 'utf8'));
+    assert.equal(summary.project, root);
     assert.equal(summary.driver, 'playwright');
     assert.equal(summary.results.length, 2);
     assert.equal(logins, 1);
     assert.ok(appVisits >= 2);
     assert.equal(settingsVisits, 2);
     await assert.rejects(stat(join(primary, 'artifacts')), {code: 'ENOENT'});
-    const tempChildren = await readdir(join(root, 'artifacts', 'tmp'));
+    await assert.rejects(stat(join(root, 'artifacts')), {code: 'ENOENT'});
+    const tempChildren = await readdir(join(central, 'tmp'));
     assert.ok(tempChildren.some(name => name.startsWith('browser-')));
     assert.ok([...observedTempPaths].some(path => path.includes('/playwright-artifacts-')));
     assert.ok([...observedTempPaths].some(path => path.includes('/playwright_chromiumdev_profile-')));
-    for (const path of observedTempPaths) assert.ok(path.startsWith(join(root, 'artifacts', 'tmp') + '/'));
+    for (const path of observedTempPaths) assert.ok(path.startsWith(join(central, 'tmp') + '/'));
     for (const result of summary.results) {
       assert.equal(result.error, null);
       assert.equal(result.components.length, 1);
@@ -544,18 +593,20 @@ test('canonical browser script logs in and captures protected password settings 
       assert.ok(!output.stderr.includes(value));
     }
     // Reuse the canonical command for comparison sheets, without another driver.
-    await promisify(execFile)(process.execPath, [...args, '--label', 'after', '--compare', artifactDir],
+    const comparison = await promisify(execFile)(process.execPath, [...args, '--label', 'after', '--compare', artifactDir,
+      '--artifact-dir', 'artifacts/factory/qa/2026-11-18/BOARD134'],
       {cwd: root, timeout: 90000, env: {...process.env, QA_FIXTURE_EMAIL: 'fixture-user-placeholder',
         QA_FIXTURE_PASSWORD: 'fixture-password-placeholder'}});
-    const compared = JSON.parse(await readFile(join(artifactDir, 'summary.json'), 'utf8'));
+    const compared = JSON.parse(comparison.stdout);
+    assert.notEqual(compared.task_dir, artifactDir);
+    assert.ok(compared.task_dir.startsWith(join(taskParent, 'run-')));
     for (const result of compared.results) {
       assert.equal(result.compare_error, undefined);
-      assert.ok(result.compare.startsWith(join(artifactDir, 'after') + '/'));
+      assert.ok(result.compare.startsWith(join(compared.task_dir, 'after') + '/'));
       assert.equal((await readFile(result.compare)).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
     }
     const local = join(root, '.kilo/local');
     await mkdir(local, {recursive: true});
-    await writeFile(join(root, '.gitignore'), 'local/\n.kilo/local/\n');
     const auth = {approved: true, origin: url, storageState: 'qa-storage-state.json', authenticatedSelector: '#signed-in'};
     await writeFile(join(local, 'qa-auth.json'), JSON.stringify(auth));
     const prepared = {cookies: [{name: 'fixture_session', value: 'fixture-session-placeholder', domain: '127.0.0.1',
@@ -571,22 +622,28 @@ test('canonical browser script logs in and captures protected password settings 
     assert.equal(foreignRequests, 0, 'redirect to the same hostname on another port must not reach the server');
     assert.equal(logins, before);
     assert.ok(!capture.stdout.includes('fixture-session-placeholder'));
+    const other = await promisify(execFile)(process.execPath, [script, '--base-url', url, '--route', '/app',
+      '--viewports', '320x800', '--artifact-dir', taskParent], {cwd: control});
+    assert.notEqual(JSON.parse(other.stdout).task_dir, artifactDir);
+    assert.deepEqual(JSON.parse(await readFile(join(artifactDir, 'summary.json'), 'utf8')), summary);
+    for (const cwd of [control, primary, root]) {
+      assert.equal(execFileSync('git', ['status', '--porcelain'], {cwd, encoding: 'utf8'}), '');
+    }
   });
 
 test('discovery fails closed before launch on unsafe config, foreign origin/state, or conflicting inputs', async t => {
   const root = await mkdtemp(join(fixtures, 'auth-config-'));
   t.after(() => rm(root, {recursive: true, force: true}));
   const git = (...args) => execFileSync('git', args, {cwd: root, stdio: 'ignore'});
-  git('init', '-q');
+  await initControl(root);
   const local = join(root, '.kilo/local');
   await mkdir(local, {recursive: true});
-  await writeFile(join(root, '.gitignore'), '.kilo/local/\n');
   const config = {approved: true, origin: base, authenticatedSelector: '#signed-in', storageState: 'qa-storage-state.json'};
   const file = join(local, 'qa-auth.json');
   const script = fileURLToPath(new URL('./browser-review.mjs', import.meta.url));
   const refusal = (...extra) => assert.throws(() => execFileSync(process.execPath,
     [script, manualCapture, '--base-url', base, '--route', '/', ...extra], {cwd: root, stdio: 'pipe'}),
-    error => error.status === 2 && !error.stderr.includes('SECRET-MARKER'));
+    error => error.status === 2 && !error.stderr.includes('SECRET-MARKER') && !error.stderr.includes('primary control'));
   for (const changed of [{approved: false}, {origin: 'https://localhost:4173'}, {origin: 'http://localhost:4174'},
     {storageState: '../SECRET-MARKER'}, {password: 'SECRET-MARKER'}]) {
     await writeFile(file, JSON.stringify({...config, ...changed})); refusal();

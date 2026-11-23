@@ -9,6 +9,7 @@ A row may go through at most 3 rounds. `next-round` refuses to open round 4;
 unresolved blockers require a human decision, not an automatic extension.
 
 Usage:
+  ledger.py artifact-root [artifacts/path]
   ledger.py [--ledger-dir <directory>] status --task-id BOARD-005
   ledger.py next-round  --task-id BOARD-005
   ledger.py finding     --task-id BOARD-005 --fingerprint "kind|category|route|subject"
@@ -20,8 +21,9 @@ Usage:
 Exit codes: 0 ok, 1 refused, 2 usage error.
 """
 import argparse
-import importlib.util
+import json
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -37,40 +39,86 @@ def ledger_path(ledger_dir, task_id):
     return os.path.join(ledger_dir, "%s-ledger.md" % task_id)
 
 
-def artifact_path(path, cwd=None):
-    cwd = cwd or os.getcwd()
-    result = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd,
-                            capture_output=True, text=True,
-                            env={key: value for key, value in os.environ.items()
-                                 if not key.startswith("GIT_")})
-    # Explicit overrides support non-Git fixtures, confined to their own cwd.
-    source = result.stdout.strip() if result.returncode == 0 else cwd
-    root = os.path.abspath(os.path.join(source, "artifacts"))
-    target = os.path.abspath(os.path.join(cwd, path))
-    if os.path.commonpath([root, target]) != root:
-        raise ValueError("output must stay inside caller worktree artifacts/")
-    if os.path.realpath(target) != target or os.path.realpath(root) != root:
-        raise ValueError("artifact output has a symlink ancestor or destination")
-    current = target
-    while current != os.path.dirname(root):
-        if os.path.islink(current):
-            raise ValueError("artifact output has a symlink ancestor or destination")
-        current = os.path.dirname(current)
-    return target
+def git(cwd, *args):
+    result = subprocess.run(['git', *args], cwd=cwd, capture_output=True,
+                            env={k: v for k, v in os.environ.items() if not k.startswith('GIT_')})
+    if result.returncode:
+        if args[0] == 'check-ignore' and result.returncode == 1:
+            raise ValueError(f'{args[-1]} is not ignored in {cwd}')
+        raise ValueError(f'git {args[0]} failed in {cwd}: {os.fsdecode(result.stderr).strip()}')
+    return os.fsdecode(result.stdout)
 
 
-def default_ledger_dir(cwd):
-    source = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
-                                          "git-worktree", "scripts", "worktree.py"))
-    spec = importlib.util.spec_from_file_location("ledger_worktree", source)
-    worktree = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(worktree)
-    root = worktree.control_root(cwd)
-    if not (os.path.isfile(os.path.join(root, ".kilo", "repos.json"))
-            and os.path.isfile(os.path.join(root, "docs", "BOARD.md"))):
-        raise ValueError("cannot resolve control root: repo map and board are required")
-    source_root = worktree.checked_git(cwd, "rev-parse", "--show-toplevel")
-    return artifact_path(os.path.join(source_root, "artifacts", "reviews"), cwd)
+def primary_checkout(cwd):
+    top = Path(git(cwd, 'rev-parse', '--show-toplevel').removesuffix('\n'))
+    entries = git(cwd, 'worktree', 'list', '--porcelain', '-z').split('\0\0')
+    roots = [entry.split('\0', 1)[0].removeprefix('worktree ') for entry in entries if entry]
+    if not roots or str(top) not in roots or (top / '.git').is_symlink():
+        raise ValueError('cannot resolve primary checkout')
+    root = Path(roots[0])
+    if (not root.is_absolute() or root.resolve(strict=True) != root or (root / '.git').is_symlink() or
+            git(root, 'rev-parse', '--show-toplevel').removesuffix('\n') != str(root) or
+            git(cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir') !=
+            git(root, 'rev-parse', '--path-format=absolute', '--git-common-dir')):
+        raise ValueError('primary Git identity mismatch')
+    return root
+
+
+def artifact_owner(cwd):
+    primary = primary_checkout(cwd)
+    # Primary ancestry also works for linked service worktrees outside the project.
+    # Installed control tooling can identify an explicitly mapped external service.
+    visited = set()
+    for start in (primary, Path(cwd), Path(__file__).absolute().parents[4]):
+        for candidate in (start, *start.parents):
+            if candidate in visited:
+                continue
+            visited.add(candidate)
+            board = candidate / 'docs/BOARD.md'
+            mapping = candidate / '.kilo/repos.json'
+            if not (os.path.lexists(board) and os.path.lexists(mapping)):
+                continue
+            if board.resolve() != board or mapping.resolve() != mapping or not board.is_file() or not mapping.is_file():
+                raise ValueError('control board and repo map must be regular files without symlinks')
+            if primary_checkout(candidate) != candidate:
+                continue  # A linked checkout or ordinary subdirectory is not an owner.
+            repos = json.loads(mapping.read_text(encoding='utf-8'))
+            if not isinstance(repos, dict) or repos.get('control') != '.':
+                raise ValueError('invalid control repo map')
+            for value in repos.values():
+                if not isinstance(value, str) or not value or '..' in Path(value).parts:
+                    raise ValueError('invalid mapped repository path')
+            if primary in (candidate / value for value in repos.values()):
+                return candidate
+    raise ValueError('no primary control board and repo map mapping the caller')
+
+
+def artifact_path(path='artifacts', cwd=None, *, reviews_only=False):
+    owner = artifact_owner(cwd or os.getcwd())
+    root = owner / 'artifacts'
+    target = owner / path
+    if not target.is_relative_to(root) or '..' in target.parts or '.git' in target.relative_to(owner).parts:
+        raise ValueError('output must stay inside primary control artifacts/')
+    if reviews_only and not target.is_relative_to(root / 'reviews'):
+        raise ValueError('manual guide must be under artifacts/reviews/')
+    if target.resolve() != target:
+        raise ValueError('artifact output has a symlink ancestor or destination')
+    if root.exists() and not root.is_dir():
+        raise ValueError('artifacts/ must be a directory')
+    directory = target
+    while not directory.is_dir():
+        directory = directory.parent
+    if git(directory, 'rev-parse', '--show-toplevel').removesuffix('\n') != str(owner):
+        raise ValueError('artifact belongs to a nested repository')
+    if (git(owner, 'ls-files', '--cached', '--', 'artifacts') or
+            git(owner, 'diff', '--cached', '--name-only', '--no-renames', '--', 'artifacts')):
+        raise ValueError('artifacts/ contains tracked or staged paths')
+    git(owner, 'check-ignore', '-q', '--', 'artifacts/')
+    if git(owner, 'ls-files', '--others', '--exclude-standard', '--', 'artifacts'):
+        raise ValueError('artifacts/ contains nonignored paths')
+    if target != root:
+        git(owner, 'check-ignore', '-q', '--', str(target.relative_to(owner)))
+    return str(target)
 
 
 def parse_ledger(text):
@@ -112,7 +160,6 @@ def read_ledger(path):
 
 
 def write_ledger(path, header, rounds):
-    path = artifact_path(path)
     directory = os.path.dirname(os.path.abspath(path)) or "."
     if not os.path.isdir(directory):
         os.makedirs(directory)
@@ -242,10 +289,11 @@ def main(argv):
         prog="ledger.py",
         description="Track the bounded QA/fix rounds of one board row.")
     parser.add_argument("--ledger-dir",
-                        help="explicit directory, relative to cwd when not absolute; "
-                              "must stay in caller worktree artifacts/; "
-                              "default: source-worktree artifacts/reviews (never commit)")
+                        help="directory inside primary control artifacts/, relative to that checkout; "
+                             "default: artifacts/reviews")
     sub = parser.add_subparsers(dest="command")
+    p = sub.add_parser('artifact-root', help='print the verified absolute primary control artifact path')
+    p.add_argument('target', nargs='?', default='artifacts', help='optional path within primary artifacts/')
 
     for name, help_text in (
             ("status", "print the round state of the ledger"),
@@ -272,21 +320,24 @@ def main(argv):
     if not args.command:
         parser.print_help()
         return USAGE
-    handler = {
+    handlers = {
         "status": cmd_status,
         "next-round": cmd_next_round,
         "finding": cmd_finding,
         "merged": cmd_merged,
         "stop": cmd_stop,
         "show": cmd_show,
-    }[args.command]
+    }
     try:
-        if args.ledger_dir is None:
-            args.ledger_dir = default_ledger_dir(os.getcwd())
-        args.ledger_dir = artifact_path(args.ledger_dir)
-        artifact_path(ledger_path(args.ledger_dir, args.task_id))
-        return handler(args)
-    except (OSError, ValueError) as error:
+        if args.command == 'artifact-root':
+            if args.ledger_dir is not None:
+                raise ValueError('artifact-root does not accept --ledger-dir')
+            print(artifact_path(args.target))
+            return OK
+        path = ledger_path(args.ledger_dir or 'artifacts/reviews', args.task_id)
+        args.ledger_dir = os.path.dirname(artifact_path(path))
+        return handlers[args.command](args)
+    except (OSError, ValueError, RuntimeError) as error:
         print("refused: %s" % error, file=sys.stderr)
         return REFUSED
 
