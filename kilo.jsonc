@@ -2,16 +2,7 @@
   "$schema": "https://app.kilo.ai/config.json",
   "mcp": {
     "playwright": {
-      "command": "playwright-mcp",
-      "args": [
-        "--executable-path",
-        "/usr/bin/chromium",
-        "--headless",
-        "--output-dir",
-        "artifacts/playwright-mcp"
-      ],
-      "enabled": true,
-      "timeout": 30000
+      "enabled": false
     }
   },
   "permission": {

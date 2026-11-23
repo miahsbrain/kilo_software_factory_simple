@@ -12,7 +12,7 @@ Tailwind stylesheet, and it produces a committed file — the viewer itself need
 | Piece | Version | Where |
 |---|---|---|
 | Python | 3.9+ | every script under `.kilo/skills/*/scripts/` |
-| Node.js | 22 | the dev container, the Playwright MCP, the Tailwind build |
+| Node.js | 22 | the dev container, the Playwright evidence runner, the Tailwind build |
 | Playwright | the global install in the dev container | the QA capture script |
 | Chromium | `/usr/bin/chromium` in the dev container | the QA capture script |
 | Tailwind CSS | 4.3.5 (`@tailwindcss/cli`) | `.kilo/skills/board/ui/`, builds the board stylesheet |

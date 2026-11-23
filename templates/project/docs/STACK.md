@@ -53,9 +53,9 @@ Refresh: the page re-reads the board every request and auto-refreshes every 10 s
 
 ## Playwright
 
-Tool: the global install the devcontainer provides, plus the Playwright MCP
+Tool: the existing QA evidence runner and the Playwright library
 Library: `/usr/local/share/npm-global/lib/node_modules/@playwright/mcp/node_modules/playwright`
-MCP server: `playwright-mcp` (on PATH), configured in `kilo.jsonc`
+MCP server: installed but disabled by default in `kilo.jsonc`; its output directory cannot confine explicit filenames
 Browser: system chromium at `/usr/bin/chromium` — the container sets
 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, so there is no downloaded browser
 

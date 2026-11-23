@@ -8,6 +8,7 @@
     worktree.py discard --board BOARD-00X [--repo <id>] [--apply --discard]
     worktree.py cleanup [<slug> | --board BOARD-00X] [--apply]
     worktree.py list | verify <slug> | mode required|optional|adaptive|status
+    worktree.py reviews status | reviews qa|ui|both on|off
     worktree.py create --board BOARD-00X [--repo ID] --skip-worktree
 
 create reads the board row named by --board from docs/BOARD.md, derives the
@@ -124,7 +125,8 @@ def local_state(root, value=None):
             return {"mode": "required", "workspaces": {}}
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
-        if data.get("mode") not in ("required", "optional", "adaptive") or not isinstance(data.get("workspaces"), dict):
+        if (not isinstance(data, dict) or data.get("mode") not in ("required", "optional", "adaptive")
+                or not isinstance(data.get("workspaces"), dict)):
             raise ValueError("invalid local workspace state")
         return data
     fd, temporary = tempfile.mkstemp(dir=common, prefix=".workspace-")
@@ -140,6 +142,42 @@ def local_state(root, value=None):
 
 def workspace_mode(cwd):
     return local_state(control_root(cwd))["mode"]
+
+
+def cmd_factory_settings(args, cwd):
+    root = control_root(cwd)
+    for relative in (REPOS_REL, "docs/BOARD.md"):
+        if not os.path.isfile(confined(os.path.join(root, relative), root)):
+            raise ValueError("review settings require a control repository with a board and repo map")
+    repos, error = load_repos(root)
+    if error or repos.get("control") != ".":
+        raise ValueError(error or "repo map must register control as '.'")
+    primary = main_checkout_root(cwd)
+    caller = confined(checked_git(cwd, "rev-parse", "--show-toplevel"), primary)
+    for repo_id in repos:
+        target, error = resolve_repo(root, repos, repo_id)
+        if error:
+            raise ValueError(error)
+        if target == primary and any(entry["path"] == caller for entry in list_worktrees(primary)):
+            break
+    else:
+        raise ValueError("caller is not a mapped project checkout")
+
+    state = local_state(root)
+    reviews = state.get("reviews", {"qa": True, "ui": True})
+    if (not isinstance(reviews, dict) or reviews.keys() != {"qa", "ui"} or
+            not all(isinstance(value, bool) for value in reviews.values())):
+        raise ValueError("invalid local review settings: expected boolean qa and ui switches")
+    if args.command == "status":
+        print(json.dumps({"mode": state["mode"], "qa": reviews["qa"], "ui": reviews["ui"]}))
+        return OK
+    if args.review != "status":
+        for name in reviews if args.review == "both" else (args.review,):
+            reviews[name] = args.value == "on"
+        state["reviews"] = reviews
+        local_state(root, state)
+    print(json.dumps(reviews, separators=(",", ":"), sort_keys=True))
+    return OK
 
 
 def load_guard_policy(root):
@@ -1823,6 +1861,13 @@ def main(argv):
     p = sub.add_parser("mode", help="project-local workspace requirement; restart Kilo after changes")
     p.add_argument("value", choices=("required", "optional", "adaptive", "status"))
 
+    sub.add_parser("status", help="show workspace mode and both automatic review switches as JSON")
+    p = sub.add_parser("reviews", help="read or set factory-local automatic review switches")
+    reviews = p.add_subparsers(dest="review", required=True)
+    reviews.add_parser("status", help="print both switches as JSON")
+    for name in ("qa", "ui", "both"):
+        reviews.add_parser(name).add_argument("value", choices=("on", "off"))
+
     p = sub.add_parser("create", help="create a worktree named from a board row")
     p.add_argument("--board", required=True, help="board row ID, e.g. BOARD-00X")
     p.add_argument("--base", help="base branch (default: the repository's own default branch)")
@@ -1872,6 +1917,8 @@ def main(argv):
     cwd = os.getcwd()
     if args.command == "mode":
         return cmd_mode(args, cwd)
+    if args.command in ("status", "reviews"):
+        return cmd_factory_settings(args, cwd)
     if args.command in ("handoff", "merge"):
         return cmd_lifecycle(args, cwd)
     if args.command == "create":

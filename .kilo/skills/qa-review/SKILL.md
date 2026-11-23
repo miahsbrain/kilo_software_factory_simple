@@ -1,13 +1,47 @@
 ---
 name: qa-review
-description: Verify a change against its acceptance criteria with Playwright, capture screenshot and console evidence, and file each finding as a board row. Use for the QA lane of any frontend or API change, or when the user says "QA review", "verify this", or "run QA".
+description: Verify feature acceptance criteria, capture QA evidence, and hand over a manual QA checklist when access is blocked or a user requests a test guide for a board or feature.
 ---
 
 # QA Review
 
 Check the assigned behavior against observable acceptance criteria. Stay read-only against application source; approved navigation and evidence writes are permitted. Use focused checks and the original workspace, not a new review worktree. Report what passed and what remains unverified; capture completion alone is not a behavior pass.
 
+## Manual checklist
+
+At completion, write and link the guide for every skipped QA or UI scope, even when nothing is blocked. Name the skipped scope and reason. For skipped critique include the relevant visual hierarchy, usability, accessibility and responsive checks; do not present them as observed results.
+
+If QA or UI critique cannot verify a criterion (for example, a redirect to an external identity provider, an unavailable service, or a missing device), keep the safe results already obtained and **write the manual guide before handing off**. Do not bypass the restriction or repeatedly retry it. Also produce a guide whenever the user asks for a QA checklist by board ID, feature name, or set of rows, even if automated QA succeeded. A checklist-only request needs no browser run, implementation or board transition.
+
+1. Resolve the requested rows from the shared board. Match feature names to their IDs; ask only if the match is ambiguous. For a whole board, list the included IDs, group checks by feature and identify dropped or not-yet-implemented items separately. Use board criteria, the actual implementation or diff, documented run commands and prior evidence. Describe what changed in user terms; distinguish planned behavior from delivered behavior.
+2. Give the tester the service/environment, revision (including uncommitted changes if relevant), start command and test role/data needed. Link directly to **each changed page**, using the known scheme, host, port and route from the assigned deployment or local run configuration. For redirects give the safe starting link, the expected destination and the visible sign of success. Never publish signed URLs, callback codes, secrets, personal IDs or passwords. If an origin or fixture ID is unknown or sensitive, say so and give a concrete way to obtain the URL from a known safe entry page; do not invent it. For non-UI changes use an exact safe command and working directory instead.
+3. Write compact Markdown in the assigned repo's ignored `artifacts/reviews/<board-id>-manual-qa.md` (safe feature slug for a multi-row guide). Verify the destination is untracked, ignored, within the assigned artifacts root and free of symlinks. Reuse a matching guide for the same revision; preserve a tester's notes/results when generating a newer version. Link the actual file in the response, including the worktree path when relevant. If writing is unavailable, supply the guide inline and state why no file exists.
+
+```markdown
+# Manual QA: <feature> (<board IDs>)
+Revision / setup: <revision, environment, prerequisites>. Automation: <verified scope; blocked scope and reason>.
+
+| Result | Change / board ID | How to test, in order | Expected result |
+| --- | --- | --- | --- |
+| Not tested | <specific fix and ID> | 1. Open <full safe URL>. 2. <action using disposable data>. | <observable page, message, status or state> |
+
+Limits: <unknown URL, unavailable dependency or unimplemented criterion, only if applicable>.
+```
+
+Cover each requested acceptance criterion, including relevant failure/recovery cases. Keep one independently testable outcome per row. Leave manual results **Not tested** until the human reports Pass, Fail or Blocked; keep automated evidence separate. Do not ask the human to perform destructive operations on real data. Generating or returning a checklist is not review approval, evidence of passing, or a reason by itself to move a board row. Record later explicit scoped acceptance through the existing board workflow.
+
 ## Capture
+
+Before delegating and again in the specialist, run `python3 .kilo/skills/git-worktree/scripts/worktree.py reviews status` from the assigned Git root (use the inherited script's absolute path if needed). Read the returned `qa` and `ui` booleans; both default to true. A failed command or invalid policy means both scopes are manual, not permission to assume defaults. Do not change settings to run a review.
+
+| `qa` | `ui` | Automatic work |
+| --- | --- | --- |
+| true | true | Run relevant QA; share its evidence with the critic. |
+| true | false | Run relevant QA only. |
+| false | true | Skip QA and fresh capture; critique existing evidence only. Hand off uncovered criteria. |
+| false | false | Skip both; hand off the manual checklist. |
+
+Normal code tests are independent of these switches. A user explicitly requesting a browser capture authorizes one manual runner invocation with `--human-requested-manual-capture`, not a policy change or an automatic review. A checklist, review, or implementation request alone is not a request for manual capture.
 
 Use the documented development command from `docs/RUNNING.md` or `docs/STACK.md`. Run the existing capture tool with the assigned source repo/worktree as the current directory (use the tool's absolute path if it lives in the control repo):
 
@@ -19,11 +53,11 @@ It captures screenshots, console/page errors, network failures, and overflow at 
 
 Use `--scheme light|dark|both`, `--component <selector>`, `--compare <dir>`, or `--label <slug>` when relevant. `--chromium <path>` selects an available approved browser. Keep raw captures unchanged in the caller's assigned Git top-level `artifacts/<scope>/qa/<date>/<ID>/`, including screenshots, components, comparisons, error logs, `summary.json`, and notes. Do not redirect worktree review evidence into control-main. Scope, date, task ID and label must be safe single path segments, not `.` or `..`. `--artifact-dir` is only an override within that same artifacts root; symlink roots/ancestors/destinations are refused before browser launch.
 
-All newly generated review artifacts, images, reports, snapshots, network/console logs, and Playwright output belong under ignored `artifacts/` in the assigned repo/worktree, never the root, `/tmp`, or an external directory. Put newly generated ad-hoc review/Playwright scripts in `artifacts/scripts/`. Maintained review TOOL SOURCE remains tracked in `.kilo/skills/qa-review/`; bootstrap copies that source, never evidence. Legitimate canonical test fixtures may remain source, but generated fixture captures and test temporary directories use `artifacts/tmp/tests/` and are cleaned safely by the tests. Do not move or delete old project output without authorization. Never stage or commit artifacts.
+All newly generated review artifacts, images, reports, snapshots, network/console logs, and Playwright output belong under ignored `artifacts/` in the assigned repo/worktree, never the root, `/tmp`, or an external directory. Non-capture scratch scripts belong in `artifacts/scripts/`. Maintained review tool source remains tracked in `.kilo/skills/qa-review/`; bootstrap copies that source, never evidence. Legitimate canonical test fixtures may remain source, but generated fixture captures and test temporary directories use `artifacts/tmp/tests/` and are cleaned safely by the tests. Do not move or delete old project output without authorization. Never stage or commit artifacts.
 
 Capture sets `TMPDIR`, `TMP`, and `TEMP` before loading/launching Playwright and restores them in `finally`. Their short relative paths resolve to the caller's `artifacts/tmp/browser-*/`, avoiding Chromium's Unix-socket pathname limit without external temp output; downloads and trace destinations are there too. Run from the assigned Git root to keep those paths short. It does not enable tracing or video. This confines the capture tool's configured and Playwright-managed output, not every Chromium/OS cache or crash artifact. Report any inaccessible browser-managed locations as a limitation rather than claiming universal filesystem enforcement.
 
-Factory Playwright MCP uses the installed supported `--output-dir artifacts/playwright-mcp` flag for automatically named output, relative to the MCP runtime CWD. Start it in the assigned worktree. Explicit MCP filenames bypass that default and resolve from the workspace root: always supply `artifacts/...` filenames for screenshots, snapshots, network/console logs and other saves, checking the resolved workspace is the assignment. The flag is not a sandbox for arbitrary filenames or internal browser temp output. Do not invent a wrapper, add dependencies, or change permissions to imply otherwise.
+Factory Playwright MCP is disabled by default. For saved browser evidence use only the existing runner from the assigned Git root; do not enable MCP, use alternate browser save tools or write ad-hoc capture scripts as a workaround.
 
 Reports/findings/ledgers belong in ignored `artifacts/reviews/`. Run ledger commands from the assigned control source worktree; board coordination still resolves the shared control root, while evidence stays in the caller's Git root. `python3 .kilo/skills/qa-review/scripts/ledger.py status --task-id <ID>` prints that ledger path. An explicit override is `python3 .kilo/skills/qa-review/scripts/ledger.py --ledger-dir artifacts/reviews status --task-id <ID>`; outside-root and symlink overrides are refused.
 
@@ -79,7 +113,7 @@ Optional `--navigation` must be ignored, untracked, `approved: true` and use rev
 
 Check the actual user flow, relevant loading/empty/error states, keyboard focus and names, contrast, tap targets, responsive layout, and unexpected console/network failures. Auth, script, API, data-loss, and security failures remain meaningful blockers. A missing favicon is nonblocking only when proven development-only and harmless; retain its raw evidence and rationale rather than filtering logs or excusing other errors.
 
-Share one capture with `ui-critic` to review hierarchy, usability, and product character without source edits. Consolidate all findings once, deduplicate, and prioritize by user impact.
+Only when `ui` is enabled, share available evidence with `ui-critic` to review hierarchy, usability, and product character without source edits. Consolidate findings once, deduplicate, and prioritize by user impact.
 
 ## Findings And Handoff
 

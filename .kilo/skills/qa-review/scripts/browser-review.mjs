@@ -16,6 +16,7 @@
  *                            [--label <slug>] [--scheme light|dark|both]
  *                            [--component <css-selector>] [--compare <dir>]
  *                            [--chromium <path>]
+ *                            [--human-requested-manual-capture]
  *
  * All output stays in the caller's Git worktree artifacts folder (cwd for
  * non-Git fixtures): <worktree>/artifacts/<scope>/qa/<date>/<task-id>/.
@@ -71,6 +72,9 @@ function usage() {
     '                 Login requires authenticatedPath. State/login require authenticatedSelector.',
     '                 Steps run after each target goto; page changes require waitForURL.',
     '  --allow-destructive Explicit authorization for steps with intent:destructive.',
+    '  --human-requested-manual-capture Run one manual capture, including outside project control.',
+    '                 Use only when a human explicitly requests this capture. Agents must not',
+    '                 add this flag on their own. Otherwise a valid enabled QA policy is required.',
     '  --help         Show this message and exit.',
   ].join('\n');
 }
@@ -253,6 +257,9 @@ export function parseArgs(argv) {
         break;
       case '--allow-destructive':
         options.allowDestructive = true;
+        break;
+      case '--human-requested-manual-capture':
+        options.humanRequestedManualCapture = true;
         break;
       default:
         fail('unknown argument (literal credentials are not accepted)');
@@ -927,6 +934,21 @@ export async function captureEntry(session, options, route, viewport, scheme, al
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (!options.humanRequestedManualCapture) {
+    const policyCli = fileURLToPath(new URL('../../git-worktree/scripts/worktree.py', import.meta.url));
+    let policy;
+    try {
+      policy = JSON.parse(execFileSync('python3', [policyCli, 'reviews', 'status'], {
+        encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+        env: {...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))),
+          PYTHONDONTWRITEBYTECODE: '1'},
+      }));
+    } catch { /* Unmapped callers and policy failures cannot authorize automatic capture. */ }
+    if (typeof policy?.qa !== 'boolean' || typeof policy?.ui !== 'boolean') {
+      fail('automatic capture refused: cannot verify review policy from the assigned directory');
+    }
+    if (!policy.qa) fail('automatic QA capture is off; no evidence captured');
+  }
   await prepareArtifacts(options);
   const {navigationConfig, storageState} = await reviewAccess(options);
   options.navigationConfig = navigationConfig;
