@@ -1,10 +1,11 @@
 # The project control repo lives inside this workspace but is its own git repository.
-# The factory never tracks it. See AGENTS.md §"The factory and the project".
+# The factory never tracks it. See CLAUDE.md §"The factory and the project".
 /project/
 
-# Agent worktrees: one per board row, created by .kilo/skills/git-worktree/scripts/worktree.py
-.kilo/worktrees/
-.kilo/local/
+# Agent worktrees: one per board row, created by .claude/skills/git-worktree/scripts/worktree.py
+.claude/worktrees/
+.claude/local/
+.claude/settings.local.json
 
 # Local review and QA evidence, including reports, ledgers, notes and summaries. Never commit.
 artifacts/
@@ -21,7 +22,7 @@ blob-report/
 
 # Local scratch
 /docs/implementation_plans/
-.kilo/qa-local/
+.claude/qa-local/
 .tmp/
 **/__pycache__/
 *.pyc
@@ -44,42 +45,43 @@ docs/BOARD.md
 **/docs/implementation_plans/
 ./docs/implementation_plans/
 
-# Keep local harness files private, even when the clone excludes .kilo/ itself.
-!/.kilo/
-/.kilo/*
-!/.kilo/skills/
-/.kilo/skills/*
-!/.kilo/skills/engineering-practices/
-/.kilo/skills/engineering-practices/*
-!/.kilo/skills/engineering-practices/SKILL.md
-!/.kilo/skills/engineering-practices/upstream/
-/.kilo/skills/engineering-practices/upstream/**
-!/.kilo/skills/engineering-practices/upstream/LICENSE
-!/.kilo/skills/engineering-practices/upstream/references/
-!/.kilo/skills/engineering-practices/upstream/references/accessibility-checklist.md
-!/.kilo/skills/engineering-practices/upstream/references/definition-of-done.md
-!/.kilo/skills/engineering-practices/upstream/references/observability-checklist.md
-!/.kilo/skills/engineering-practices/upstream/references/orchestration-patterns.md
-!/.kilo/skills/engineering-practices/upstream/references/performance-checklist.md
-!/.kilo/skills/engineering-practices/upstream/references/security-checklist.md
-!/.kilo/skills/engineering-practices/upstream/references/testing-patterns.md
-!/.kilo/skills/engineering-practices/upstream/skills/
-!/.kilo/skills/engineering-practices/upstream/skills/[a-z]*/
-!/.kilo/skills/engineering-practices/upstream/skills/*/guide.md
-!/.kilo/skills/engineering-practices/upstream/skills/idea-refine/examples.md
-!/.kilo/skills/engineering-practices/upstream/skills/idea-refine/frameworks.md
-!/.kilo/skills/engineering-practices/upstream/skills/idea-refine/refinement-criteria.md
-!/.kilo/skills/engineering-practices/upstream/skills/*/references/
-!/.kilo/skills/engineering-practices/upstream/skills/constraint-driven-development/references/floor-guard.md
-!/.kilo/skills/engineering-practices/upstream/skills/performance-optimization/references/optimization-patterns.md
-!/.kilo/skills/engineering-practices/upstream/skills/security-and-hardening/references/hardening-patterns.md
-!/.kilo/skills/qa-review/
-/.kilo/skills/qa-review/*
-!/.kilo/skills/qa-review/vendor/
-/.kilo/skills/qa-review/vendor/*
-!/.kilo/skills/qa-review/vendor/axe-core/
-/.kilo/skills/qa-review/vendor/axe-core/*
-!/.kilo/skills/qa-review/vendor/axe-core/axe.min.js
-!/.kilo/skills/qa-review/vendor/axe-core/LICENSE
-!/.kilo/skills/qa-review/vendor/axe-core/LICENSE-3RD-PARTY.txt
-!/.kilo/skills/qa-review/vendor/axe-core/PROVENANCE.md
+# Keep local harness files private, even when the clone excludes .claude/ itself.
+!/.claude/
+/.claude/*
+!/.claude/settings.json
+!/.claude/skills/
+/.claude/skills/*
+!/.claude/skills/engineering-practices/
+/.claude/skills/engineering-practices/*
+!/.claude/skills/engineering-practices/SKILL.md
+!/.claude/skills/engineering-practices/upstream/
+/.claude/skills/engineering-practices/upstream/**
+!/.claude/skills/engineering-practices/upstream/LICENSE
+!/.claude/skills/engineering-practices/upstream/references/
+!/.claude/skills/engineering-practices/upstream/references/accessibility-checklist.md
+!/.claude/skills/engineering-practices/upstream/references/definition-of-done.md
+!/.claude/skills/engineering-practices/upstream/references/observability-checklist.md
+!/.claude/skills/engineering-practices/upstream/references/orchestration-patterns.md
+!/.claude/skills/engineering-practices/upstream/references/performance-checklist.md
+!/.claude/skills/engineering-practices/upstream/references/security-checklist.md
+!/.claude/skills/engineering-practices/upstream/references/testing-patterns.md
+!/.claude/skills/engineering-practices/upstream/skills/
+!/.claude/skills/engineering-practices/upstream/skills/[a-z]*/
+!/.claude/skills/engineering-practices/upstream/skills/*/guide.md
+!/.claude/skills/engineering-practices/upstream/skills/idea-refine/examples.md
+!/.claude/skills/engineering-practices/upstream/skills/idea-refine/frameworks.md
+!/.claude/skills/engineering-practices/upstream/skills/idea-refine/refinement-criteria.md
+!/.claude/skills/engineering-practices/upstream/skills/*/references/
+!/.claude/skills/engineering-practices/upstream/skills/constraint-driven-development/references/floor-guard.md
+!/.claude/skills/engineering-practices/upstream/skills/performance-optimization/references/optimization-patterns.md
+!/.claude/skills/engineering-practices/upstream/skills/security-and-hardening/references/hardening-patterns.md
+!/.claude/skills/qa-review/
+/.claude/skills/qa-review/*
+!/.claude/skills/qa-review/vendor/
+/.claude/skills/qa-review/vendor/*
+!/.claude/skills/qa-review/vendor/axe-core/
+/.claude/skills/qa-review/vendor/axe-core/*
+!/.claude/skills/qa-review/vendor/axe-core/axe.min.js
+!/.claude/skills/qa-review/vendor/axe-core/LICENSE
+!/.claude/skills/qa-review/vendor/axe-core/LICENSE-3RD-PARTY.txt
+!/.claude/skills/qa-review/vendor/axe-core/PROVENANCE.md

@@ -2,15 +2,13 @@
 apps/*/
 
 # Clone-local tooling; source, product docs and services.json remain tracked.
-.kilo/
+.claude/
 .devcontainer/
-kilo.jsonc
-/AGENTS.md
+/CLAUDE.md
 
 # Assigned linked worktrees; explicitly assigned features may share a worktree/branch.
-.kilo/worktrees/
-.kilo/local/
-.kilo/agent-manager.json
+.claude/worktrees/
+.claude/local/
 
 # Local review and QA evidence, including reports, ledgers, notes and summaries. Never commit.
 artifacts/
@@ -27,7 +25,7 @@ blob-report/
 
 # Local scratch
 /docs/implementation_plans/
-.kilo/qa-local/
+.claude/qa-local/
 .tmp/
 **/__pycache__/
 *.pyc

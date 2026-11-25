@@ -11,46 +11,46 @@ Tailwind stylesheet, and it produces a committed file — the viewer itself need
 
 | Piece | Version | Where |
 |---|---|---|
-| Python | 3.9+ | every script under `.kilo/skills/*/scripts/` |
+| Python | 3.9+ | every script under `.claude/skills/*/scripts/` |
 | Node.js | 22 | the dev container, the Playwright evidence runner, the Tailwind build |
 | Playwright | the global install in the dev container | the QA capture script |
 | Chromium | `/usr/bin/chromium` in the dev container | the QA capture script |
-| Tailwind CSS | 4.3.5 (`@tailwindcss/cli`) | `.kilo/skills/board/ui/`, builds the board stylesheet |
-| Geist Sans / Geist Mono | variable woff2, SIL OFL | `.kilo/skills/board/static/fonts/` |
+| Tailwind CSS | 4.3.5 (`@tailwindcss/cli`) | `.claude/skills/board/ui/`, builds the board stylesheet |
+| Geist Sans / Geist Mono | variable woff2, SIL OFL | `.claude/skills/board/static/fonts/` |
 
 ## Commands
 
 ```bash
 # Board viewer (read-only dashboard on port 15180)
-python3 .kilo/skills/board/scripts/board_serve.py --port 15180
+python3 .claude/skills/board/scripts/board_serve.py --port 15180
 
 # Rebuild the board stylesheet after a class change (needs Node 22, not needed at runtime)
-npm --prefix .kilo/skills/board/ui run build
-# output: .kilo/skills/board/static/board.css (committed)
+npm --prefix .claude/skills/board/ui run build
+# output: .claude/skills/board/static/board.css (committed)
 
 # Show the board
-python3 .kilo/skills/board/scripts/board.py show
+python3 .claude/skills/board/scripts/board.py show
 
 # Create the worktree for a board row
-python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
+python3 .claude/skills/git-worktree/scripts/worktree.py create --board BOARD-00X --base main
 
-# Project-local mode (required default); restart Kilo after a change
-python3 .kilo/skills/git-worktree/scripts/worktree.py mode status
-python3 .kilo/skills/git-worktree/scripts/worktree.py mode optional
-python3 .kilo/skills/git-worktree/scripts/worktree.py mode required
+# Project-local mode (required default); the guard hook reads it on every tool call
+python3 .claude/skills/git-worktree/scripts/worktree.py mode status
+python3 .claude/skills/git-worktree/scripts/worktree.py mode optional
+python3 .claude/skills/git-worktree/scripts/worktree.py mode required
 # Link a finding to the original repo-specific workspace
-python3 .kilo/skills/git-worktree/scripts/worktree.py create --board BOARD-FIX --reuse BOARD-PARENT --repo ID
+python3 .claude/skills/git-worktree/scripts/worktree.py create --board BOARD-FIX --reuse BOARD-PARENT --repo ID
 # All-repository handoff; human previews/applies lifecycle actions
-python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board BOARD-ID
-python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board BOARD-ID --apply
-python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board BOARD-ID --repo ID
+python3 .claude/skills/git-worktree/scripts/worktree.py handoff --board BOARD-ID
+python3 .claude/skills/git-worktree/scripts/worktree.py merge --board BOARD-ID --apply
+python3 .claude/skills/git-worktree/scripts/worktree.py discard --board BOARD-ID --repo ID
 # Explicit human loss approval only:
-python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board BOARD-ID --repo ID --apply --discard
+python3 .claude/skills/git-worktree/scripts/worktree.py discard --board BOARD-ID --repo ID --apply --discard
 
 # Guard rails
-python3 .kilo/skills/git-worktree/scripts/guard.py check-git -- "git merge feat/x"
-python3 .kilo/skills/git-worktree/scripts/guard.py check-policy
-python3 .kilo/skills/git-worktree/scripts/guard.py check-repos
+python3 .claude/skills/git-worktree/scripts/guard.py check-git -- "git merge feat/x"
+python3 .claude/skills/git-worktree/scripts/guard.py check-policy
+python3 .claude/skills/git-worktree/scripts/guard.py check-repos
 ```
 
 ## Ports
@@ -58,7 +58,7 @@ python3 .kilo/skills/git-worktree/scripts/guard.py check-repos
 Lifecycle `--board`/`--repo` may repeat; `--target` overrides the saved base. Merge preflights all
 clean sources/targets except live board metadata, readiness and commits; non-atomic failures
 preserve progress. Human completes conflicts in existing checkouts, then retries. No agent merges.
-For protected pages, follow the [QA state setup](../.kilo/skills/qa-review/SKILL.md#authentication).
+For protected pages, follow the [QA state setup](../.claude/skills/qa-review/SKILL.md#authentication).
 The runner discovers the local profile and verifies the origin and visible signed-in marker;
 no navigation file is required.
 
@@ -70,7 +70,7 @@ no navigation file is required.
 
 ## Environment
 
-`BASH_ENV` and `KILO_CONFIG` are set by `.devcontainer/devcontainer.json`. See
+`BASH_ENV` and the optional `ANTHROPIC_API_KEY` are set by `.devcontainer/devcontainer.json`. See
 `docs/ENVIRONMENT.md`.
 
 ## What a project adds

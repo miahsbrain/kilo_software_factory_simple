@@ -8,8 +8,9 @@ from pathlib import Path
 
 
 FACTORY = Path(__file__).resolve().parents[1]
-BOARD = FACTORY / '.kilo/skills/board/scripts/board.py'
-WORKTREE = FACTORY / '.kilo/skills/git-worktree/scripts/worktree.py'
+BOARD = FACTORY / '.claude/skills/board/scripts/board.py'
+WORKTREE = FACTORY / '.claude/skills/git-worktree/scripts/worktree.py'
+GUARD = FACTORY / '.claude/skills/git-worktree/scripts/guard.py'
 
 
 class MaintenanceWorkflowTests(unittest.TestCase):
@@ -23,12 +24,11 @@ class MaintenanceWorkflowTests(unittest.TestCase):
         path = root / 'docs/BOARD.md'
         path.parent.mkdir()
         shutil.copyfile(FACTORY / 'templates/project/docs/BOARD.md', path)
-        policy = Path('.kilo/policies/git-policy.json')
+        policy = Path('.claude/policies/git-policy.json')
         (root / policy.parent).mkdir(parents=True)
         shutil.copyfile(FACTORY / policy, root / policy)
-        shutil.copyfile(FACTORY / 'kilo.jsonc', root / 'kilo.jsonc')
-        (root / '.kilo/repos.json').write_text('{"control":"."}\n')
-        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_') and k != 'KILO_CONFIG'}
+        (root / '.claude/repos.json').write_text('{"control":"."}\n')
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GIT_')}
         env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM='1', PYTHONDONTWRITEBYTECODE='1')
 
         def run(*args, refusal=None):
@@ -45,6 +45,8 @@ class MaintenanceWorkflowTests(unittest.TestCase):
         worktree = (sys.executable, WORKTREE)
         skip = (*worktree, 'create', '--board', row, '--repo', 'control', '--skip-worktree')
         run('git', 'init', '-b', 'main')
+        run(sys.executable, GUARD, 'check-policy', '--write')
+        run(sys.executable, GUARD, 'check-policy')
         run(*board, 'add', '--id', row, '--task', 'Refresh guidance', '--type', 'Docs',
             '--status', 'Ready', '--priority', 'P2', '--risk', 'low', '--blocked-by', '- None.',
             '--repos', 'control', '--note', 'Check the wording')

@@ -1,0 +1,1350 @@
+#!/usr/bin/env python3
+"""Guard for destructive shell commands, git commands and file edits in this factory.
+
+Claude Code runs `guard.py hook` as a PreToolUse hook on every Bash, edit and read
+tool call (see .claude/settings.json). The same checks can be run explicitly:
+
+    guard.py hook < pre-tool-use-event.json
+    guard.py check-delete -- "rm -rf /tmp/scratch"
+    guard.py check-worktree -- "git worktree add .claude/worktrees/x -b feat/x main"
+    guard.py check-git -- "git push origin main"
+    guard.py check-policy [--write]
+    guard.py sync --repo <id> [--apply]
+    guard.py check-repos
+    guard.py policy
+
+check-delete allows deletion only inside a linked worktree (the one under
+.claude/worktrees/<slug>/) or inside a temp root (/tmp, /private/tmp,
+/var/folders, $TMPDIR) but never a temp root itself. Anything inside the main
+checkout that is not a linked worktree, the repository root, the filesystem
+root and $HOME are denied.
+
+check-worktree requires every `git worktree add|move` target to resolve inside
+<repo-root>/.claude/worktrees/.
+
+check-git reads the canonical policy from .claude/policies/git-policy.json and
+evaluates the git command against it: the context checks first (protected
+branch, branch switch inside a worktree, raw worktree remove), then the bash
+rules with LAST MATCH WINS.
+
+hook reads a Claude Code PreToolUse event on stdin and applies the ordered bash,
+edit and read rules, the saved workspace mode, the git context checks and the
+deletion check. A deny or ask is returned to Claude Code; an allow returns
+nothing, so Claude Code's own permission mode still decides.
+
+check-policy proves that .claude/settings.json still carries the static rules and
+the hook generated from the policy file. --write regenerates them; policy prints them.
+
+sync copies the supported .claude slice and the settings file from the
+control repo into another repo named in .claude/repos.json. It is a dry run
+unless --apply is given. check-repos proves that the map and the apps/ layout
+agree.
+
+Exit codes: 0 allowed, 1 denied, 2 usage error, 3 needs the user's approval.
+A failure inside the guard never blocks work: it exits 0 with a note.
+"""
+import argparse
+import fnmatch
+import importlib.util
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+RM_CMDS = {"rm", "rmdir", "unlink", "trash"}
+TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
+GIT_VALUE_OPTS = {"-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
+ADD_VALUE_OPTS = {"-b", "-B", "--reason"}
+SYNC_SLICE = ["agents", "commands", "skills", "policies"]
+SCHEMA_URL = "https://json.schemastore.org/claude-code-settings.json"
+CONFIG_REL = os.path.join(".claude", "settings.json")
+GUARDED_TOOLS = "Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Grep|Glob"
+EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+READ_TOOLS = ("Read", "Grep", "Glob")
+STRICTNESS = {"allow": 0, "ask": 1, "deny": 2}
+# Claude Code reads settings only from the launch directory, so the hook walks up to the
+# nearest guard: a project worktree under .claude/worktrees/ uses its control checkout's.
+HOOK_COMMAND = ('d="${CLAUDE_PROJECT_DIR:-$PWD}"; while [ "$d" != / ]; do '
+                'g="$d/.claude/skills/git-worktree/scripts/guard.py"; '
+                'if [ -f "$g" ]; then exec python3 "$g" hook; fi; d=$(dirname "$d"); done; '
+                'echo "guard.py not found; tool call refused" >&2; exit 2')
+
+OK = 0
+DENIED = 1
+USAGE = 2
+
+
+def segments(command):
+    """Split a shell command into simple-command token lists. Quotes are honoured; nothing runs."""
+    out, tokens, cur, has, quote = [], [], "", False, None
+    i = 0
+
+    def push_token():
+        nonlocal cur, has
+        if has:
+            tokens.append(cur)
+        cur, has = "", False
+
+    while i < len(command):
+        c = command[i]
+        if quote:
+            if c == quote:
+                quote = None
+            elif c == "\\" and quote == '"' and i + 1 < len(command):
+                i += 1
+                cur += command[i]
+            else:
+                if c == "$" and quote == "'":
+                    cur += "\0"
+                else:
+                    cur += c
+        elif c in "'\"":
+            quote, has = c, True
+        elif c == "\\" and i + 1 < len(command):
+            i += 1
+            cur += command[i]
+            has = True
+        elif c in " \t":
+            push_token()
+        elif c in ";\n|&()":
+            push_token()
+            if tokens:
+                out.append(tokens)
+            tokens = []
+        else:
+            cur += c
+            has = True
+        i += 1
+    push_token()
+    if tokens:
+        out.append(tokens)
+    return out
+
+
+def expand(word, env, local):
+    """Expand ~ and $VAR like the shell. None when the value cannot be known before it runs."""
+    if "$(" in word or "`" in word:
+        return None
+    s = re.sub(r"^~(?=/|$)", lambda m: env.get("HOME", "~"), word)
+    unknowable = []
+
+    def var(m):
+        name = m.group(1) or m.group(2)
+        if name in local:
+            unknowable.append(name)
+        return env.get(name, "")
+
+    s = re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)", var, s)
+    if unknowable:
+        return None
+    return s.replace("\0", "$")
+
+
+def under(path, root):
+    return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+
+def real(path):
+    return os.path.realpath(path) if os.path.exists(path) else path
+
+
+def git_out(cwd, *args):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        r = subprocess.run(["git", "-C", cwd] + list(args), capture_output=True, text=True,
+                           env=env, timeout=15)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def git_rc(cwd, *args):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        r = subprocess.run(["git", "-C", cwd] + list(args), capture_output=True, text=True,
+                           env=env, timeout=15)
+    except (OSError, subprocess.TimeoutExpired):
+        return 1
+    return r.returncode
+
+
+def list_worktrees(cwd):
+    out = git_out(cwd, "worktree", "list", "--porcelain") or ""
+    wts = []
+    for block in out.split("\n\n"):
+        wt = {"path": "", "head": "", "branch": None, "bare": False}
+        for line in block.splitlines():
+            key, _, val = line.partition(" ")
+            if key == "worktree":
+                wt["path"] = val
+            elif key == "HEAD":
+                wt["head"] = val
+            elif key == "branch":
+                wt["branch"] = val[len("refs/heads/"):] if val.startswith("refs/heads/") else val
+            elif key == "bare":
+                wt["bare"] = True
+        if wt["path"]:
+            wts.append(wt)
+    return wts
+
+
+def repo_context(cwd):
+    """Where the repository is, and whether this shell sits in a linked worktree."""
+    top = git_out(cwd, "rev-parse", "--show-toplevel")
+    if not top:
+        return None
+    common = (git_out(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
+              or git_out(cwd, "rev-parse", "--git-common-dir"))
+    wts = list_worktrees(cwd)
+    main = wts[0]["path"] if wts else top
+    repo_root = real(main)
+    top_real = real(top)
+    worktrees_root = os.path.join(repo_root, ".claude", "worktrees")
+    registered_link = any(real(wt["path"]) == top_real for wt in wts[1:])
+    return {
+        "top": top_real,
+        "repo_root": repo_root,
+        "worktrees_root": worktrees_root,
+        "common": os.path.abspath(common) if common else None,
+        "registered_link": registered_link,
+        "linked": registered_link and os.path.dirname(top_real) == worktrees_root,
+    }
+
+
+def verdict(path, ctx, env):
+    """None when the deletion target is fine, else why it is not."""
+    forms = {os.path.normpath(path),
+             os.path.join(os.path.realpath(os.path.dirname(path)), os.path.basename(path))}
+    home = os.path.normpath(env["HOME"]) if env.get("HOME") else None
+    for p in forms:
+        if p == os.sep:
+            return "is the filesystem root"
+        if home and p == home:
+            return "is your home directory"
+
+    if ctx["linked"]:
+        for p in forms:
+            if under(p, ctx["top"]):
+                return None
+
+    temps = list(TEMP_ROOTS)
+    if env.get("TMPDIR"):
+        temps.append(os.path.normpath(env["TMPDIR"]))
+    for p in forms:
+        for t in temps:
+            if under(p, t) and os.path.normpath(p) != os.path.normpath(t):
+                return None
+
+    for p in forms:
+        if p == ctx["repo_root"]:
+            return "is the repository root (%s)" % ctx["repo_root"]
+        if under(p, ctx["worktrees_root"]):
+            return ("is another linked worktree, not the current one; remove it with "
+                    "worktree.py cleanup, not with rm")
+        if under(p, ctx["repo_root"]):
+            return "is inside the main checkout (%s), which is never deleted" % ctx["repo_root"]
+    return "is outside the current worktree and the allowed temp roots"
+
+
+def denial(cmd, raw, resolved, why, ctx):
+    if ctx["linked"]:
+        where = ("the current linked worktree (%s)" % ctx["top"])
+        rule = "Deletion is allowed only inside %s" % where
+        hint = "Delete inside the worktree, use a temp dir, or ask the user to run it themselves."
+    else:
+        where = ("the main checkout (%s), where no repository path is deletable" % ctx["repo_root"])
+        rule = ("Deletion is allowed only inside a linked worktree, and this command runs in "
+                "%s" % where)
+        hint = ("Do not delete anything in the main checkout. Do the work in a linked worktree, "
+                "use a temp dir, or ask the user to run it themselves.")
+    return (
+        'Blocked: %s target "%s" resolves to %s, which %s.\n'
+        "%s, or inside a temp dir under /tmp or $TMPDIR (never the temp root itself).\n%s"
+        % (cmd, raw, resolved, why, rule, hint)
+    )
+
+
+def collect_delete_targets(command, cwd, env, ctx):
+    """[(command_name, raw_word, resolved_or_None)] for every deletion target."""
+    found, d, local = [], cwd, set()
+    for tokens in segments(command):
+        while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+            local.add(tokens[0].split("=", 1)[0])
+            tokens = tokens[1:]
+        while tokens and tokens[0] in ("sudo", "command", "nice", "time", "xargs"):
+            tokens = tokens[1:]
+        if tokens and tokens[0] in ("export", "local", "read", "for"):
+            local.update(re.sub(r"=.*", "", t) for t in tokens[1:] if re.match(r"^[A-Za-z_]", t))
+            continue
+        if not tokens:
+            continue
+        cmd, args = os.path.basename(tokens[0]), tokens[1:]
+        if cmd == "cd":
+            target = expand(args[0], env, local) if args else env.get("HOME")
+            d = os.path.normpath(os.path.join(d, target)) if target else d
+            continue
+
+        def resolve(word, base=None):
+            ex = expand(word, env, local)
+            if ex is None or ex == "":
+                return None
+            return os.path.normpath(os.path.join(base or d, ex))
+
+        if cmd in RM_CMDS:
+            words, end = [], False
+            for a in args:
+                if not end and a == "--":
+                    end = True
+                elif end or not a.startswith("-") or a == "-":
+                    words.append(a)
+            for w in words:
+                found.append((cmd, w, resolve(w)))
+        elif cmd == "find":
+            if "-delete" in args or any(a == "-exec" and i + 1 < len(args)
+                                        and os.path.basename(args[i + 1]) in RM_CMDS
+                                        for i, a in enumerate(args)):
+                for w in args:
+                    if w.startswith("-") or w in ("!", "(", ")"):
+                        break
+                    found.append(("find", w, resolve(w)))
+        elif cmd == "git":
+            git_dir, i = d, 0
+            while i < len(args) and args[i].startswith("-"):
+                if args[i] == "-C" and i + 1 < len(args):
+                    git_dir = resolve(args[i + 1]) or git_dir
+                    i += 2
+                elif args[i] in GIT_VALUE_OPTS:
+                    i += 2
+                else:
+                    i += 1
+            rest = args[i:]
+            if not rest:
+                continue
+            sub = rest[0]
+            if sub == "clean":
+                found.append(("git clean", git_dir, git_dir))
+            elif sub == "worktree" and len(rest) > 1 and rest[1] == "remove":
+                for w in rest[2:]:
+                    if not w.startswith("-"):
+                        found.append(("git worktree remove", w, resolve(w)))
+            elif sub == "checkout" and "--" in rest:
+                for w in rest[rest.index("--") + 1:]:
+                    found.append(("git checkout --", w, resolve(w)))
+    return found
+
+
+def check_delete(command, cwd, ctx, env):
+    """None when allowed, else the deny reason."""
+    for cmd, raw, resolved in collect_delete_targets(command, cwd, env, ctx):
+        if resolved is None:
+            continue
+        why = verdict(resolved, ctx, env)
+        if why:
+            return denial(cmd, raw, resolved, why, ctx)
+    for tokens in segments(command):
+        if not tokens or os.path.basename(tokens[0]) != "git":
+            continue
+        args = tokens[1:]
+        i = 0
+        while i < len(args) and args[i].startswith("-"):
+            i += 1
+        rest = args[i:]
+        if not rest:
+            continue
+        if rest[0] == "branch" and "-D" in rest:
+            names = [rest[j + 1] for j, a in enumerate(rest) if a == "-D" and j + 1 < len(rest)]
+            for name in names:
+                if git_rc(cwd, "merge-base", "--is-ancestor", name, "HEAD") != 0:
+                    return ('Blocked: git branch -D %s would delete commits that are not merged into HEAD.\n'
+                            "Delete a branch only after its work is merged; use `git branch -d` for a safe delete."
+                            % name)
+        if rest[0] == "reset" and "--hard" in rest:
+            if not ctx["linked"]:
+                return ('Blocked: git reset --hard would touch the main checkout (%s).\n'
+                        "Do not run destructive git commands in the main checkout; run them inside "
+                        "a linked worktree." % ctx["repo_root"])
+            status = git_out(cwd, "status", "--porcelain")
+            if status:
+                return ('Blocked: git reset --hard would discard uncommitted changes in %s.\n'
+                        "Commit or stash the work first, then reset." % cwd)
+    return None
+
+
+def worktree_targets(command, cwd, env, ctx):
+    """[(raw, resolved_or_None)] for every worktree add/move target."""
+    found, d = [], cwd
+    for tokens in segments(command):
+        while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+            tokens = tokens[1:]
+        if not tokens:
+            continue
+        cmd, args = tokens[0], tokens[1:]
+        if cmd == "cd":
+            target = expand(args[0], env, set()) if args else env.get("HOME")
+            if target:
+                d = os.path.normpath(os.path.join(d, target))
+            continue
+        if os.path.basename(cmd) != "git":
+            continue
+        git_dir, i = d, 0
+        while i < len(args) and args[i].startswith("-"):
+            if args[i] == "-C":
+                target = expand(args[i + 1] if i + 1 < len(args) else "", env, set())
+                if target:
+                    git_dir = os.path.normpath(os.path.join(git_dir, target))
+                i += 2
+            elif args[i] in GIT_VALUE_OPTS:
+                i += 2
+            else:
+                i += 1
+        if i >= len(args) or args[i] != "worktree" or i + 1 >= len(args):
+            continue
+        sub = args[i + 1]
+        if sub not in ("add", "move"):
+            continue
+        positional, j = [], i + 2
+        while j < len(args):
+            a = args[j]
+            if a == "--":
+                positional += args[j + 1:]
+                break
+            if a in ADD_VALUE_OPTS:
+                j += 1
+            elif not a.startswith("-") and not re.match(r"^\d*[<>]", a):
+                positional.append(a)
+            j += 1
+        idx = 0 if sub == "add" else 1
+        if len(positional) <= idx:
+            continue
+        raw = positional[idx]
+        ex = expand(raw, env, set())
+        if ex is None:
+            found.append((raw, None))
+            continue
+        base = ex if os.path.isabs(ex) else os.path.join(ctx["repo_root"], ex)
+        found.append((raw, os.path.normpath(base)))
+    return found
+
+
+def check_worktree(command, cwd, ctx, env):
+    """None when allowed, else the deny reason."""
+    allowed = ctx["worktrees_root"]
+    for raw, resolved in worktree_targets(command, cwd, env, ctx):
+        if resolved and under(resolved, allowed) and os.path.normpath(resolved) != os.path.normpath(allowed):
+            continue
+        where = ("resolves to " + resolved) if resolved else "cannot be resolved before it runs"
+        return (
+            'Blocked: worktree path "%s" %s, outside %s.\n'
+            "Worktrees live only under %s so cleanup and sweeps can find them.\n"
+            "Use: git worktree add .claude/worktrees/<slug> -b <type>/<slug> <base> (from the repo root)."
+            % (raw, where, allowed, allowed)
+        )
+    return None
+
+
+PROTECTED_BRANCHES = ("main", "master", "base")
+
+
+def protected_branch_names(repo, policy=None):
+    """The branches a commit must never land on in this repository.
+
+    The list comes from the policy, so a project that bases on ``dev``
+    protects ``dev``. The branch the repository names as its own default
+    through ``origin/HEAD`` is always included.
+    """
+    names = set((policy or {}).get("protected_branches") or PROTECTED_BRANCHES)
+    result = subprocess.run(["git", "-C", repo, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+                            capture_output=True, text=True, timeout=30)
+    if result.returncode not in (0, 1):
+        raise ValueError("cannot resolve protected default branch")
+    head = result.stdout.strip()
+    if head:
+        names.add(head.split("/", 1)[1] if "/" in head else head)
+    return names
+POLICY_REL = os.path.join(".claude", "policies", "git-policy.json")
+REPOS_REL = os.path.join(".claude", "repos.json")
+FALLBACK_KEY = "*"
+ASK = 3
+
+
+def script_project_root():
+    """The root of the tree that holds this script, whatever the cwd is."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.abspath(os.path.join(here, "..", "..", "..", ".."))
+
+
+def find_policy(ctx):
+    """(root, policy_path) for the tree that holds the policy file, else (None, None).
+
+    The tree the shell is in wins, so an agent in a worktree guards and
+    regenerates the files of that worktree, not the main checkout.
+    """
+    roots = []
+    if ctx:
+        roots.append(ctx.get("top"))
+        roots.append(ctx.get("repo_root"))
+    roots.append(script_project_root())
+    for root in roots:
+        if not root:
+            continue
+        path = os.path.join(root, POLICY_REL)
+        if os.path.exists(path):
+            return root, path
+    return None, None
+
+
+def load_policy(path):
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def pattern_matches(command, pattern):
+    """Match the same glob patterns used by the generated permission map."""
+    return fnmatch.fnmatchcase(command, pattern)
+
+
+def git_commands(command, cwd=None):
+    """[(reconstructed, subcommand, args, directory)] for each git command."""
+    found = []
+    for tokens in segments(command):
+        directory = cwd or os.getcwd()
+        if any("$(" in token or "`" in token for token in tokens):
+            raise ValueError("shell evaluation requires manual review; use direct git -C")
+        while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+            if tokens[0].startswith("GIT_"):
+                raise ValueError("git environment overrides require manual review")
+            tokens = tokens[1:]
+        while tokens and tokens[0] in ("sudo", "command", "nice", "time", "xargs"):
+            tokens = tokens[1:]
+        if not tokens or os.path.basename(tokens[0]) != "git":
+            if any(os.path.basename(token) in ("cd", "pushd", "popd", "git", "eval", "source", ".",
+                                              "sh", "bash", "dash", "zsh", "ksh", "fish")
+                   or token.startswith("--chdir") or token in ("-C", "-D") for token in tokens):
+                raise ValueError("unsupported directory-changing shell chain; use direct git -C")
+            continue
+        args = tokens[1:]
+        i = 0
+        while i < len(args) and args[i].startswith("-"):
+            if args[i].startswith(("--git-dir", "--work-tree")):
+                raise ValueError("git directory overrides require manual review")
+            option = args[i]
+            if option == "-C" or option in GIT_VALUE_OPTS:
+                if i + 1 >= len(args):
+                    raise ValueError("missing argument for git %s" % option)
+                if option == "-C" and args[i + 1]:
+                    directory = os.path.abspath(os.path.join(directory, args[i + 1]))
+                i += 2
+            elif option.startswith("-C"):
+                directory = os.path.abspath(os.path.join(directory, option[2:]))
+                i += 1
+            elif (option.startswith("-c") or option.startswith(("--config-env=", "--namespace=", "--exec-path="))
+                  or option in ("--bare", "--no-pager", "--paginate", "-p", "-P", "--no-replace-objects",
+                                "--literal-pathspecs", "--glob-pathspecs", "--noglob-pathspecs",
+                                "--icase-pathspecs", "--no-optional-locks", "--no-lazy-fetch")):
+                i += 1
+            else:
+                raise ValueError("unsupported git global option: %s" % option)
+        if i >= len(args):
+            continue
+        sub = args[i]
+        rest = args[i + 1:]
+        found.append(("git %s%s" % (sub, (" " + " ".join(rest)) if rest else ""), sub, rest, directory))
+    return found
+
+
+def context_verdict(policy, command, cwd, ctx):
+    """The context rule that fires for this command, or None."""
+    for rule in policy.get("context", []):
+        if not any(pattern_matches(command, p) for p in rule.get("applies_to", [])):
+            continue
+        check = rule.get("check")
+        if check == "always":
+            fired = True
+        elif check == "protected_branch":
+            branch = git_out(cwd, "rev-parse", "--abbrev-ref", "HEAD")
+            if not branch or branch == "HEAD":
+                raise ValueError("cannot establish a named branch; refusing commit")
+            top = git_out(cwd, "rev-parse", "--show-toplevel") or cwd
+            fired = branch in protected_branch_names(top, policy)
+        elif check == "in_worktree":
+            mode = load_worktree_module().workspace_mode(cwd)
+            fired = mode != "optional" and not (ctx and ctx["linked"])
+            if fired and mode == "adaptive":
+                return {**rule, "reason": "Adaptive commit checks have no board-row context; use an assigned linked worktree to commit."}
+        elif check == "branch_switch_in_worktree":
+            parts = command.split()
+            sub = parts[1] if len(parts) > 1 else ""
+            rest = parts[2:]
+            switches = sub in ("checkout", "switch") and not (sub == "checkout" and rest[:1] == ["--"])
+            fired = bool(ctx and ctx["registered_link"]) and switches
+        else:
+            fired = False
+        if fired:
+            return rule
+    return None
+
+
+def bash_verdict(policy, command):
+    """(action, reason) from the bash rules, LAST MATCH WINS."""
+    action, reason = None, None
+    for rule in policy.get("bash", []):
+        if pattern_matches(command, rule["pattern"]):
+            action = rule["action"]
+            reason = rule.get("reason")
+    if action is None:
+        fallback = policy.get("fallback", {})
+        action = fallback.get("action", "allow")
+        reason = fallback.get("reason")
+    return action, reason
+
+
+def git_verdict(policy, command, cwd):
+    """(action, reason) for every git command in a shell command; the first non-allow wins."""
+    for reconstructed, _sub, _rest, directory in git_commands(command, cwd):
+        context = repo_context(directory)
+        if not context:
+            return "deny", "cannot establish git repository context"
+        rule = context_verdict(policy, reconstructed, directory, context)
+        if rule:
+            return rule.get("action", "deny"), "%s: %s" % (reconstructed, rule.get("reason", ""))
+        action, reason = bash_verdict(policy, reconstructed)
+        if action != "allow":
+            return action, "%s: %s" % (reconstructed, reason)
+    return "allow", None
+
+
+def cmd_check_git(command, cwd, ctx):
+    root, path = find_policy(ctx)
+    if not path:
+        print("policy file not found: %s\n"
+              "The canonical guard-rail policy is missing; run guard.py check-policy --write "
+              "after creating .claude/policies/git-policy.json." % POLICY_REL, file=sys.stderr)
+        return USAGE
+    commands = git_commands(command, cwd)
+    if not commands:
+        print("no git command")
+        return OK
+    if any(repo_context(directory) is None for _r, _s, _a, directory in commands):
+        print("blocked: cannot establish git repository context", file=sys.stderr)
+        return DENIED
+    action, reason = git_verdict(load_policy(path), command, cwd)
+    if action == "deny":
+        print("blocked: %s\nnext: do not run this command." % reason)
+        return DENIED
+    if action == "ask":
+        print("needs approval: %s\nnext: the user must approve it before it runs." % reason)
+        return ASK
+    print("allowed: %s" % command)
+    return OK
+
+
+def load_config(path):
+    """(config, error_line). The error line is None when the file parses."""
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return None, None
+    try:
+        return json.loads(text), None
+    except json.JSONDecodeError as exc:
+        return None, exc.lineno
+
+
+def ordered_rules(policy, mode="required"):
+    """{kind: {pattern: action}} in policy order, fallback first; evaluated LAST MATCH WINS.
+
+    `hidden_paths` becomes the `read` map, so git config, credential and .env files are never
+    readable by Read, Grep or Glob.
+    """
+    fallback = policy.get("fallback", {}).get("action", "allow")
+    rules = {}
+    for kind in ("bash", "edit"):
+        mapping = {FALLBACK_KEY: fallback}
+        for rule in policy.get(kind, []):
+            action = rule["action"]
+            if kind == "edit" and rule.get("workspace_default"):
+                # Static path rules cannot tell a maintenance edit from Feature work.
+                if mode == "optional":
+                    action = "allow"
+                elif mode == "adaptive" and action != "deny":
+                    action = "ask"
+            mapping[rule["pattern"]] = action
+        rules[kind] = mapping
+    hidden = policy.get("hidden_paths") or {}
+    mapping = {FALLBACK_KEY: fallback}
+    for path in hidden.get("paths", []):
+        mapping[path] = "deny"
+    for path in hidden.get("allow", []):
+        mapping[path] = "allow"
+    rules["read"] = mapping
+    return rules
+
+
+def is_guard_hook(entry):
+    return any(hook.get("command") == HOOK_COMMAND for hook in (entry or {}).get("hooks", []))
+
+
+def generated_settings(policy):
+    """The settings.json content guard.py owns.
+
+    Claude Code evaluates static rules deny-first, not in order, so only rules that never
+    conflict are static: hard denies as a backstop and explicit allows for convenience. The
+    ordered policy, saved workspace mode and context checks run in the PreToolUse hook.
+    """
+    hidden = policy.get("hidden_paths") or {}
+    read_rules = ([(path, "deny") for path in hidden.get("paths", [])] +
+                  [(path, "allow") for path in hidden.get("allow", [])])
+
+    def static_denies(tool, ordered):
+        # A static deny would beat a later, narrower exception (.env.* would hide .env.example,
+        # **/docs/BOARD.md the template board), so overlapped denies stay hook-only.
+        return ["%s(%s)" % (tool, pattern) for index, (pattern, action) in enumerate(ordered)
+                if action == "deny" and not any(later_action != "deny" and fnmatch.fnmatchcase(later, pattern)
+                                                for later, later_action in ordered[index + 1:])]
+
+    deny = static_denies("Bash", [(rule["pattern"], rule["action"]) for rule in policy.get("bash", [])])
+    deny += static_denies("Edit", [(rule["pattern"], rule["action"]) for rule in policy.get("edit", [])])
+    deny += static_denies("Read", read_rules)
+    allow = ["Bash(%s)" % rule["pattern"] for rule in policy.get("bash", []) if rule["action"] == "allow"]
+    allow += ["Edit(%s)" % rule["pattern"] for rule in policy.get("edit", [])
+              if rule["action"] == "allow" and not rule.get("workspace_default")]
+    return {
+        "permissions": {"allow": allow, "deny": deny},
+        "hooks": {"PreToolUse": [{"matcher": GUARDED_TOOLS,
+                                  "hooks": [{"type": "command", "command": HOOK_COMMAND}]}]},
+    }
+
+
+def merged_settings(config, policy):
+    """The config with guard-owned keys regenerated; user keys and other hooks are kept."""
+    generated = generated_settings(policy)
+    updated = dict(config)
+    permissions = dict(updated.get("permissions") or {})
+    permissions.update(generated["permissions"])
+    updated["permissions"] = permissions
+    hooks = dict(updated.get("hooks") or {})
+    others = [entry for entry in hooks.get("PreToolUse", []) if not is_guard_hook(entry)]
+    hooks["PreToolUse"] = generated["hooks"]["PreToolUse"] + others
+    updated["hooks"] = hooks
+    return updated
+
+
+def settings_match(config, policy):
+    return isinstance(config, dict) and merged_settings(config, policy) == config
+
+
+def write_settings(config_path, policy, create_missing=False, preview=False):
+    """(settings, message). Writes the guard-owned keys into a Claude Code settings file."""
+    existed = os.path.exists(config_path)
+    config, bad_line = load_config(config_path)
+    if config is None:
+        if not create_missing or existed:
+            return None, ("cannot parse %s%s" %
+                          (config_path, (" at line %d" % bad_line) if bad_line else ""))
+        config = {"$schema": SCHEMA_URL}
+    if not isinstance(config, dict):
+        return None, "config must be an object: %s" % config_path
+    updated = merged_settings(config, policy)
+    text = json.dumps(updated, indent=2, ensure_ascii=False) + "\n"
+    if preview:
+        return updated, text
+    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+    fd, temporary = tempfile.mkstemp(dir=os.path.dirname(config_path), prefix=".settings-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(temporary, config_path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return updated, ("updated" if existed else "created")
+
+
+def cmd_check_policy(write, cwd, ctx):
+    root, path = find_policy(ctx)
+    if not path:
+        print("policy file not found: %s" % POLICY_REL, file=sys.stderr)
+        return USAGE
+    policy = load_policy(path)
+    config_path = os.path.join(root, CONFIG_REL)
+    if write:
+        settings, message = write_settings(config_path, policy, create_missing=True)
+        if settings is None:
+            print(message, file=sys.stderr)
+            return USAGE
+        print("settings written to %s" % config_path)
+        return OK
+    config, bad_line = load_config(config_path)
+    if config is None:
+        print("cannot parse %s%s" % (config_path, (" at line %d" % bad_line) if bad_line else ""),
+              file=sys.stderr)
+        return USAGE
+    if settings_match(config, policy):
+        print("policy in sync")
+        return OK
+    print("policy out of sync: %s does not match %s" % (config_path, path))
+    print(json.dumps(generated_settings(policy), indent=2))
+    return DENIED
+
+
+def cmd_policy(cwd, ctx):
+    root, path = find_policy(ctx)
+    if not path:
+        print("policy file not found: %s" % POLICY_REL, file=sys.stderr)
+        return USAGE
+    print(json.dumps(generated_settings(load_policy(path)), indent=2))
+    return OK
+
+
+def path_verdict(mapping, candidates):
+    """(action, matched pattern): LAST MATCH WINS across every form of the path."""
+    action, matched = mapping[FALLBACK_KEY], None
+    for pattern, rule_action in mapping.items():
+        if pattern != FALLBACK_KEY and any(fnmatch.fnmatchcase(c, pattern) for c in candidates):
+            action, matched = rule_action, pattern
+    return action, matched
+
+
+def path_forms(path, cwd, ctx):
+    """The absolute path, its home-relative form and its form relative to the checkout root."""
+    home = os.path.expanduser("~")
+    absolute = os.path.abspath(os.path.join(cwd, os.path.expanduser(path)))
+    forms = {absolute}
+    if under(absolute, home):
+        forms.add("~/" + os.path.relpath(absolute, home))
+    root = ctx["top"] if ctx else cwd
+    for base in {root, real(root)}:
+        if under(absolute, base) or under(real(absolute), base):
+            forms.add(os.path.relpath(real(absolute) if under(real(absolute), base) else absolute, base))
+    return forms
+
+
+def saved_mode(cwd):
+    """The project-local workspace mode; the strictest mode when it cannot be read."""
+    module = load_worktree_module()
+    try:
+        return module.workspace_mode(cwd) if module else "required"
+    except (ValueError, OSError):
+        return "required"
+
+
+def bash_hook_verdict(policy, command, cwd, ctx):
+    """The strictest of the whole-command, per-segment, git-context and deletion verdicts."""
+    parts = segments(command)
+    verdicts = [bash_verdict(policy, command)]
+    verdicts += [bash_verdict(policy, " ".join(tokens)) for tokens in parts]
+    if any(os.path.basename(token) == "git" for tokens in parts for token in tokens):
+        try:
+            verdicts.append(git_verdict(policy, command, cwd))
+        except ValueError as exc:
+            verdicts.append(("ask", "git command needs manual review: %s" % exc))
+    if ctx:
+        reason = check_delete(command, cwd, ctx, dict(os.environ))
+        if reason:
+            verdicts.append(("deny", reason))
+    return max(verdicts, key=lambda verdict: STRICTNESS.get(verdict[0], STRICTNESS["deny"]))
+
+
+def tool_verdict(policy, tool, tool_input, cwd):
+    """(action, reason) for one Claude Code tool call."""
+    ctx = repo_context(cwd)
+    if tool == "Bash":
+        return bash_hook_verdict(policy, tool_input.get("command") or "", cwd, ctx)
+    if tool in EDIT_TOOLS:
+        path = tool_input.get("file_path") or tool_input.get("notebook_path")
+        if not path:
+            return "allow", None
+        mapping = ordered_rules(policy, saved_mode(cwd))["edit"]
+        action, pattern = path_verdict(mapping, path_forms(path, cwd, ctx))
+        reason = next((rule.get("reason") for rule in reversed(policy.get("edit", []))
+                       if rule["pattern"] == (pattern or FALLBACK_KEY)), None)
+        return action, "%s: %s" % (path, reason or "factory edit policy")
+    if tool in READ_TOOLS:
+        mapping = ordered_rules(policy)["read"]
+        for path in (tool_input.get(key) for key in ("file_path", "path", "pattern")):
+            if not path:
+                continue
+            action, _pattern = path_verdict(mapping, path_forms(path, cwd, ctx))
+            if action != "allow":
+                return action, "%s: %s" % (path, (policy.get("hidden_paths") or {}).get("reason", ""))
+    return "allow", None
+
+
+def cmd_hook(stdin):
+    """Claude Code PreToolUse hook: deny or ask from the policy; an allow defers to Claude Code."""
+    try:
+        event = json.load(stdin)
+        tool = event.get("tool_name") or ""
+        tool_input = event.get("tool_input") or {}
+        cwd = event.get("cwd") or os.getcwd()
+        _root, path = find_policy(repo_context(cwd))
+        if not path:
+            action, reason = "deny", "guard policy %s not found; tool call refused" % POLICY_REL
+        else:
+            action, reason = tool_verdict(load_policy(path), tool, tool_input, cwd)
+    except Exception as exc:  # A broken guard must not silently allow a guarded call.
+        action, reason = "deny", "guard.py internal error; refusing tool call: %s" % exc
+    if action not in ("deny", "ask"):
+        return OK
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": action,
+        "permissionDecisionReason": reason or "factory policy",
+    }}))
+    return OK
+
+
+def load_worktree_module():
+    """The sibling worktree.py, loaded by path so it works from anywhere."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "worktree.py")
+    if not os.path.exists(path):
+        return None
+    spec = importlib.util.spec_from_file_location("worktree", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_scope_module():
+    """The sibling scope.py, loaded by path so it works from anywhere."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scope.py")
+    if not os.path.exists(path):
+        return None
+    spec = importlib.util.spec_from_file_location("scope", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def shell_tree(ctx):
+    """The tree the shell is in: the source of the supported .claude slice."""
+    if ctx:
+        top = ctx.get("top")
+        if top:
+            return top
+    return script_project_root()
+
+
+def control_root(ctx):
+    """The control repo's main checkout: the place the target repositories live.
+
+    A nested app repository at apps/<name>/ is not tracked by the control repo,
+    so it exists only in the main checkout, never in a worktree of it. A work
+    surface holds application code only, so the control repo is found by
+    walking up to the nearest ancestor that holds a repo map and a board.
+    """
+    wt = load_worktree_module()
+    if wt is not None:
+        root = wt.control_root(os.getcwd())
+        if root:
+            return root
+    if ctx:
+        root = ctx.get("repo_root")
+        if root:
+            return root
+    return script_project_root()
+
+
+def repo_targets(source_tree, control, repo_id):
+    """(target root, repos map, error). The map in .claude/repos.json is the only way in.
+
+    The map is read from the tree the shell is in. The target is resolved in
+    the control repo's main checkout, except for 'control' itself, which is
+    the tree the shell is in.
+    """
+    wt = load_worktree_module()
+    if wt is None:
+        return None, None, "worktree.py not found next to guard.py"
+    repos, err = wt.load_repos(source_tree)
+    if repos is None:
+        return None, None, err
+    if repo_id == "control":
+        return source_tree, repos, None
+    target, err = wt.resolve_repo(control, repos, repo_id)
+    if err:
+        return None, repos, err
+    return target, repos, None
+
+
+def is_control_repo(path):
+    """True when this repository owns a harness: a repo map and a board."""
+    return (os.path.exists(os.path.join(path, REPOS_REL))
+            and os.path.exists(os.path.join(path, "docs", "BOARD.md")))
+
+
+def file_state(source, destination):
+    """'new', 'changed' or 'identical' for one planned file.
+
+    The source is either a path to copy or the literal content to write.
+    """
+    if not os.path.exists(destination):
+        return "new"
+    try:
+        if isinstance(source, str) and os.path.exists(source):
+            with open(source, "rb") as fh:
+                a = fh.read()
+        else:
+            a = source.encode("utf-8") if isinstance(source, str) else source
+        with open(destination, "rb") as fh:
+            b = fh.read()
+    except OSError:
+        return "changed"
+    return "identical" if a == b else "changed"
+
+
+def cmd_sync_all(apply, cwd, ctx):
+    """Sync every repo in the map, except the control repo itself."""
+    source_tree = shell_tree(ctx)
+    control = control_root(ctx)
+    wt = load_worktree_module()
+    if wt is None:
+        print("worktree.py not found next to guard.py", file=sys.stderr)
+        return DENIED
+    repos, err = wt.load_repos(source_tree)
+    if repos is None:
+        print(err, file=sys.stderr)
+        return DENIED
+    ids = [rid for rid in sorted(repos) if rid != "control"]
+    if not ids:
+        print("the repo map registers no repository besides the control repo")
+        return OK
+    failures = []
+    for repo_id in ids:
+        code = cmd_sync(repo_id, apply, cwd, ctx)
+        if code != OK:
+            failures.append(repo_id)
+    print("")
+    print("synced %d repository(ies)%s" %
+          (len(ids) - len(failures), "" if apply else " (dry run)"))
+    if failures:
+        print("failed: %s" % ", ".join(failures), file=sys.stderr)
+        return DENIED
+    return OK
+
+
+def cmd_sync(repo_id, apply, cwd, ctx):
+    source_tree = shell_tree(ctx)
+    control = control_root(ctx)
+    target, repos, err = repo_targets(source_tree, control, repo_id)
+    if err:
+        print(err, file=sys.stderr)
+        return DENIED
+    wt = load_worktree_module()
+    is_repo = bool(wt) and wt.is_git_repo(target)
+    if not is_repo and apply:
+        print("target %s is not a git repository; refusing to write into it" % target,
+              file=sys.stderr)
+        return DENIED
+    plan = []
+    # Project controls own their harness copies; apps inherit the local config.
+    target_is_control = is_control_repo(target)
+    if target_is_control:
+        for folder in SYNC_SLICE:
+            source_dir = os.path.join(source_tree, ".claude", folder)
+            if not os.path.isdir(source_dir):
+                continue
+            for dirpath, dirnames, filenames in os.walk(source_dir):
+                dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+                rel = os.path.relpath(dirpath, source_dir)
+                for name in sorted(filenames):
+                    if name.endswith(".pyc"):
+                        continue
+                    source = os.path.join(dirpath, name)
+                    rel_file = name if rel == "." else os.path.join(rel, name)
+                    plan.append((source, os.path.join(target, ".claude", folder, rel_file)))
+        slice_ignore = os.path.join(source_tree, ".claude", ".gitignore")
+        if os.path.exists(slice_ignore):
+            plan.append((slice_ignore, os.path.join(target, ".claude", ".gitignore")))
+    config_path = os.path.join(target, CONFIG_REL)
+
+    print("control repo: %s" % control)
+    print("target repo:  %s (%s)%s" % (target, repo_id,
+                                       "" if is_repo else " - not a git repository yet"))
+    print("plan:")
+    written = identical = 0
+    for source, destination in plan:
+        state = file_state(source, destination)
+        if state == "identical":
+            identical += 1
+        else:
+            written += 1
+        print("  %-9s %s" % (state, os.path.relpath(destination, target)))
+    if target_is_control:
+        print("  %-9s %s" % ("regen", os.path.relpath(config_path, target)))
+    if not is_repo:
+        print("note: the target is not a git repository; --apply would be refused.")
+
+    if not apply:
+        print("dry run; re-run with --apply to act")
+        return OK
+
+    for source, destination in plan:
+        if os.path.realpath(source) == os.path.realpath(destination):
+            continue
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        shutil.copyfile(source, destination)
+    if target_is_control:
+        policy = load_policy(os.path.join(source_tree, POLICY_REL))
+        written_config, message = write_settings(config_path, policy, create_missing=True)
+        print("settings %s (%s)" % (os.path.relpath(config_path, target), message))
+    print("files written: %d, identical: %d, skipped: 0" % (written, identical))
+    scope = load_scope_module()
+    if scope is not None and is_repo and not target_is_control:
+        ok, note = scope.ensure_ignored(target)
+        print("inherited harness files excluded: %s" % note)
+    return OK
+
+
+def cmd_check_repos(cwd, ctx):
+    source_tree = shell_tree(ctx)
+    control = control_root(ctx)
+    target, repos, err = repo_targets(source_tree, control, "control")
+    if err:
+        print(err, file=sys.stderr)
+        return DENIED
+    problems = []
+    registered = set()
+    for repo_id in sorted(repos):
+        resolved, err = resolve_repo_path(control, repos, repo_id)
+        if err:
+            problems.append(err)
+            continue
+        if not os.path.isdir(resolved):
+            problems.append("repo %r: %s does not exist" % (repo_id, resolved))
+            continue
+        registered.add(os.path.realpath(resolved))
+        wt = load_worktree_module()
+        if not wt or not wt.is_git_repo(resolved):
+            print("repo %r: %s - registered, not a git repository yet" % (repo_id, resolved))
+            continue
+        print("repo %r: %s - git repository" % (repo_id, resolved))
+    control_real = os.path.realpath(control)
+    if "control" not in repos:
+        problems.append("the control repo %s is not registered as 'control'" % control)
+    elif control_real not in registered:
+        problems.append("the 'control' entry does not point at the control repo %s" % control)
+    apps = os.path.join(control, "apps")
+    if os.path.isdir(apps):
+        for name in sorted(os.listdir(apps)):
+            folder = os.path.join(apps, name)
+            if os.path.isdir(folder) and os.path.exists(os.path.join(folder, ".git")):
+                if os.path.realpath(folder) not in registered:
+                    problems.append("apps/%s is a git repository but is not registered in %s"
+                                    % (name, REPOS_REL))
+    if problems:
+        for problem in problems:
+            print("problem: %s" % problem, file=sys.stderr)
+        print("the repo map and the layout disagree", file=sys.stderr)
+        return DENIED
+    print("repos in sync")
+    return OK
+
+
+def resolve_repo_path(control, repos, repo_id):
+    """The absolute path of a repo id, or an error message."""
+    wt = load_worktree_module()
+    if wt is None:
+        return None, "worktree.py not found next to guard.py"
+    return wt.resolve_repo(control, repos, repo_id)
+
+
+HOOK_MARKER = "# installed by guard.py install-hooks"
+HOOK_BODY = """#!/bin/sh
+%s
+# A commit is allowed only inside a linked worktree. Fail closed when the guard is missing.
+top=$(git rev-parse --show-toplevel) || exit 1
+d=$top
+while [ "$d" != "/" ]; do
+  if [ -f "$d/.claude/skills/git-worktree/scripts/guard.py" ]; then
+    exec python3 "$d/.claude/skills/git-worktree/scripts/guard.py" check-git -- "git commit"
+  fi
+  d=$(dirname "$d")
+done
+echo "guard.py not found; commit refused" >&2
+exit 1
+""" % HOOK_MARKER
+
+
+def hooks_dir(repo):
+    """The hooks directory shared by every worktree of a repository."""
+    common = git_out(repo, "rev-parse", "--git-common-dir")
+    if not common:
+        return None
+    path = common if os.path.isabs(common) else os.path.join(repo, common)
+    return os.path.join(os.path.realpath(path), "hooks")
+
+
+def install_hook(repo, apply):
+    """(state, message). Writes a pre-commit hook that calls guard.py check-git."""
+    hooks = hooks_dir(repo)
+    if not hooks:
+        return "error", "not a git repository"
+    path = os.path.join(hooks, "pre-commit")
+    if os.path.exists(path):
+        try:
+            current = open(path, encoding="utf-8", errors="ignore").read()
+        except OSError as exc:
+            return "error", "cannot read %s (%s)" % (path, exc)
+        if HOOK_MARKER not in current:
+            return "conflict", "existing pre-commit hook not installed by guard.py: %s" % path
+    if not apply:
+        return "would-write", path
+    try:
+        os.makedirs(hooks, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(HOOK_BODY)
+        os.chmod(path, 0o755)
+    except OSError as exc:
+        return "error", "cannot write %s (%s)" % (path, exc)
+    return "written", path
+
+
+def cmd_install_hooks(all_flag, repo_id, apply, cwd, ctx):
+    """Install the worktree-only pre-commit hook in the control repo and every app repo."""
+    wt = load_worktree_module()
+    if wt is None:
+        print("worktree.py not found next to guard.py", file=sys.stderr)
+        return USAGE
+    control = control_root(ctx)
+    source = shell_tree(ctx)
+    repos, err = wt.load_repos(source)
+    if repos is None:
+        print(err or "no repo map", file=sys.stderr)
+        return USAGE
+    targets = [("control", control)]
+    if all_flag:
+        for rid in sorted(repos):
+            if rid == "control":
+                continue
+            path, rerr = wt.resolve_repo(control, repos, rid)
+            if rerr:
+                print("skip %s: %s" % (rid, rerr), file=sys.stderr)
+                continue
+            targets.append((rid, path))
+    elif repo_id:
+        path, rerr = wt.resolve_repo(control, repos, repo_id)
+        if rerr:
+            print(rerr, file=sys.stderr)
+            return DENIED
+        targets = [(repo_id, path)]
+    failed = False
+    for rid, path in targets:
+        state, message = install_hook(path, apply)
+        print("%-10s %-10s %s" % (state, rid, message))
+        if state in ("error", "conflict"):
+            failed = True
+    if not apply:
+        print("dry run; add --apply to write")
+    return DENIED if failed else OK
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(
+        prog="guard.py", description="Guard destructive shell commands in this factory.")
+    sub = parser.add_subparsers(dest="command")
+
+    p_del = sub.add_parser("check-delete", help="allow or deny a destructive shell command")
+    p_del.add_argument("shell_command", nargs="?", help="the shell command to inspect")
+    p_del.add_argument("rest", nargs=argparse.REMAINDER)
+
+    p_wt = sub.add_parser("check-worktree", help="allow or deny a git worktree add/move path")
+    p_wt.add_argument("shell_command", nargs="?", help="the shell command to inspect")
+    p_wt.add_argument("rest", nargs=argparse.REMAINDER)
+
+    p_git = sub.add_parser("check-git", help="allow, ask or deny a git command from the policy")
+    p_git.add_argument("shell_command", nargs="?", help="the shell command to inspect")
+    p_git.add_argument("rest", nargs=argparse.REMAINDER)
+
+    sub.add_parser("hook", help="Claude Code PreToolUse hook; reads the event JSON on stdin")
+
+    p_pol = sub.add_parser("check-policy", help="prove .claude/settings.json matches the policy file")
+    p_pol.add_argument("--write", action="store_true", help="regenerate the guard-owned settings")
+
+    p_sync = sub.add_parser("sync", help="copy the guard rails into another repo")
+    p_sync.add_argument("--repo", help="repo id from .claude/repos.json")
+    p_sync.add_argument("--all", action="store_true",
+                        help="sync every repository in the map, except the control repo")
+    p_sync.add_argument("--apply", action="store_true", help="act; without it this is a dry run")
+
+    sub.add_parser("check-repos", help="prove the repo map and the apps/ layout agree")
+
+    p_hooks = sub.add_parser("install-hooks",
+                             help="install the worktree-only pre-commit hook")
+    p_hooks.add_argument("--repo", help="repo id from .claude/repos.json")
+    p_hooks.add_argument("--all", action="store_true",
+                         help="install in the control repo and every repository in the map")
+    p_hooks.add_argument("--apply", action="store_true", help="write; without it this is a dry run")
+
+    sub.add_parser("policy", help="print the generated settings block")
+
+    args = parser.parse_args(argv)
+    if not args.command:
+        parser.print_help()
+        return USAGE
+
+    if args.command == "hook":
+        return cmd_hook(sys.stdin)
+
+    if args.command in ("check-policy", "policy"):
+        cwd = os.getcwd()
+        ctx = repo_context(cwd)
+        if args.command == "policy":
+            return cmd_policy(cwd, ctx)
+        return cmd_check_policy(args.write, cwd, ctx)
+
+    if args.command == "install-hooks":
+        cwd = os.getcwd()
+        return cmd_install_hooks(args.all, args.repo, args.apply, cwd, repo_context(cwd))
+
+    if args.command in ("sync", "check-repos"):
+        cwd = os.getcwd()
+        ctx = repo_context(cwd)
+        if args.command == "check-repos":
+            return cmd_check_repos(cwd, ctx)
+        if args.all:
+            return cmd_sync_all(args.apply, cwd, ctx)
+        if not args.repo:
+            print("name a repository with --repo, or sync them all with --all", file=sys.stderr)
+            return USAGE
+        return cmd_sync(args.repo, args.apply, cwd, ctx)
+
+    parts = [args.shell_command] if args.shell_command else []
+    parts.extend(args.rest or [])
+    command = " ".join(p for p in parts if p).strip()
+    if not command:
+        print("no shell command given", file=sys.stderr)
+        return USAGE
+
+    cwd = os.getcwd()
+    ctx = repo_context(cwd)
+    if ctx is None:
+        print("not inside a git repository; refusing operation", file=sys.stderr)
+        return DENIED
+
+    env = dict(os.environ)
+    if args.command == "check-delete":
+        reason = check_delete(command, cwd, ctx, env)
+    elif args.command == "check-git":
+        return cmd_check_git(command, cwd, ctx)
+    else:
+        reason = check_worktree(command, cwd, ctx, env)
+
+    if reason:
+        print(reason, file=sys.stderr)
+        return DENIED
+    print("allowed: %s" % command)
+    return OK
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv[1:]))
+    except SystemExit:
+        raise
+    except Exception as exc:
+        print("guard.py internal error; refusing operation: %s" % exc, file=sys.stderr)
+        sys.exit(DENIED)

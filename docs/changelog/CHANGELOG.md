@@ -3,6 +3,12 @@
 Newest first. Append-only. One section per change.
 Full rationale for a change lives in `docs/changelog/<YYYY-MM-DD>-<slug>.md`.
 
+## [2026-11-25] Converted the factory from Kilo Code to Claude Code
+**Type:** Chore
+**Board:** none (direct user request) | **Branch:** claudecode (primary checkout, optional mode, uncommitted)
+**Changed:** `.kilo/` became `.claude/` (`agents/`, `commands/` with `factory-` prefixes, `skills/`, `policies/`), and `AGENTS.md` became `CLAUDE.md`. `kilo.jsonc` was replaced by a generated `.claude/settings.json` with a `guard.py hook` PreToolUse hook and the non-conflicting static denies/allows. Mode changes no longer rewrite config; worktrees and restored services get their own settings. The devcontainer now installs Claude Code and `playwright`, not the Kilo CLI and Playwright MCP. Review-switch prose was consolidated into the qa-review skill, which also gains an integrated-browser-first **Browser** section. The plan research notes were removed. See ADR-097.
+**Verification:** With a real `TMPDIR`: bootstrap 44 OK, lifecycle 66 OK (including new hook tests), env all checks passed, ledger 12 OK, `tests/` 37 OK, browser runner 26 pass/1 skip, `guard.py check-policy` in sync, `git diff --check` clean. Not checked: a devcontainer image build, or a live Claude Code session in a bootstrapped project.
+
 ## [2026-11-23] Authorize combined commit and prepare human merge
 **Type:** Chore
 **Board:** BOARD-132 through BOARD-136 | **Branch:** chore/enforce-planned-product-role-service-boundaries

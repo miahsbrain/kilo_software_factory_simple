@@ -1,0 +1,415 @@
+#!/usr/bin/env python3
+"""Self-test for the env provisioning and the worktree reuse rules.
+
+    python3 .claude/skills/git-worktree/scripts/test_env.py
+
+The test builds a throwaway git repository under a temp directory, copies the
+scripts into it, and drives them the way an agent would. It never touches this
+repository's board, worktrees or branches.
+
+Exit codes: 0 ok, 1 a check failed.
+"""
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import guard
+
+SCRIPTS = os.path.dirname(os.path.abspath(__file__))
+REPO_SCRIPTS = os.path.abspath(os.path.join(SCRIPTS, "..", ".."))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPTS, "..", "..", "..", ".."))
+MARKER = "FACTORY-TEST-SECRET-MARKER"
+
+FAILURES = []
+
+
+def check(condition, message):
+    if not condition:
+        FAILURES.append(message)
+        print("FAIL: %s" % message)
+    return condition
+
+
+def run(repo, *args):
+    """Run a script in the scratch repository; returns (code, stdout, stderr)."""
+    proc = subprocess.run([sys.executable] + list(args), cwd=repo,
+                          capture_output=True, text=True, timeout=120)
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def git(repo, *args):
+    proc = subprocess.run(["git", "-C", repo] + list(args), capture_output=True,
+                          text=True, timeout=60)
+    return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
+
+
+def write(path, content):
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(content)
+
+
+def make_repo(base):
+    """A scratch control repo with the scripts, a board and one row."""
+    repo = os.path.join(base, "repo")
+    os.makedirs(os.path.join(repo, "docs"))
+    for group in ("git-worktree", "board"):
+        target = os.path.join(repo, ".claude", "skills", group, "scripts")
+        os.makedirs(target)
+        for name in os.listdir(os.path.join(REPO_SCRIPTS, group, "scripts")):
+            if name.endswith(".py"):
+                shutil.copyfile(os.path.join(REPO_SCRIPTS, group, "scripts", name),
+                                os.path.join(target, name))
+    for relative in (".claude/policies/git-policy.json",):
+        target = os.path.join(repo, relative)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(os.path.join(REPO_ROOT, relative), target)
+    write(os.path.join(repo, ".claude", "repos.json"), '{\n  "control": "."\n}\n')
+    write(os.path.join(repo, "docs", "BOARD.md"), (
+        "| ID | Task | Type | Status | Priority | Risk | Blocked by | Repos | "
+        "Branch/Worktree | Notes |\n"
+        "|---|---|---|---|---|---|---|---|---|---|\n"
+        "| BOARD-900 | Provision env files in the scratch repo | Feature | Ready | P2 | "
+        "test | None. | control | - | test row |\n"
+        "| BOARD-901 | Provision env files in the scratch repo | Feature | Ready | P2 | "
+        "test | None. | control | - | a second row with the same title |\n"
+        "| BOARD-904 | Hand off a worktree | Feature | Ready | P2 | "
+        "test | None. | control | - | the hand-off block |\n"
+        "| BOARD-905 | Clean up a worktree by board row | Feature | Ready | P2 | "
+        "test | None. | control | - | the teardown named by the row |\n"
+        "| BOARD-906 | Clean up a worktree by slug | Feature | Ready | P2 | "
+        "test | None. | control | - | the teardown named by a slug |\n"
+        "| BOARD-907 | Set the lane after a merged cleanup | Feature | Ready | P2 | "
+        "test | None. | control | - | cleanup --board on a merged worktree |\n"
+        "| BOARD-908 | Refuse a cleanup that holds unmerged work | Feature | Ready | P2 | "
+        "test | None. | control | - | the refused cleanup |\n"
+        "| BOARD-911 | Discard a worktree | Feature | Ready | P2 | "
+        "test | None. | control | - | explicit destructive consent |\n"))
+    write(os.path.join(repo, "README.md"), "scratch\n")
+    write(os.path.join(repo, '.gitignore'), '.claude/local/\n.claude/worktrees/\n__pycache__/\n')
+    settings, error = guard.write_settings(os.path.join(repo, guard.CONFIG_REL),
+        guard.load_policy(os.path.join(repo, guard.POLICY_REL)), create_missing=True)
+    assert settings is not None, error
+    git(repo, "init", "-b", "main")
+    git(repo, "config", "user.email", "test@example.invalid")
+    git(repo, "config", "user.name", "Test")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-m", "initial")
+    return repo
+
+
+def env_names(repo):
+    """Top-level environment files reported by status."""
+    return [".env", ".env.local"]
+
+
+def row_cells(repo, board_id):
+    """The cells of one board row, as a list of strings."""
+    path = os.path.join(repo, "docs", "BOARD.md")
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            stripped = line.strip()
+            if stripped.startswith("| %s " % board_id):
+                return [cell.strip() for cell in stripped.strip("|").split("|")]
+    return []
+
+
+def row_state(repo, board_id):
+    """(status, branch/worktree cell) of one board row."""
+    cells = row_cells(repo, board_id)
+    if len(cells) < 9:
+        return None, None
+    return cells[3], cells[8]
+
+
+def main():
+    fixtures = os.path.join(REPO_ROOT, 'artifacts', 'tmp', 'tests')
+    if os.path.realpath(fixtures) != fixtures:
+        raise ValueError('unsafe test fixture directory')
+    os.makedirs(fixtures, exist_ok=True)
+    base = tempfile.mkdtemp(prefix="factory-env-test-", dir=fixtures)
+    repo = make_repo(base)
+    worktree_script = os.path.join(repo, ".claude", "skills", "git-worktree", "scripts",
+                                   "worktree.py")
+    env_script = os.path.join(repo, ".claude", "skills", "git-worktree", "scripts", "env.py")
+    outputs = []
+
+    def call(script, *args):
+        code, out, err = run(repo, script, *args)
+        outputs.append(out)
+        outputs.append(err)
+        return code, out, err
+
+    source = os.path.join(repo, ".env")
+    write(source, "TOKEN=%s\n" % MARKER)
+    os.chmod(source, 0o640)
+    local = os.path.join(repo, ".env.local")
+    write(local, "LOCAL=%s\n" % MARKER)
+    nested = os.path.join(repo, "config", ".env.staging")
+    os.makedirs(os.path.dirname(nested))
+    write(nested, "NESTED=%s\n" % MARKER)
+    navigation = os.path.join(repo, ".claude", "local", "qa-navigation.json")
+    os.makedirs(os.path.dirname(navigation))
+    write(navigation, '{"qa": "%s"}\n' % MARKER)
+    auth = os.path.join(os.path.dirname(navigation), 'qa-auth.json')
+    state = os.path.join(os.path.dirname(navigation), 'qa-storage-state.json')
+    write(auth, '{}')
+    write(state, MARKER)
+
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-900")
+    check(code == 0, "create failed: %s%s" % (out, err))
+    slug = "provisioned-env-files-in-the-scratch-repo"
+    worktree = os.path.join(repo, ".claude", "worktrees", slug)
+    check(os.path.isdir(worktree), "the worktree was not created at %s" % worktree)
+
+    for name in env_names(repo):
+        copied = os.path.join(worktree, name)
+        check(os.path.isfile(copied), "%s was not provisioned into the worktree" % name)
+        if not os.path.isfile(copied):
+            continue
+        mode = stat.S_IMODE(os.stat(copied).st_mode)
+        check(mode == stat.S_IMODE(os.stat(os.path.join(repo, name)).st_mode),
+              "%s did not preserve its source permissions" % name)
+        with open(copied, encoding="utf-8") as fh:
+            content = fh.read()
+        with open(os.path.join(repo, name), encoding="utf-8") as fh:
+            check(content == fh.read(), "%s is not byte-identical to the source" % name)
+
+    _, common, _ = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    exclude = os.path.join(common, "info", "exclude")
+    check(os.path.isfile(exclude), "the repository has no info/exclude file")
+    if os.path.isfile(exclude):
+        with open(exclude, encoding="utf-8") as fh:
+            excluded = fh.read()
+        for name in env_names(repo):
+            check(name in excluded, "%s is not listed in info/exclude" % name)
+        check("config/.env.staging" in excluded,
+              "nested env path is not listed in info/exclude")
+    nested_copy = os.path.join(worktree, "config", ".env.staging")
+    navigation_copy = os.path.join(worktree, ".claude", "local", "qa-navigation.json")
+    check(os.path.isfile(nested_copy), "nested env file was not provisioned")
+    check(os.path.isfile(navigation_copy), "QA navigation config was not provisioned")
+    auth_copy = os.path.join(os.path.dirname(navigation_copy), 'qa-auth.json')
+    state_copy = os.path.join(os.path.dirname(navigation_copy), 'qa-storage-state.json')
+    for path in (auth_copy, state_copy):
+        check(os.path.isfile(path) and stat.S_IMODE(os.stat(path).st_mode) == 0o600,
+              'QA config and state copies must be private')
+    write(auth_copy, 'keep')
+    code, _, _ = call(env_script, 'sync', '--worktree', worktree)
+    with open(auth_copy) as stream:
+        check(code == 0 and stream.read() == 'keep', 'sync replaced existing QA config')
+    os.unlink(state_copy)
+    git(worktree, 'add', '-f', '.claude/local/qa-auth.json')
+    os.unlink(auth_copy)
+    os.rename(os.path.dirname(navigation), os.path.join(base, 'local-source'))
+    os.symlink(os.path.join(base, 'local-source'), os.path.dirname(navigation))
+    call(env_script, 'sync', '--worktree', worktree)
+    check(not os.path.exists(state_copy), 'sync followed QA source parent symlink')
+    os.unlink(os.path.dirname(navigation))
+    os.rename(os.path.join(base, 'local-source'), os.path.dirname(navigation))
+    git(repo, 'add', '-f', '.claude/local/qa-storage-state.json')
+    call(env_script, 'sync', '--worktree', worktree)
+    check(not os.path.exists(auth_copy), 'sync recreated a tracked deleted QA destination')
+    check(not os.path.exists(state_copy), 'sync copied a tracked QA source')
+    git(repo, 'rm', '--cached', '.claude/local/qa-storage-state.json')
+    git(worktree, 'rm', '--cached', '.claude/local/qa-auth.json')
+    os.rename(os.path.dirname(navigation_copy), os.path.join(base, 'local-destination'))
+    os.symlink(os.path.join(base, 'local-destination'), os.path.dirname(navigation_copy))
+    call(env_script, 'sync', '--worktree', worktree)
+    check(not os.path.exists(state_copy), 'sync followed QA destination parent symlink')
+    os.unlink(os.path.dirname(navigation_copy))
+    os.rename(os.path.join(base, 'local-destination'), os.path.dirname(navigation_copy))
+    fake = os.path.join(repo, '.claude/worktrees/unregistered')
+    os.mkdir(fake)
+    code, _, _ = call(env_script, 'sync', '--worktree', fake)
+    check(code != 0 and not os.listdir(fake), 'sync wrote to an unregistered destination')
+
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-900")
+    check(code != 0, "create did not refuse for a row that already has a live worktree")
+    check("resume --board BOARD-900 --repo control" in out + err and worktree in out + err,
+          "the refusal does not identify the assigned workspace to resume")
+
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-901")
+    check(code != 0 and "--reuse" in out + err and "--new" in out + err,
+          "create did not require an explicit workspace choice for another row")
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-901", "--new")
+    check(code != 0, "create did not refuse for a row whose slug directory is taken")
+    check("BOARD-900" in out + err, "the refusal does not name the row that owns the worktree")
+    check("resume" not in out + err,
+          "the refusal offers a resume for a row that has no worktree")
+    check("inspect" in out + err and "--slug" not in out + err,
+          "the refusal should direct inspection, not a retry with another slug")
+
+    code, out, err = call(env_script, "status", "--board", "BOARD-900")
+    check(code == 0, "status failed: %s%s" % (out, err))
+    for name in [*env_names(repo), '.claude/local/qa-auth.json', '.claude/local/qa-storage-state.json']:
+        check(name in out, "status does not report %s" % name)
+
+    code, out, err = call(env_script, "clean", "--board", "BOARD-900")
+    check(code == 0, "the clean dry run failed: %s%s" % (out, err))
+    check(os.path.isfile(os.path.join(worktree, ".env")),
+          "the clean dry run removed the env copy")
+    code, out, err = call(env_script, "clean", "--board", "BOARD-900", "--apply")
+    check(code == 0, "clean --apply failed: %s%s" % (out, err))
+    for name in env_names(repo):
+        check(os.path.exists(os.path.join(worktree, name)),
+              "clean --apply removed a file without provenance: %s" % name)
+
+    outside = os.path.join(repo, "not-a-worktree")
+    os.makedirs(outside, exist_ok=True)
+    code, out, err = call(env_script, "sync", "--worktree", outside)
+    check(code != 0, "sync accepted a destination outside .claude/worktrees/")
+
+    link_target = os.path.join(base, "link-target.txt")
+    write(link_target, "untouched\n")
+    planted = os.path.join(worktree, ".env")
+    if os.path.exists(planted) or os.path.islink(planted):
+        os.unlink(planted)
+    os.symlink(link_target, planted)
+    code, out, err = call(env_script, "sync", "--worktree", worktree)
+    check(code == 0, "sync failed on a planted symlink: %s%s" % (out, err))
+    with open(link_target, encoding="utf-8") as fh:
+        check(fh.read() == "untouched\n", "the copy was written through the symlink")
+    check(os.path.islink(planted), "sync replaced a pre-existing symlink")
+
+    code, out, err = call(worktree_script, "resume", "--board", "BOARD-900")
+    check(code == 0, "resume failed: %s%s" % (out, err))
+    check(os.path.isdir(worktree), "resume removed the worktree")
+    with open(os.path.join(repo, "docs", "BOARD.md"), encoding="utf-8") as fh:
+        check("In Progress" in fh.read(), "resume did not put the row back in progress")
+    with open(os.path.join(worktree, ".env.local"), "w", encoding="utf-8") as fh:
+        fh.write("LOCAL=worktree-value\n")
+    os.unlink(nested_copy)
+    code, out, err = call(worktree_script, "resume", "--board", "BOARD-900")
+    check(code == 0, "second resume failed: %s%s" % (out, err))
+    with open(os.path.join(worktree, ".env.local"), encoding="utf-8") as fh:
+        check(fh.read() == "LOCAL=worktree-value\n", "resume overwrote a local file")
+    check(os.path.isfile(nested_copy), "resume did not restore the missing nested env file")
+    if os.path.isfile(nested_copy):
+        with open(nested_copy, encoding="utf-8") as fh:
+            check(fh.read() == "NESTED=%s\n" % MARKER, "resume restored incorrect env contents")
+
+    marker_file = os.path.join(worktree, "dirty.txt")
+    write(marker_file, "uncommitted\n")
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-900", "--apply")
+    check(code != 0, "discard acted without explicit consent")
+    check(os.path.isdir(worktree), "discard without consent removed the worktree")
+
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-900")
+    check(code == 0, "the discard dry run failed: %s%s" % (out, err))
+    check(os.path.isdir(worktree), "the discard dry run removed the worktree")
+    code, out, err = call(worktree_script, "discard", "--board", "BOARD-900", "--apply", "--discard")
+    check(code == 0, "discard with consent failed: %s%s" % (out, err))
+    check(not os.path.exists(worktree), "discard --apply left the worktree behind")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug not in branches, "discard --apply left the branch behind")
+    with open(os.path.join(repo, "docs", "BOARD.md"), encoding="utf-8") as fh:
+        check(".claude/worktrees/%s" % slug not in fh.read(),
+              "discard did not clear the row's worktree cell")
+    status, cell = row_state(repo, "BOARD-900")
+    check(status == "Dropped", "discard set row status to %r, expected Dropped" % status)
+    check(cell in ("-", ""), "discard left a worktree cell: %r" % cell)
+    check(not os.path.exists(os.path.join(common, "cleanup-wt")),
+          "discard created backup artifacts")
+
+    code, out, err = call(worktree_script, "list")
+    check(code == 0, "list failed: %s%s" % (out, err))
+    check("state" in out, "list has no state column")
+
+    handoff(repo, worktree_script, call, check)
+
+    cleanup_merged(repo, worktree_script, call, check)
+
+    cleanup_by_board(repo, worktree_script, call, check)
+
+    joined = "".join(outputs)
+    check(MARKER not in joined, "the secret value appeared in the script output")
+
+    shutil.rmtree(base, ignore_errors=True)
+    if FAILURES:
+        print("%d check(s) failed" % len(FAILURES))
+        return 1
+    print("all checks passed")
+    return 0
+
+
+def handoff(repo, worktree_script, call, check):
+    """The hand-off block: the diff command first, then the merge command."""
+    code, out, err = call(worktree_script, "handoff", "--board", "BOARD-901")
+    check(code != 0, "handoff did not refuse for a row with no worktree")
+
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-904")
+    check(code == 0, "create failed for BOARD-904: %s%s" % (out, err))
+    slug = "handed-off-a-worktree"
+    worktree = os.path.join(repo, ".claude", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-904 worktree was not created")
+
+    code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")
+    check(code == 0, "handoff failed: %s%s" % (out, err))
+    check("workspace: " + os.path.relpath(worktree, repo) in out.splitlines(),
+          "the block does not name the control-root-relative worktree path")
+    check("feat/" + slug in out, "the block does not name the branch")
+    diff_at = out.find("diff main")
+    merge_at = out.find("merge --board BOARD-904")
+    check(diff_at != -1, "the block has no diff command")
+    check(merge_at != -1, "the block has no merge command")
+    check(diff_at < merge_at, "the merge command comes before the diff command")
+    check("merge --board BOARD-904 --apply" in out,
+          "the handoff does not include the human apply command")
+
+    write(os.path.join(worktree, "kept.txt"), "committed on the branch\n")
+    git(worktree, "add", "-A")
+    git(worktree, "commit", "-m", "a commit on the branch")
+    git(repo, "merge", "--no-ff", "feat/" + slug, "-m", "merge: " + slug)
+
+    code, out, err = call(worktree_script, "handoff", "--board", "BOARD-904")
+    check(code == 0, "handoff failed after the merge: %s%s" % (out, err))
+    check("merge --board BOARD-904" in out,
+          "the handoff does not retain the human lifecycle merge command")
+    check("diff main" in out, "the block has no diff command for a merged branch")
+
+
+def cleanup_merged(repo, worktree_script, call, check):
+    """cleanup --board on a merged, clean worktree: the worktree, the branch and the cell go."""
+    slug = "handed-off-a-worktree"
+    worktree = os.path.join(repo, ".claude", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-904 worktree is gone before the cleanup")
+
+    code, out, err = call(worktree_script, "cleanup", "--board", "BOARD-904", "--apply")
+    check(code == 0, "cleanup --board failed: %s%s" % (out, err))
+    check(not os.path.exists(worktree), "cleanup --board left the worktree behind")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug not in branches, "cleanup --board left the branch behind")
+    with open(os.path.join(repo, "docs", "BOARD.md"), encoding="utf-8") as fh:
+        check(".claude/worktrees/%s" % slug not in fh.read(),
+              "cleanup --board did not clear the row's worktree cell")
+
+
+def cleanup_by_board(repo, worktree_script, call, check):
+    """cleanup --board on an unmerged branch: the refusal, and nothing destroyed."""
+    code, out, err = call(worktree_script, "create", "--board", "BOARD-905")
+    check(code == 0, "create failed for BOARD-905: %s%s" % (out, err))
+    slug = "cleaned-up-a-worktree-by-board-row"
+    worktree = os.path.join(repo, ".claude", "worktrees", slug)
+    check(os.path.isdir(worktree), "the BOARD-905 worktree was not created")
+
+    code, out, err = call(worktree_script, "cleanup", slug, "--board", "BOARD-905")
+    check(code == 2, "cleanup with a slug and --board did not exit 2")
+
+    code, out, err = call(worktree_script, "cleanup")
+    check(code == 2, "cleanup with neither a slug nor --board did not exit 2")
+
+    write(os.path.join(worktree, "unmerged.txt"), "a commit the base does not have\n")
+    git(worktree, "add", "-A")
+    git(worktree, "commit", "-m", "a commit the base does not have")
+
+    code, out, err = call(worktree_script, "cleanup", "--board", "BOARD-905", "--apply")
+    check(code != 0, "cleanup --board accepted a branch with an unmerged commit: %s%s" % (out, err))
+    check(os.path.isdir(worktree), "the refused cleanup removed the worktree")
+    _, branches, _ = git(repo, "branch", "--list")
+    check(slug in branches, "the refused cleanup deleted the branch")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

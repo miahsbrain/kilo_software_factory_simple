@@ -7,7 +7,7 @@ an agent needs. Do not guess commands. Do not read `docs/ENVIRONMENT.md` for sta
 
 ```bash
 # Board viewer (from the repo root)
-python3 .kilo/skills/board/scripts/board_serve.py --port 15180
+python3 .claude/skills/board/scripts/board_serve.py --port 15180
 
 # The application's own commands go here.
 ```
@@ -18,17 +18,17 @@ to either. It re-reads `docs/BOARD.md` on every request, so the page is always c
 ## Workspace Lifecycle
 
 ```bash
-# Project-local mode, required default; restart Kilo after a change
-python3 .kilo/skills/git-worktree/scripts/worktree.py mode status
-python3 .kilo/skills/git-worktree/scripts/worktree.py mode optional
-python3 .kilo/skills/git-worktree/scripts/worktree.py mode required
+# Project-local mode, required default; the guard hook reads it on every tool call
+python3 .claude/skills/git-worktree/scripts/worktree.py mode status
+python3 .claude/skills/git-worktree/scripts/worktree.py mode optional
+python3 .claude/skills/git-worktree/scripts/worktree.py mode required
 # Shared finding workspace; reuse the original mapped repository path
-python3 .kilo/skills/git-worktree/scripts/worktree.py create --board FIX --reuse PARENT --repo ID
+python3 .claude/skills/git-worktree/scripts/worktree.py create --board FIX --reuse PARENT --repo ID
 # All-repo review output; human-only apply, repeat --board for batches
-python3 .kilo/skills/git-worktree/scripts/worktree.py handoff --board ID
-python3 .kilo/skills/git-worktree/scripts/worktree.py merge --board ID --apply
+python3 .claude/skills/git-worktree/scripts/worktree.py handoff --board ID
+python3 .claude/skills/git-worktree/scripts/worktree.py merge --board ID --apply
 # Preview first; --apply --discard only after explicit human loss approval
-python3 .kilo/skills/git-worktree/scripts/worktree.py discard --board ID --repo ID
+python3 .claude/skills/git-worktree/scripts/worktree.py discard --board ID --repo ID
 ```
 
 All lanes reuse original workspace paths; optional mode does not expand assignment. New workspace
@@ -47,15 +47,15 @@ Port: TBD
 
 Tool: Python 3 standard library server (`board_serve.py`), no dependencies
 Port: 15180
-Dev command: `python3 .kilo/skills/board/scripts/board_serve.py --port 15180`
+Dev command: `python3 .claude/skills/board/scripts/board_serve.py --port 15180`
 Host: `127.0.0.1` by default; `--host 0.0.0.0` to bind wider
 Refresh: the page re-reads the board every request and auto-refreshes every 10 seconds
 
 ## Playwright
 
 Tool: the existing QA evidence runner and the Playwright library
-Library: `/usr/local/share/npm-global/lib/node_modules/@playwright/mcp/node_modules/playwright`
-MCP server: installed but disabled by default in `kilo.jsonc`; its output directory cannot confine explicit filenames
+Library: the global `playwright` package the devcontainer installs (`npm root -g`)
+Interactive browser: Claude Code's integrated browser in the desktop app; not available in the CLI or devcontainer
 Browser: system chromium at `/usr/bin/chromium` — the container sets
 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`, so there is no downloaded browser
 
@@ -73,7 +73,7 @@ When no chromium is found, the capture script exits 2 and prints the list of pla
 plus the commands that point it at a binary. It never installs a browser and never falls back to
 another driver.
 
-For protected pages, follow the installed [QA state setup](../.kilo/skills/qa-review/SKILL.md#authentication).
+For protected pages, follow the installed [QA state setup](../.claude/skills/qa-review/SKILL.md#authentication).
 The runner discovers the local profile and verifies the origin and visible signed-in marker;
 no navigation file is required. Inspect evidence before sharing; masking is not comprehensive.
 

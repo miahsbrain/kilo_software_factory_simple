@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git ls-files*)",
+      "Bash(git blame*)",
+      "Bash(git describe*)",
+      "Bash(git cat-file*)",
+      "Bash(git shortlog*)",
+      "Bash(git whatchanged*)",
+      "Bash(git diff-tree*)",
+      "Bash(git rev-parse*)",
+      "Bash(git worktree list*)",
+      "Bash(git branch --show-current*)",
+      "Edit(.claude/worktrees/**)",
+      "Edit(**/.claude/worktrees/**)",
+      "Edit(artifacts/reviews/**)",
+      "Edit(**/artifacts/reviews/**)",
+      "Edit(.env.example)",
+      "Edit(**/.env.example)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "Bash(git -C * push*)",
+      "Bash(git clean*)",
+      "Bash(git checkout --*)",
+      "Bash(git reset --hard*)",
+      "Bash(git branch -D*)",
+      "Bash(git worktree remove*)",
+      "Bash(git filter-branch*)",
+      "Bash(git filter-repo*)",
+      "Bash(git reflog expire*)",
+      "Bash(git reflog delete*)",
+      "Bash(git gc*)",
+      "Bash(git update-ref -d*)",
+      "Bash(*worktree.py*discard*)",
+      "Edit(docs/BOARD.md)",
+      "Edit(.env)",
+      "Edit(**/.env)",
+      "Edit(.git/config)",
+      "Edit(**/.git/config)",
+      "Edit(*.git/config)",
+      "Edit(.git-credentials)",
+      "Edit(**/.git-credentials)",
+      "Edit(.gitconfig)",
+      "Edit(**/.gitconfig)",
+      "Edit(.npmrc)",
+      "Edit(**/.npmrc)",
+      "Edit(*.pem)",
+      "Edit(*.key)",
+      "Edit(*.p12)",
+      "Edit(id_rsa*)",
+      "Edit(**/id_rsa*)",
+      "Read(.git/config)",
+      "Read(.git/config.*)",
+      "Read(**/.git/config)",
+      "Read(**/.git/config.*)",
+      "Read(**/*.git/config)",
+      "Read(**/.git/modules/**/config)",
+      "Read(.git-credentials)",
+      "Read(**/.git-credentials)",
+      "Read(~/.git-credentials)",
+      "Read(.gitconfig)",
+      "Read(**/.gitconfig)",
+      "Read(~/.gitconfig)",
+      "Read(~/.config/git/config)",
+      "Read(~/.config/git/credentials)",
+      "Read(**/.config/git/config)",
+      "Read(**/.config/git/credentials)",
+      "Read(.env)",
+      "Read(**/.env)",
+      "Read(.npmrc)",
+      "Read(**/.npmrc)",
+      "Read(*.pem)",
+      "Read(**/*.pem)",
+      "Read(*.key)",
+      "Read(**/*.key)",
+      "Read(*.p12)",
+      "Read(**/*.p12)",
+      "Read(id_rsa*)",
+      "Read(**/id_rsa*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; while [ \"$d\" != / ]; do g=\"$d/.claude/skills/git-worktree/scripts/guard.py\"; if [ -f \"$g\" ]; then exec python3 \"$g\" hook; fi; d=$(dirname \"$d\"); done; echo \"guard.py not found; tool call refused\" >&2; exit 2"
+          }
+        ]
+      }
+    ]
+  }
+}

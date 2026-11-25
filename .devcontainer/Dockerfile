@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/devcontainers/javascript-node:22-bookworm
 ENV DEBIAN_FRONTEND=noninteractive \
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-# Base tooling, nginx gateway, system Chromium (for the Playwright MCP),
+# Base tooling, nginx gateway, system Chromium (for the QA browser runner),
 # and build deps that Rust crates commonly need.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       git jq curl ca-certificates ripgrep unzip \
@@ -22,9 +22,10 @@ RUN case "$(dpkg --print-architecture)" in \
     && curl -fsSL "https://github.com/tilt-dev/tilt/releases/download/v${TILT_VERSION}/tilt.${TILT_VERSION}.linux.${T}.tar.gz" \
        | tar -xz -C /usr/local/bin tilt
 
-RUN npm install -g @kilocode/cli @playwright/mcp yarn
+# Playwright is the library browser-review.mjs drives; it uses the system Chromium.
+RUN npm install -g @anthropic-ai/claude-code playwright yarn
 
-RUN mkdir -p /home/node/.config/kilo /home/node/.vscode-server \
-    && chown -R node:node /home/node/.config /home/node/.vscode-server
+RUN mkdir -p /home/node/.claude /home/node/.vscode-server \
+    && chown -R node:node /home/node/.claude /home/node/.vscode-server
 
 USER node

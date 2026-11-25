@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 FACTORY = Path(__file__).resolve().parents[1]
-BOARD_CLI = FACTORY / '.kilo/skills/board/scripts/board.py'
+BOARD_CLI = FACTORY / '.claude/skills/board/scripts/board.py'
 
 
 class TitleTests(unittest.TestCase):
@@ -57,8 +57,8 @@ class ManualReviewTests(unittest.TestCase):
 
     def test_add_names_only_new_task_cell(self):
         root = self.path.parent
-        (root / '.kilo').mkdir()
-        (root / '.kilo/repos.json').write_text('{"billing":"apps/payments"}')
+        (root / '.claude').mkdir()
+        (root / '.claude/repos.json').write_text('{"billing":"apps/payments"}')
         (root / 'frontend').mkdir()
         legacy = '\U0001f680 [feat] inhouz_agentic_ms: add kus deployment manifests'
         for row, task, name in [('A', legacy, 'Added kus deployment manifests'),

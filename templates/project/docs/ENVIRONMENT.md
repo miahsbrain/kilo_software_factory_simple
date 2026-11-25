@@ -10,8 +10,8 @@ The user populates real secrets.
 
 | Key | Where | Notes |
 |---|---|---|
-| `mode` | common Git directory `kilo-workspace.json` | Project-local required (default) / optional; regenerate permissions and restart Kilo. |
-| `.kilo/local/qa-auth.json`, `.kilo/local/qa-storage-state.json` | standalone QA capture | Human prepares ignored, private state for this project. See the installed [setup and renewal](../.kilo/skills/qa-review/SKILL.md#authentication); no login environment variables required. |
+| `mode` | common Git directory `claude-workspace.json` | Project-local required (default) / optional / adaptive; the guard hook reads it on every tool call. |
+| `.claude/local/qa-auth.json`, `.claude/local/qa-storage-state.json` | standalone QA capture | Human prepares ignored, private state for this project. See the installed [setup and renewal](../.claude/skills/qa-review/SKILL.md#authentication); no login environment variables required. |
 
 ## Rules
 

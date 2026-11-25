@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 
-CLI = Path(__file__).resolve().parents[1] / ".kilo/skills/git-worktree/scripts/worktree.py"
+CLI = Path(__file__).resolve().parents[1] / ".claude/skills/git-worktree/scripts/worktree.py"
 
 
 class ReviewSwitchTests(unittest.TestCase):
@@ -17,12 +17,12 @@ class ReviewSwitchTests(unittest.TestCase):
         self.root = Path(fixture.name) / "factory"
         self.root.mkdir()
         self.git(self.root, "init")
-        (self.root / ".kilo").mkdir()
+        (self.root / ".claude").mkdir()
         (self.root / "docs").mkdir()
         (self.root / "docs/BOARD.md").touch()
-        self.map = self.root / ".kilo/repos.json"
+        self.map = self.root / ".claude/repos.json"
         self.map.write_text('{"control":"."}')
-        self.state = self.root / ".git/kilo-workspace.json"
+        self.state = self.root / ".git/claude-workspace.json"
 
     def git(self, cwd, *args):
         env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
@@ -71,7 +71,7 @@ class ReviewSwitchTests(unittest.TestCase):
         self.map.write_text('{"control":".","app":"app"}')
         for repo in (self.root, app):
             self.git(repo, "commit", "--allow-empty", "-m", "disposable fixture")
-            linked = repo / ".kilo/worktrees/linked"
+            linked = repo / ".claude/worktrees/linked"
             self.git(repo, "worktree", "add", "--detach", str(linked))
             nested = linked / "nested"
             nested.mkdir()
@@ -79,7 +79,7 @@ class ReviewSwitchTests(unittest.TestCase):
             self.assertEqual(self.reviews("status"), self.reviews("status", cwd=nested))
             self.assertEqual(self.factory_status(nested), {"mode": "required", "qa": True, "ui": False})
             self.reviews("both", "on")
-        self.assertFalse((app / ".git/kilo-workspace.json").exists())
+        self.assertFalse((app / ".git/claude-workspace.json").exists())
 
     def test_malformed_state_is_not_reset(self):
         for reviews in (None, [], {}, {"qa": True}, {"qa": 0, "ui": True},
@@ -100,7 +100,7 @@ class ReviewSwitchTests(unittest.TestCase):
             cwd.mkdir()
             self.git(cwd, "init")
             self.reviews("both", "off", cwd=cwd, code=1)
-            self.assertFalse((cwd / ".git/kilo-workspace.json").exists())
+            self.assertFalse((cwd / ".git/claude-workspace.json").exists())
         self.assertFalse(self.state.exists())
 
     def test_usage_errors_do_not_write(self):

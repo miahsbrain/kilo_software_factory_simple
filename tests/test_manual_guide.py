@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 
-CLI = Path(__file__).resolve().parents[1] / '.kilo/skills/qa-review/scripts/check-finding.py'
+CLI = Path(__file__).resolve().parents[1] / '.claude/skills/qa-review/scripts/check-finding.py'
 SECTION = '''## BOARD-021: Chat readability
 Changed: Conversation text is larger.
 Setup: Open the chat fixture.
@@ -29,8 +29,8 @@ class ManualGuideTests(unittest.TestCase):
         (self.repo / '.gitignore').write_text('/artifacts/\n')
         (self.repo / 'docs').mkdir()
         (self.repo / 'docs/BOARD.md').touch()
-        (self.repo / '.kilo').mkdir()
-        (self.repo / '.kilo/repos.json').write_text('{"control":".","web":"apps/web"}')
+        (self.repo / '.claude').mkdir()
+        (self.repo / '.claude/repos.json').write_text('{"control":".","web":"apps/web"}')
 
     def check_path(self, path, **kwargs):
         return subprocess.run([sys.executable, '-B', CLI, '--manual-guide', '--body-file', path],

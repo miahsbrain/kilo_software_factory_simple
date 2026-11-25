@@ -10,10 +10,10 @@ Use shared spacing, typography, semantic color, radius and elevation tokens. Pre
 
 Design deliberate hierarchy, useful density, specific content, and responsive composition. Preserve keyboard access, visible focus, accessible names, contrast, and usable targets. Avoid generic dashboard templates and decorative noise.
 
-Use the existing `browser-review.mjs` capture through `.kilo/skills/qa-review/SKILL.md`. Share evidence with `ui-critic`. Focus on meaningful defects, consolidate findings once, then have the builder fix and recheck; reviewers do not edit source. Keep raw evidence and report limitations. A proven harmless development-only missing favicon is nonblocking; do not ignore auth, script, or API failures.
+Use the existing `browser-review.mjs` capture through `.claude/skills/qa-review/SKILL.md`. Share evidence with `ui-critic`. Focus on meaningful defects, consolidate findings once, then have the builder fix and recheck; reviewers do not edit source. Keep raw evidence and report limitations. A proven harmless development-only missing favicon is nonblocking; do not ignore auth, script, or API failures.
 
-When capture is authorized, run `browser-review.mjs` from the assigned source worktree. Resolve `python3 <qa scripts>/ledger.py artifact-root` there and keep captures, raw files, logs and scratch scripts beneath the returned primary control artifacts root. Bootstrap copies maintained `.kilo/` tools, never evidence.
+When capture is authorized, run `browser-review.mjs` from the assigned source worktree. Resolve `python3 <qa scripts>/ledger.py artifact-root` there and keep captures, raw files, logs and scratch scripts beneath the returned primary control artifacts root. Bootstrap copies maintained `.claude/` tools, never evidence.
 
-The factory disables Playwright MCP. Its output directory does not constrain explicit screenshot, snapshot or log filenames. Use a live read-only inspection without saving, or the confined runner for saved browser evidence. Do not use an external tool as a capture fallback. This default is not a system-wide sandbox or a migration of existing installs.
+Use Claude Code's integrated browser for live, interactive inspection without saving; the user signs in once in its pane when a page needs a login. Use the confined runner for saved browser evidence, and in the CLI or devcontainer, where the integrated browser is unavailable. Do not use another tool as a capture fallback.
 
 Project direction and approved styling choices: TBD.

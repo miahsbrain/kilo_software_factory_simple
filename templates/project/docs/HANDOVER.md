@@ -20,4 +20,4 @@ Record actual checks/results, known risks, and unresolved material decisions. Do
 
 ## Documents
 
-See `../DOMAIN.md` for scope, `../ROADMAP.md` for planned work, `DECISIONS.md` for approved choices, and `../AGENTS.md` for the working agreement. Add per-application handovers only where useful.
+See `../DOMAIN.md` for scope, `../ROADMAP.md` for planned work, `DECISIONS.md` for approved choices, and `../CLAUDE.md` for the working agreement. Add per-application handovers only where useful.

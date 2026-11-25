@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / '.kilo/skills/plan/scripts/plan.py'
+SCRIPT = ROOT / '.claude/skills/plan/scripts/plan.py'
 
 
 class PlanWriterTest(unittest.TestCase):
@@ -27,8 +27,8 @@ class PlanWriterTest(unittest.TestCase):
         self.git('init', '-q')
         (self.primary / 'docs').mkdir()
         (self.primary / 'docs/BOARD.md').write_text('# Board\n')
-        (self.primary / '.kilo').mkdir()
-        self.mapping = self.primary / '.kilo/repos.json'
+        (self.primary / '.claude').mkdir()
+        self.mapping = self.primary / '.claude/repos.json'
         self.mapping.write_text('{"control":"."}')
         self.ignore = self.primary / '.gitignore'
         self.ignore.write_text('/docs/implementation_plans/\n')

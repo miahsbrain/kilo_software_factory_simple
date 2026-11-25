@@ -15,7 +15,7 @@ define product or application architecture.
   recursive eligible source set without printing file contents.
 - The control repository's main checkout owns board writes. A worktree branch holds application
   changes and scope documentation, but never edits the live board.
-- `.kilo/policies/git-policy.json` is the source of truth for command permissions; generated
+- `.claude/policies/git-policy.json` is the source of truth for command permissions; generated
   configuration carries the enforcement map.
 - Human approval separates review and merge from teardown. The lifecycle CLI performs teardown;
   raw Git worktree removal is not an alternate path.

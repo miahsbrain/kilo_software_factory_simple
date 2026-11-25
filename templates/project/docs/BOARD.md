@@ -27,9 +27,9 @@ Lanes: `Backlog` → `Ready` → `In Progress` → `In Review` → `Pending Merg
 - **Record the original workspace set for the change.** Build, fixes, QA, critique and docs
   reuse its branches and paths. Never create a worktree just for a finding or review.
 - **Project-local mode controls the worktree requirement:**
-  `python3 .kilo/skills/git-worktree/scripts/worktree.py mode required|optional|status`.
-  Required is the default; optional permits the assigned checkout. Restart Kilo after changing
-  mode. Protected branches, secrets and assigned scopes remain protected in either mode.
+  `python3 .claude/skills/git-worktree/scripts/worktree.py mode required|optional|status`.
+  Required is the default; optional permits the assigned checkout. The guard hook reads the
+  mode on every tool call. Protected branches, secrets and assigned scopes remain protected in either mode.
 - Create a new workspace only on explicit user request or for the next approved task after
   the previous change merged. Record every mapped repository, path and branch here.
 - Move the row the moment the status changes. `In Progress` → `In Review` → `Pending Merge`.

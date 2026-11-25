@@ -1,0 +1,15 @@
+node_modules
+package.json
+package-lock.json
+pnpm-lock.yaml
+bun.lock
+yarn.lock
+settings.local.json
+worktrees
+
+# Generated Playwright output, at any depth.
+.playwright-mcp/
+.playwright/
+playwright-report/
+test-results/
+blob-report/
